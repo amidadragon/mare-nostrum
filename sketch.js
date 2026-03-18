@@ -1001,6 +1001,9 @@ function setup() {
   menuFadeIn = 200;
   // Sound system
   snd = new SoundManager();
+  // Hide loading screen now that everything is initialized
+  let loadEl = document.getElementById('loading');
+  if (loadEl) { loadEl.style.opacity = '0'; setTimeout(() => loadEl.remove(), 800); }
 }
 
 function startNewGame() {
@@ -3689,6 +3692,20 @@ function updateTime(dt) {
     // Colony income (daily)
     updateColonyIncome();
     if (typeof onDayTransitionEconomy === 'function') onDayTransitionEconomy();
+    // Daily island resource refresh — nodes respawn each day for revisit incentive
+    if (state.vulcan.phase !== 'unexplored') {
+      state.vulcan.obsidianNodes.forEach(n => n.collected = false);
+    }
+    if (state.hyperborea.phase !== 'unexplored') {
+      state.hyperborea.frostNodes.forEach(n => n.collected = false);
+    }
+    if (state.plenty.phase !== 'unexplored') {
+      state.plenty.spiceNodes.forEach(n => n.collected = false);
+      state.plenty.fruitTrees.forEach(t => { t.fruit = true; t.timer = 0; });
+    }
+    if (state.necropolis.phase !== 'unexplored') {
+      state.necropolis.soulNodes.forEach(n => n.collected = false);
+    }
     // Cat passive: Grey finds stone, Golden gives gold
     state.cats.filter(c => c.adopted).forEach(cat => {
       if (cat.passive === 'stone' && random() < 0.3) { state.stone++; }
