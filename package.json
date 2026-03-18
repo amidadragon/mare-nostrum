@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "npx live-server --port=8080 --no-browser --wait=500",
     "start": "npx live-server --port=8080",
-    "check": "node -c sketch.js && node -c combat.js && node -c diving.js && node -c economy.js && node -c islands.js && node -c narrative.js && node -c engine.js && node -c debug.js && echo 'All files OK'",
+    "check": "node -c sketch.js && node -c sound.js && node -c combat.js && node -c diving.js && node -c economy.js && node -c islands.js && node -c narrative.js && node -c engine.js && node -c debug.js && echo 'All files OK'",
     "count": "wc -l *.js *.html",
     "format": "npx prettier --write '*.js' '*.html' --single-quote --print-width 160"
   },

@@ -180,10 +180,12 @@ function drawHyperboreEntities() {
     if (allLooted && !ritualDone) {
       fill(120, 200, 255, floor(40 * iceGlow));
       ellipse(ox, oy - 24, 40 + iceGlow * 10, 80 + iceGlow * 20);
-      fill(200, 240, 255, 180);
-      textAlign(CENTER); textSize(7);
-      text('[E] Study the Obelisk', ox, oy - 72);
-      textAlign(LEFT);
+      if (dist(p.x, p.y, h.frozenObelisk.x, h.frozenObelisk.y) < 60) {
+        fill(200, 240, 255, 180);
+        textAlign(CENTER); textSize(7);
+        text('[E] Study the Obelisk', ox, oy - 72);
+        textAlign(LEFT);
+      }
     } else if (!allLooted && !ritualDone && dist(p.x, p.y, h.frozenObelisk.x, h.frozenObelisk.y) < 40) {
       fill(160, 210, 255, 160);
       textAlign(CENTER); textSize(7);
