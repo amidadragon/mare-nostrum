@@ -55,6 +55,7 @@ let empireDashOpen = false;   // Tab key
 let inventoryOpen = false;    // I key
 let screenTransition = { active: false, alpha: 0, dir: 1, callback: null };
 let achievementPopup = null;  // { text, timer, slideX }
+let photoMode = false;
 
 // ─── DIALOG SYSTEM ─────────────────────────────────────────────────────
 let dialogState = {
@@ -397,6 +398,20 @@ function initState() {
       energy: 100,
       pulsePhase: 0,
       trailPoints: [],
+    },
+
+    // Quarrier companion — auto-collects stone, unlocks at island level 5
+    quarrier: {
+      x: WORLD.islandCX + 80, y: WORLD.islandCY + 30,
+      vx: 0, vy: 0,
+      speed: 1.5,
+      task: 'idle',
+      taskTarget: null,
+      mineTimer: 0,
+      energy: 100,
+      pulsePhase: 0,
+      trailPoints: [],
+      unlocked: false,
     },
 
     // Central pyramid
@@ -755,9 +770,6 @@ function initState() {
       rank: 'Pauper',     // treasury rank title
       milestones: [],     // unlocked milestone IDs
     },
-
-    // Pirate raid system
-    pirateRaid: null, // { timer, routeId, shipId } — active pirate attack on a trade route
 
     // Victory
     won: false,          // true after Imperator ceremony completes
@@ -1395,7 +1407,7 @@ function drawMenuScreen() {
   noStroke();
   _initMenuParticles();
 
-  // ─── DRAW BACKGROUND IMAGE (cover mode) ───
+  // ─── DRAW BACKGROUND IMAGE (cover mode, subtle rocking) ───
   if (menuBgImg) {
     let scale = max(w / menuBgImg.width, h / menuBgImg.height);
     let iw = menuBgImg.width * scale;
@@ -1403,7 +1415,13 @@ function drawMenuScreen() {
     // Slow parallax drift
     let driftX = sin(t0 * 0.04) * w * 0.02;
     let driftY = cos(t0 * 0.03) * h * 0.01;
-    image(menuBgImg, (w - iw) / 2 + driftX, (h - ih) / 2 + driftY, iw, ih);
+    // Subtle harbor rocking — very gentle rotation around center
+    let rockAngle = sin(t0 * 0.3) * 0.002;
+    push();
+    translate(w / 2, h / 2);
+    rotate(rockAngle);
+    image(menuBgImg, -iw / 2 + driftX, -ih / 2 + driftY, iw, ih);
+    pop();
   } else {
     // Procedural sky fallback — deep Mediterranean dusk
     for (let y = 0; y < h; y += 2) {
@@ -1525,17 +1543,48 @@ function drawMenuScreen() {
     rect(floor(bx + 1), floor(by + wingUp * 0.8), bird.size, 1);
   }
 
-  // ─── SHORE FOAM — animated waterline on the beach ───
+  // ─── SHORE FOAM — animated waterline on the beach (multi-layer) ───
   let shoreY = h * 0.76;
   let foamAdvance = sin(t0 * 0.5) * 4;
+  // Layer 1 — leading foam edge
   for (let x = floor(w * 0.08); x < floor(w * 0.42); x += 4) {
     let foamY = shoreY + foamAdvance + sin(x * 0.03 + t0 * 1.2) * 2;
     let foamA = (sin(t0 * 1.5 + x * 0.05) + 1) * 0.5;
     fill(230, 245, 255, floor(25 * foamA * aF));
     rect(x, floor(foamY), 4, 2);
   }
+  // Layer 2 — receding foam line (offset phase, moves right)
+  let foamAdv2 = sin(t0 * 0.5 + 1.8) * 5;
+  for (let x = floor(w * 0.06); x < floor(w * 0.44); x += 3) {
+    let foamY2 = shoreY + 4 + foamAdv2 + sin(x * 0.04 + t0 * 1.6 + 2.0) * 2.5;
+    let foamA2 = (sin(t0 * 1.2 + x * 0.06 + 1.0) + 1) * 0.5;
+    fill(240, 250, 255, floor(18 * foamA2 * aF));
+    rect(x, floor(foamY2), 3, 1);
+  }
+  // Layer 3 — thin trailing foam wisps
+  let foamAdv3 = sin(t0 * 0.4 + 3.5) * 3;
+  for (let x = floor(w * 0.10); x < floor(w * 0.40); x += 6) {
+    let foamY3 = shoreY + 8 + foamAdv3 + sin(x * 0.05 + t0 * 0.9 + 4.0) * 1.5;
+    let foamA3 = (sin(t0 * 0.9 + x * 0.08 + 2.5) + 1) * 0.5;
+    fill(255, 255, 255, floor(12 * foamA3 * aF));
+    rect(x, floor(foamY3), 5, 1);
+  }
 
-  // ─── WINDOW LIGHTS — warm glow in building windows ───
+  // ─── WINDOW LIGHTS — warm glow in building windows (oil lamp flicker) ───
+  // Initialize per-light random phases once
+  if (!drawMenuScreen._winPhases) {
+    drawMenuScreen._winPhases = [];
+    for (let i = 0; i < 10; i++) {
+      drawMenuScreen._winPhases.push({
+        phase1: (i * 7.3 + 2.1) % 6.28,
+        phase2: (i * 4.9 + 0.8) % 6.28,
+        phase3: (i * 11.1 + 5.3) % 6.28,
+        speed1: 2.0 + (i % 4) * 0.7,
+        speed2: 3.5 + (i % 3) * 1.2,
+        speed3: 5.8 + (i % 5) * 0.9,
+      });
+    }
+  }
   let windows = [
     [0.12, 0.38], [0.15, 0.42], [0.18, 0.35], [0.22, 0.40],
     [0.08, 0.43], [0.25, 0.37], [0.10, 0.46], [0.20, 0.44],
@@ -1543,12 +1592,23 @@ function drawMenuScreen() {
   ];
   for (let i = 0; i < windows.length; i++) {
     let wx = windows[i][0] * w, wy = windows[i][1] * h;
-    let flicker = 0.7 + sin(t0 * 2.5 + i * 1.7) * 0.2 + sin(t0 * 4.1 + i * 3.3) * 0.1;
-    fill(255, 200, 100, floor(20 * flicker * aF));
-    rect(floor(wx - 2), floor(wy - 2), 5, 4);
-    // Warm glow
-    fill(255, 180, 80, floor(8 * flicker * aF));
-    ellipse(wx, wy, 12, 8);
+    let wp = drawMenuScreen._winPhases[i];
+    // Multi-frequency flicker for realistic oil lamp effect
+    let flicker = 0.6
+      + sin(t0 * wp.speed1 + wp.phase1) * 0.18
+      + sin(t0 * wp.speed2 + wp.phase2) * 0.12
+      + sin(t0 * wp.speed3 + wp.phase3) * 0.08;
+    // Occasional dim dip (lamp guttering)
+    let gutter = sin(t0 * 0.4 + wp.phase1 * 3.0);
+    if (gutter > 0.85) flicker *= 0.5;
+    fill(255, 200, 100, floor(24 * flicker * aF));
+    rect(floor(wx - 1), floor(wy - 1), 3, 3);
+    // Inner bright core
+    fill(255, 230, 160, floor(14 * flicker * aF));
+    rect(floor(wx), floor(wy), 1, 1);
+    // Warm glow halo
+    fill(255, 170, 60, floor(10 * flicker * aF));
+    ellipse(wx, wy, 14, 10);
   }
 
   // ─── CYPRESS TREE SWAY — trees on the hillside ───
@@ -1707,9 +1767,18 @@ function drawMenuScreen() {
   vertex(w / 2 - dSize, ornY);
   endShape(CLOSE);
 
-  // Title text — multi-layer for depth
+  // Title text — multi-layer for depth + golden glow pulse
   textStyle(BOLD);
   textSize(ts);
+  // Pulsing golden glow shadow (sin-based size oscillation)
+  let glowPulse = 0.5 + sin(t0 * 0.8) * 0.5; // 0..1, slow
+  let glowSize = floor(2 + glowPulse * 4); // 2..6px spread
+  let glowAlpha = floor((15 + glowPulse * 25) * titleAlpha);
+  fill(255, 200, 80, glowAlpha);
+  for (let gd = -glowSize; gd <= glowSize; gd += 2) {
+    text('MARE NOSTRUM', w / 2 + gd, titleY + titleBob);
+    text('MARE NOSTRUM', w / 2, titleY + titleBob + gd);
+  }
   // Outer glow
   fill(180, 140, 60, floor(40 * titleAlpha));
   text('MARE NOSTRUM', w / 2, titleY + titleBob + 3);
@@ -1767,8 +1836,10 @@ function drawMenuScreen() {
   let isCursorPointer = false;
 
   for (let i = 0; i < itemCount; i++) {
-    let itemAlpha = constrain((menuFadeIn - 160 - i * 25) / 100, 0, 1);
-    if (itemAlpha <= 0) continue;
+    // Staggered slide-in: each item delayed, but all reach full alpha
+    let slideProgress = constrain((menuFadeIn - 160 - i * 25) / 60, 0, 1);
+    let itemAlpha = constrain(menuFadeIn / 255, 0, 1); // overall fade applies equally
+    if (slideProgress <= 0) continue;
 
     let iy = menuStartY + i * itemGap;
     let iw = textWidth(items[i]);
@@ -1778,8 +1849,9 @@ function drawMenuScreen() {
     if (hovered) { menuHover = i; menuKeyIdx = -1; isCursorPointer = true; }
     let selected = hovered || menuKeyIdx === i;
 
-    // Slide-in offset (items slide in from right)
-    let slideX = (1 - itemAlpha) * 40;
+    // Slide-in offset (items slide in from right, eased)
+    let slideEase = 1 - pow(1 - slideProgress, 3); // cubic ease-out
+    let slideX = (1 - slideEase) * 60;
 
     if (selected) {
       // Highlight bar behind text
@@ -1822,7 +1894,7 @@ function drawMenuScreen() {
   textStyle(NORMAL);
   textSize(8);
   fill(120, 110, 90, floor(120 * botAlpha));
-  text('v0.9  -  A Mediterranean Survival Saga', w / 2, h - 18);
+  text('v0.9  -  Shipwrecked. Sunlit. Reborn.', w / 2, h - 18);
 
   // ─── FADES ───
   if (aF < 1) { fill(0, 0, 0, floor(255 * (1 - aF))); rect(0, 0, w, h); }
@@ -1832,8 +1904,8 @@ function drawMenuScreen() {
 // ─── SETTINGS PANEL (overlay) ────────────────────────────────────────────
 function drawSettingsPanel(fadeA) {
   let w = width, h = height;
-  let panW = 280, panH = 310;
-  let px = floor(w / 2 - panW / 2), py = floor(h * 0.28);
+  let panW = 280, panH = 340;
+  let px = floor(w / 2 - panW / 2), py = floor(h * 0.26);
 
   fill(0, 0, 0, 160); rect(0, 0, w, h);
 
@@ -1858,12 +1930,12 @@ function drawSettingsPanel(fadeA) {
 
   if (snd) {
     let sliderY = py + 80, sliderW = 120, slX = floor(w / 2 + 10);
-    let keys = ['master', 'sfx', 'ambient'];
-    let labels = ['Master', 'SFX', 'Ambient'];
+    let keys = ['master', 'sfx', 'ambient', 'music'];
+    let labels = ['Master', 'SFX', 'Ambient', 'Music'];
     for (let ki = 0; ki < keys.length; ki++) {
       fill(180, 160, 120, 200); textSize(10);
       text(labels[ki], w / 2 - 45, sliderY);
-      let vol = snd.volumes ? snd.volumes[keys[ki]] || 0.5 : 0.5;
+      let vol = snd.vol ? snd.vol[keys[ki]] || 0.5 : 0.5;
       fill(40, 35, 28); rect(slX, sliderY - 3, sliderW, 6);
       fill(190, 165, 60); rect(slX, sliderY - 3, floor(vol * sliderW), 6);
       fill(220, 200, 120); rect(slX + floor(vol * sliderW) - 3, sliderY - 5, 6, 10);
@@ -1871,7 +1943,7 @@ function drawSettingsPanel(fadeA) {
     }
   }
 
-  let delY = py + 220;
+  let delY = py + 250;
   fill(140, 50, 40, 200); textSize(10);
   text('Delete Save Data', w / 2, delY);
 
@@ -1935,7 +2007,7 @@ function handleMenuClick() {
     }
     if (snd) {
       let sliderY = py + 80, sliderW = 120, slX = floor(width / 2 + 10);
-      let keys = ['master', 'sfx', 'ambient'];
+      let keys = ['master', 'sfx', 'ambient', 'music'];
       for (let k of keys) {
         if (mouseX >= slX - 4 && mouseX <= slX + sliderW + 4 && mouseY >= sliderY - 10 && mouseY <= sliderY + 10) {
           snd.setVolume(k, constrain((mouseX - slX) / sliderW, 0, 1));
@@ -1944,12 +2016,12 @@ function handleMenuClick() {
         sliderY += 24;
       }
     }
-    let delY = py + 220;
+    let delY = py + 250;
     if (mouseX > width/2 - 60 && mouseX < width/2 + 60 && mouseY > delY - 10 && mouseY < delY + 12) {
       if (localStorage.getItem('sunlitIsles_save')) localStorage.removeItem('sunlitIsles_save');
       return;
     }
-    let backY = py + 310 - 25;
+    let backY = py + 340 - 25;
     if (mouseX > width/2 - 40 && mouseX < width/2 + 40 && mouseY > backY - 8 && mouseY < backY + 10) {
       gameScreen = 'menu'; return;
     }
@@ -1989,6 +2061,39 @@ function drawIntroCinematic(dt) {
   let WAKE = 360;          // 6 sec — player wakes
   let DONE = 420;          // 7 sec — game starts
 
+
+  // --- INTRO AUDIO CUES ---
+  if (snd && snd.ready) {
+    let masterVol = snd.vol.master * snd.vol.ambient;
+    // Storm ambient during wreckage (frames 0-240): low rumble wind
+    if (t < WRECKAGE) {
+      let stormIntensity = min(1, t / FADE_IN);
+      snd._windGain.amp(0.14 * stormIntensity * masterVol, 0.3);
+      snd._windFilter.freq(40 + sin(frameCount * 0.004) * 20);
+      snd._waveGain.amp(0.10 * stormIntensity * masterVol, 0.3);
+      snd._waveFilter.freq(180 + sin(frameCount * 0.003) * 40);
+    }
+    // Thunder crack at frame 180
+    if (t >= 180 && t < 182 && !state._introThunderPlayed) {
+      state._introThunderPlayed = true;
+      snd.playSFX('thunder');
+    }
+    // Gentle wave transition after wreckage (frames 240+): calm down storm
+    if (t >= WRECKAGE && t < DONE) {
+      let calm = min(1, (t - WRECKAGE) / 120);
+      snd._windGain.amp(lerp(0.14, 0.02, calm) * masterVol, 0.5);
+      snd._windFilter.freq(lerp(40, 400, calm));
+      snd._waveGain.amp(lerp(0.10, 0.05, calm) * masterVol, 0.5);
+      snd._waveFilter.freq(lerp(180, 350, calm));
+    }
+    // Soft lyre note at exact wake moment (frame 360) -- D4 sine, gentle
+    if (t >= WAKE && t < WAKE + 2 && !state._introLyrePlayed) {
+      state._introLyrePlayed = true;
+      snd._pluckLyre(0, 293.7, 0.10 * snd.vol.master * snd.vol.music, 800);
+    }
+  }
+
+
   // Background — dawn sky gradient
   let skyAlpha = min(1, t / FADE_IN);
   // Deep night → warm dawn
@@ -2000,6 +2105,16 @@ function drawIntroCinematic(dt) {
     fill(lerpColor(skyTop, skyBot, amt));
     rect(0, y, w, 4);
   }
+
+  // Thunder screen shake near lightning (frame 178-184)
+  let thunderShakeX = 0, thunderShakeY = 0;
+  if (t >= 176 && t <= 186) {
+    let shakeMag = max(0, 1 - abs(t - 180) / 6) * 4;
+    thunderShakeX = sin(t * 17.3) * shakeMag;
+    thunderShakeY = cos(t * 13.7) * shakeMag;
+  }
+  push();
+  translate(thunderShakeX, thunderShakeY);
 
   // Ocean — dark choppy water
   let oceanY = floor(h * 0.55);
@@ -2020,8 +2135,51 @@ function drawIntroCinematic(dt) {
   fill(155, 140, 105, 80);
   for (let x = 0; x < w; x += 20) rect(x + floor(sin(x) * 3), beachY + 2, 8, 2);
 
+  // ─── RAIN STREAKS during wreckage phase ───
+  if (t > FADE_IN && t < WAKE) {
+    let rainAlpha = min(1, (t - FADE_IN) / 60);
+    for (let ri = 0; ri < 40; ri++) {
+      let rx = ((ri * 137 + floor(t * 3.7)) % w);
+      let ry = ((ri * 89 + floor(t * 5.2)) % (h * 0.8));
+      let ra = floor((30 + (ri % 3) * 10) * rainAlpha);
+      fill(200, 210, 230, ra);
+      // Diagonal rain — wind from left
+      rect(floor(rx), floor(ry), 1, 6);
+      rect(floor(rx + 1), floor(ry + 6), 1, 4);
+    }
+  }
+
+  // ─── FLOATING DEBRIS in ocean during wreckage ───
+  if (t > FADE_IN + 20 && t < WAKE) {
+    let debAlpha = min(255, (t - FADE_IN - 20) * 3);
+    let debPieces = [
+      { x: 0.20, y: 0.62, w: 14, h: 3, phase: 0.0 },
+      { x: 0.65, y: 0.65, w: 10, h: 2, phase: 1.5 },
+      { x: 0.75, y: 0.60, w: 12, h: 3, phase: 2.8 },
+      { x: 0.30, y: 0.70, w: 8,  h: 2, phase: 4.1 },
+      { x: 0.80, y: 0.72, w: 11, h: 2, phase: 0.9 },
+      { x: 0.50, y: 0.68, w: 9,  h: 3, phase: 3.3 },
+      { x: 0.15, y: 0.75, w: 7,  h: 2, phase: 5.0 },
+    ];
+    for (let dp of debPieces) {
+      let dx = dp.x * w + sin(frameCount * 0.01 + dp.phase) * 8;
+      let dy = dp.y * h + sin(frameCount * 0.025 + dp.phase) * 3;
+      fill(65, 42, 20, debAlpha);
+      rect(floor(dx), floor(dy), dp.w, dp.h);
+      // Highlight on top edge
+      fill(90, 60, 30, debAlpha * 0.5);
+      rect(floor(dx + 1), floor(dy), dp.w - 2, 1);
+    }
+  }
+
   if (t > FADE_IN) {
     let sceneAlpha = min(255, (t - FADE_IN) * 4);
+
+    // ─── LIGHTNING FLASH at frame 180 ───
+    if (t >= 178 && t <= 181) {
+      fill(255, 255, 255, floor(200 * (1 - abs(t - 180) / 3)));
+      rect(0, 0, w, h);
+    }
 
     // ─── WRECKAGE SCENE ───
     let cx = floor(w * 0.35);
@@ -2070,6 +2228,18 @@ function drawIntroCinematic(dt) {
     let playerX = floor(w * 0.55);
     let playerY = cy - 1;
     let wakeProgress = max(0, (t - WAKE) / 60); // 0 → 1 as player wakes
+
+    // Dark silhouette shadow behind figure during wake (dramatic backlit effect)
+    if (wakeProgress > 0 && wakeProgress < 1.2) {
+      let silAlpha = floor(min(1, wakeProgress) * 80);
+      let silH = floor(lerp(4, 14, min(1, wakeProgress)));
+      let silW = floor(lerp(20, 8, min(1, wakeProgress)));
+      fill(10, 5, 0, silAlpha);
+      rect(playerX - silW / 2, playerY - silH + 2, silW, silH);
+      // Ground shadow elongated by dawn light
+      fill(10, 5, 0, floor(silAlpha * 0.4));
+      rect(playerX - silW, playerY + 2, silW * 2, 3);
+    }
 
     push();
     translate(playerX, playerY);
@@ -2125,25 +2295,32 @@ function drawIntroCinematic(dt) {
     pop();
   }
 
+  pop(); // end thunder shake transform
+
   // ─── TEXT OVERLAYS ───
   textAlign(CENTER, CENTER);
   noStroke();
 
-  // Title text — fades in during wreckage phase
+  // Title text — fades in during wreckage phase (character-by-character reveal)
   if (t > TEXT_START && t < DONE) {
     let textAlpha = min(255, (t - TEXT_START) * 3);
     if (t > WAKE) textAlpha = max(0, textAlpha - (t - WAKE) * 5); // fade out
 
     fill(220, 195, 140, textAlpha);
     textSize(14);
-    text('Shipwrecked by cursed storm...', w / 2, h * 0.2);
+    // Character-by-character reveal (1 char per 2 frames)
+    let line1 = 'Shipwrecked by cursed storm...';
+    let charsShown1 = min(line1.length, floor((t - TEXT_START) / 2));
+    text(line1.substring(0, charsShown1), w / 2, h * 0.2);
 
     if (t > TEXT_START + 60) {
       let subAlpha = min(255, (t - TEXT_START - 60) * 3);
       if (t > WAKE) subAlpha = max(0, subAlpha - (t - WAKE) * 5);
       fill(180, 160, 120, subAlpha);
       textSize(10);
-      text('Rebuild under Sol Invictus.', w / 2, h * 0.2 + 22);
+      let line2 = 'Rebuild under Sol Invictus.';
+      let charsShown2 = min(line2.length, floor((t - TEXT_START - 60) / 2));
+      text(line2.substring(0, charsShown2), w / 2, h * 0.2 + 22);
     }
   }
 
@@ -2173,6 +2350,8 @@ function drawIntroCinematic(dt) {
       // Snap camera to player (wreck beach or home)
       cam.x = state.player.x; cam.y = state.player.y;
       camSmooth.x = cam.x; camSmooth.y = cam.y;
+      // First-minute tutorial hint
+      showTutorialHint('Gather materials — walk to glowing nodes and press [E]', state.player.x, state.player.y - 40);
     }
   }
 
@@ -2184,6 +2363,8 @@ function skipIntro() {
   if (state.introPhase !== 'done') {
     state.introPhase = 'done';
     state.time = 6 * 60;
+    cam.x = state.player.x; cam.y = state.player.y;
+    camSmooth.x = cam.x; camSmooth.y = cam.y;
   }
 }
 
@@ -2466,6 +2647,26 @@ function drawSailingCutscene(dt) {
   let ARRIVAL = 520;     // approaching shore
   let DONE = 600;
 
+  // --- SAILING AUDIO CUES ---
+  if (snd && snd.ready) {
+    let masterVol = snd.vol.master * snd.vol.ambient;
+    // Steady wind ambient (~300Hz filtered noise)
+    let windAmt = min(1, t / FADE_IN);
+    snd._windGain.amp(0.08 * windAmt * masterVol, 0.3);
+    snd._windFilter.freq(300 + sin(frameCount * 0.002) * 60);
+    // Gentle waves
+    snd._waveGain.amp(0.05 * windAmt * masterVol, 0.3);
+    snd._waveFilter.freq(280 + sin(frameCount * 0.003) * 50);
+    // Oar splash every ~120 frames
+    if (t > PUSH_OFF && t < DONE && floor(t) % 120 === 0 && floor(t) !== floor(t - dt)) {
+      snd.playSFX('oar_splash');
+    }
+    // Seagull call every ~200 frames
+    if (t > PUSH_OFF && t < DONE && floor(t) % 200 === 0 && floor(t) !== floor(t - dt)) {
+      snd.playSFX('seagull');
+    }
+  }
+
   let skyAlpha = min(1, t / FADE_IN);
   noStroke();
 
@@ -2536,6 +2737,52 @@ function drawSailingCutscene(dt) {
         rect(reflX - reflW / 2, y, max(1, reflW), 2);
       }
     }
+  }
+
+  // ─── SEAGULLS — flying overhead ───
+  if (!drawSailingCutscene._gulls) {
+    drawSailingCutscene._gulls = [
+      { x: 0.3, y: 0.18, speed: 0.012, wingPhase: 0, size: 5 },
+      { x: 0.6, y: 0.22, speed: 0.009, wingPhase: 2.1, size: 4 },
+      { x: 0.8, y: 0.14, speed: 0.015, wingPhase: 4.3, size: 3.5 },
+    ];
+  }
+  for (let gull of drawSailingCutscene._gulls) {
+    gull.x -= gull.speed * 0.016;
+    if (gull.x < -0.05) { gull.x = 1.1; gull.y = 0.12 + (gull.wingPhase * 37 % 15) / 100; }
+    let gx = gull.x * w, gy = gull.y * h;
+    let wingUp = sin(t * 0.08 + gull.wingPhase) * gull.size * 0.6;
+    fill(40, 35, 50, floor(140 * skyAlpha));
+    // Body
+    rect(floor(gx - 1), floor(gy), 3, 2);
+    // V-shape wings
+    rect(floor(gx - gull.size), floor(gy - wingUp), floor(gull.size), 1);
+    rect(floor(gx + 1), floor(gy + wingUp * 0.7), floor(gull.size), 1);
+  }
+
+  // ─── SUN SHIMMER LINE on water — golden reflection band ───
+  if (t > PUSH_OFF) {
+    let shimBand = floor(seaY + 6);
+    for (let sy = shimBand; sy < shimBand + 12; sy += 2) {
+      let shimW = floor(20 + sin(t * 0.03 + sy * 0.2) * 12);
+      let shimX = sunX + floor(sin(t * 0.02 + sy * 0.1) * 6) - shimW / 2;
+      let shimA = floor((sin(t * 0.05 + sy * 0.15) + 1) * 12 * skyAlpha * sunRise);
+      fill(255, 220, 100, shimA);
+      rect(floor(shimX), sy, shimW, 2);
+    }
+  }
+
+  // ─── DISTANT ISLAND SILHOUETTE — gradually appearing on horizon ───
+  if (t > SAILING && t < ISLAND_APPEAR + 60) {
+    let distAppear = min(1, (t - SAILING) / 200);
+    let distX = floor(w * 0.88);
+    let distY = floor(seaY + 2);
+    let distA = floor(distAppear * 60 * skyAlpha);
+    // Low dark landmass on horizon
+    fill(25, 30, 40, distA);
+    rect(distX - 20, distY - 4, 40, 6);
+    rect(distX - 14, distY - 7, 28, 4);
+    rect(distX - 6, distY - 10, 12, 4);
   }
 
   // ─── WRECK ISLAND — receding behind (left side, shrinking) ───
@@ -2812,6 +3059,7 @@ function doFirstRepair() {
 // Transfer to home island (called after sailing cutscene)
 function completeSailToHome() {
   state.progression.homeIslandReached = true;
+  saveGame();
   state.progression.wreckExplored = true;
   unlockJournal('home_found');
 
@@ -3048,6 +3296,7 @@ function drawInner() {
       let _full = !_pg.gameStarted || _pg.villaCleared;
       if (_full || _pg.companionsAwakened.lares) updateCompanion(dt);
       if (_full || _pg.companionsAwakened.woodcutter) updateWoodcutter(dt);
+      updateQuarrier(dt);
       if (_full || _pg.companionsAwakened.centurion) updateCenturion(dt);
     }
     updateParticles(dt);
@@ -3090,9 +3339,10 @@ function drawInner() {
       // When sailing, ocean covers almost the entire screen
       horizonOffset = height * 0.19;
     } else {
-      let islandTopScreen = (WORLD.islandCY - state.islandRY * 0.55 + floatOffset) - camSmooth.y + height / 2;
-      let horizonY = min(islandTopScreen - 15, height * 0.25);
-      horizonY = max(horizonY, height * 0.06);
+      // Sky stays fixed — only slight parallax from camera, not 1:1 tracking
+      let camOffsetY = (camSmooth.y - WORLD.islandCY) * 0.05; // very gentle parallax
+      let baseHorizon = height * 0.22;
+      let horizonY = constrain(baseHorizon - camOffsetY, height * 0.06, height * 0.25);
       horizonOffset = (height * 0.25) - horizonY;
     }
     push();
@@ -3334,7 +3584,7 @@ function drawInner() {
     if (!state.conquest.active && !state.adventure.active) drawColorGrading();
 
     drawHUD();
-    if (typeof drawQuestTracker === 'function') drawQuestTracker();
+    if (!photoMode && typeof drawQuestTracker === 'function') drawQuestTracker();
     drawHotbar();
     drawFestivalBanner();
     drawBuildUI();
@@ -3345,7 +3595,7 @@ function drawInner() {
     if (typeof drawLoreTabletPopup === 'function') drawLoreTabletPopup();
     if (typeof drawNarrativeDialogue === 'function') drawNarrativeDialogue();
     drawDiscoveryEvent();
-    drawTutorialHintUI();
+    if (!photoMode) drawTutorialHintUI();
     drawScreenFlash();
     drawImperatorBanner();
     drawDailySummary();
@@ -3354,11 +3604,20 @@ function drawInner() {
     drawDialogSystem();
     drawEmpireDashboard();
     drawInventoryScreen();
+    if (typeof drawSkillTree === 'function') drawSkillTree();
     drawAchievementPopup();
     if (typeof drawEconomyUIOverlay === 'function') drawEconomyUIOverlay();
     drawScreenTransition();
     drawImperatorCeremony();
-    drawCursor();
+    // Photo mode hint — always visible at low alpha
+    if (!photoMode) {
+      push(); noStroke();
+      fill(160, 140, 100, 102);
+      textSize(7); textAlign(RIGHT, BOTTOM);
+      text('[ P ] PHOTO', width - 18, height - 6);
+      pop();
+    }
+    if (!photoMode) drawCursor();
   }
 
   // Debug console — always on top of everything
@@ -3473,10 +3732,12 @@ function updateTime(dt) {
     let nearBath = state.buildings.some(b => b.type === 'bath' && dist(state.player.x, state.player.y, b.x, b.y) < 60);
     if (nearBath) solarRate *= 2;
     state.solar = min(state.maxSolar, state.solar + solarRate * dt);
-    state.companion.energy = min(100, state.companion.energy + solarRate * 2.0 * dt);
+    let _cRegenBonus = typeof getCompanionRegenBonus === 'function' ? getCompanionRegenBonus() : 0;
+    state.companion.energy = min(100, state.companion.energy + (solarRate * 2.0 + _cRegenBonus) * dt);
   } else {
     // Slow nighttime recovery (resting)
-    state.companion.energy = min(100, state.companion.energy + 0.02 * dt);
+    let _cRegenBonusN = typeof getCompanionRegenBonus === 'function' ? getCompanionRegenBonus() : 0;
+    state.companion.energy = min(100, state.companion.energy + (0.02 + _cRegenBonusN) * dt);
   }
   // Heatwave drains companion energy faster
   if (state.weather.type === 'heatwave') {
@@ -3749,6 +4010,10 @@ function drawStars(alpha) { drawStarField(alpha); }
 
 let cloudPositions = null;
 function drawDriftClouds(bright) {
+  if (typeof drawDriftClouds._prevCamY === 'undefined') drawDriftClouds._prevCamY = camSmooth.y;
+  let camDY = camSmooth.y - drawDriftClouds._prevCamY;
+  drawDriftClouds._prevCamY = camSmooth.y;
+
   let h = state.time / 60;
   if (!cloudPositions) {
     cloudPositions = [];
@@ -3792,6 +4057,8 @@ function drawDriftClouds(bright) {
   cloudPositions.forEach(cl => {
     cl.x += cl.speed * cl.depth;
     if (cl.x > width + cl.w) cl.x = -cl.w;
+    cl.y -= camDY * 0.04;
+    cl.y = constrain(cl.y, height * 0.02, height * 0.22);
     let alpha = map(bright, 0.1, 0.5, 15, 55) * cl.depth;
     let cx = floor(cl.x), cy = floor(cl.y);
     let cw = floor(cl.w), ch = floor(cl.h);
@@ -5065,6 +5332,7 @@ function rollFishType() {
   if (eligible.length === 0) return FISH_TYPES[0]; // fallback sardine
   // Weighted random — rarer fish less likely, prophecy boosts rare
   let rareMult = (state.prophecy && state.prophecy.type === 'rarefish') ? 3 : 1;
+  if (typeof getFishingLuckBonus === 'function') rareMult *= getFishingLuckBonus();
   let weights = eligible.map(f => f.weight > 2 ? (1 / f.weight) * rareMult : 1 / f.weight);
   let total = weights.reduce((a, b) => a + b, 0);
   let r = random() * total;
@@ -7801,6 +8069,8 @@ function drawWorldObjectsSorted() {
     items.push({ y: state.companion.y, draw: drawCompanion });
   if (state.woodcutter && (fullyUnlocked || prog.companionsAwakened.woodcutter))
     items.push({ y: state.woodcutter.y, draw: drawWoodcutter });
+  if (state.quarrier && state.quarrier.unlocked)
+    items.push({ y: state.quarrier.y, draw: drawQuarrier });
   if (!state.rowing.active && (fullyUnlocked || prog.companionsAwakened.centurion))
     items.push({ y: state.centurion.y, draw: drawCenturion });
   // Main NPC — always present once home reached
@@ -9943,6 +10213,20 @@ function drawPlayer() {
   // Weary slump at night
   if (a.emotion === 'weary' && !p.moving) bobY += 1;
 
+  // Dodge roll motion blur — ghost silhouettes trailing behind
+  if (typeof _dodgeState !== 'undefined' && _dodgeState.motionBlur > 0) {
+    let blurDx = _dodgeState.dx * -3;
+    let blurDy = _dodgeState.dy * -3;
+    for (let gi = 2; gi >= 1; gi--) {
+      push();
+      translate(floor(sx + blurDx * gi), floor(sy + bobY + a.bounceY + blurDy * gi));
+      noStroke();
+      fill(180, 140, 90, 30 / gi);
+      rect(-8, -16, 16, 22, 2);
+      pop();
+    }
+  }
+
   push();
   translate(floor(sx), floor(sy + bobY + a.bounceY));
   noStroke();
@@ -10856,7 +11140,7 @@ function drawWoodcutter() {
 function updateCenturion(dt) {
   let cen = state.centurion;
   let p = state.player;
-  if (state.rowing.active) { cen.vx *= 0.9; cen.vy *= 0.9; return; }
+  if (state.rowing.active) { cen.x = p.x + 15; cen.y = p.y + 8; cen.vx = 0; cen.vy = 0; return; }
   if (cen.flashTimer > 0) cen.flashTimer -= dt;
   if (cen.attackTimer > 0) cen.attackTimer -= dt;
 
@@ -10939,6 +11223,133 @@ function updateCenturion(dt) {
       cen.y = c.isleY + sin(a) * c.isleRY * 0.9;
     }
   }
+}
+
+// ─── QUARRIER COMPANION — auto-mines stone, unlocks at island level 5 ───
+function updateQuarrier(dt) {
+  let q = state.quarrier;
+  if (!q.unlocked) {
+    if (state.islandLevel >= 5) { q.unlocked = true; addFloatingText(width / 2, height * 0.3, 'Quarrier joined your island!', '#aaaaaa'); }
+    else return;
+  }
+  let origSpeed = q.speed;
+  if (state.blessing.type === 'speed') q.speed *= 2;
+  let p = state.player;
+  q.pulsePhase += 0.04;
+  if (state.rowing.active) { q.vx *= 0.9; q.vy *= 0.9; q.speed = origSpeed; return; }
+
+  switch (q.task) {
+    case 'idle': {
+      let dx = p.x + 30 - q.x, dy = p.y + 15 - q.y;
+      let d = sqrt(dx * dx + dy * dy);
+      if (d > 35) { q.vx = (dx / d) * q.speed * 0.5; q.vy = (dy / d) * q.speed * 0.5; }
+      if (q.energy > 25) {
+        let res = state.resources.find(r => r.active && r.type === 'stone');
+        if (res) { q.task = 'mine'; q.taskTarget = res; q.mineTimer = 0; }
+      }
+      break;
+    }
+    case 'mine': {
+      if (!q.taskTarget || !q.taskTarget.active) { q.task = 'idle'; break; }
+      let tx = q.taskTarget.x, ty = q.taskTarget.y;
+      let dx = tx - q.x, dy = ty - q.y, d = sqrt(dx * dx + dy * dy);
+      if (d < 20) {
+        q.vx *= 0.3; q.vy *= 0.3;
+        q.mineTimer += dt;
+        if (q.mineTimer > 50) {
+          q.mineTimer = 0;
+          q.taskTarget.active = false;
+          q.taskTarget.respawnTimer = 600;
+          state.stone += 2;
+          checkQuestProgress('stone', 2);
+          addFloatingText(w2sX(tx), w2sY(ty) - 15, '+2 Stone', '#aaaaaa');
+          spawnParticles(tx, ty, 'collect', 5);
+          if (snd) snd.playSFX('stone_mine');
+          q.energy = max(0, q.energy - 10);
+          q.task = 'idle'; q.taskTarget = null;
+        }
+      } else {
+        q.vx = (dx / d) * q.speed * 1.1; q.vy = (dy / d) * q.speed * 1.1;
+      }
+      break;
+    }
+  }
+  let nx = q.x + q.vx * dt, ny = q.y + q.vy * dt;
+  if (isWalkable(nx, ny)) { q.x = nx; q.y = ny; }
+  q.vx *= 0.8; q.vy *= 0.8;
+  let hour = state.time / 60;
+  if (hour >= 6 && hour <= 18) q.energy = min(100, q.energy + 0.15 * dt);
+  else q.energy = min(100, q.energy + 0.03 * dt);
+  q.speed = origSpeed;
+  q.trailPoints.unshift({ x: q.x, y: q.y, life: 8 });
+  q.trailPoints = q.trailPoints.filter(t => t.life > 0);
+  q.trailPoints.forEach(t => t.life--);
+}
+
+function drawQuarrier() {
+  let q = state.quarrier;
+  if (!q.unlocked) return;
+  let sx = w2sX(q.x), sy = w2sY(q.y);
+  let bob = floor(sin(frameCount * 0.06 + 2) * 2);
+  let pulse = sin(q.pulsePhase) * 0.3 + 0.7;
+  let ef = q.energy / 100;
+
+  // Stone dust trail
+  q.trailPoints.forEach(t => {
+    noStroke(); fill(140, 135, 125, map(t.life, 0, 8, 0, 30));
+    rect(floor(w2sX(t.x)), floor(w2sY(t.y)), 2, 2);
+  });
+
+  // Rock chip particles when mining
+  if (q.task === 'mine' && frameCount % 12 === 0) {
+    particles.push({ x: q.x + random(-8, 8), y: q.y + random(-12, -4), vx: random(-1, 1), vy: random(-1.5, -0.5), life: random(10, 18), maxLife: 18, type: 'sundust', size: random(1, 2), r: 140, g: 130, b: 115, phase: random(TWO_PI), world: true });
+  }
+
+  push();
+  translate(floor(sx), floor(sy + bob));
+  noStroke();
+
+  // Glow
+  let ga = floor(8 * pulse * ef);
+  fill(floor(140 * ef), floor(135 * ef), floor(120 * ef), ga);
+  rect(-5, -1, 10, 2); rect(-1, -5, 2, 10);
+
+  // Shadow
+  fill(0, 0, 0, 35); rect(-7, 12, 14, 2);
+
+  // Boots — sturdy stone-worker
+  fill(90, 80, 65); rect(-5, 9, 4, 3); rect(1, 9, 4, 3);
+
+  // Legs — dusty brown
+  fill(110, 100, 80); rect(-4, 4, 3, 6); rect(1, 4, 3, 6);
+
+  // Torso — grey stone-worker tunic
+  fill(130, 125, 115); rect(-5, -4, 10, 9);
+  fill(140, 135, 125); rect(-4, -3, 8, 4); // lighter chest
+
+  // Arms
+  fill(120, 110, 95); rect(-7, -2, 3, 7); rect(4, -2, 3, 7);
+
+  // Head
+  fill(190, 155, 115); rect(-3, -9, 6, 6);
+  // Eyes
+  fill(50, 40, 30); rect(-2, -7, 1, 1); rect(1, -7, 1, 1);
+  // Headband (stone dust)
+  fill(160, 155, 140); rect(-3, -9, 6, 1);
+
+  // Pickaxe on back
+  stroke(100, 85, 60); strokeWeight(1);
+  line(4, -8, 8, 4); noStroke();
+  fill(140, 140, 150); // iron head
+  rect(7, 2, 3, 2);
+
+  pop();
+
+  // Label
+  noStroke(); fill(140, 135, 120, 120);
+  textSize(7); textAlign(CENTER, TOP);
+  text('QUARRIER', floor(sx), floor(sy + 16));
+  textAlign(LEFT, TOP);
 }
 
 function drawCenturion() {
@@ -11393,8 +11804,8 @@ function drawNPC() {
   push();
   scale(invS);
 
-  if (n.currentLine >= 0) {
-    let ln = n.lines[n.currentLine];
+  if (n.currentLine !== -1 && n.currentLine !== null) {
+    let ln = (typeof n.currentLine === 'string') ? n.currentLine : n.lines[n.currentLine];
     drawDialogBubble(0, -34, ln);
     n.dialogTimer--;
     if (n.dialogTimer <= 0) n.currentLine = -1;
@@ -11417,13 +11828,13 @@ function drawNPC() {
 
   for (let h = 0; h < n.hearts; h++) {
     fill(200, 50, 80, 180);
-    drawHeart(h * 12 - (n.hearts * 6) + 6, -26 - (n.currentLine >= 0 ? 28 : 0), 4);
+    drawHeart(h * 12 - (n.hearts * 6) + 6, -26 - (n.currentLine !== -1 && n.currentLine !== null ? 28 : 0), 4);
   }
   // Relationship tier label
   if (typeof getRelationshipTier === 'function' && n.hearts > 0) {
     let tier = getRelationshipTier(n.hearts);
     fill(color(tier.color)); textAlign(CENTER, CENTER); textSize(5);
-    text(tier.title, 0, -34 - (n.currentLine >= 0 ? 28 : 0));
+    text(tier.title, 0, -34 - (n.currentLine !== -1 && n.currentLine !== null ? 28 : 0));
     textAlign(LEFT, TOP);
   }
 
@@ -13570,6 +13981,7 @@ function updateEnemyAI(e, dt, p, a) {
         p.invincTimer = 45;
         addFloatingText(w2sX(p.x), w2sY(p.y) - 25, '-' + dmg, '#ff6644');
         triggerScreenShake(6, 10);
+        if (snd) snd.playSFX('player_hurt');
       }
       // Arena boundary
       let bx = (e.x - a.isleX) / (a.isleRX - 10);
@@ -13594,6 +14006,7 @@ function updateEnemyAI(e, dt, p, a) {
           addFloatingText(w2sX(p.x), w2sY(p.y) - 25, '-' + eDmg, '#ff6644');
           triggerScreenShake(4, 8);
           spawnParticles(p.x, p.y, 'combat', 3);
+          if (snd) snd.playSFX('player_hurt');
         }
         e.state = 'chase';
         e.attackCooldown = e.type === 'wolf' ? 40 : 60;
@@ -16028,6 +16441,7 @@ function updateConquestEnemy(e, dt, p, c) {
             p.invincTimer = 30;
             addFloatingText(w2sX(p.x), w2sY(p.y) - 25, '-' + dmg, '#ff6644');
             triggerScreenShake(3, 6);
+            if (snd) snd.playSFX('player_hurt');
           } else {
             for (let s of c.soldiers) {
               if (s.hp <= 0) continue;
@@ -17426,9 +17840,10 @@ function drawHudResource(x, y, label, val, col, key) {
   textSize(9);
   textAlign(LEFT, TOP);
   text(label + val, 0, 0);
-  // Flash highlight on change
+  // Gold flash pulse on change
   if (flashAlpha > 0) {
-    fill(255, 255, 200, 120 * flashAlpha);
+    let pulse = 0.5 + 0.5 * sin(flashAlpha * PI);
+    fill(255, 200, 60, 160 * flashAlpha * pulse);
     text(label + val, 0, 0);
   }
   pop();
@@ -17606,14 +18021,20 @@ function drawHotbar() {
 }
 
 function drawHUD() {
+  if (photoMode) return;
   let h = state.time / 60;
   let mins = floor(state.time % 60);
   let ampm = h >= 12 ? 'PM' : 'AM';
   let displayH = floor(h % 12) || 12;
   let timeStr = displayH + ':' + nf(mins, 2) + ' ' + ampm;
 
-  // Top-left panel
-  let hudH = 210;
+  // Top-left panel — fade when player is in that screen quadrant
+  let _psx = w2sX(state.player.x), _psy = w2sY(state.player.y);
+  let _hudFade = (_psx < width * 0.35 && _psy < height * 0.45) ? 0.35 : 1.0;
+  drawingContext.globalAlpha = _hudFade;
+
+  // Top-left panel — compact
+  let hudH = 195;
   if (state.ironOre > 0) hudH += 12;
   if (state.rareHide > 0) hudH += 12;
   if (state.ancientRelic > 0) hudH += 12;
@@ -17625,23 +18046,21 @@ function drawHUD() {
   if (state.quest) hudH += 12;
   if (state.weather.type !== 'clear') hudH += 12;
   hudH += 12; // crop select line
-  drawHUDPanel(12, 12, 230, hudH);
-  fill(color(C.textDim));
-  textSize(8);
+  if (state.quarrier && state.quarrier.unlocked) hudH += 14;
+  drawHUDPanel(12, 12, 195, hudH - 14);
   textAlign(LEFT, TOP);
-  text('DAY ' + state.day + '  //  ' + timeStr, 22, 20);
 
-  drawBarHUD(22, 34, 100, 8, state.solar / state.maxSolar, C.solarBright, C.solarGold, 'SOLAR');
+  drawBarHUD(22, 20, 100, 8, state.solar / state.maxSolar, C.solarBright, C.solarGold, 'SOLAR');
 
-  drawHudResource(22, 52, 'SEEDS    ', state.seeds, color(C.textBright), 'seeds');
-  drawHudResource(22, 64, 'HARVEST  ', state.harvest, color(C.textBright), 'harvest');
-  drawHudResource(22, 76, 'WOOD     ', state.wood, color(140, 100, 40), 'wood');
-  drawHudResource(22, 88, 'STONE    ', state.stone, color(C.stoneLight), 'stone');
-  drawHudResource(22, 100, 'CRYSTALS ', state.crystals, color(C.crystalGlow), 'crystals');
-  drawHudResource(22, 112, 'GOLD     ', state.gold, color(C.solarBright), 'gold');
-  drawHudResource(22, 124, 'FISH     ', state.fish, color(100, 180, 255), 'fish');
+  drawHudResource(22, 38, 'SEEDS    ', state.seeds, color(C.textBright), 'seeds');
+  drawHudResource(22, 50, 'HARVEST  ', state.harvest, color(C.textBright), 'harvest');
+  drawHudResource(22, 62, 'WOOD     ', state.wood, color(140, 100, 40), 'wood');
+  drawHudResource(22, 74, 'STONE    ', state.stone, color(C.stoneLight), 'stone');
+  drawHudResource(22, 86, 'CRYSTALS ', state.crystals, color(C.crystalGlow), 'crystals');
+  drawHudResource(22, 98, 'GOLD     ', state.gold, color(C.solarBright), 'gold');
+  drawHudResource(22, 110, 'FISH     ', state.fish, color(100, 180, 255), 'fish');
   // Expedition resources
-  let expResY = 136;
+  let expResY = 122;
   if (state.ironOre > 0 || state.rareHide > 0 || state.ancientRelic > 0 || state.titanBone > 0) {
     fill(170, 185, 200);
     if (state.ironOre > 0) { text('IRON     ' + state.ironOre, 22, expResY); expResY += 12; }
@@ -17663,17 +18082,24 @@ function drawHUD() {
 
   drawBarHUD(22, cookedY + 2, 100, 7, state.companion.energy / 100, C.companionG, C.companionD, 'CRITTER');
   drawBarHUD(22, cookedY + 16, 100, 7, state.woodcutter.energy / 100, '#A0724A', '#4A3520', 'CUTTER');
+  if (state.quarrier.unlocked) drawBarHUD(22, cookedY + 30, 100, 7, state.quarrier.energy / 100, '#8A8078', '#3A3530', 'QUARRY');
+  let qOff = (state.quarrier && state.quarrier.unlocked) ? 14 : 0;
 
   // Island level
   fill(color(C.textDim));
   textSize(7);
   let rankTitle = state.islandLevel >= 25 ? 'IMPERATOR' : state.islandLevel >= 20 ? 'CONSUL' : state.islandLevel >= 15 ? 'SENATOR' : state.islandLevel >= 10 ? 'GOVERNOR' : 'CITIZEN';
-  text(rankTitle + ' — LV.' + state.islandLevel, 22, cookedY + 30);
+  text(rankTitle + ' — LV.' + state.islandLevel, 22, cookedY + 30 + qOff);
+  // Skill points alert
+  if ((state.player.skillPoints || 0) > 0) {
+    fill(255, 220, 80); textSize(7);
+    text('[K] ' + state.player.skillPoints + ' skill pt' + (state.player.skillPoints > 1 ? 's' : '') + ' ready', 22, cookedY + 41 + qOff);
+  }
   // Season
   let seasonCol = getSeason() === 2 ? color(200, 140, 40) : getSeason() === 3 ? color(180, 200, 220) : getSeason() === 1 ? color(200, 180, 60) : color(80, 160, 50);
   fill(seasonCol);
   textSize(7);
-  text(getSeasonName(), 22, cookedY + 41);
+  text(getSeasonName(), 22, cookedY + 41 + qOff);
 
   // Ship status
   let hudY = cookedY + 53;
@@ -17684,11 +18110,16 @@ function drawHUD() {
     hudY += 12;
   }
 
-  // Grape/olive seeds
-  fill(140, 60, 160);
-  textSize(7);
-  text('GRAPE SD ' + state.grapeSeeds + '  OLIVE SD ' + state.oliveSeeds, 22, hudY);
-  hudY += 11;
+  // Grape/olive seeds — only show when player has some
+  if (state.grapeSeeds > 0 || state.oliveSeeds > 0) {
+    fill(140, 60, 160);
+    textSize(7);
+    let seedStr = '';
+    if (state.grapeSeeds > 0) seedStr += 'GRAPE ' + state.grapeSeeds + '  ';
+    if (state.oliveSeeds > 0) seedStr += 'OLIVE ' + state.oliveSeeds;
+    text(seedStr.trim(), 22, hudY);
+    hudY += 11;
+  }
 
   // Crop select
   fill(color(C.textDim));
@@ -17725,19 +18156,11 @@ function drawHUD() {
     hudY += 12;
   }
 
-  // ─── TOP-CENTER: Time/Day/Season ───
-  let tcW=155,tcH=28,tcX=width/2-77,tcY=8;
-  noStroke();fill(25,20,14,200);rect(tcX,tcY,tcW,tcH,4);stroke(180,145,70,140);strokeWeight(1);noFill();rect(tcX,tcY,tcW,tcH,4);noStroke();
-  if(h<5||h>=20){fill(200,210,230,200);circle(tcX+14,tcY+tcH/2,10);fill(25,20,14,200);circle(tcX+17,tcY+tcH/2-2,9);}
-  else{fill(255,200,60,200);circle(tcX+14,tcY+tcH/2,10);}
-  fill(220,200,160);textSize(9);textAlign(CENTER,TOP);text('DAY '+state.day,width/2,tcY+3);
-  fill(180,160,120);textSize(7);text(timeStr,width/2,tcY+15);
-  let _sCl=getSeason()===2?color(200,140,40):getSeason()===3?color(180,200,220):getSeason()===1?color(200,180,60):color(80,160,50);
-  fill(_sCl);textSize(7);textAlign(RIGHT,CENTER);text(getSeasonName().split(' ')[0],tcX+tcW-8,tcY+tcH/2);textAlign(LEFT,TOP);
+  drawingContext.globalAlpha = 1.0;
 
   // Storm warning
   if (stormActive) {
-    fill(color(C.stormFlash));textSize(9);textAlign(CENTER,TOP);text('DRIFT STORM ACTIVE',width/2,tcY+tcH+4);textAlign(LEFT,TOP);
+    fill(color(C.stormFlash));textSize(9);textAlign(CENTER,TOP);text('DRIFT STORM ACTIVE',width/2,40);textAlign(LEFT,TOP);
   }
 
   // ─── QUEST TRACKER (right side) ───
@@ -17749,20 +18172,24 @@ function drawHUD() {
     fill(212,160,64);rect(qtX+6,qtY+24,100*_qF,4,2);fill(160,140,100);textSize(6);textAlign(RIGHT,TOP);
     text(state.quest.progress+'/'+state.quest.target,qtX+150,qtY+22);textAlign(LEFT,TOP);}
 
-  // Controls (bottom right) — condensed
+  // Controls (bottom right) — context-aware, minimal
   let cr = width - 12, cb = height - 12;
-  let controlH = 105;
-  drawHUDPanel(cr - 145, cb - controlH, 145, controlH);
-  fill(160, 140, 100); textSize(7); textAlign(LEFT, TOP);
-  let bx = cr - 139, by = cb - controlH + 7;
-  text('WASD move   SHIFT dash', bx, by);
-  text('E interact  F fish/trade', bx, by + 10);
-  text('B build     X expand', bx, by + 20);
-  text('T pray      C cook', bx, by + 30);
-  text('V codex     1-4 crop', bx, by + 40);
-  text('P save      L load', bx, by + 50);
-  fill(180, 150, 80); text('TAB empire  I inventory', bx, by + 64);
-  fill(200, 170, 90); text(state.buildMode ? 'Q rotate  CLICK place' : 'companions auto-farm', bx, by + 78);
+  let controlLines = [];
+  if (state.buildMode) {
+    controlLines = ['WASD move  |  CLICK place  |  Q rotate  |  B close'];
+  } else if (state.rowing && state.rowing.active) {
+    controlLines = ['WASD row  |  E dock  |  ESC menu'];
+  } else if (state.wreck && state.wreck.active) {
+    controlLines = ['WASD move  |  E gather  |  TAB raft'];
+  } else {
+    controlLines = ['WASD move  |  E interact/dive  |  B build', 'TAB empire  |  K skills  |  P photo  |  ESC menu'];
+  }
+  let controlH = 10 + controlLines.length * 12;
+  drawHUDPanel(cr - 200, cb - controlH, 200, controlH);
+  fill(160, 140, 100, 180); textSize(7); textAlign(LEFT, TOP);
+  for (let ci = 0; ci < controlLines.length; ci++) {
+    text(controlLines[ci], cr - 194, cb - controlH + 5 + ci * 12);
+  }
 
   noStroke();
   textAlign(LEFT, TOP);
@@ -17848,14 +18275,14 @@ function drawHUD() {
 function drawBuildUI() {
   if (!state.buildMode) return;
 
+  // Build mode = personal decoration only. Landmark buildings auto-spawn with island levels.
   let baseTypes = ['floor', 'wall', 'door', 'chest', 'bridge', 'fence', 'torch', 'flower', 'lantern', 'mosaic', 'aqueduct', 'bath'];
-  let advTypes  = ['granary', 'well', 'temple', 'market', 'forum', 'watchtower', 'arch', 'villa'];
   let slotW = 48;
   let gap = 4;
   let numBase = baseTypes.length;
   let barW = numBase * slotW + (numBase - 1) * gap + 24;
   let rowH = 56;
-  let barH = rowH * 2 + 8;
+  let barH = rowH + 8;
   let barX = width / 2 - barW / 2;
   let barY = height - barH - 16;
 
@@ -17945,7 +18372,6 @@ function drawBuildUI() {
   }
 
   baseTypes.forEach((t, i) => drawSlot(t, i, 0));
-  advTypes.forEach((t, i) => drawSlot(t, i, 1));
 
   // Title bar
   fill(200, 170, 90, 220);
@@ -18285,30 +18711,18 @@ function drawBuildIcon(type, selected) {
 
 function drawHUDPanel(x, y, w, h) {
   noStroke();
-  // Parchment background with depth
-  // Outer shadow
-  fill(0, 0, 0, 40);
-  rect(x + 2, y + 2, w, h, 4);
-  // Main parchment
-  fill(35, 28, 20, 225);
-  rect(x, y, w, h, 4);
-  // Subtle inner gradient (lighter top)
-  fill(60, 48, 35, 30);
-  rect(x + 2, y + 2, w - 4, h * 0.3, 3, 3, 0, 0);
-  // Mosaic border — gold outer
-  stroke(180, 150, 80, 200);
-  strokeWeight(1.5);
+  // Lighter, more elegant panel
+  fill(0, 0, 0, 25);
+  rect(x + 1, y + 1, w, h, 3);
+  // Semi-transparent dark background
+  fill(25, 20, 15, 160);
+  rect(x, y, w, h, 3);
+  // Single pixel golden border
+  stroke(180, 150, 80, 120);
+  strokeWeight(0.8);
   noFill();
-  rect(x, y, w, h, 4);
-  // Inner mosaic line — warm terracotta
-  stroke(140, 90, 50, 100);
-  strokeWeight(0.6);
-  rect(x + 4, y + 4, w - 8, h - 8, 3);
-  // Corner accents — pixel dots
-  fill(200, 170, 80, 120);
+  rect(x, y, w, h, 3);
   noStroke();
-  rect(x + 5, y + 5, 2, 2); rect(x + w - 7, y + 5, 2, 2);
-  rect(x + 5, y + h - 7, 2, 2); rect(x + w - 7, y + h - 7, 2, 2);
 }
 
 function drawParchmentPanel(x, y, w, h) {
@@ -18421,6 +18835,8 @@ function mousePressed() {
   // Dismiss lore tablet popup / narrative dialogue on click
   if (typeof loreTabletPopup !== 'undefined' && loreTabletPopup) { loreTabletPopup = null; return; }
   if (typeof narrativeDialogue !== 'undefined' && narrativeDialogue) { narrativeDialogue = null; return; }
+  // Skill tree click handling
+  if (typeof handleSkillTreeClick === 'function' && handleSkillTreeClick(mouseX, mouseY)) return;
   // Economy UI click handling
   if (typeof handleEconomyClick === 'function' && handleEconomyClick(mouseX, mouseY)) return;
   // Expedition modifier select — click handling
@@ -18546,26 +18962,23 @@ function mousePressed() {
     return;
   }
 
-  // Build mode click-to-select building type
+  // Build mode click-to-select building type (decoration only)
   if (state.buildMode) {
     let baseTypes = ['floor', 'wall', 'door', 'chest', 'bridge', 'fence', 'torch', 'flower', 'lantern', 'mosaic', 'aqueduct', 'bath'];
-    let advTypes  = ['granary', 'well', 'temple', 'market', 'forum', 'watchtower', 'arch', 'villa'];
     let slotW = 48, gap = 4;
     let numBase = baseTypes.length;
     let barW = numBase * slotW + (numBase - 1) * gap + 24;
     let rowH = 56;
-    let barH = rowH * 2 + 8;
+    let barH = rowH + 8;
     let barX = width / 2 - barW / 2;
     let barY = height - barH - 16;
     if (mouseY > barY && mouseY < barY + barH) {
       let startX = barX + 12;
-      let row = mouseY < barY + rowH + 4 ? 0 : 1;
-      let rowTypes = row === 0 ? baseTypes : advTypes;
-      let ty0 = barY + row * (rowH + 4) + 5;
-      for (let i = 0; i < rowTypes.length; i++) {
+      let ty0 = barY + 5;
+      for (let i = 0; i < baseTypes.length; i++) {
         let tx = startX + i * (slotW + gap);
         if (mouseX > tx && mouseX < tx + slotW && mouseY > ty0 && mouseY < ty0 + 48) {
-          state.buildType = rowTypes[i];
+          state.buildType = baseTypes[i];
           return;
         }
       }
@@ -18598,6 +19011,10 @@ function mousePressed() {
         if (festR && festR.effect.allResources) harvestAmt *= festR.effect.allResources;
         // Right tool bonus: +1 harvest if sickle was already equipped
         if (toolBonus) harvestAmt += 1;
+        // Agricultural colony spec: +30% harvest yield
+        if (state.colonySpec && state.colonySpec['conquest'] === 'agricultural') harvestAmt = floor(harvestAmt * 1.3);
+        // Fertile Hands passive skill bonus
+        if (typeof getHarvestSkillBonus === 'function') harvestAmt = floor(harvestAmt * getHarvestSkillBonus());
         // Harvest combo
         harvestAmt = onHarvestCombo(p, harvestAmt);
         state.harvest += harvestAmt;
@@ -18661,7 +19078,7 @@ function mousePressed() {
       let amt = pickBonus ? 2 : 1;
       if (nearRes.type === 'stone') { state.stone += amt; checkQuestProgress('stone', amt); addFloatingText(w2sX(nearRes.x), w2sY(nearRes.y) - 15, '+' + amt + ' Stone', '#aaaaaa'); }
       else if (nearRes.type === 'crystal_shard') { state.crystals += amt; checkQuestProgress('crystal', amt); addFloatingText(w2sX(nearRes.x), w2sY(nearRes.y) - 15, '+' + amt + ' Crystal', C.crystalGlow); }
-      if (snd) snd.playSFX('crystal');
+      if (snd) snd.playSFX(nearRes.type === 'stone' ? 'stone_mine' : 'crystal');
       spawnParticles(nearRes.x, nearRes.y, 'collect', 5);
       clicked = true;
     }
@@ -18755,7 +19172,7 @@ function mouseDragged() {
     let sliderY = py + 80;
     let sliderW = 120;
     let slX = floor(width / 2 + 10);
-    let keys = ['master', 'sfx', 'ambient'];
+    let keys = ['master', 'sfx', 'ambient', 'music'];
     for (let k of keys) {
       if (mouseX >= slX - 10 && mouseX <= slX + sliderW + 10 && mouseY >= sliderY - 12 && mouseY <= sliderY + 12) {
         snd.setVolume(k, constrain((mouseX - slX) / sliderW, 0, 1));
@@ -18809,7 +19226,7 @@ function keyPressed() {
   }
 
   // ─── IMPERATOR CEREMONY DISMISS ───
-  if (state.victoryCeremony && state.victoryCeremony.timer > 180) {
+  if (state.victoryCeremony && state.victoryCeremony.phase === 4) {
     state.victoryCeremony = null;
     return;
   }
@@ -18991,6 +19408,14 @@ function keyPressed() {
 
   // Interact
   if (key === 'e' || key === 'E') {
+    // Dive — E near water (moved from D key to avoid movement conflict)
+    if (typeof startDive === 'function' && !state.rowing.active && !state.buildMode &&
+        !state.conquest.active && !state.adventure.active) {
+      let inWater = isInShallows(state.player.x, state.player.y) ||
+                    !isOnIsland(state.player.x, state.player.y);
+      if (inWater) { startDive(); return; }
+    }
+
     // Discovery event interaction (NPC rescue, etc.)
     if (handleDiscoveryInteract()) return;
 
@@ -19162,7 +19587,8 @@ function keyPressed() {
       }
       if (giftHearts > 0) {
         n.hearts = min(10, n.hearts + giftHearts);
-        n.currentLine = floor(random(n.lines.length));
+        let _liviaGiftLine = (typeof getExpandedDialogue === 'function') ? getExpandedDialogue('livia') : null;
+        n.currentLine = _liviaGiftLine || n.lines[floor(random(n.lines.length))];
         n.dialogTimer = 180;
         let heartText = giftHearts > 1 ? '♥ +' + giftHearts + ' Hearts (' + giftName + ')' : '♥ +Heart';
         addFloatingText(w2sX(n.x), w2sY(n.y) - 30, heartText, '#ff6688');
@@ -19181,10 +19607,10 @@ function keyPressed() {
           n.dialogTimer = 200;
           addFloatingText(w2sX(n.x), w2sY(n.y) - 30, 'New Quest: ' + state.quest.desc, C.solarBright);
         } else {
-          // Show quest progress or expanded dialogue
+          // Show expanded dialogue or fall back to generic lines
           let _liviaLine = (typeof getExpandedDialogue === 'function') ? getExpandedDialogue('livia') : null;
           n.dialogTimer = 150;
-          if (_liviaLine) { n.currentLine = floor(random(n.lines.length)); }
+          n.currentLine = _liviaLine || n.lines[floor(random(n.lines.length))];
           addFloatingText(w2sX(n.x), w2sY(n.y) - 30, state.quest.desc + ' (' + state.quest.progress + '/' + state.quest.target + ')', C.textBright);
         }
       }
@@ -19248,14 +19674,6 @@ function keyPressed() {
     });
   }
 
-  // Diving — D key near water
-  if (key === 'd' || key === 'D') {
-    if (typeof startDive === 'function' && typeof getNearestDiveSpot === 'function' &&
-        !state.rowing.active && !state.buildMode && !state.conquest.active && !state.adventure.active) {
-      if (getNearestDiveSpot()) { startDive(); return; }
-    }
-  }
-
   // Fishing / Trade with ship
   if (key === 'f' || key === 'F') {
     if (state.fishing.active && state.fishing.bite) {
@@ -19294,6 +19712,7 @@ function keyPressed() {
   if (keyCode === 27) {
     if (empireDashOpen) { empireDashOpen = false; return; }
     if (inventoryOpen) { inventoryOpen = false; return; }
+    if (typeof skillTreeOpen !== 'undefined' && skillTreeOpen) { skillTreeOpen = false; return; }
     if (dialogState.active) { dialogState.active = false; return; }
   }
 
@@ -19312,6 +19731,12 @@ function keyPressed() {
   if (key === 'i' || key === 'I') {
     inventoryOpen = !inventoryOpen;
     if (inventoryOpen) empireDashOpen = false;
+    return;
+  }
+
+  // Skill tree toggle (K key)
+  if (key === 'k' || key === 'K') {
+    if (typeof toggleSkillTree === 'function') toggleSkillTree();
     return;
   }
 
@@ -19420,8 +19845,12 @@ function keyPressed() {
     }
   }
 
+  // Photo mode toggle
+  if (key === 'p' || key === 'P') {
+    photoMode = !photoMode;
+    addFloatingText(width / 2, height * 0.3, photoMode ? 'PHOTO MODE' : 'HUD RESTORED', '#ffdc50');
+  }
   // Save / Load
-  if (key === 'p' || key === 'P') { saveGame(); }
   if (key === 'l' || key === 'L') { loadGame(); }
 
   // Debug seeds
@@ -20944,62 +21373,127 @@ function checkImperatorVictory() {
   if (liviaHearts < 10 || marcusHearts < 10 || vestaHearts < 10 || felixHearts < 10) return;
   if (!state.conquest.colonized) return;
   state.won = true;
-  state.victoryCeremony = { timer: 0, phase: 'start' };
+  state.victoryCeremony = { timer: 0, phase: 1 };
 }
 
 function updateImperatorCeremony(dt) {
   if (!state.victoryCeremony) return;
   let vc = state.victoryCeremony;
   vc.timer += dt;
-  if (frameCount % 3 === 0) {
-    for (let i = 0; i < 4; i++) {
+  if (vc.phase === 1 && vc.timer >= 60) vc.phase = 2;
+  if (vc.phase === 2 && vc.timer >= 180) vc.phase = 3;
+  if (vc.phase === 3 && vc.timer >= 360) vc.phase = 4;
+  // Phase 3: gold particle cannon (8/frame)
+  if (vc.phase === 3) {
+    for (let i = 0; i < 8; i++) {
       particles.push({
-        x: width * 0.5 + random(-width * 0.45, width * 0.45),
-        y: height * 0.5 + random(-height * 0.45, height * 0.45),
-        vx: random(-1.5, 1.5), vy: random(-4, -0.5),
-        life: random(60, 130), maxLife: 130,
+        x: width * 0.5 + random(-width * 0.3, width * 0.3),
+        y: height + 4,
+        vx: random(-2, 2), vy: random(-6, -2),
+        life: random(60, 140), maxLife: 140,
         type: 'burst', size: random(3, 8),
         r: 255, g: floor(random(180, 240)), b: 20,
         world: false,
       });
     }
   }
+  // Phase 4: gentle lingering particles
+  if (vc.phase === 4 && frameCount % 4 === 0) {
+    for (let i = 0; i < 2; i++) {
+      particles.push({
+        x: random(0, width), y: random(0, height),
+        vx: random(-0.5, 0.5), vy: random(-1.5, -0.3),
+        life: random(40, 90), maxLife: 90,
+        type: 'burst', size: random(2, 5),
+        r: 255, g: floor(random(200, 240)), b: 40,
+        world: false,
+      });
+    }
+  }
   if (vc.timer < 30) triggerScreenShake(8, 2);
-  if (vc.timer > 600) state.victoryCeremony = null;
+  if (vc.timer > 720) state.victoryCeremony = null;
 }
 
 function drawImperatorCeremony() {
   if (!state.victoryCeremony) return;
   let vc = state.victoryCeremony;
   let t = vc.timer;
-  let alpha = t < 30 ? map(t, 0, 30, 0, 255) : t > 540 ? map(t, 540, 600, 255, 0) : 255;
   push(); noStroke();
-  fill(0, 0, 0, alpha * 0.55);
+
+  // Phase 1 (0-60): Blackout fade in
+  if (vc.phase === 1) {
+    let fadeAlpha = map(t, 0, 60, 0, 255);
+    fill(0, 0, 0, fadeAlpha);
+    rect(0, 0, width, height);
+    pop(); return;
+  }
+
+  // Full black backdrop for phases 2-4
+  let bgAlpha = t > 660 ? map(t, 660, 720, 255, 0) : 255;
+  fill(0, 0, 0, bgAlpha);
   rect(0, 0, width, height);
-  let bannerY = height * 0.38 + sin(t * 0.03) * 4;
-  fill(20, 10, 0, alpha * 0.9);
-  rect(width * 0.1, bannerY - 38, width * 0.8, 78, 6);
-  fill(200, 160, 40, alpha * 0.6);
-  rect(width * 0.1, bannerY - 38, width * 0.8, 5, 3);
-  rect(width * 0.1, bannerY + 35, width * 0.8, 5, 3);
-  fill(255, 220, 80, alpha);
-  textAlign(CENTER, CENTER);
-  textSize(36); textStyle(BOLD);
-  text('IMPERATOR', width / 2, bannerY);
-  textStyle(NORMAL); textSize(12);
-  fill(220, 200, 140, alpha * 0.85);
-  text('Mare Nostrum is yours.', width / 2, bannerY + 22);
-  if (t > 90) {
-    let subAlpha = min(alpha, map(t, 90, 150, 0, 255));
-    fill(180, 160, 100, subAlpha * 0.7);
+
+  // Phase 2+ (60+): NPC silhouettes
+  if (vc.phase >= 2) {
+    let silAlpha = vc.phase === 2 ? map(t, 60, 100, 0, 255) : bgAlpha;
+    let npcNames = ['Livia', 'Marcus', 'Vesta', 'Felix'];
+    let npcHearts = [
+      state.npc ? state.npc.hearts : 0,
+      state.marcus ? state.marcus.hearts : 0,
+      state.vesta ? state.vesta.hearts : 0,
+      state.felix ? state.felix.hearts : 0
+    ];
+    let spacing = width / 5;
+    for (let i = 0; i < 4; i++) {
+      let cx = spacing * (i + 1);
+      let cy = height * 0.72;
+      // 12x24 gold pixel silhouette
+      fill(218, 165, 32, silAlpha * 0.9);
+      rect(cx - 4, cy - 24, 8, 8);
+      rect(cx - 6, cy - 16, 12, 14);
+      rect(cx - 5, cy - 2, 4, 8);
+      rect(cx + 1, cy - 2, 4, 8);
+      // Name
+      fill(255, 220, 80, silAlpha);
+      textAlign(CENTER, TOP); textSize(9);
+      text(npcNames[i], cx, cy + 10);
+      // Golden hearts
+      fill(255, 200, 40, silAlpha * 0.8);
+      textSize(8);
+      let heartStr = '';
+      for (let h = 0; h < min(npcHearts[i], 10); h++) heartStr += '\u2665';
+      text(heartStr, cx, cy + 22);
+    }
+  }
+
+  // Phase 3+ (180+): IMPERATOR title + subtitle
+  if (vc.phase >= 3) {
+    let titleAlpha = vc.phase === 3 ? map(t, 180, 220, 0, 255) : bgAlpha;
+    let bannerY = height * 0.28 + sin(t * 0.03) * 3;
+    fill(255, 220, 80, titleAlpha);
+    textAlign(CENTER, CENTER);
+    textSize(42); textStyle(BOLD);
+    text('IMPERATOR', width / 2, bannerY);
+    textStyle(NORMAL); textSize(13);
+    fill(220, 200, 140, titleAlpha * 0.85);
+    text('By grain and stone and stubborn hope.', width / 2, bannerY + 30);
+  }
+
+  // Phase 4 (360-720): Warm golden tint + linger text + blink prompt
+  if (vc.phase === 4) {
+    let tintAlpha = t > 660 ? map(t, 660, 720, 40, 0) : map(t, 360, 420, 0, 40);
+    fill(255, 200, 60, tintAlpha);
+    rect(0, 0, width, height);
+    let fadeA = t > 660 ? map(t, 660, 720, 255, 0) : 255;
+    fill(220, 200, 140, fadeA * 0.9);
+    textAlign(CENTER, CENTER); textSize(14);
+    text('Mare Nostrum is yours.', width / 2, height * 0.45);
+    let blinkA = (sin(t * 0.08) * 0.4 + 0.6) * fadeA * 0.7;
+    fill(160, 140, 80, blinkA);
     textSize(9);
-    text('All hearts won. All lands colonized. The empire endures.', width / 2, bannerY + 38);
+    text('[any key] to continue', width / 2, height * 0.55);
   }
-  if (t > 180) {
-    fill(160, 140, 80, (sin(t * 0.08) * 0.4 + 0.6) * alpha * 0.7);
-    textSize(8);
-    text('[any key] to continue', width / 2, bannerY + 56);
-  }
+
   pop();
 }
 
@@ -21023,6 +21517,7 @@ function saveGame() {
     npcHearts: state.npc.hearts,
     companionX: state.companion.x, companionY: state.companion.y, companionEnergy: state.companion.energy,
     woodcutterX: state.woodcutter.x, woodcutterY: state.woodcutter.y, woodcutterEnergy: state.woodcutter.energy,
+    quarrierX: state.quarrier.x, quarrierY: state.quarrier.y, quarrierEnergy: state.quarrier.energy, quarrierUnlocked: state.quarrier.unlocked,
     harvesterX: state.harvester ? state.harvester.x : null,
     harvesterY: state.harvester ? state.harvester.y : null,
     blessing: state.blessing,
@@ -21080,6 +21575,16 @@ function saveGame() {
     npcQuests: state.npcQuests || null,
     loreTablets: state.loreTablets || null,
     narrativeFlags: state.narrativeFlags || null,
+    // Diving resources & upgrades
+    diving: {
+      pearls: state.diving.pearls,
+      coral: state.diving.coral,
+      sponges: state.diving.sponges,
+      amphoras: state.diving.amphoras,
+      lungCapacity: state.diving.lungCapacity,
+      diveSpeed: state.diving.diveSpeed,
+      totalDives: state.diving.totalDives,
+    },
     wreck: {
       scavNodes: state.wreck.scavNodes,
       triremeHP: state.wreck.triremeHP,
@@ -21228,6 +21733,16 @@ function loadGame() {
       if (!Array.isArray(state.wreck.birds)) state.wreck.birds = [];
       if (!Array.isArray(state.wreck.glints)) state.wreck.glints = [];
     }
+    // Diving resources & upgrades
+    if (d.diving) {
+      state.diving.pearls = d.diving.pearls || 0;
+      state.diving.coral = d.diving.coral || 0;
+      state.diving.sponges = d.diving.sponges || 0;
+      state.diving.amphoras = d.diving.amphoras || 0;
+      state.diving.lungCapacity = d.diving.lungCapacity || 0;
+      state.diving.diveSpeed = d.diving.diveSpeed || 0;
+      state.diving.totalDives = d.diving.totalDives || 0;
+    }
     state.solar = d.solar || 80; state.maxSolar = d.maxSolar || 100;
     state.islandLevel = d.islandLevel || 1; state.islandRX = d.islandRX || WORLD.islandRX; state.islandRY = d.islandRY || WORLD.islandRY;
     if (d.pyramidLevel) state.pyramid.level = d.pyramidLevel;
@@ -21238,6 +21753,9 @@ function loadGame() {
     state.companion.energy = d.companionEnergy || 100;
     if (d.woodcutterX) { state.woodcutter.x = d.woodcutterX; state.woodcutter.y = d.woodcutterY; }
     state.woodcutter.energy = d.woodcutterEnergy || 100;
+    if (d.quarrierX) { state.quarrier.x = d.quarrierX; state.quarrier.y = d.quarrierY; }
+    state.quarrier.energy = d.quarrierEnergy || 100;
+    state.quarrier.unlocked = d.quarrierUnlocked || (state.islandLevel >= 5);
     if (d.harvesterX && state.harvester) {
       state.harvester.x = d.harvesterX; state.harvester.y = d.harvesterY;
     }
@@ -22897,19 +23415,45 @@ function expandIsland() {
   state.islandRY += ryGrowth;
   state.pyramid.level = state.islandLevel;
 
-  // Milestone unlocks
+  // Milestone unlocks — landmark buildings auto-spawn at key levels
+  let rx = getSurfaceRX(), ry = getSurfaceRY();
+  let cx = WORLD.islandCX, cy = WORLD.islandCY;
+  if (state.islandLevel === 5) {
+    // Granary near farm, Well near center
+    let fc = { x: getFarmCenterX(), y: getFarmCenterY() };
+    state.buildings.push({ x: fc.x + rx * 0.15, y: fc.y - ry * 0.3, w: 48, h: 36, type: 'granary', rot: 0 });
+    state.buildings.push({ x: cx + rx * 0.2, y: cy + ry * 0.4, w: 24, h: 24, type: 'well', rot: 0 });
+    addFloatingText(width / 2, height * 0.25, 'CITIZEN — Granary & Well constructed!', '#88cc66');
+    spawnParticles(fc.x + rx * 0.15, fc.y - ry * 0.3, 'build', 12);
+  }
   if (state.islandLevel === 10) {
     unlockJournal('imperial_governor');
-    addFloatingText(width / 2, height * 0.25, 'GOVERNOR RANK — Colony Management Unlocked!', '#ffdd66');
+    // Temple on the east side, Market near port
+    let port = getPortPosition();
+    state.buildings.push({ x: cx + rx * 0.55, y: cy - ry * 0.35, w: 56, h: 40, type: 'temple', rot: 0 });
+    state.buildings.push({ x: port.x + 80, y: port.y - 30, w: 36, h: 28, type: 'market', rot: 0 });
+    addFloatingText(width / 2, height * 0.25, 'GOVERNOR — Temple & Market erected!', '#ffdd66');
+    triggerScreenShake(6, 15);
+    spawnParticles(cx + rx * 0.55, cy - ry * 0.35, 'build', 15);
   }
   if (state.islandLevel === 15) {
     unlockJournal('imperial_senator');
-    addFloatingText(width / 2, height * 0.25, 'SENATOR RANK — Advanced Structures!', '#ff9944');
+    // Forum in the south, Watchtower on the far east edge
+    state.buildings.push({ x: cx, y: cy + ry * 0.5, w: 64, h: 48, type: 'forum', rot: 0 });
+    state.buildings.push({ x: cx + rx * 0.8, y: cy - ry * 0.1, w: 20, h: 44, type: 'watchtower', rot: 0 });
+    addFloatingText(width / 2, height * 0.25, 'SENATOR — Forum & Watchtower raised!', '#ff9944');
+    triggerScreenShake(8, 20);
+    spawnParticles(cx, cy + ry * 0.5, 'build', 15);
   }
   if (state.islandLevel === 20) {
     unlockJournal('imperial_consul');
-    addFloatingText(width / 2, height * 0.25, 'CONSUL RANK — Imperial Bridge Unlocked!', '#ffaa00');
+    // Triumphal Arch near port entrance, Villa on the north
+    let port = getPortPosition();
+    state.buildings.push({ x: port.x + 120, y: port.y - 15, w: 48, h: 52, type: 'arch', rot: 0 });
+    state.buildings.push({ x: cx - rx * 0.3, y: cy - ry * 0.55, w: 60, h: 44, type: 'villa', rot: 0 });
+    addFloatingText(width / 2, height * 0.25, 'CONSUL — Triumphal Arch & Villa built! Imperial Bridge Unlocked!', '#ffaa00');
     triggerScreenShake(12, 30);
+    spawnParticles(port.x + 120, port.y - 15, 'build', 20);
   }
   if (state.islandLevel === 25) {
     unlockJournal('imperator');
@@ -22932,7 +23476,6 @@ function expandIsland() {
     checkImperatorVictory();
   }
 
-  let cx = WORLD.islandCX, cy = WORLD.islandCY;
   let farmCX = getFarmCenterX(), farmCY = getFarmCenterY();
   let lvl = state.islandLevel;
 
@@ -23331,13 +23874,20 @@ class SoundManager {
     let diving = typeof state !== 'undefined' && state.diving && state.diving.active;
     this._divingActive = diving;
 
+    // Imperial Bridge detection — exposed causeway between islands
+    let onBridge = typeof state !== 'undefined' && typeof isOnImperialBridge === 'function'
+      && state.imperialBridge && state.imperialBridge.built
+      && isOnImperialBridge(state.player.x, state.player.y);
+
     // ─── Waves ───
     let waveMute = (island === 'hyperborea' || island === 'necropolis');
     let waveVol = waveMute ? 0 : (0.06 + (1 - bright) * 0.04) * masterVol;
     if (diving) waveVol = 0.12 * masterVol; // louder underwater
+    if (onBridge) waveVol = 0.10 * masterVol; // water close below
     this._waveGain.amp(waveVol, 0.3);
     let waveFreq = 300 + sin(frameCount * 0.003) * 80;
     if (diving) waveFreq = 180 + sin(frameCount * 0.002) * 40;
+    if (onBridge) waveFreq = 220 + sin(frameCount * 0.004) * 60; // deeper, closer water
     this._waveFilter.freq(waveFreq);
 
     // ─── Wind ───
@@ -23345,6 +23895,7 @@ class SoundManager {
     let windFreq = 500 + sin(frameCount * 0.002) * 150;
     if (island === 'vulcan') windFreq = 800 + sin(frameCount * 0.002) * 100;
     if (diving) { windVol *= 0.2; windFreq = 120; }
+    if (onBridge) { windVol = 0.07 * masterVol; windFreq = 280 + sin(frameCount * 0.0015) * 80; } // exposed wind, lower pitch
     this._windGain.amp(max(0, windVol), 0.5);
     this._windFilter.freq(windFreq);
 
@@ -23355,7 +23906,7 @@ class SoundManager {
     }
 
     // ─── Bird chirps ───
-    let birdMute = (island === 'necropolis' || diving);
+    let birdMute = (island === 'necropolis' || diving || onBridge);
     let birdChance = 0.008;
     if (island === 'vulcan') birdChance = 0.003;
     if (island === 'plenty') birdChance = 0.018;
@@ -23437,6 +23988,16 @@ class SoundManager {
       if (island === 'necropolis') eerieVol *= (0.4 + sin(frameCount * 0.02) * 0.6);
       this._eerieGain.amp(max(0, eerieVol), 0.3);
     }
+
+    // ─── Home island: chicken clucks & cat meows ───
+    if (island === 'home' && !diving && typeof state !== 'undefined') {
+      if (state.chickens && state.chickens.length > 0 && frameCount % 400 < 1 && random() < 0.5) {
+        this.playSFX('chicken_cluck');
+      }
+      if (state.cats && state.cats.length > 0 && frameCount % 600 < 1 && random() < 0.4) {
+        this.playSFX('cat_meow');
+      }
+    }
   }
 
   // --- LYRE MODE API ---
@@ -23455,7 +24016,9 @@ class SoundManager {
     if (musicVol < 0.01) return;
 
     // Auto-detect lyre mode from game state
-    if (typeof state !== 'undefined') {
+    if (typeof gameScreen !== 'undefined' && (gameScreen === 'menu' || gameScreen === 'settings' || gameScreen === 'credits')) {
+      if (this._lyreMode !== 'menu') this.setLyreMode('menu');
+    } else if (typeof state !== 'undefined') {
       if (state.necropolis && state.necropolis.active) {
         if (this._lyreMode !== 'eerie') this.setLyreMode('eerie');
       } else if (state.conquest && state.conquest.active) {
@@ -23475,7 +24038,16 @@ class SoundManager {
 
     let scale, phrases;
 
-    if (this._lyreMode === 'tense') {
+    if (this._lyreMode === 'menu') {
+      scale = dorian;
+      // Contemplative: 2-3 notes per phrase, long pauses, very quiet
+      phrases = [
+        [[0,80,0.3,0],[-1,120,0,0],[4,90,0.25,1],[-1,180,0,0]],
+        [[3,90,0.28,0],[-1,150,0,0],[0,100,0.22,1],[-1,200,0,0]],
+        [[4,100,0.25,0],[7,80,0.20,1],[-1,160,0,0],[4,90,0.22,0],[-1,220,0,0]],
+        [[0,110,0.26,0],[-1,140,0,0],[3,80,0.22,1],[0,100,0.20,2],[-1,250,0,0]],
+      ];
+    } else if (this._lyreMode === 'tense') {
       scale = phrygian;
       phrases = [
         [[0,25,0.7,0],[1,25,0.6,1],[3,30,0.8,0],[4,25,0.7,1],[5,30,0.6,0],[-1,10,0,0],
@@ -23514,7 +24086,7 @@ class SoundManager {
 
     if (ni >= 0 && ni < scale.length) {
       let freq = scale[ni];
-      let amp = vel * musicVol * 0.14;
+      let amp = vel * musicVol * (this._lyreMode === 'menu' ? 0.06 : 0.14);
       if (this._lyreMode === 'eerie' && freq > 500) freq *= 0.5;
       this._pluckLyre(voice, freq, amp, dur * 16);
     }
@@ -23524,7 +24096,8 @@ class SoundManager {
     if (this._lyreNoteIdx >= phrase.length) {
       this._lyreNoteIdx = 0;
       this._lyrePhrase++;
-      if (this._lyreMode === 'tense') this._lyreTimer += floor(random(20, 50));
+      if (this._lyreMode === 'menu') this._lyreTimer += floor(random(180, 360));
+      else if (this._lyreMode === 'tense') this._lyreTimer += floor(random(20, 50));
       else if (this._lyreMode === 'eerie') this._lyreTimer += floor(random(100, 200));
       else this._lyreTimer += floor(random(60, 140));
     }
@@ -23643,11 +24216,96 @@ class SoundManager {
       case 'scavenge':  playTwo('sine', 349, 440, 0.16, 250, 90); break;  // F4->A4 find
       // Combat
       case 'hit':       play('triangle', 280, 0.22, 120, 100, { attack: 3 }); break;  // impact thud
-      case 'whirlwind': play('triangle', 600, 0.20, 150, 180, { attack: 5 }); break;  // fast descending sweep
-      case 'dodge':     play('triangle', 400, 0.14, 100, 40, { attack: 2 }); break;  // fast whoosh burst
+      case 'whirlwind':
+        play('triangle', 600, 0.20, 150, 180, { attack: 5 });  // fast descending sweep
+        // Sub-bass rumble layer for punch
+        setTimeout(() => {
+          let sr = this._getSfxSlot();
+          if (sr) { sr.osc.setType('sine'); sr.osc.freq(60); sr._vol = 0.18 * vol; sr._peak = sr._vol;
+            sr.gain.amp(0,0); sr.gain.amp(sr._vol, 0.01); this._sfxEnvSmooth(sr, 60, 40, 300, { attack: 10 }); }
+        }, 10);
+        break;
+      case 'dodge':
+        play('triangle', 400, 0.14, 100, 30, { attack: 1 });  // snappy whoosh
+        // High freq crack layer
+        setTimeout(() => {
+          let sd = this._getSfxSlot();
+          if (sd) { sd.osc.setType('sine'); sd.osc.freq(1200); sd._vol = 0.10 * vol; sd._peak = sd._vol;
+            sd.gain.amp(0,0); sd.gain.amp(sd._vol, 0.005); this._sfxEnvSmooth(sd, 1200, 800, 25, { attack: 1 }); }
+        }, 5);
+        break;
+      case 'shield_bash':
+        play('triangle', 180, 0.24, 80, 120, { attack: 3 });  // heavy thud
+        // Metallic ring layer
+        setTimeout(() => {
+          let sb = this._getSfxSlot();
+          if (sb) { sb.osc.setType('sine'); sb.osc.freq(800); sb._vol = 0.14 * vol; sb._peak = sb._vol;
+            sb.gain.amp(0,0); sb.gain.amp(sb._vol, 0.008); this._sfxEnvSmooth(sb, 800, 600, 50, { attack: 2 }); }
+        }, 8);
+        break;
+      case 'player_hurt':
+        play('sine', 150, 0.22, 90, 100, { attack: 3 });  // low filtered grunt
+        // Slight pitch-drop layer for impact feel
+        setTimeout(() => {
+          let sh = this._getSfxSlot();
+          if (sh) { sh.osc.setType('triangle'); sh.osc.freq(120); sh._vol = 0.12 * vol; sh._peak = sh._vol;
+            sh.gain.amp(0,0); sh.gain.amp(sh._vol, 0.005); this._sfxEnvSmooth(sh, 120, 60, 80, { attack: 2 }); }
+        }, 10);
+        break;
+      case 'skill_unlock':
+        play('sine', 600, 0.18, 600, 30, { attack: 3 });  // ascending chime: note 1
+        setTimeout(() => {
+          let s2 = this._getSfxSlot();
+          if (s2) { s2.osc.setType('sine'); s2.osc.freq(800); s2._vol = 0.18 * vol; s2._peak = s2._vol;
+            s2.gain.amp(0,0); s2.gain.amp(s2._vol, 0.005); this._sfxEnvSmooth(s2, 800, 800, 30, { attack: 3 }); }
+        }, 40);
+        setTimeout(() => {
+          let s3 = this._getSfxSlot();
+          if (s3) { s3.osc.setType('sine'); s3.osc.freq(1000); s3._vol = 0.20 * vol; s3._peak = s3._vol;
+            s3.gain.amp(0,0); s3.gain.amp(s3._vol, 0.005); this._sfxEnvSmooth(s3, 1000, 1000, 40, { attack: 3 }); }
+        }, 80);
+        break;  // 600->800->1000Hz ascending chime
       // Diving
       case 'water':     play('sine', 250, 0.16, 120, 300, { attack: 20 }); break;  // splash plunge
       case 'bubble_pop':play('triangle', 800, 0.18, 1200, 20, { attack: 2 }); break;  // bubble pop
+      // Mining — dull impacts
+      case 'stone_mine': play('sine', 180, 0.22, 120, 80, { attack: 3 }); break;  // deep thud + crumble
+      // Cinematic
+      case 'thunder':
+        play('sine', 45, 0.30, 25, 200, { attack: 3 });  // low sine hit
+        setTimeout(() => {
+          let s2 = this._getSfxSlot();
+          if (s2) { s2.osc.setType('triangle'); s2.osc.freq(90); s2._vol = 0.25 * vol; s2._peak = s2._vol;
+            s2.gain.amp(0,0); s2.gain.amp(s2._vol, 0.005); this._sfxEnvSmooth(s2, 90, 30, 180, { attack: 3 }); }
+        }, 20);
+        break;  // thunder crack: noise burst + low sine
+      case 'seagull':
+        play('sine', 2800, 0.12, 2200, 150, { attack: 8 }); // high descending chirp
+        setTimeout(() => {
+          let s2 = this._getSfxSlot();
+          if (s2) { s2.osc.setType('sine'); s2.osc.freq(2400); s2._vol = 0.10 * vol; s2._peak = s2._vol;
+            s2.gain.amp(0,0); s2.gain.amp(s2._vol, 0.01); this._sfxEnvSmooth(s2, 2400, 1900, 120, { attack: 5 }); }
+        }, 100);
+        break;  // seagull: two-part descending call
+      case 'oar_splash':
+        play('triangle', 200, 0.10, 100, 180, { attack: 10 }); break;  // subtle water splash
+      // Ambient animals
+      case 'chicken_cluck':
+        play('sine', 800, 0.08, 600, 40, { attack: 2 });  // short cluck
+        setTimeout(() => {
+          let sc = this._getSfxSlot();
+          if (sc) { sc.osc.setType('sine'); sc.osc.freq(750); sc._vol = 0.06 * vol; sc._peak = sc._vol;
+            sc.gain.amp(0,0); sc.gain.amp(sc._vol, 0.005); this._sfxEnvSmooth(sc, 750, 550, 35, { attack: 2 }); }
+        }, 50);
+        break;  // two-part cluck
+      case 'cat_meow':
+        play('sine', 700, 0.07, 500, 120, { attack: 10 });  // rising then falling meow
+        setTimeout(() => {
+          let sm = this._getSfxSlot();
+          if (sm) { sm.osc.setType('sine'); sm.osc.freq(600); sm._vol = 0.06 * vol; sm._peak = sm._vol;
+            sm.gain.amp(0,0); sm.gain.amp(sm._vol, 0.008); this._sfxEnvSmooth(sm, 600, 400, 100, { attack: 8 }); }
+        }, 80);
+        break;  // soft descending meow
     }
   }
 

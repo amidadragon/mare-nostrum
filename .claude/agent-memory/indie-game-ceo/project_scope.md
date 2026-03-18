@@ -16,33 +16,37 @@ type: project
 - 7 bug fixes (colonySpec save, narrative flags, etc.)
 - Save/load updated with new resources
 
-**Sprint 2 — IN PROGRESS (target: itch.io demo ready):**
-Focus: bug closure + 45-min session design + itch.io readiness
+**Sprint 2 — COMPLETE (working tree, not committed):**
+- Sky/horizon chaos bug: FIXED (camOffsetY * 0.05 gentle parallax instead of 1:1 camera tracking)
+- Quarrier companion added (auto-mines stone, unlocks at island level 5)
+- Fix is uncommitted — needs a commit
 
-**Known bugs to fix (priority order):**
-1. HIGH: Chapters 7-10 narrative flags never set — game story cannot complete. Needs setter calls:
-   - forge_vulcan_blade: should fire when player interacts with Vulcan forge and has materials (sketch.js near the forge interaction)
-   - learn_ritual: should fire from a specific Hyperborea interaction (frozen ruin or special object)
-   - final_inscription: should fire from reading Tablet 19 (the last tablet — "Tablet of Mare Nostrum")
-   - rite_mare_nostrum: should fire at crystal shrine when conditions met (all NPCs max hearts + level 25)
-2. MEDIUM: Colony agricultural spec stub (economy.js:230) — adds nothing to colony plots harvest
-3. MEDIUM: dawn_prayer/oracle_riddle autocomplete together — split into two separate time-gated events
-4. LOW: MIN_TEXT_SIZE forces labels to 11px — drop to 9px or remove override entirely
-5. LOW: nq_vesta_nights counter visibility — player needs a hint to stand near pyramid at night
+**Sprint 3 — PLANNED (itch.io release sprint):**
+Focus: Screenshot moments, first impression polish, narrative completion, itch.io readiness
+
+**Known bugs to fix (Sprint 3 priority order):**
+1. HIGH: Chapters 7-10 narrative flags — forge_vulcan_blade setter exists in islands.js:364, learn_ritual setter exists in islands.js:460 — need to verify they fire correctly. final_inscription fires at narrative.js:724. rite_mare_nostrum fires at sketch.js:19261. All setters EXIST but untested.
+2. HIGH: Colony agricultural spec stub (economy.js:230) — adds nothing to harvest
+3. MEDIUM: dawn_prayer/oracle_riddle autocomplete together — acceptable but not ideal
+4. LOW: MIN_TEXT_SIZE=11 overrides decorative labels at sketch.js:8
+
+**Itch.io readiness checklist:**
+- [x] Sky/atmosphere stable
+- [ ] All 10 chapters completable (need playtesting)
+- [ ] 45+ minute session loop
+- [ ] Photo mode / HUD hide for screenshots (new feature needed)
+- [ ] Screenshot-worthy moments clearly staged
+- [ ] Tutorial covers all core actions
+- [ ] Menu screen + credits screen (exists but credits panel is minimal)
+- [ ] Open Graph meta tags in index.html for link sharing
+- [ ] Game has a clear win state (Imperator ceremony — exists)
+- [ ] Version bump in index.html script tags (currently v=194)
 
 **What's been cut (do not re-add):**
 - Fleet/pirate raid system (state.fleet, state.pirateRaid defined but no logic) — too large for scope
-- Skill tree UI — skill tree state exists in player but no UI was built. DEFERRED.
+- Skill tree UI — skill tree state exists in player but no UI. DEFERRED.
 - Touch/mobile controls — DEFERRED to post-itch demo
 - PWA manifest/service worker — post-demo
 
-**Itch.io readiness checklist:**
-- [ ] All 10 chapters completable
-- [ ] 45+ minute session loop (see design_core_loop.md)
-- [ ] No crash-on-startup bugs
-- [ ] Tutorial covers all core actions
-- [ ] Menu screen + credits screen
-- [ ] Game has a clear win state (Imperator ceremony)
-
-**Why:** Updated post Sprint 1 with concrete bug analysis.
-**How to apply:** Sprint 2 dev should close bugs 1-4 first, then content work.
+**Why:** Updated after Sprint 2 partial completion and Sprint 3 planning.
+**How to apply:** Sprint 3 dev should: commit Sky fix + Quarrier, then tackle itch.io readiness items top-down.

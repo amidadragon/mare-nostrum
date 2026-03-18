@@ -25,19 +25,35 @@ type: project
 - Menu: beautiful animated background with parallax, boats, birds
 
 **What is BROKEN or stub:**
-- 4 new islands (Vulcan, Hyperborea, Plenty, Necropolis): enter/exit works, visuals exist, but [E] interactions do nothing — obsidianNodes, frostNodes, spiceNodes, soulNodes have no harvest handler
-- `const dt = 1;` in drawInner() means delta time is always 1 frame — FPS drops will slow the game proportionally instead of maintaining game speed
-- Combat skill tree in state (skills: whirlwind, shieldBash, etc.) is defined but no skill tree UI exists
+- Combat skill tree UI: state.player.skills + skillPoints defined, grantXP() awards points, but NO UI exists to spend them — biggest vibe-killer per audit
+- D-key conflict: keyPressed() triggers enterDive() on 'd', updatePlayer() uses keyIsDown(68) for rightward movement — simultaneous fire
+- Agricultural spec misdescription: UI says "3x harvest" but code (sketch.js:18995) does harvestAmt * 1.3 (30%)
+- Diving resources not saved: pearls/sponges/coral counters in state.dive never written to saveGame() — reset on reload
+- Fake loading screen: index.html uses setTimeout(1500) CSS animation; if CDN slow, game silently fails
+- Dawn prayer + oracle_riddle autocomplete together (sketch.js:22596-22604) — both flags set in same shrine interaction
+- Livia has no dialogue entries in either dialogue system (old arrays and getExpandedDialogue() both missing her)
+- Engine plugin system (registerUpdate/registerDraw in engine.js): built but never called from draw loop
+- 4 new islands (Vulcan, Hyperborea, Plenty, Necropolis): Sprint 1 complete per islands.js — enter/exit/interact all wired — but no recurring reason to revisit
 - Pirate raid system (state.pirateRaid) is defined but no update/draw code
 - Fleet system (state.fleet) is defined but no update/draw code
-- Imperial treasury rank system is defined but never updates
-- `menu_bg.webp` must exist as a file — not bundled
-- New island resources not saved (obsidian, frostCrystal, exoticSpices, soulEssence missing from saveGame())
-- Colony specialization only has 3 of 5 planned specs
+- Old NPC line arrays (MARCUS_LINES, VESTA_LINES, FELIX_LINES at sketch.js:5783) are dead weight — expanded dialogue system supersedes them
+- HUD shows DAY twice: left panel (drawHUD() line 18004) AND top-center widget (drawTimeWidget() line 18138)
+- Damage numbers have camera-drift jank: world-space spawn, screen-space render, no camera-delta correction
+
+**Priority fix order (from full audit):**
+1. Skill tree UI (biggest impact — severs the core combat loop)
+2. D-key conflict (one-line fix, high visibility bug)
+3. Agricultural spec string fix (trust issue)
+4. Save diving resources (data loss)
+5. Fix fake loader
+6. Fix oracle_riddle autocomplete
+7. Fix Livia dialogue
 
 **What is 7/10 and needs polish:**
+- Combat: great juice but skills feel identical to basic attacks (no hit-stop or extra screenshake)
 - Conquest combat: fun but enemies can crash the system (error recovery code is evidence)
-- Dialogue system: typewriter text exists but many NPCs just cycle 10 hardcoded lines
+- Dialogue system: typewriter text exists, expanded system good, but still falls back to generic on Livia
 - Quest objectives: checked via closures in narrative.js but reward delivery is incomplete
+- Island revisit: 4 new islands need 1 recurring daily resource each to stay relevant
 
-**Why:** Documented during full codebase audit, March 2026.
+**Why:** Full first-player codebase audit completed March 2026. All 8 files read (sketch.js ~24k lines, combat.js, diving.js, economy.js, islands.js, narrative.js, engine.js, debug.js, index.html).

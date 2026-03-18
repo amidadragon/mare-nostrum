@@ -19,7 +19,7 @@ const TRADE_SHIP_SPEED = 0.4;
 // ─── COLONY SPECIALIZATION ──────────────────────────────────────────────────
 
 const COLONY_SPECS = {
-  agricultural: { name: 'Agricultural', desc: '3x harvest from colony', color: '#88cc44' },
+  agricultural: { name: 'Agricultural', desc: '+30% harvest from colony', color: '#88cc44' },
   mining:       { name: 'Mining',       desc: '2x stone & iron',       color: '#aaaacc' },
   trading:      { name: 'Trading',      desc: '2x gold from routes',   color: '#ddaa44' },
 };
@@ -228,7 +228,7 @@ function onDayTransitionEconomy() {
 
   // Apply colony spec bonuses to harvest
   if (state.colonySpec['conquest'] === 'agricultural') {
-    // Bonus harvest already handled through colony plots
+    // +30% harvest bonus applied at harvest time in sketch.js farm plot harvest code
   }
   if (state.colonySpec['conquest'] === 'mining') {
     state.stone += floor(c.colonyLevel * 0.5);

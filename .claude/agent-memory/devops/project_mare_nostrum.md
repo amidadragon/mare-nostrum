@@ -10,9 +10,9 @@ Mare Nostrum (Sunlit Isles) is a p5.js browser game served as static files.
 
 **Modularization**: Plan documented in MODULARIZATION_PLAN.md. 15 candidate extractions identified totaling ~18k lines. Safest first extractions: sound.js (SoundManager class, lines 22503-23118), cinematics.js (intro+cutscenes, lines 1963-3351), wreck.js (wreck beach system, lines 18815-19992). Script load order: all new files go before sketch.js in index.html.
 
-**Save system**: localStorage key `sunlitIsles_save`, version field currently 7. Resources added over time — island resources (obsidian, frostCrystal, exoticSpices, soulEssence) added to save/load as of 2026-03-18.
+**Save system**: localStorage key `sunlitIsles_save`, version field currently 7. Resources added over time — island resources (obsidian, frostCrystal, exoticSpices, soulEssence) added to save/load as of 2026-03-18. Diving resources (pearls, coral, sponges, amphoras, lungCapacity, diveSpeed, totalDives) added to save/load as of 2026-03-18.
 
-**Cache busting**: Manual `?v=N` on all script tags in index.html. All scripts should share the same version number. Currently at v=194.
+**Cache busting**: Manual `?v=N` on all script tags in index.html. All scripts should share the same version number. Currently at v=200.
 
 **Delta time**: `_delta` is calculated in seconds in the draw() preamble (line ~1282). `drawInner()` converts to frame-units via `min(2, _delta * 60)` — the clamp at 2 prevents death spirals on tab-switch.
 

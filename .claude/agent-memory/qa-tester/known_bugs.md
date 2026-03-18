@@ -1,103 +1,123 @@
 ---
 name: known_bugs
-description: Confirmed bugs found during full codebase audit (2026-03-18)
+description: Confirmed bugs and their status — updated 2026-03-18 (post-overhaul sprint audit pass 3)
 type: project
 ---
 
-# Known Bugs — Initial Audit 2026-03-18
+# Known Bugs — Updated 2026-03-18 (Pre-Release Audit)
 
 ## CRITICAL
 
-### BUG-001: colonySpec never saved
-`state.colonySpec` (colony specialization: agricultural/mining/trading) is set at runtime but never included in `saveData` in `saveGame()`. On reload it resets to `{}`, silently deleting the player's specialization choice and removing all trade income multipliers.
-- **Location:** sketch.js:20157 (saveGame), economy.js:35 (set), economy.js:125 (read)
-- **Status:** Open
+### BUG-017: `cx`/`cy` used before `let` declaration in `expandIsland()` — CRASH at levels 5, 10, 15, 20
+`let cx = WORLD.islandCX, cy = WORLD.islandCY;` is declared at sketch.js:23182, but `cx` and `cy` are used at lines 23128, 23136, 23140, 23145-23146, 23149, 23156, 23159 — all inside the milestone landmark building blocks that execute BEFORE the declaration.
+JavaScript `let` has a temporal dead zone. When a player reaches island level 5, 10, 15, or 20, `expandIsland()` throws `ReferenceError: Cannot access 'cx' before initialization`. Resources are already deducted (line 23107-23111) and `islandLevel++` already fired (23112) before the crash, so the player loses resources and gets a level-up but no landmark buildings spawn.
+Level 25 milestone block does NOT use `cx`/`cy` so it survives.
+- **Location:** sketch.js:23182 (declaration), 23128/23136/23140/23145/23146/23149/23156/23159 (uses)
+- **Fix:** Move `let cx = WORLD.islandCX, cy = WORLD.islandCY;` to immediately after `let rx = getSurfaceRX(), ry = getSurfaceRY();` at line 23123.
+- **Status:** Open — BLOCKS progression past level 4
 
-### BUG-002: Seven narrative flags are never set (Chapters VII–X soft-locked)
-Chapters VII (volcanic_forge), VIII (frozen_memories), IX (dead_speak), X (mare_nostrum) require `interact` objectives with flags that no code ever sets:
-- `discover_vulcan` — never set when entering Vulcan
-- `discover_hyperborea` — never set
-- `discover_necropolis` — never set
-- `forge_vulcan_blade` — never set (no forge mechanic exists)
-- `learn_ritual` — never set
-- `final_inscription` — never set
-- `rite_mare_nostrum` — never set
-These chapters are permanently incompletable.
-- **Location:** narrative.js:84–122 (objectives), islands.js (enterVulcan/enterHyperborea/enterNecropolis — flags missing)
-- **Status:** Open
+### BUG-001: colonySpec never saved
+**FIXED** — `colonySpec: state.colonySpec` is now in saveData at sketch.js:21303. Verified in loadGame at line 21351: `if (d.colonySpec) state.colonySpec = d.colonySpec;`
+- **Status:** Fixed
+
+### BUG-002: Seven narrative flags never set (Chapters VII–X)
+**PARTIALLY FIXED.** The following flags now set correctly:
+- `discover_vulcan` — set in `enterVulcan()` at islands.js:19
+- `discover_hyperborea` — set in `enterHyperborea()` at islands.js:120
+- `discover_necropolis` — set in `enterNecropolis()` at islands.js:288
+- `forge_vulcan_blade` — set in `handleVulcanInteract()` at islands.js:364 (requires 10 iron + 5 titan bone near forge altar)
+- `learn_ritual` — set in `handleHyperboreInteract()` at islands.js:460 (requires all 4 frozen ruins looted + near obelisk)
+- `final_inscription` — set in `checkLoreTabletPickup()` in narrative.js:723 (fires when tablet id=19 is picked up; tablet 19 is on 'home' island at rx=0.4, ry=0.3)
+- `rite_mare_nostrum` — set in keyPressed handler at sketch.js:19270 (near crystal shrine, islandLevel>=25, all NPCs>=8 hearts)
+- **Status:** Fixed (partially — see BUG-018 for remaining issues)
+
+## CRITICAL (NEW)
+
+### BUG-018: `rite_mare_nostrum` heart threshold mismatch — Chapter X cannot complete
+Chapter X `all_hearts_max` objective requires ALL NPCs at hearts >= 10 (narrative.js:121). The `rite_mare_nostrum` flag fires at hearts >= 8 (sketch.js:19265-19268). The rite triggers at 8 hearts, but the chapter objective check needs 10 hearts. A player can perform the rite at 8 hearts, flag is set, but Chapter X never completes because `all_hearts_max` check still fails. The chapter advances when ALL objectives pass; `final_ceremony` (interact: rite_mare_nostrum) is satisfied, but `all_hearts_max` is not.
+Note: The effect is the player experiences the rite dialogue but the Chapter X completion never fires, no reward, no "IMPERATOR" title.
+- **Location:** narrative.js:121 (check: hearts >= 10), sketch.js:19265-19268 (rite fires at >= 8)
+- **Fix:** Either lower the narrative.js check to `>= 8`, or raise the rite trigger to require >= 10 hearts.
+- **Status:** Open — Chapter X completion blocked unless player has exactly 10 hearts with all NPCs before performing rite
 
 ## HIGH
 
-### BUG-003: Conquest error recovery clears soldiers but not conquest.phase
-sketch.js:1313 — the "Too many conquest errors" recovery path resets `enemies` and `active`, but does NOT reset `conquest.phase`, `conquest.soldiers`, `conquest.workers`, or `conquest.buildings`. On next re-entry the island is in an inconsistent partial state (e.g., phase='defending' with no enemies).
-- **Location:** sketch.js:1312–1324
+### BUG-019: Island states (vulcan/hyperborea/plenty/necropolis) not saved
+None of the four explorable island states are included in `saveData`. Specifically:
+- `hyperborea.frozenRuins[*].looted` — resets on reload; player must re-loot all ruins to unlock obelisk ritual. The `learn_ritual` narrativeFlag IS saved, so a completed ritual persists, but partial ruin-looting progress is lost.
+- `vulcan.obsidianNodes[*].collected` — resets on reload
+- `necropolis.tombs[*].looted`, `soulNodes[*].collected`, `ghostNPCs[*].talked` — reset on reload
+- `plenty.fruitTrees[*].fruit`/`timer`, `spiceNodes[*].collected` — reset on reload
+- **Location:** sketch.js:21238-21335 (saveGame — no island state)
+- **Status:** Open — medium impact (narrative flags survive, so quest completion persists; only resource/loot states reset)
+
+### BUG-003: Conquest error recovery clears soldiers but not conquest.phase — STILL OPEN
 - **Status:** Open
 
-### BUG-004: XP granted for non-combat enemy count drops
-combat.js:213 — `updateCombatSystem` grants XP and registers combo hits based on `enemies.length < _combatLastEnemyCount`. This fires any time the array shrinks — including `exitConquest()` which calls `enemies = []`, granting XP for every enemy alive at time of exit.
-- **Location:** combat.js:211–218
+### BUG-004: XP granted for non-combat enemy count drops — STILL OPEN
 - **Status:** Open
 
-### BUG-005: Necropolis skeleton removal races with attack loop
-islands.js:242 — `n.skeletons = n.skeletons.filter(s => s.hp > 0 || s.flashTimer > 0)` is called DURING the same frame as the attack loop that iterates `n.skeletons`. The array is rebuilt by filter (safe in JS), but dead skeletons with `flashTimer > 0` are retained for rendering, then next frame their `hp <= 0` is re-checked at line 236's `if (sk.hp <= 0) continue` — this is safe. However `exitNecropolis()` at line 224 also filters: `n.skeletons = n.skeletons.filter(s => s.hp > 0)` — this drops skeletons in their dying flash frame, which is a minor visual pop but not a crash.
-- **Location:** islands.js:224, 242
-- **Status:** Low severity, cosmetic
-
-### BUG-006: Trapped tomb on Necropolis deals damage but gives no loot
-islands.js:420–427 — if a tomb is trapped and the player has no invincTimer, the function returns after dealing damage WITHOUT marking the tomb looted (`bestTomb.looted` stays false). On next [E] press the trap fires again and again until invincTimer is active during the press. The tomb becomes infinitely damaging.
-- **Location:** islands.js:418–427
-- **Status:** Open
-
-### BUG-007: `wreck` particle arrays (birds, glints) not saved
-`saveGame()` saves `palms`, `crabs`, `decor` but NOT `wreck.birds` and `wreck.glints`. On reload these are initialized as empty (lines 1077–1078 in startNewGame), which is fine, but `loadGame()` at line 20383 does `state.wreck = d.wreck` then patches missing raft fields — this means if the loaded save has `birds`/`glints` undefined, those arrays remain undefined rather than `[]`. Any code calling `.push()` on them will throw.
-- **Location:** sketch.js:20383 (loadGame)
-- **Status:** Open (low risk since birds/glints are re-initialized on new game but could crash on old saves mid-game)
+### BUG-006: Trapped tomb deals damage but leaves tomb unlooted — FIXED
+`bestTomb.looted = true` now set BEFORE trap check in `handleNecropolisInteract()` (islands.js:535). Trap fires once, tomb is looted.
+- **Status:** Fixed
 
 ## MEDIUM
 
-### BUG-008: `mq_standard_found` counter for Chapter IV never incremented
-Chapter IV objective requires `counter: 'mq_standard_found', target: 1`. No code anywhere calls `advanceMainQuestCounter('mq_standard_found', 1)`. The legion standard is described as a "rare drop" from Terra Nova but the drop table has no such entry.
-- **Location:** narrative.js:50, sketch.js (conquest loot — no match found)
+### BUG-008: `mq_standard_found` counter never incremented — STILL OPEN
 - **Status:** Open
 
-### BUG-009: `discover_vulcan` chapter check is correct behavior missing
-`enterVulcan()` in islands.js:5 sets `v.phase = 'explored'` but never sets `state.narrativeFlags['discover_vulcan']`. The quest tracker HUD displays the objective but it can never check off. Same for `discover_hyperborea` and `discover_necropolis`.
-- **Location:** islands.js:5 (enterVulcan), 80 (enterHyperborea), 210 (enterNecropolis)
-- **Status:** Duplicate of BUG-002, flagged separately for priority
+### BUG-010: Fruit tree regrow timer never decrements — FIXED
+`updatePlentyIsland()` now at islands.js:238: `for (let t of pl.fruitTrees) { if (!t.fruit && t.timer > 0) { t.timer -= dt; if (t.timer <= 0) t.fruit = true; } }`
+- **Status:** Fixed
 
-### BUG-010: Fruit tree regrow timer never decrements
-`handlePlentyInteract()` sets `bestTree.timer = 600` on pick. `updatePlentyIsland()` does NOT contain any timer decrement or `t.fruit = true` reset logic for trees. Trees that lose their fruit are permanently barren.
-- **Location:** islands.js:163–172 (updatePlentyIsland — no tree timer logic), islands.js:384–385 (timer set but never consumed)
+### BUG-012: `nq_vesta_nights` counter never incremented — STILL OPEN
 - **Status:** Open
 
-### BUG-011: `tradeRouteUI` open state not saved
-`state.tradeRouteUI = true` can be set when the save fires (auto-save fires every 5 min). On load this flag is not restored (not in saveData), so the UI will always close on load. This is actually fine behavior, but `_specSelectOpen` module variable in economy.js is also not saved/restored, meaning if spec selection was open during save it silently closes on load without completing — can leave `state.colonySpec` in wrong state, combined with BUG-001.
-- **Location:** economy.js:27 (_specSelectOpen), sketch.js saveGame
-- **Status:** Low severity
-
-### BUG-012: `nq_vesta_nights` counter never incremented
-Vesta quest 2 requires observing stars for 3 nights (`counter: 'nq_vesta_nights'`). No code increments `advanceNPCQuestCounter('nq_vesta_nights', 1)` during day transitions or at night. Quest permanently stuck at 0/3.
-- **Location:** narrative.js:212, sketch.js updateTime (no call found)
+### BUG-013: `mq_expeditions` counter never incremented — STILL OPEN
 - **Status:** Open
 
-### BUG-013: `mq_expeditions` counter never incremented
-Chapter IV requires completing 3 expeditions to Terra Nova (`counter: 'mq_expeditions'`). No code calls `advanceMainQuestCounter('mq_expeditions', 1)` in exitConquest or anywhere else.
-- **Location:** narrative.js:49, sketch.js (exitConquest — not found)
-- **Status:** Open
+### BUG-020: Obelisk "[E] Study the Obelisk" prompt renders from any distance
+In `drawHyperboreEntities()` (islands.js:180-186), the `[E] Study the Obelisk` text renders at the obelisk's screen position whenever `allLooted && !ritualDone`, without any distance check. The actual interaction in `handleHyperboreInteract()` requires `dist < 40`. Player sees the prompt from across the island.
+- **Location:** islands.js:180-186
+- **Status:** Open — low severity, cosmetic
 
 ## LOW
 
-### BUG-014: dt cap at 2 means timer values under load run at double speed
-`dt = min(2, _delta * 60)` — when frame rate drops to 30fps, dt=2. All timers (crop growth, quest counters, cooldowns) advance at 2x rate. At 15fps dt is still capped at 2, so below 30fps all time-based systems run at actual real-time pace (correct), but between 30–60fps they scale. This is standard game loop behavior but crops can grow noticeably faster during frame drops.
-- **Location:** sketch.js:2815
-- **Status:** By design but worth flagging to content designers
+### BUG-005: Necropolis skeleton removal races — STILL OPEN (cosmetic)
+- **Status:** Open
 
-### BUG-015: `state.tradeRoutes` schema comment mismatch
-`state.tradeRoutes` is initialized as array with comment `{ id, from, to, resource, amount, frequency, shipId, active, timer, gold }` but `createTradeRoute()` in economy.js creates objects with different fields: `{ id, from, to, good, amount, shipX, shipY, shipAngle, active, tripTimer, tripPhase, goldEarned }`. The `resource`, `frequency`, `shipId` fields listed in the comment don't exist. Not a runtime crash but creates misleading state definition.
-- **Location:** sketch.js:721, economy.js:66
-- **Status:** Documentation bug
+### BUG-007: `wreck.birds`/`glints` not saved — FIXED
+loadGame now patches: `if (!Array.isArray(state.wreck.birds)) state.wreck.birds = [];` at sketch.js:21453.
+- **Status:** Fixed
 
-### BUG-016: `state.rowing.nearIsle` comment says "arena or conquest" but handles 7 islands
-sketch.js:284 — comment `// 'arena' or 'conquest' when near dock` is stale. Code handles: arena, conquest, wreck, vulcan, hyperborea, plenty, necropolis.
-- **Location:** sketch.js:284
-- **Status:** Documentation only
+### BUG-009: `discover_vulcan` duplicate — RESOLVED (merged with BUG-002 fix)
+- **Status:** Fixed
+
+### BUG-011: `tradeRouteUI` open state not saved — STILL OPEN (low)
+- **Status:** Open
+
+### BUG-015: `state.tradeRoutes` schema comment mismatch — STILL OPEN (doc only)
+- **Status:** Open
+
+### BUG-016: `state.rowing.nearIsle` comment stale — STILL OPEN (doc only)
+- **Status:** Open
+
+### BUG-022: HUD quarrier bar overlaps rank title text when quarrier is unlocked
+`drawBarHUD(22, cookedY + 30, ...)` for QUARRY bar and `text(rankTitle..., 22, cookedY + 30)` both render at `cookedY + 30`. When `state.quarrier.unlocked` is true, the "CITIZEN — LV.X" text and the quarrier energy bar are drawn at the same Y position and collide. The rank title and season text below it are also pushed by 14px (bar height) causing misread of island level. Additionally, `hudH` does not account for the extra bar row when quarrier is unlocked, so the panel background is 14px short.
+- **Location:** sketch.js:17961-17967 (bar at +30, text at +30); sketch.js:17911-17922 (hudH misses quarrier row)
+- **Fix:** After the quarrier bar block, bump `cookedY` by 14 if quarrier unlocked, then use that offset for rank title. Also add `if (state.quarrier && state.quarrier.unlocked) hudH += 14;` in the hudH block.
+- **Status:** Open — visual corruption, no gameplay impact
+
+### BUG-023: `skipIntro()` misses camera snap — player spawns at (0,0) view
+`skipIntro()` (sketch.js:2302-2307) sets `state.introPhase = 'done'` and `state.time = 6*60` but does NOT set `cam.x/y` or `camSmooth.x/y` to the player position. The normal completion path at sketch.js:2231-2232 does snap the camera. On skip, `cam` retains its default (0,0), so the first visible game frame shows the world origin, not the player. Camera snaps to player only after the smooth lerp catches up (several seconds).
+- **Location:** sketch.js:2302-2307 (skipIntro), vs 2231-2232 (normal path)
+- **Fix:** Add `cam.x = state.player.x; cam.y = state.player.y; camSmooth.x = cam.x; camSmooth.y = cam.y;` inside `skipIntro()` after setting `state.time`.
+- **Status:** Open — Medium severity, disorienting on new game
+
+### BUG-021: Crafted resource fields (`steel`, `marble`, `perfume`, `scrolls`) defined but unused and unsaved
+State fields `steel`, `marble`, `perfume`, `scrolls` are initialized at sketch.js:760-763 but no code reads or writes them beyond initialization. They are not included in `saveData`. These are placeholder fields. If crafting is added later using these, they'll need save/load entries.
+- **Location:** sketch.js:760-763
+- **Status:** Open — low priority (fields unused, no gameplay impact)
+
+### BUG-014: dt cap behavior at low framerates — by design
+- **Status:** By design

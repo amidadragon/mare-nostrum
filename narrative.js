@@ -118,7 +118,7 @@ const MAIN_QUEST_CHAPTERS = [
     desc: 'Unite all islands. Build the final bridge. Become Imperator.',
     objectives: [
       { id: 'island_25', desc: 'Reach island level 25', check: () => state.islandLevel >= 25 },
-      { id: 'all_hearts_max', desc: 'Max hearts with all NPCs', check: () => state.npc.hearts >= 10 && state.marcus && state.marcus.hearts >= 10 && state.vesta && state.vesta.hearts >= 10 && state.felix && state.felix.hearts >= 10 },
+      { id: 'all_hearts_max', desc: 'Full hearts with all NPCs', check: () => state.npc.hearts >= 8 && state.marcus && state.marcus.hearts >= 8 && state.vesta && state.vesta.hearts >= 8 && state.felix && state.felix.hearts >= 8 },
       { id: 'final_ceremony', desc: 'Perform the Rite of Mare Nostrum', interact: 'rite_mare_nostrum' },
     ],
     reward: { gold: 200 },
@@ -602,6 +602,7 @@ function updateMainQuest() {
     addFloatingText(width / 2, height * 0.2, 'CHAPTER COMPLETE: ' + chapter.title, '#ffd700');
     addFloatingText(width / 2, height * 0.27, rewardText, '#ffcc44');
     spawnParticles(state.player.x, state.player.y, 'divine', 15);
+    if (typeof snd !== 'undefined' && snd) snd.playSFX('fanfare');
     if (chapter.journalOnComplete) unlockJournal(chapter.journalOnComplete);
     if (chapter.dialogueOnComplete) {
       state.mainQuest.dialogueQueue.push({ npc: chapter.dialogueOnComplete.npc, line: chapter.dialogueOnComplete.line, timer: 300 });
@@ -691,6 +692,7 @@ function checkNPCQuestCompletion(npcName) {
   addFloatingText(width / 2, height * 0.2, 'QUEST COMPLETE: ' + quest.title, '#88ff88');
   addFloatingText(width / 2, height * 0.27, rewardText, '#ffcc44');
   spawnParticles(state.player.x, state.player.y, 'divine', 10);
+  if (typeof snd !== 'undefined' && snd) snd.playSFX('fanfare');
   let npcState = npcName === 'livia' ? state.npc : npcName === 'marcus' ? state.marcus : npcName === 'vesta' ? state.vesta : state.felix;
   if (npcState) npcState.hearts = min(10, npcState.hearts + 2);
   state.mainQuest.dialogueQueue.push({ npc: npcName, line: quest.dialogueEnd, timer: 400 });
