@@ -3156,7 +3156,7 @@ function drawInner() {
     drawVulcanEntities();
     drawParticles(); drawFloatingText(); pop();
     drawVulcanHUD();
-    drawScreenFlash(); drawCursor();
+    drawGameVignette(); drawScreenFlash(); drawCursor();
     return;
   }
   if (state.hyperborea.active) {
@@ -3173,7 +3173,7 @@ function drawInner() {
     drawHyperboreEntities();
     drawParticles(); drawFloatingText(); pop();
     drawHyperboreHUD();
-    drawScreenFlash(); drawCursor();
+    drawGameVignette(); drawScreenFlash(); drawCursor();
     return;
   }
   if (state.plenty.active) {
@@ -3190,7 +3190,7 @@ function drawInner() {
     drawPlentyEntities();
     drawParticles(); drawFloatingText(); pop();
     drawPlentyHUD();
-    drawScreenFlash(); drawCursor();
+    drawGameVignette(); drawScreenFlash(); drawCursor();
     return;
   }
   if (state.necropolis.active) {
@@ -3208,7 +3208,7 @@ function drawInner() {
     drawNecropolisEntities();
     drawParticles(); drawFloatingText(); pop();
     drawNecropolisHUD();
-    drawScreenFlash(); drawCursor();
+    drawGameVignette(); drawScreenFlash(); drawCursor();
     return;
   }
 
@@ -5573,6 +5573,19 @@ function onHarvestCombo(plot, baseYield) {
     else { state.seeds++; addFloatingText(width / 2, height * 0.34, '+1 Seed!', C.vineLight); }
   }
   return finalYield;
+}
+
+function drawGameVignette() {
+  // Subtle screen-edge darkening for atmosphere
+  let bright = getSkyBrightness();
+  let vigA = bright > 0.5 ? 12 : lerp(30, 12, bright * 2); // darker at night
+  noStroke();
+  // Top edge
+  for (let i = 0; i < 40; i++) { fill(0, 0, 0, vigA * (1 - i / 40)); rect(0, i, width, 1); }
+  // Bottom edge
+  for (let i = 0; i < 30; i++) { fill(0, 0, 0, vigA * 0.7 * (1 - i / 30)); rect(0, height - i, width, 1); }
+  // Side edges
+  for (let i = 0; i < 25; i++) { fill(0, 0, 0, vigA * 0.5 * (1 - i / 25)); rect(i, 0, 1, height); rect(width - i, 0, 1, height); }
 }
 
 function drawScreenFlash() {
