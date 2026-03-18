@@ -5,7 +5,7 @@ p5.disableFriendlyErrors = true;
 
 // ─── GLOBAL TEXT READABILITY — enforce minimum size + dark outlines ──────
 const _origTextSize = p5.prototype.textSize;
-const MIN_TEXT_SIZE = 11;
+const MIN_TEXT_SIZE = 9;
 p5.prototype.textSize = function(s) {
   return _origTextSize.call(this, max(s, MIN_TEXT_SIZE));
 };
