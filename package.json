@@ -1,0 +1,20 @@
+{
+  "name": "mare-nostrum",
+  "version": "0.9.0",
+  "description": "Cozy Roman solarpunk life-sim — p5.js browser game",
+  "scripts": {
+    "dev": "npx live-server --port=8080 --no-browser --wait=500",
+    "start": "npx live-server --port=8080",
+    "check": "node -c sketch.js && node -c combat.js && node -c diving.js && node -c economy.js && node -c islands.js && node -c narrative.js && node -c engine.js && node -c debug.js && echo 'All files OK'",
+    "count": "wc -l *.js *.html",
+    "format": "npx prettier --write '*.js' '*.html' --single-quote --print-width 160"
+  },
+  "keywords": ["game", "p5js", "roman", "solarpunk", "life-sim", "indie"],
+  "author": "amidevs",
+  "license": "MIT",
+  "type": "commonjs",
+  "devDependencies": {
+    "live-server": "^1.2.2",
+    "prettier": "^3.8.1"
+  }
+}
