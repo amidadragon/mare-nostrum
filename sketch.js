@@ -11213,12 +11213,16 @@ function updateCenturion(dt) {
   let dx = p.x - followDist * (p.facing === 'left' ? -1 : 1) - cen.x;
   let dy = p.y + 5 - cen.y;
   let d = sqrt(dx * dx + dy * dy);
-  if (d > 20) {
-    let spd = d > 100 ? cen.speed * 1.5 : cen.speed;
+  if (d > 200 && !state.conquest.active) {
+    // Too far — snap to player (prevents rubber-banding across island)
+    cen.x = p.x + 20; cen.y = p.y + 10; cen.vx = 0; cen.vy = 0;
+  } else if (d > 20) {
+    let spd = min(cen.speed * 1.2, cen.speed + d * 0.005); // gentle speed boost, no wild teleporting
     cen.vx = (dx / d) * spd;
     cen.vy = (dy / d) * spd;
-    cen.x += cen.vx * dt;
-    cen.y += cen.vy * dt;
+    let nx = cen.x + cen.vx * dt, ny = cen.y + cen.vy * dt;
+    if (isWalkable(nx, ny)) { cen.x = nx; cen.y = ny; }
+    else { cen.vx *= 0.3; cen.vy *= 0.3; } // don't push through island edge
     cen.facing = dx > 0 ? 1 : -1;
   } else {
     cen.vx *= 0.8;
@@ -18796,49 +18800,26 @@ function drawBarHUD(x, y, w, h, frac, colFull, colEmpty, label) {
 // ─── CURSOR ───────────────────────────────────────────────────────────────
 function drawCursor() {
   let mx = mouseX, my = mouseY;
+  noStroke();
 
   if (state.buildMode) {
-    // Build cursor — golden Roman column marker
-    noFill();
-    stroke(200, 170, 60, 200);
-    strokeWeight(1.5);
-    // Column shaft
-    line(mx, my - 10, mx, my + 6);
-    // Capital (top ornament)
-    line(mx - 4, my - 10, mx + 4, my - 10);
-    line(mx - 3, my - 12, mx + 3, my - 12);
-    // Base
-    line(mx - 4, my + 6, mx + 4, my + 6);
-    line(mx - 5, my + 8, mx + 5, my + 8);
-    // Golden glow dot
-    noStroke(); fill(255, 200, 60, 120);
-    ellipse(mx, my - 2, 4, 4);
-  } else {
-    // Roman spear/pilum cursor — historical pointer
-    noFill();
-    let pulse = sin(frameCount * 0.06) * 0.15 + 0.85;
-    // Spear shaft (angled like a pointer)
-    stroke(180, 155, 100, floor(200 * pulse));
-    strokeWeight(1.5);
-    line(mx, my, mx + 10, my + 14);
-    // Spearhead (iron tip)
-    stroke(160, 150, 130, floor(220 * pulse));
-    strokeWeight(2);
-    line(mx, my, mx - 1, my - 3);
-    line(mx - 1, my - 3, mx + 1, my - 5);
-    line(mx + 1, my - 5, mx + 2, my - 2);
-    line(mx + 2, my - 2, mx, my);
-    // Tip highlight
-    noStroke(); fill(220, 200, 150, floor(180 * pulse));
-    triangle(mx, my, mx - 1, my - 4, mx + 2, my - 2);
-    // Small laurel leaves at shaft base
-    stroke(80, 120, 50, floor(140 * pulse));
+    // Build cursor — golden crosshair
+    stroke(200, 170, 60, 180);
     strokeWeight(1);
-    // Left leaf
-    noFill();
-    arc(mx + 6, my + 8, 6, 4, PI * 0.8, PI * 1.6);
-    // Right leaf
-    arc(mx + 8, my + 7, 6, 4, PI * 1.4, PI * 2.2);
+    line(mx - 8, my, mx - 3, my);
+    line(mx + 3, my, mx + 8, my);
+    line(mx, my - 8, mx, my - 3);
+    line(mx, my + 3, mx, my + 8);
+    noStroke();
+    fill(255, 200, 60, 100);
+    ellipse(mx, my, 3, 3);
+  } else {
+    // Simple warm pointer — small triangle + dot
+    fill(220, 190, 140, 200);
+    triangle(mx, my, mx + 3, my + 10, mx + 8, my + 5);
+    // Bright tip dot
+    fill(255, 230, 180, 220);
+    ellipse(mx + 1, my + 1, 2, 2);
   }
   noStroke();
 }
@@ -21921,7 +21902,7 @@ function loadGame() {
 // ─── ZONE PLACEMENT HELPERS ──────────────────────────────────────────────
 // Farm zone bounding box — used to keep other elements away
 function getFarmBounds() {
-  let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
+  let farmCX = getFarmCenterX(), farmCY = getFarmCenterY();
   // Grid grows: base 3x3 (38x28 spacing), expands per level
   let cols = 3 + (state.islandLevel >= 2 ? 1 : 0) + (state.islandLevel >= 4 ? 1 : 0);
   let rows = 3 + (state.islandLevel >= 3 ? 1 : 0) + (state.islandLevel >= 5 ? 1 : 0);
@@ -23453,10 +23434,10 @@ function expandIsland() {
   let rx = getSurfaceRX(), ry = getSurfaceRY();
   let cx = WORLD.islandCX, cy = WORLD.islandCY;
   if (state.islandLevel === 5) {
-    // Granary near farm, Well near center
+    // Granary north of farm (well clear), Well to the south-east
     let fc = { x: getFarmCenterX(), y: getFarmCenterY() };
-    state.buildings.push({ x: fc.x + rx * 0.15, y: fc.y - ry * 0.3, w: 48, h: 36, type: 'granary', rot: 0 });
-    state.buildings.push({ x: cx + rx * 0.2, y: cy + ry * 0.4, w: 24, h: 24, type: 'well', rot: 0 });
+    state.buildings.push({ x: fc.x, y: fc.y - ry * 0.7, w: 48, h: 36, type: 'granary', rot: 0 });
+    state.buildings.push({ x: cx + rx * 0.35, y: cy + ry * 0.55, w: 24, h: 24, type: 'well', rot: 0 });
     addFloatingText(width / 2, height * 0.25, 'CITIZEN — Granary & Well constructed!', '#88cc66');
     spawnParticles(fc.x + rx * 0.15, fc.y - ry * 0.3, 'build', 12);
   }
