@@ -4603,6 +4603,7 @@ function buyMarketItem(idx) {
   if (item.reward === 'blessing') {
     let types = ['crops', 'solar', 'speed', 'luck'];
     state.blessing = { type: types[floor(random(types.length))], timer: 720 };
+    if (snd) snd.playSFX('ding');
     addFloatingText(width / 2, height * 0.3, 'Blessed!', '#ffcc44');
   } else if (item.reward === 'catTreat') {
     let wild = state.cats.find(c => !c.adopted);
@@ -5321,6 +5322,7 @@ function updateCooking(dt) {
     let recipe = RECIPES.find(r => r.name === c.recipe);
     if (recipe) {
       let qty = recipe.qty || 1;
+      if (snd) snd.playSFX('ding');
       addFloatingText(width / 2, height * 0.35, '+' + qty + ' ' + recipe.name + '!', C.solarBright);
       spawnParticles(state.player.x, state.player.y, 'harvest', 10);
     }
@@ -9918,6 +9920,8 @@ function updatePlayer(dt) {
 
   // Slow down in shallow water / diving
   let inShallows = isInShallows(p.x, p.y);
+  if (inShallows && !p._wasInShallows) { if (snd) snd.playSFX('water'); }
+  p._wasInShallows = inShallows;
   if (inShallows) spd *= (state.diving && state.diving.active) ? 0.7 : 0.55;
 
   let dx = 0, dy = 0;
@@ -10167,7 +10171,13 @@ function updatePlayerAnim(dt) {
   // Walk frame advance (4-frame cycle, ~8 frames per step)
   if (p.moving) {
     a.walkTimer += dt;
-    if (a.walkTimer >= 8) { a.walkTimer = 0; a.walkFrame = (a.walkFrame + 1) % 4; }
+    if (a.walkTimer >= 8) {
+      a.walkTimer = 0; a.walkFrame = (a.walkFrame + 1) % 4;
+      // Footstep sound on frames 1 and 3 (feet hitting ground)
+      if ((a.walkFrame === 1 || a.walkFrame === 3) && snd && frameCount % 2 === 0) {
+        snd.playSFX(isInShallows(p.x, p.y) ? 'water' : 'step_sand');
+      }
+    }
   } else {
     a.walkFrame = 0; a.walkTimer = 0;
   }
@@ -10688,6 +10698,7 @@ function updateCompanion(dt) {
         state.seeds--;
         c.energy = max(0, c.energy - 8);
         spawnParticles(plx, ply, 'build', 4);
+        if (snd) snd.playSFX('build');
         addFloatingText(w2sX(plx), w2sY(ply) - 15, 'Planted!', C.cropGlow);
         c.task = 'idle';
       } else {
@@ -13338,6 +13349,7 @@ function updateShip(dt) {
       if (abs(ship.x - targetX) < 5) {
         ship.state = 'docked';
         ship.timer = 0;
+        if (snd) snd.playSFX('sail');
         addFloatingText(width / 2, height * 0.35, 'Ship docked at port! Walk to the harbor to trade.', C.solarBright);
         addNotification('Merchant trireme has arrived!', '#ffbb22');
       }
@@ -15907,6 +15919,7 @@ function colonizeTerraNovaAction() {
   c.soldiers = [];
 
   unlockJournal('terra_nova_colonized');
+  if (snd) snd.playSFX('fanfare');
   addFloatingText(width / 2, height * 0.15, 'TERRA NOVA COLONIZED!', '#ffdd66');
   addFloatingText(width / 2, height * 0.22, 'Colony Level 1 — Income: +5g/day', '#aaddff');
   addFloatingText(width / 2, height * 0.29, 'Workers: 3 — Farms: 6', '#88cc88');
@@ -15978,6 +15991,7 @@ function upgradeColony() {
     });
   }
 
+  if (snd) snd.playSFX('fanfare');
   addFloatingText(width / 2, height * 0.15, 'COLONY LEVEL ' + c.colonyLevel + '!', '#ffdd66');
   addFloatingText(width / 2, height * 0.22, 'Income: +' + c.colonyIncome + 'g/day  Workers: ' + c.colonyWorkers, '#aaddff');
   triggerScreenShake(6, 15);
@@ -16070,6 +16084,7 @@ function updateBridgeConstruction(dt) {
     b.progress = 100;
     b.building = false;
     b.built = true;
+    if (snd) snd.playSFX('fanfare');
     addFloatingText(width / 2, height * 0.15, 'THE IMPERIAL BRIDGE IS COMPLETE!', '#ffdd00');
     addFloatingText(width / 2, height * 0.22, 'Walk freely between your islands!', '#aaddff');
     triggerScreenShake(15, 40);
@@ -19087,6 +19102,7 @@ function mousePressed() {
         if (canPlant) {
           p.planted = true; p.stage = 0; p.timer = 0; p.cropType = cropType;
           if (typeof advanceNPCQuestCounter === 'function') advanceNPCQuestCounter('nq_livia_planted', 1);
+          if (snd) snd.playSFX('build');
           let label = cropType === 'grain' ? 'Planted' : 'Planted ' + cropType;
           addFloatingText(px, py - 20, label, C.vineLight);
         }
@@ -19686,6 +19702,7 @@ function keyPressed() {
           nn.currentLine = getNPCDialogue(nn, lines, mid, high);
           nn.dialogTimer = 180;
           npcHeartPop(nn);
+          if (snd) snd.playSFX('heart');
           state.dailyActivities.gifted++;
           let ht = giftH > 1 ? '+' + giftH + ' Hearts (' + giftN + ')' : '+Heart';
           addFloatingText(w2sX(nn.x), w2sY(nn.y) - 30, ht, '#ff6688');
