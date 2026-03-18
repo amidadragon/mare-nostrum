@@ -4063,20 +4063,23 @@ function drawDriftClouds(bright) {
     let cx = floor(cl.x), cy = floor(cl.y);
     let cw = floor(cl.w), ch = floor(cl.h);
 
-    // Main cloud body
+    // Main cloud body — soft ellipses
     fill(cloudR, cloudG, cloudB, alpha);
-    rect(cx - cw * 0.4, cy - 2, cw * 0.8, ch * 0.5);
+    ellipse(cx, cy, cw * 0.8, ch * 0.6);
     // Upper bumps
-    fill(highlightR, highlightG, highlightB, alpha * 0.85);
-    rect(cx - cw * 0.25, cy - ch * 0.35, cw * 0.5, ch * 0.35);
-    rect(cx + cw * 0.1, cy - ch * 0.42, cw * 0.25, ch * 0.2);
-    rect(cx - cw * 0.35, cy - ch * 0.22, cw * 0.2, ch * 0.2);
+    fill(highlightR, highlightG, highlightB, alpha * 0.75);
+    ellipse(cx - cw * 0.15, cy - ch * 0.2, cw * 0.5, ch * 0.4);
+    ellipse(cx + cw * 0.2, cy - ch * 0.15, cw * 0.35, ch * 0.3);
+    // Side puffs
+    fill(cloudR, cloudG, cloudB, alpha * 0.6);
+    ellipse(cx - cw * 0.35, cy + ch * 0.05, cw * 0.3, ch * 0.35);
+    ellipse(cx + cw * 0.35, cy + ch * 0.05, cw * 0.25, ch * 0.3);
     // Bottom shadow
-    fill(shadowR, shadowG, shadowB, alpha * 0.7);
-    rect(cx - cw * 0.45, cy + ch * 0.18, cw * 0.9, ch * 0.18);
+    fill(shadowR, shadowG, shadowB, alpha * 0.5);
+    ellipse(cx, cy + ch * 0.2, cw * 0.7, ch * 0.25);
     // Bright highlight on top
-    fill(highlightR, highlightG, highlightB, alpha * 0.45);
-    rect(cx - cw * 0.15, cy - ch * 0.33, cw * 0.3, ch * 0.1);
+    fill(highlightR, highlightG, highlightB, alpha * 0.35);
+    ellipse(cx - cw * 0.05, cy - ch * 0.25, cw * 0.3, ch * 0.15);
   });
 }
 
@@ -4183,13 +4186,14 @@ function drawStormClouds() {
     let cx = floor(c.x * width + sin(frameCount * 0.003 + i) * 20);
     let cy = floor(c.y * height);
     let r = 100 + i * 30;
-    // Pixel storm cloud — stacked rects
-    fill(30, 40, 60, 160 * intensity);
-    rect(cx - r, cy - floor(r * 0.15), r * 2, floor(r * 0.3));
-    rect(cx - r * 0.7, cy - floor(r * 0.25), r * 1.4, floor(r * 0.2));
-    fill(20, 28, 48, 120 * intensity);
-    rect(cx + 10, cy + 2, floor(r * 1.4), floor(r * 0.2));
-    rect(cx - r * 0.6, cy + floor(r * 0.12), r * 1.2, floor(r * 0.1));
+    // Soft storm clouds — ellipses
+    fill(30, 40, 60, 140 * intensity);
+    ellipse(cx, cy, r * 2, r * 0.5);
+    fill(25, 35, 55, 120 * intensity);
+    ellipse(cx - r * 0.3, cy - r * 0.1, r * 1.2, r * 0.35);
+    ellipse(cx + r * 0.3, cy + r * 0.05, r * 1.0, r * 0.3);
+    fill(20, 28, 48, 90 * intensity);
+    ellipse(cx, cy + r * 0.15, r * 1.5, r * 0.25);
   });
 }
 
@@ -18052,15 +18056,18 @@ function drawHUD() {
 
   drawBarHUD(22, 20, 100, 8, state.solar / state.maxSolar, C.solarBright, C.solarGold, 'SOLAR');
 
-  drawHudResource(22, 38, 'SEEDS    ', state.seeds, color(C.textBright), 'seeds');
-  drawHudResource(22, 50, 'HARVEST  ', state.harvest, color(C.textBright), 'harvest');
-  drawHudResource(22, 62, 'WOOD     ', state.wood, color(140, 100, 40), 'wood');
-  drawHudResource(22, 74, 'STONE    ', state.stone, color(C.stoneLight), 'stone');
-  drawHudResource(22, 86, 'CRYSTALS ', state.crystals, color(C.crystalGlow), 'crystals');
-  drawHudResource(22, 98, 'GOLD     ', state.gold, color(C.solarBright), 'gold');
-  drawHudResource(22, 110, 'FISH     ', state.fish, color(100, 180, 255), 'fish');
+  // Core resources — always show
+  let resY = 38;
+  drawHudResource(22, resY, 'SEEDS    ', state.seeds, color(C.textBright), 'seeds'); resY += 11;
+  drawHudResource(22, resY, 'HARVEST  ', state.harvest, color(C.textBright), 'harvest'); resY += 11;
+  drawHudResource(22, resY, 'WOOD     ', state.wood, color(140, 100, 40), 'wood'); resY += 11;
+  drawHudResource(22, resY, 'STONE    ', state.stone, color(C.stoneLight), 'stone'); resY += 11;
+  drawHudResource(22, resY, 'CRYSTALS ', state.crystals, color(C.crystalGlow), 'crystals'); resY += 11;
+  // Conditional resources — only when player has them
+  if (state.gold > 0) { drawHudResource(22, resY, 'GOLD     ', state.gold, color(C.solarBright), 'gold'); resY += 11; }
+  if (state.fish > 0) { drawHudResource(22, resY, 'FISH     ', state.fish, color(100, 180, 255), 'fish'); resY += 11; }
   // Expedition resources
-  let expResY = 122;
+  let expResY = resY;
   if (state.ironOre > 0 || state.rareHide > 0 || state.ancientRelic > 0 || state.titanBone > 0) {
     fill(170, 185, 200);
     if (state.ironOre > 0) { text('IRON     ' + state.ironOre, 22, expResY); expResY += 12; }
