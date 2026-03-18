@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>MARE NOSTRUM — Cozy Roman Survival</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/addons/p5.sound.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%;
+      background: #0a0e1a;
+      overflow: hidden;
+      cursor: default;
+    }
+    canvas { display: block; }
+
+    /* Loading screen */
+    #loading {
+      position: fixed; inset: 0;
+      background: #0a0810;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 100;
+      font-family: 'Cinzel', Georgia, serif;
+      color: #c8a050;
+      letter-spacing: 0.2em;
+      transition: opacity 1.2s ease;
+    }
+    #loading h1 {
+      font-size: clamp(1.8rem, 5vw, 3.2rem);
+      color: #f4d58d;
+      text-shadow: 0 0 40px rgba(200,160,60,0.4), 0 2px 8px rgba(0,0,0,0.8);
+      margin-bottom: 0.2em;
+      font-weight: 900;
+    }
+    #loading p {
+      font-size: 0.7rem;
+      color: rgba(200,170,100,0.5);
+      margin-bottom: 2.5em;
+      font-style: italic;
+      letter-spacing: 0.3em;
+    }
+    #loading .bar-wrap {
+      width: 200px; height: 2px;
+      background: rgba(200,170,100,0.1);
+      border: 1px solid rgba(200,170,100,0.2);
+      position: relative;
+    }
+    #loading .bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, rgba(200,160,60,0.3), #f4d58d);
+      width: 0%;
+      animation: loadBar 1.5s ease forwards 0.5s;
+      box-shadow: 0 0 12px rgba(200,160,60,0.5);
+    }
+    @keyframes loadBar {
+      to { width: 100%; }
+    }
+    #loading .sub {
+      margin-top: 2em;
+      font-size: 0.55rem;
+      color: rgba(200,170,100,0.2);
+      letter-spacing: 0.25em;
+      font-family: 'Courier New', monospace;
+    }
+  </style>
+</head>
+<body>
+  <div id="loading">
+    <h1>MARE NOSTRUM</h1>
+    <p>A Mediterranean Survival Saga</p>
+    <div class="bar-wrap"><div class="bar-fill"></div></div>
+    <div class="sub">NAVIGATING THE ANCIENT WATERS...</div>
+  </div>
+
+  <script src="engine.js?v=194"></script>
+  <script src="narrative.js?v=194"></script>
+  <script src="sketch.js?v=194"></script>
+  <script src="islands.js?v=194"></script>
+  <script src="diving.js?v=194"></script>
+  <script src="combat.js?v=194"></script>
+  <script src="economy.js?v=194"></script>
+  <script src="debug.js?v=194"></script>
+  <script>
+    // Hide loading screen after p5 starts
+    setTimeout(() => {
+      const l = document.getElementById('loading');
+      if (l) { l.style.opacity = '0'; setTimeout(() => l.remove(), 800); }
+    }, 1500);
+  </script>
+</body>
+</html>
