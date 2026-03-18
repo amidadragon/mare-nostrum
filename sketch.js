@@ -10263,13 +10263,34 @@ function drawPlayer() {
     armSwing = (wf === 1) ? 1 : (wf === 3) ? -1 : 0;
   }
 
-  drawPlayerShadow(s);
-  drawPlayerFeet(s, legOff);
-  drawPlayerCape(fDir, p.moving);
-  drawPlayerBody();
-  drawPlayerArms(armSwing);
-  drawPlayerTool(fDir, p.hotbarSlot, p.toolSwing);
-  drawPlayerHead(fDir, facingUp, a);
+  let inWater = isInShallows(p.x, p.y);
+
+  if (inWater) {
+    // Swimming mode — only draw upper body, add water line
+    drawPlayerBody();
+    drawPlayerArms(p.moving ? floor(sin(frameCount * 0.15) * 2) : 0); // swim stroke
+    drawPlayerHead(fDir, facingUp, a);
+    // Water surface line over legs
+    fill(60, 140, 180, 100);
+    ellipse(0, 6, 28 + sin(frameCount * 0.08) * 4, 8);
+    fill(100, 180, 220, 60);
+    ellipse(0, 5, 22 + sin(frameCount * 0.12 + 1) * 3, 5);
+    // Ripple rings when moving
+    if (p.moving) {
+      noFill(); stroke(120, 200, 240, 40); strokeWeight(0.5);
+      let rPhase = (frameCount * 0.1) % TWO_PI;
+      ellipse(0, 6, 20 + sin(rPhase) * 10, 6 + sin(rPhase) * 3);
+      noStroke();
+    }
+  } else {
+    drawPlayerShadow(s);
+    drawPlayerFeet(s, legOff);
+    drawPlayerCape(fDir, p.moving);
+    drawPlayerBody();
+    drawPlayerArms(armSwing);
+    drawPlayerTool(fDir, p.hotbarSlot, p.toolSwing);
+    drawPlayerHead(fDir, facingUp, a);
+  }
 
   // Dash cross-flash
   if (p.dashTimer > 0) {
