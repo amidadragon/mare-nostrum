@@ -14116,7 +14116,10 @@ function drawArenaDistantLabel() {
   let a = state.adventure;
   let sx = w2sX(a.isleX);
   let sy = w2sY(a.isleY);
-  if (sx < -300 || sx > width + 300 || sy < -300 || sy > height + 300) return;
+  // Clamp to below horizon — don't float in the sky
+  let minY = max(height * 0.06, height * 0.25 - horizonOffset) + 10;
+  sy = max(sy, minY);
+  if (sx < -300 || sx > width + 300 || sy > height + 300) return;
   push();
   noStroke();
   fill(200, 185, 150, 140 + sin(frameCount * 0.03) * 30);
@@ -14136,7 +14139,9 @@ function drawConquestDistantLabel() {
   let c = state.conquest;
   let sx = w2sX(c.isleX);
   let sy = w2sY(c.isleY);
-  if (sx < -400 || sx > width + 400 || sy < -400 || sy > height + 400) return;
+  let minY = max(height * 0.06, height * 0.25 - horizonOffset) + 10;
+  sy = max(sy, minY);
+  if (sx < -400 || sx > width + 400 || sy > height + 400) return;
   push();
   noStroke();
   fill(170, 160, 130, 140);

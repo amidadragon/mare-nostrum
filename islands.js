@@ -93,6 +93,7 @@ function drawVulcanEntities() {
 }
 function drawVulcanDistantLabel() {
   if (state.vulcan.active) return; let v = state.vulcan, sx = w2sX(v.isleX), sy = w2sY(v.isleY);
+  let minY = max(height * 0.06, height * 0.25 - horizonOffset) + 10; sy = max(sy, minY);
   if (sx < -400 || sx > width + 400 || sy < -400 || sy > height + 400) return;
   push(); noStroke(); fill(255, 100, 60, 140 + sin(frameCount * 0.03) * 30); textSize(9); textAlign(CENTER); textStyle(ITALIC); text('Isle of Vulcan', sx, sy + v.isleRY + 18); textStyle(NORMAL); fill(200, 120, 80, 100); textSize(6); text('Volcanic Forge', sx, sy + v.isleRY + 28); pop();
 }
@@ -196,7 +197,8 @@ function drawHyperboreEntities() {
   drawPlayer(); let dockX = w2sX(h.isleX), dockY = w2sY(h.isleY + h.isleRY * 0.82); fill(160, 175, 190); rect(floor(dockX) - 15, floor(dockY), 30, 6);
 }
 function drawHyperboreDistantLabel() {
-  if (state.hyperborea.active) return; let h = state.hyperborea, sx = w2sX(h.isleX), sy = w2sY(h.isleY); if (sx < -400 || sx > width + 400 || sy < -400 || sy > height + 400) return;
+  if (state.hyperborea.active) return; let h = state.hyperborea, sx = w2sX(h.isleX), sy = w2sY(h.isleY); let minY = max(height * 0.06, height * 0.25 - horizonOffset) + 10; sy = max(sy, minY);
+  if (sx < -400 || sx > width + 400 || sy < -400 || sy > height + 400) return;
   push(); noStroke(); fill(140, 200, 240, 140 + sin(frameCount * 0.03) * 30); textSize(9); textAlign(CENTER); textStyle(ITALIC); text('Hyperborea', sx, sy + h.isleRY + 18); textStyle(NORMAL); fill(120, 180, 220, 100); textSize(6); text('Frozen Wastes', sx, sy + h.isleRY + 28); pop();
 }
 function drawHyperboreHUD() {
@@ -265,7 +267,8 @@ function drawPlentyEntities() {
   drawPlayer(); let dockX = w2sX(pl.isleX), dockY = w2sY(pl.isleY + pl.isleRY * 0.82); fill(140, 100, 50); rect(floor(dockX) - 15, floor(dockY), 30, 6);
 }
 function drawPlentyDistantLabel() {
-  if (state.plenty.active) return; let pl = state.plenty, sx = w2sX(pl.isleX), sy = w2sY(pl.isleY); if (sx < -400 || sx > width + 400 || sy < -400 || sy > height + 400) return;
+  if (state.plenty.active) return; let pl = state.plenty, sx = w2sX(pl.isleX), sy = w2sY(pl.isleY); let minY = max(height * 0.06, height * 0.25 - horizonOffset) + 10; sy = max(sy, minY);
+  if (sx < -400 || sx > width + 400 || sy < -400 || sy > height + 400) return;
   push(); noStroke(); fill(60, 200, 80, 140 + sin(frameCount * 0.03) * 30); textSize(9); textAlign(CENTER); textStyle(ITALIC); text('Isle of Plenty', sx, sy + pl.isleRY + 18); textStyle(NORMAL); fill(80, 180, 60, 100); textSize(6); text('Tropical Paradise', sx, sy + pl.isleRY + 28); pop();
 }
 function drawPlentyHUD() {
@@ -341,7 +344,8 @@ function drawNecropolisEntities() {
   drawPlayer(); let dockX = w2sX(n.isleX), dockY = w2sY(n.isleY + n.isleRY * 0.82); fill(60, 50, 55); rect(floor(dockX) - 15, floor(dockY), 30, 6);
 }
 function drawNecropolisDistantLabel() {
-  if (state.necropolis.active) return; let n = state.necropolis, sx = w2sX(n.isleX), sy = w2sY(n.isleY); if (sx < -400 || sx > width + 400 || sy < -400 || sy > height + 400) return;
+  if (state.necropolis.active) return; let n = state.necropolis, sx = w2sX(n.isleX), sy = w2sY(n.isleY); let minY = max(height * 0.06, height * 0.25 - horizonOffset) + 10; sy = max(sy, minY);
+  if (sx < -400 || sx > width + 400 || sy < -400 || sy > height + 400) return;
   push(); noStroke(); fill(160, 100, 200, 140 + sin(frameCount * 0.03) * 30); textSize(9); textAlign(CENTER); textStyle(ITALIC); text('Necropolis', sx, sy + n.isleRY + 18); textStyle(NORMAL); fill(130, 80, 170, 100); textSize(6); text('City of the Dead', sx, sy + n.isleRY + 28); pop();
 }
 function drawNecropolisHUD() {
