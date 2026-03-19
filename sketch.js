@@ -2240,18 +2240,18 @@ function updateTime(dt) {
     // Random event roll — 20% chance per day
     checkRandomEvent();
     // Daily island resource refresh — nodes respawn each day for revisit incentive
-    if (state.vulcan.phase !== 'unexplored') {
-      state.vulcan.obsidianNodes.forEach(n => n.collected = false);
+    if (state.vulcan && state.vulcan.phase !== 'unexplored') {
+      (state.vulcan.obsidianNodes || []).forEach(n => n.collected = false);
     }
-    if (state.hyperborea.phase !== 'unexplored') {
-      state.hyperborea.frostNodes.forEach(n => n.collected = false);
+    if (state.hyperborea && state.hyperborea.phase !== 'unexplored') {
+      (state.hyperborea.frostNodes || []).forEach(n => n.collected = false);
     }
-    if (state.plenty.phase !== 'unexplored') {
-      state.plenty.spiceNodes.forEach(n => n.collected = false);
-      state.plenty.fruitTrees.forEach(t => { t.fruit = true; t.timer = 0; });
+    if (state.plenty && state.plenty.phase !== 'unexplored') {
+      (state.plenty.spiceNodes || []).forEach(n => n.collected = false);
+      (state.plenty.fruitTrees || []).forEach(t => { t.fruit = true; t.timer = 0; });
     }
-    if (state.necropolis.phase !== 'unexplored') {
-      state.necropolis.soulNodes.forEach(n => n.collected = false);
+    if (state.necropolis && state.necropolis.phase !== 'unexplored') {
+      (state.necropolis.soulNodes || []).forEach(n => n.collected = false);
     }
     // Crystal rain event (15% chance per day after day 10)
     if (state.day > 10 && random() < 0.15) {
@@ -15147,10 +15147,11 @@ function keyPressed() {
   // Block input when overlays are open
   if (empireDashOpen || inventoryOpen || state.naturalistOpen || wardrobeOpen) return;
 
-  // Villa Codex toggle
-  if (key === 'v' || key === 'V') {
+  // Villa Codex toggle (C key)
+  if (key === 'c' || key === 'C') {
     state.codexOpen = !state.codexOpen;
     state.journalOpen = false;
+    return;
   }
 
   // Build mode toggle
@@ -15190,10 +15191,10 @@ function keyPressed() {
     expandIsland();
   }
 
-  // Build Imperial Bridge
-  if (key === 'v' || key === 'V') {
+  // Build Imperial Bridge (G key — near pyramid)
+  if (key === 'g' || key === 'G') {
     let nearPyramid = dist2(state.player.x, state.player.y, state.pyramid.x, state.pyramid.y) < 70;
-    if (nearPyramid && canBuildBridge()) {
+    if (nearPyramid && typeof canBuildBridge === 'function' && canBuildBridge()) {
       startBuildBridge();
     }
   }
