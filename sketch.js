@@ -923,6 +923,9 @@ function initState() {
     legia: {
       recruits: 0, maxRecruits: 5, trainingQueue: 0, trainingTimer: 0,
       castrumLevel: 0, castrumX: 0, castrumY: 0, deployed: 0, legiaUIOpen: false,
+      soldiers: [], // { x, y, hp, maxHp, facing, state: 'patrol'|'idle', patrolTimer, targetX, targetY }
+      expeditionTarget: null, // island name string or null
+      marching: false,
     },
 
     _expedSummary: null, // expedition victory overlay { timer, kills, gold, loot, soldiersStart, soldiersLost, isDeath }
@@ -1811,6 +1814,7 @@ function drawInner() {
     updateDiscoveryEvents(dt);
     updateBridgeConstruction(dt);
     updateLegia(dt);
+    updateLegionAmbient(dt);
     if (typeof updateDiving === 'function') updateDiving(dt);
     updateNotifications(dt);
     // Narrative engine updates
@@ -5148,6 +5152,8 @@ function drawWorldObjectsSorted() {
   if (state.cats && fullyUnlocked) state.cats.forEach(cat => items.push({ y: cat.y, draw: () => drawOneCat(cat) }));
   // Ambient citizens
   if (state.citizens) state.citizens.forEach(c => items.push({ y: c.y, draw: () => drawOneCitizen(c) }));
+  // Legion soldiers on home island
+  if (state.legia && state.legia.soldiers) state.legia.soldiers.forEach(s => items.push({ y: s.y, draw: () => drawLegionAmbientSoldier(s) }));
   // Characters — gated by progression
   if (fullyUnlocked || prog.companionsAwakened.lares)
     items.push({ y: state.companion.y, draw: drawCompanion });
@@ -7080,6 +7086,23 @@ function drawRowingBoat() {
     }
 
     pop();
+  }
+
+  // Legion formation behind boat when marching
+  if (state.legia && state.legia.marching && state.legia.soldiers) {
+    let boatX = floor(sx);
+    let boatY = floor(sy + bob);
+    noStroke();
+    state.legia.soldiers.forEach((s, i) => {
+      let ox = -20 - (i % 3) * 12;
+      let oy = 10 + floor(i / 3) * 8;
+      // Small soldier body in formation
+      fill(160, 50, 40);
+      rect(boatX + ox, boatY + oy, 4, 5);
+      // Helmet
+      fill(150, 140, 120);
+      rect(boatX + ox, boatY + oy - 2, 4, 2);
+    });
   }
 }
 
@@ -11553,6 +11576,17 @@ function updateLegia(dt) {
       lg.trainingQueue--;
       lg.trainingTimer = lg.trainingQueue > 0 ? 300 : 0;
       addFloatingText(w2sX(lg.castrumX), w2sY(lg.castrumY) - 30, 'Legionary Ready!', '#cc4444');
+      // Spawn ambient soldier entity near castrum
+      let cx = lg.castrumX, cy = lg.castrumY;
+      let soldierMaxHP = 60 + (state.expeditionUpgrades ? state.expeditionUpgrades.soldierHP : 0) * 20;
+      lg.soldiers.push({
+        x: cx + random(-30, 30), y: cy + random(-20, 20),
+        hp: soldierMaxHP, maxHp: soldierMaxHP,
+        facing: random() > 0.5 ? 1 : -1,
+        state: 'patrol',
+        patrolTimer: floor(random(60, 200)),
+        targetX: cx, targetY: cy,
+      });
     }
   }
 }
@@ -11630,6 +11664,76 @@ function drawLegionPatrol() {
     text('[E] Legia', w2sX(cx), w2sY(cy) - 35 + floatOffset);
     pop();
   }
+}
+
+function updateLegionAmbient(dt) {
+  if (!state.legia || !state.legia.soldiers) return;
+  let cx = state.legia.castrumX || WORLD.islandCX + 200;
+  let cy = state.legia.castrumY || WORLD.islandCY + 100;
+  state.legia.soldiers.forEach(s => {
+    s.patrolTimer -= dt;
+    if (s.state === 'idle' && s.patrolTimer <= 0) {
+      s.targetX = cx + random(-50, 50);
+      s.targetY = cy + random(-30, 30);
+      s.state = 'patrol';
+      s.patrolTimer = floor(random(120, 300));
+    } else if (s.state === 'patrol') {
+      let dx = (s.targetX || cx) - s.x, dy = (s.targetY || cy) - s.y;
+      let d = sqrt(dx * dx + dy * dy);
+      if (d < 5 || s.patrolTimer <= 0) {
+        s.state = 'idle';
+        s.patrolTimer = floor(random(60, 200));
+      } else {
+        s.x += (dx / d) * 1.2 * dt;
+        s.y += (dy / d) * 0.8 * dt;
+        s.facing = dx > 0 ? 1 : -1;
+      }
+    }
+  });
+}
+
+function drawLegionAmbientSoldier(s) {
+  let sx = w2sX(s.x), sy = w2sY(s.y);
+  if (sx < -30 || sx > width + 30 || sy < -30 || sy > height + 30) return;
+  push();
+  translate(sx, sy + floatOffset);
+  scale(s.facing, 1);
+  noStroke();
+  // Shadow
+  fill(0, 0, 0, 30);
+  ellipse(0, 2, 10, 4);
+  // Body (red tunic)
+  fill(160, 50, 40);
+  rect(-3, -8, 6, 10);
+  // Armor plate
+  fill(180, 170, 150);
+  rect(-3, -7, 6, 4);
+  // Head
+  fill(195, 165, 130);
+  rect(-2, -12, 4, 4);
+  // Helmet
+  fill(150, 140, 120);
+  rect(-3, -13, 6, 3);
+  // Spear
+  stroke(100, 80, 60);
+  strokeWeight(1);
+  line(3, -16, 3, 4);
+  noStroke();
+  // Shield
+  fill(140, 50, 35);
+  rect(-5, -6, 2, 6);
+  // Walking animation
+  if (s.state === 'patrol') {
+    let step = sin(frameCount * 0.12 + s.x) * 2;
+    fill(120, 40, 30);
+    rect(-2, 2, 2, 3);
+    rect(0 + step * 0.3, 2, 2, 3);
+  } else {
+    fill(120, 40, 30);
+    rect(-2, 2, 2, 3);
+    rect(1, 2, 2, 3);
+  }
+  pop();
 }
 
 // ─── FOG OF WAR ─────────────────────────────────────────────────────────
@@ -11806,9 +11910,28 @@ function enterConquest() {
   camSmooth.x = p.x; camSmooth.y = p.y;
   initConquestIsland();
 
-  // Start with 2 soldiers on first visit
+  // Deploy army if marching with soldiers
   let soldierHP = 60 + state.expeditionUpgrades.soldierHP * 20;
-  if (c.soldiers.length === 0 && c.phase === 'unexplored') {
+  let lg = state.legia;
+  if (lg && lg.marching && lg.soldiers && lg.soldiers.length > 0) {
+    // Transfer home island soldiers to conquest soldiers
+    c.soldiers = [];
+    lg.soldiers.forEach((s, i) => {
+      let ang = (i / max(1, lg.soldiers.length)) * TWO_PI;
+      c.soldiers.push({
+        x: p.x + cos(ang) * 30, y: p.y + sin(ang) * 20,
+        vx: 0, vy: 0, hp: s.hp, maxHp: s.maxHp,
+        state: 'follow', target: null,
+        attackTimer: 0, facing: 1, flashTimer: 0,
+      });
+    });
+    lg.soldiers = [];
+    lg.marching = false;
+    lg.expeditionTarget = null;
+    if (c.phase === 'unexplored') { c.phase = 'landing'; c.phaseTimer = 0; }
+    addFloatingText(width / 2, height * 0.35, c.soldiers.length + ' soldiers deployed!', '#ddccaa');
+  } else if (c.soldiers.length === 0 && c.phase === 'unexplored') {
+    // Start with 2 soldiers on first visit (no army)
     for (let i = 0; i < 2; i++) {
       let ang = (i / 2) * PI - HALF_PI;
       c.soldiers.push({
@@ -11860,14 +11983,8 @@ function enterConquest() {
   addFloatingText(width / 2, height * 0.28, getPhaseObjective(c.phase), '#bbaa77');
   triggerScreenShake(3, 8);
 
-  // Deploy legia soldiers for this expedition
-  let lg = state.legia;
-  if (lg && lg.recruits > 0) {
-    lg.deployed = lg.recruits;
-    lg.recruits = 0;
-    addFloatingText(width / 2, height * 0.35, lg.deployed + ' soldiers deployed!', '#ddccaa');
-  }
-  c._soldiersAtStart = (lg && lg.deployed) || 0;
+  // Track soldiers at start for expedition summary
+  c._soldiersAtStart = c.soldiers.length;
 }
 
 function exitConquest(isDeath) {
@@ -11908,22 +12025,34 @@ function exitConquest(isDeath) {
   }
   trackMilestone('first_expedition');
 
-  // Legia: roll soldier survival (20% death chance each), all lost on death-exit
+  // Legia: return surviving conquest soldiers to home island
   let lg = state.legia;
   let soldiersAtStart = c._soldiersAtStart || 0;
   let soldiersLost = 0;
-  if (lg && lg.deployed > 0) {
+  if (lg) {
+    let aliveSoldiers = c.soldiers.filter(s => s.hp > 0);
     if (isDeath) {
-      soldiersLost = lg.deployed;
-      lg.deployed = 0;
+      // All soldiers lost on death
+      soldiersLost = soldiersAtStart;
+      lg.soldiers = [];
     } else {
-      let survived = 0;
-      for (let i = 0; i < lg.deployed; i++) {
-        if (random() < 0.2) { soldiersLost++; } else { survived++; }
-      }
-      lg.deployed = 0;
-      lg.recruits = min(survived, lg.maxRecruits);
+      // Surviving conquest soldiers return as home island soldiers
+      soldiersLost = soldiersAtStart - aliveSoldiers.length;
+      let cx = lg.castrumX || WORLD.islandCX + 200;
+      let cy = lg.castrumY || WORLD.islandCY + 100;
+      lg.soldiers = aliveSoldiers.map(s => ({
+        x: cx + random(-30, 30), y: cy + random(-20, 20),
+        hp: s.hp, maxHp: s.maxHp,
+        facing: random() > 0.5 ? 1 : -1,
+        state: 'patrol',
+        patrolTimer: floor(random(60, 200)),
+        targetX: cx, targetY: cy,
+      }));
+      lg.recruits = lg.soldiers.length;
     }
+    lg.deployed = 0;
+    lg.marching = false;
+    c.soldiers = [];
   }
 
   // Transfer expedition loot
@@ -15034,6 +15163,12 @@ function keyPressed() {
   }
   // Legia UI number keys
   if (state.legia && state.legia.legiaUIOpen) {
+    if ((key === 'r' || key === 'R') && state.legia.soldiers && state.legia.soldiers.length > 0) {
+      state.legia.marching = true;
+      state.legia.legiaUIOpen = false;
+      addFloatingText(width / 2, height * 0.3, 'The legion marches! Board your ship.', '#cc4444');
+      return;
+    }
     if (handleLegiaKey(key)) return;
     return; // block all other keys while legiaUI open
   }
@@ -15948,6 +16083,9 @@ function loadGame() {
       state.legia.castrumY = d.legia.castrumY || 0;
       state.legia.deployed = d.legia.deployed || 0;
       state.legia.legiaUIOpen = false; // never restore open
+      state.legia.soldiers = d.legia.soldiers || [];
+      state.legia.expeditionTarget = null; // reset expedition state on load
+      state.legia.marching = false;
     }
     state.arenaHighWave = d.arenaHighWave || 0;
     // Random events

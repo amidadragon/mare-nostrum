@@ -892,7 +892,15 @@ function drawLegiaUI() {
     let upg = lg.castrumLevel === 1 ? '100g + 20 stone' : '300g + 50 stone + 10 iron';
     text('[2] Upgrade Castrum (' + upg + ')', px + 14, py + 112);
   }
-  text('[ESC] Close', px + 14, py + 126);
+  // Army count and expedition launch prompt
+  if (state.legia.soldiers && state.legia.soldiers.length > 0) {
+    fill(220, 200, 160); textSize(9);
+    text('Army: ' + state.legia.soldiers.length + ' legionaries', px + 14, py + 112);
+    fill(180, 160, 120); textSize(8);
+    text('[R] Launch expedition (go to port)', px + 14, py + 126);
+  } else {
+    text('[ESC] Close', px + 14, py + 126);
+  }
   pop();
 }
 
