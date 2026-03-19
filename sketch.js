@@ -165,6 +165,41 @@ const WORLD = {
   tileSize: 32,     // grid snap for building
 };
 
+// Organic coastline — cached noise vertices (regenerated on island resize)
+let _coastlineVerts = null;
+let _coastlineLastRX = 0;
+let _coastlineLastRY = 0;
+
+function getCoastlineVerts() {
+  let rx = state.islandRX, ry = state.islandRY;
+  if (_coastlineVerts && _coastlineLastRX === rx && _coastlineLastRY === ry) return _coastlineVerts;
+  _coastlineVerts = [];
+  let numVerts = 128;
+  let noiseSeed = 42;
+  for (let i = 0; i < numVerts; i++) {
+    let angle = (i / numVerts) * TWO_PI;
+    let noiseVal = noise(cos(angle) * 2 + noiseSeed, sin(angle) * 2 + noiseSeed);
+    let offset = (noiseVal - 0.5) * 0.06;
+    _coastlineVerts.push({ angle: angle, offset: offset });
+  }
+  _coastlineLastRX = rx;
+  _coastlineLastRY = ry;
+  return _coastlineVerts;
+}
+
+function drawCoastlineShape(screenCX, screenCY, radiusX, radiusY, yOffset) {
+  let verts = getCoastlineVerts();
+  beginShape();
+  for (let i = 0; i < verts.length; i++) {
+    let v = verts[i];
+    let r = 1 + v.offset;
+    let vx = screenCX + cos(v.angle) * radiusX * r;
+    let vy = (screenCY + yOffset) + sin(v.angle) * radiusY * r;
+    vertex(vx, vy);
+  }
+  endShape(CLOSE);
+}
+
 function getEra() {
   let lv = state.islandLevel || 1;
   return lv <= 8 ? 'village' : lv <= 17 ? 'city' : 'atlantis';
@@ -5424,16 +5459,16 @@ function drawIsland() {
     ellipse(ffx, ffy, 8 + sin(fa * 2.7) * 3, 3);
   }
 
-  // Sandy beach ring — warm golden sand
+  // Sandy beach ring — warm golden sand (organic coastline)
   fill(210, 190, 145);
-  ellipse(ix, iy - 14, iw * 0.93, ih * 0.39);
+  drawCoastlineShape(ix, iy, iw * 0.465, ih * 0.195, -14);
   // Wet sand (darker warm inner ring — tide line)
   fill(180, 158, 115);
-  ellipse(ix, iy - 16, iw * 0.915, ih * 0.375);
+  drawCoastlineShape(ix, iy, iw * 0.4575, ih * 0.1875, -16);
   // Wet sand shimmer — subtle water sheen on wet zone
   let wetShimmer = sin(frameCount * 0.03) * 0.3 + 0.5;
   fill(160, 185, 200, 18 * wetShimmer * dayMix);
-  ellipse(ix, iy - 15, iw * 0.925, ih * 0.385);
+  drawCoastlineShape(ix, iy, iw * 0.4625, ih * 0.1925, -15);
 
   // Grass top — seasonal colors with terrain variation
   let sg = getSeasonGrass();
