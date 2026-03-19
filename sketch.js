@@ -8116,28 +8116,47 @@ function drawPyramid() {
 
   // ─── TIER 4+: ETERNAL ROOF FLAME ───
   if (tier >= 4) {
-    let roofFlameY = pedY - pedH - 14;
-    // Bronze tripod
-    fill(170, 140, 58);
-    rect(-4, roofFlameY + 4, 8, 10);
-    fill(180, 150, 68);
-    rect(-3, roofFlameY + 5, 6, 3);
-    // Multi-layer flame (always on)
-    let flameH = 14 + sin(frameCount * 0.07) * 2;
-    for (let f = 0; f < 3; f++) {
-      let fw = (3 - f) * 3;
-      let fh = flameH * (1 - f * 0.2);
-      let flicker = sin(frameCount * 0.15 + f * 2) * 1.5;
-      fill(lerpColor(color(255, 140, 30, 200), color(255, 220, 60, 180), f / 3));
-      beginShape();
-      vertex(-fw + flicker, roofFlameY + 3);
-      quadraticVertex(-fw * 0.5, roofFlameY - fh * 0.4, flicker * 0.3, roofFlameY - fh);
-      quadraticVertex(fw * 0.5, roofFlameY - fh * 0.4, fw + flicker, roofFlameY + 3);
-      endShape(CLOSE);
+    let flameBaseY = pedY - pedH - 8;
+    let flameH = 18 + sin(frameCount * 0.08) * 5;
+    let flameW = 12;
+    // Flame layer 1 — outer orange
+    fill(255, 107, 0, 200);
+    noStroke();
+    beginShape();
+    vertex(-flameW / 2, flameBaseY);
+    vertex(-flameW / 4, flameBaseY - flameH * 0.6);
+    vertex(0, flameBaseY - flameH);
+    vertex(flameW / 4, flameBaseY - flameH * 0.6);
+    vertex(flameW / 2, flameBaseY);
+    endShape(CLOSE);
+    // Flame layer 2 — inner gold
+    fill(255, 215, 0, 220);
+    beginShape();
+    vertex(-flameW / 3, flameBaseY);
+    vertex(-flameW / 6, flameBaseY - flameH * 0.5);
+    vertex(0, flameBaseY - flameH * 0.8);
+    vertex(flameW / 6, flameBaseY - flameH * 0.5);
+    vertex(flameW / 3, flameBaseY);
+    endShape(CLOSE);
+    // Flame layer 3 — white core
+    fill(255, 240, 200, 180);
+    beginShape();
+    vertex(-2, flameBaseY);
+    vertex(0, flameBaseY - flameH * 0.5);
+    vertex(2, flameBaseY);
+    endShape(CLOSE);
+    // Golden spark particles
+    if (frameCount % 3 === 0) {
+      particles.push({
+        x: pyr.x + random(-4, 4),
+        y: pyr.y - (cellaTop - colH + pedH + 8 + flameH),
+        vx: random(-0.3, 0.3), vy: random(-2, -0.8),
+        life: random(25, 45), maxLife: 45,
+        type: 'burst', size: random(1.5, 3),
+        r: 255, g: 200 + floor(random(-20, 20)), b: 40,
+        gravity: -0.02, world: true,
+      });
     }
-    // White-gold core
-    fill(255, 240, 160, 120);
-    ellipse(0, roofFlameY - 2, 4, 6);
   }
 
   // ─── FLANKING STATUES (Tier 3+) ───
@@ -8227,30 +8246,34 @@ function drawPyramid() {
 
   // ─── TIER 5: CRYSTAL FORMATIONS ───
   if (tier === 5) {
-    // Crystal apex beacon behind pediment
-    let crystH = 15 + (lvl - 20) * 9; // 15 at lv20, 60 at lv25
-    let apexY = pedY - pedH - 8;
-    // Main crystal prism
-    fill(94, 236, 208, 200);
+    let crystalH = min((lvl - 19) * 6, 24);
+    let crystalBaseY = pedY - pedH - 8;
+    let crystalTopY = crystalBaseY - crystalH;
+    // Crystal hexagonal prism
+    stroke(180, 220, 255);
+    strokeWeight(1);
+    fill(160, 200, 255, 180);
     beginShape();
-    vertex(-6, apexY);
-    vertex(-3, apexY - crystH);
-    vertex(3, apexY - crystH);
-    vertex(6, apexY);
+    for (let i = 0; i < 6; i++) {
+      let a = i * TWO_PI / 6 - HALF_PI;
+      let r = crystalH * 0.25;
+      vertex(cos(a) * r, crystalBaseY - crystalH / 2 + sin(a) * r * 0.4);
+    }
     endShape(CLOSE);
-    // Bright core
-    fill(223, 255, 255, 160);
+    // Crystal taper top
+    fill(180, 220, 255, 200);
     beginShape();
-    vertex(-2, apexY - 4);
-    vertex(-1, apexY - crystH + 4);
-    vertex(1, apexY - crystH + 4);
-    vertex(2, apexY - 4);
+    vertex(-crystalH * 0.2, crystalBaseY - crystalH * 0.3);
+    vertex(0, crystalTopY);
+    vertex(crystalH * 0.2, crystalBaseY - crystalH * 0.3);
     endShape(CLOSE);
+    noStroke();
     // Teal glow around crystal
     for (let gr = 30; gr > 0; gr -= 5) {
       fill(80, 240, 200, 4 * (gr / 30));
-      circle(0, apexY - crystH * 0.5, gr * 2);
+      circle(0, crystalBaseY - crystalH * 0.5, gr * 2);
     }
+    let apexY = crystalTopY;
 
     // Secondary crystal clusters on stylobate corners (lv22+)
     if (lvl >= 22) {
@@ -8293,43 +8316,42 @@ function drawPyramid() {
       }
     }
 
-    // Golden beam (lv22+, night/dusk)
-    let tBright = getSkyBrightness();
-    if (lvl >= 22 && tBright < 0.6) {
-      let beamAlpha = map(tBright, 0.6, 0, 0, 1);
-      let beamPulse = sin(frameCount * 0.013) * 0.2 + 0.8;
-      let ba = beamAlpha * beamPulse;
-      let beamTop = apexY - crystH;
-      // Wide halo
-      stroke(255, 240, 120, 6 * ba);
-      strokeWeight(20);
-      line(0, beamTop, 0, beamTop - 400);
-      // Medium beam
-      stroke(255, 230, 100, 18 * ba);
-      strokeWeight(8);
-      line(0, beamTop, 0, beamTop - 400);
-      // Tight core
-      stroke(255, 255, 200, 80 * ba);
-      strokeWeight(2.5);
-      line(0, beamTop, 0, beamTop - 300);
-      noStroke();
+    // ─── TIER 5: GOLDEN LIGHT BEAM (level 22+, night only) ───
+    if (lvl >= 22) {
+      let bright = getSkyBrightness();
+      if (bright < 0.3) {
+        let beamPulse = 0.85 + 0.15 * sin(frameCount * 0.04);
+        // Render pass 1: soft wide halo
+        stroke(255, 217, 122, floor(12 * beamPulse));
+        strokeWeight(20);
+        line(0, apexY, 0, apexY - 400);
+        // Render pass 2: medium beam
+        stroke(255, 217, 122, floor(30 * beamPulse));
+        strokeWeight(6);
+        line(0, apexY, 0, apexY - 400);
+        // Render pass 3: bright core
+        stroke(255, 240, 180, floor(80 * beamPulse));
+        strokeWeight(1.5);
+        line(0, apexY, 0, apexY - 300);
+        noStroke();
+      }
     }
 
-    // Crystal ring (lv23+)
+    // ─── TIER 5: CRYSTAL RING ORBIT (level 23+) ───
     if (lvl >= 23) {
-      let ringCY = apexY - crystH - 6;
       for (let r = 0; r < 12; r++) {
         let angle = r * TWO_PI / 12 + frameCount * 0.01;
-        let shardAlpha = sin(frameCount * 0.05 + r * 0.5) * 0.3 + 0.7;
-        let shX = cos(angle) * 18;
-        let shY = ringCY + sin(angle) * 8;
-        fill(80, 240, 200, 200 * shardAlpha);
-        beginShape();
-        vertex(shX, shY - 3);
-        vertex(shX - 1.5, shY);
-        vertex(shX, shY + 3);
-        vertex(shX + 1.5, shY);
-        endShape(CLOSE);
+        let rx = 40, ry = 14;
+        let shardX = cos(angle) * rx;
+        let shardY = apexY + sin(angle) * ry;
+        let shardAlpha = 160 + sin(frameCount * 0.05 + r * 0.5) * 60;
+        push();
+        translate(shardX, shardY);
+        rotate(angle + HALF_PI);
+        fill(160, 200, 255, shardAlpha);
+        noStroke();
+        rect(-1, -4, 2, 8, 1);
+        pop();
       }
     }
 
