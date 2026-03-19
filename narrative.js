@@ -814,6 +814,7 @@ function startNPCQuest(npcName, quest) {
 }
 
 function checkNPCQuestCompletion(npcName) {
+  if (!state.npcQuests) return;
   let nqState = state.npcQuests[npcName];
   if (!nqState || !nqState.active) return;
   let chain = NPC_QUEST_CHAINS[npcName];
