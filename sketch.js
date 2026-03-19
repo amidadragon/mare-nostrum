@@ -948,6 +948,9 @@ function initState() {
       castrumLevel: 0, castrumX: 0, castrumY: 0, deployed: 0, legiaUIOpen: false,
     },
 
+    _expedSummary: null, // expedition victory overlay { timer, kills, gold, loot, soldiersStart, soldiersLost, isDeath }
+    arenaHighWave: 0,    // all-time best wave across arena sessions
+
     isInitialized: false,
   };
   buildIsland();
@@ -5481,6 +5484,126 @@ function drawSeasonalEffects() {
   }
 }
 
+// ─── ATLANTIS WATER RINGS (level 18+) ─────────────────────────────────────
+function drawAtlantisRings() {
+  if (state.islandLevel < 18) return;
+
+  let lvl = state.islandLevel;
+  let cx = w2sX(WORLD.islandCX);
+  let cy = w2sY(WORLD.islandCY) - 18;
+  let bright = getSkyBrightness();
+  let isNight = bright < 0.3;
+
+  let iw = state.islandRX * 2;
+  let ih = state.islandRY * 2;
+  let ySquash = 0.40;
+
+  let rings = [
+    { rf: 0.24, cw: 14, startLvl: 18 },
+    { rf: 0.52, cw: 12, startLvl: 19 },
+    { rf: 0.78, cw: 10, startLvl: 20 },
+  ];
+
+  let sg = getSeasonGrass();
+  noStroke();
+
+  rings.forEach(function(ring) {
+    if (lvl < ring.startLvl) return;
+
+    let fadeIn = min(1, (lvl - ring.startLvl + 1) / 2);
+    let alpha = fadeIn * 180;
+
+    let outerRX = iw * ring.rf * 0.5;
+    let outerRY = ih * ring.rf * 0.5 * ySquash;
+    let innerRX = outerRX - ring.cw;
+    let innerRY = outerRY - ring.cw * ySquash;
+
+    let waterR = lerp(20, 40, bright);
+    let waterG = lerp(80, 160, bright);
+    let waterB = lerp(100, 180, bright);
+
+    fill(waterR, waterG, waterB, alpha);
+    ellipse(cx, cy, outerRX * 2, outerRY * 2);
+
+    fill(sg.r, sg.g, sg.b);
+    ellipse(cx, cy, innerRX * 2, innerRY * 2);
+
+    let shimmer = sin(frameCount * 0.03 + ring.rf * 10) * 0.3 + 0.5;
+    fill(80, 200, 180, 20 * shimmer * fadeIn);
+    ellipse(cx, cy, (outerRX - 2) * 2, (outerRY - 1) * 2);
+
+    if (isNight && lvl >= 22) {
+      let glowPulse = sin(frameCount * 0.02 + ring.rf * 5) * 0.3 + 0.7;
+      fill(0, 220, 190, 25 * glowPulse * fadeIn);
+      ellipse(cx, cy, (outerRX + 8) * 2, (outerRY + 4) * 2);
+      fill(0, 240, 210, 15 * glowPulse * fadeIn);
+      ellipse(cx, cy, outerRX * 2, outerRY * 2);
+    }
+
+    if (bright > 0.15) {
+      fill(100, 210, 195, 30 * fadeIn);
+      for (let r = 0; r < 8; r++) {
+        let a = r * TWO_PI / 8 + frameCount * 0.005;
+        let midRX = (outerRX + innerRX) / 2;
+        let midRY = (outerRY + innerRY) / 2;
+        let rx = cx + cos(a) * midRX;
+        let ry = cy + sin(a) * midRY;
+        ellipse(rx, ry, 6, 3);
+      }
+    }
+  });
+
+  // Bridges at cardinal points
+  let bridgeColor = lvl >= 20 ? [200, 195, 180] : [170, 155, 130];
+  let crystalAccent = lvl >= 22;
+
+  let bridgeDirs = [
+    { angle: -HALF_PI, label: 'N' },
+    { angle: HALF_PI, label: 'S' },
+    { angle: 0, label: 'E' },
+    { angle: PI, label: 'W' },
+  ];
+
+  bridgeDirs.forEach(function(bd) {
+    rings.forEach(function(ring) {
+      if (lvl < ring.startLvl) return;
+
+      let outerRX = iw * ring.rf * 0.5;
+      let outerRY = ih * ring.rf * 0.5 * ySquash;
+
+      let bx = cx + cos(bd.angle) * outerRX;
+      let by = cy + sin(bd.angle) * outerRY;
+
+      fill(bridgeColor[0], bridgeColor[1], bridgeColor[2]);
+      push();
+      translate(bx, by);
+      let bw = ring.cw + 4;
+      let bh = 10;
+      if (bd.label === 'N' || bd.label === 'S') {
+        rect(-bh / 2, -bw / 2, bh, bw);
+        fill(bridgeColor[0] - 15, bridgeColor[1] - 15, bridgeColor[2] - 15);
+        rect(-bh / 2, -bw / 2, bh, 2);
+        rect(-bh / 2, bw / 2 - 2, bh, 2);
+      } else {
+        rect(-bw / 2, -bh / 2, bw, bh);
+        fill(bridgeColor[0] - 15, bridgeColor[1] - 15, bridgeColor[2] - 15);
+        rect(-bw / 2, -bh / 2, 2, bh);
+        rect(bw / 2 - 2, -bh / 2, 2, bh);
+      }
+
+      if (crystalAccent) {
+        fill(80, 220, 200, 180);
+        rect(-2, -2, 4, 4);
+        if (isNight) {
+          fill(80, 240, 210, 40);
+          ellipse(0, 0, 12, 8);
+        }
+      }
+      pop();
+    });
+  });
+}
+
 // ─── ISLAND ───────────────────────────────────────────────────────────────
 function drawIsland() {
   let ix = w2sX(WORLD.islandCX);
@@ -5655,6 +5778,9 @@ function drawIsland() {
       rect(dotX, dotY, 2, 2);
     }
   }
+
+  // Atlantis concentric water rings (level 18+)
+  drawAtlantisRings();
 
   // Gravel side-paths from ports to the main road
   noStroke();
@@ -14182,6 +14308,23 @@ const WAVE_DEFS = [
   [{ type: 'minotaur', count: 1 }],
 ];
 
+// Generate a scaled wave def for waves beyond WAVE_DEFS.length
+function generateWaveDef(n) {
+  // Boss wave every 5th
+  if (n % 5 === 0) {
+    return [{ type: 'minotaur', count: 1 + floor((n - 5) / 10) }, { type: 'secutor', count: 2 }];
+  }
+  let hpMult = 1 + (n - WAVE_DEFS.length) * 0.08;
+  let extras = floor((n - WAVE_DEFS.length) / 3);
+  let wolves = 2 + extras;
+  let bandits = 1 + extras;
+  // Alternate harpy/secutor mix
+  if (n % 2 === 0) {
+    return [{ type: 'harpy', count: bandits }, { type: 'wolf', count: wolves }, { type: '_hpMult', count: hpMult }];
+  }
+  return [{ type: 'secutor', count: 1 + extras }, { type: 'bandit', count: bandits }, { type: '_hpMult', count: hpMult }];
+}
+
 function getEnemyStats(type) {
   switch (type) {
     case 'wolf':     return { hp: 30, damage: 8, speed: 2.2, size: 12 };
@@ -14196,19 +14339,26 @@ function getEnemyStats(type) {
 function spawnWave(n) {
   let a = state.adventure;
   a.enemies = [];
-  let defs = WAVE_DEFS[min(n - 1, WAVE_DEFS.length - 1)];
-  let total = defs.reduce((s, d) => s + d.count, 0);
+  let defs = n <= WAVE_DEFS.length ? WAVE_DEFS[n - 1] : generateWaveDef(n);
+  // Extract HP multiplier if present (injected by generateWaveDef)
+  let hpMult = 1;
+  let spawnDefs = defs.filter(d => {
+    if (d.type === '_hpMult') { hpMult = d.count; return false; }
+    return true;
+  });
+  let total = spawnDefs.reduce((s, d) => s + d.count, 0);
   let idx = 0;
-  for (let def of defs) {
+  for (let def of spawnDefs) {
     for (let i = 0; i < def.count; i++) {
       let angle = (TWO_PI / total) * idx + random(-0.3, 0.3);
       let stats = getEnemyStats(def.type);
+      let scaledHp = floor(stats.hp * hpMult);
       a.enemies.push({
         type: def.type,
         x: a.isleX + cos(angle) * (a.isleRX - 20),
         y: a.isleY + sin(angle) * (a.isleRY - 20),
         vx: 0, vy: 0,
-        hp: stats.hp, maxHp: stats.hp,
+        hp: scaledHp, maxHp: scaledHp,
         damage: stats.damage, speed: stats.speed, size: stats.size,
         state: 'chase', stateTimer: 0,
         attackCooldown: 0, facing: 1, flashTimer: 0,
@@ -14220,8 +14370,10 @@ function spawnWave(n) {
   a.wave = n;
   a.waveState = 'fighting';
   a.waveTimer = 0;
-  addFloatingText(width / 2, height * 0.25, 'WAVE ' + n, '#ffcc44');
-  triggerScreenShake(4, 10);
+  let isBoss = n > WAVE_DEFS.length && n % 5 === 0;
+  addFloatingText(width / 2, height * 0.25, isBoss ? 'BOSS WAVE ' + n + '!' : 'WAVE ' + n, isBoss ? '#ff6633' : '#ffcc44');
+  if (isBoss) triggerScreenShake(8, 20);
+  else triggerScreenShake(4, 10);
 }
 
 function enterAdventure() {
@@ -14299,20 +14451,14 @@ function updateAdventure(dt) {
     }
     // Check wave clear
     if (a.enemies.length === 0) {
-      if (a.wave >= WAVE_DEFS.length) {
-        a.waveState = 'victory';
-        a.waveTimer = 0;
-        if (a.wave > a.bestWave) a.bestWave = a.wave;
-        state.gold += 20;
-        state.crystals += 2;
-        addFloatingText(width / 2, height * 0.25, 'VICTORY!', '#ffdd44');
-        triggerScreenShake(6, 15);
-      } else {
-        a.waveState = 'intermission';
-        a.waveTimer = 120; // 2 seconds between waves
-        if (a.wave > a.bestWave) a.bestWave = a.wave;
-        addFloatingText(width / 2, height * 0.3, 'Wave ' + a.wave + ' Complete!', '#aaddff');
-      }
+      if (a.wave > a.bestWave) a.bestWave = a.wave;
+      state.arenaHighWave = max(state.arenaHighWave, a.wave);
+      let waveGold = 10 + a.wave * 5;
+      state.gold += waveGold;
+      if (a.wave % 5 === 0) { state.crystals += 2; }
+      addFloatingText(width / 2, height * 0.3, 'Wave ' + a.wave + ' Clear! +' + waveGold + ' Gold', '#aaddff');
+      a.waveState = 'intermission';
+      a.waveTimer = 120; // 2 seconds between waves
     }
   }
 
@@ -15566,7 +15712,7 @@ function drawAdventureHUD() {
 
   // Wave indicator
   let waveText = '';
-  if (a.waveState === 'fighting') waveText = 'WAVE ' + a.wave + ' / ' + WAVE_DEFS.length;
+  if (a.waveState === 'fighting') waveText = 'WAVE ' + a.wave + (a.wave > WAVE_DEFS.length ? ' (Endless)' : ' / ' + WAVE_DEFS.length);
   else if (a.waveState === 'intermission') waveText = 'Next wave in ' + ceil(a.waveTimer / 60) + '...';
   else if (a.waveState === 'victory') waveText = 'VICTORY! Press E to return';
   else if (a.waveState === 'idle') waveText = 'Prepare...';
@@ -16360,6 +16506,15 @@ function enterConquest() {
   addFloatingText(width / 2, height * 0.2, 'EXPEDITION #' + c.expeditionNum, '#ddcc88');
   addFloatingText(width / 2, height * 0.28, getPhaseObjective(c.phase), '#bbaa77');
   triggerScreenShake(3, 8);
+
+  // Deploy legia soldiers for this expedition
+  let lg = state.legia;
+  if (lg && lg.recruits > 0) {
+    lg.deployed = lg.recruits;
+    lg.recruits = 0;
+    addFloatingText(width / 2, height * 0.35, lg.deployed + ' soldiers deployed!', '#ddccaa');
+  }
+  c._soldiersAtStart = (lg && lg.deployed) || 0;
 }
 
 function exitConquest(isDeath) {
@@ -16400,12 +16555,41 @@ function exitConquest(isDeath) {
   }
   trackMilestone('first_expedition');
 
+  // Legia: roll soldier survival (20% death chance each), all lost on death-exit
+  let lg = state.legia;
+  let soldiersAtStart = c._soldiersAtStart || 0;
+  let soldiersLost = 0;
+  if (lg && lg.deployed > 0) {
+    if (isDeath) {
+      soldiersLost = lg.deployed;
+      lg.deployed = 0;
+    } else {
+      let survived = 0;
+      for (let i = 0; i < lg.deployed; i++) {
+        if (random() < 0.2) { soldiersLost++; } else { survived++; }
+      }
+      lg.deployed = 0;
+      lg.recruits = min(survived, lg.maxRecruits);
+    }
+  }
+
   // Transfer expedition loot
   let lootMult = isDeath ? 0.5 : 1.0;
   let lootBonusMult = 1 + state.expeditionUpgrades.lootBonus * 0.15;
+  // Legia loot bonus: +10% per soldier at start
+  if (!isDeath && soldiersAtStart > 0) lootBonusMult *= (1 + soldiersAtStart * 0.10);
   let modGoldMult = getModifier().goldMult || 1.0;
-  let goldEarned = floor((10 + c.dangerLevel * 5 + c.expeditionNum * 2) * lootMult * modGoldMult);
+  let baseGold = floor((10 + c.dangerLevel * 5 + c.expeditionNum * 2) * lootMult * modGoldMult);
+  // Legia gold bonus: +15% per soldier at start
+  let goldEarned = isDeath ? baseGold : floor(baseGold * (1 + soldiersAtStart * 0.15));
   state.gold += goldEarned;
+
+  // Build loot summary for overlay before consuming lootBag
+  let lootSummary = {};
+  for (let loot of c.lootBag) {
+    let name = {wood:'Wood', iron_ore:'Iron', rare_hide:'Hide', ancient_relic:'Relic', titan_bone:'Bone'}[loot.type] || loot.type;
+    lootSummary[name] = (lootSummary[name] || 0) + max(1, floor(loot.qty * lootMult * lootBonusMult));
+  }
 
   for (let loot of c.lootBag) {
     let qty = max(1, floor(loot.qty * lootMult * lootBonusMult));
@@ -16426,27 +16610,22 @@ function exitConquest(isDeath) {
   });
   if (state.expeditionLog.length > 5) state.expeditionLog.pop();
 
-  if (isDeath) {
-    addFloatingText(width / 2, height * 0.25, 'RETREAT! (50% loot lost)', '#ff6644');
-  } else {
-    addFloatingText(width / 2, height * 0.25, 'Expedition Complete!', '#88cc88');
-    spawnLootCascade(c.lootBag, goldEarned);
-  }
-  addFloatingText(width / 2, height * 0.33, '+' + goldEarned + ' Gold', '#ffcc44');
-  // Itemized loot summary
-  let lootSummary = {};
-  for (let loot of c.lootBag) {
-    let name = {wood:'Wood', iron_ore:'Iron', rare_hide:'Hide', ancient_relic:'Relic', titan_bone:'Bone'}[loot.type] || loot.type;
-    lootSummary[name] = (lootSummary[name] || 0) + max(1, floor(loot.qty * lootMult * lootBonusMult));
-  }
-  let yOff = 0.38;
-  for (let [name, qty] of Object.entries(lootSummary)) {
-    let col = {Wood:'#bb8844', Iron:'#aabbcc', Hide:'#cc9966', Relic:'#ff88ff', Bone:'#ffdd88'}[name] || '#cccccc';
-    addFloatingText(width / 2, height * yOff, '+' + qty + ' ' + name, col);
-    yOff += 0.04;
-  }
+  // Set expedition summary overlay (5 seconds)
+  state._expedSummary = {
+    timer: 300, // 5 seconds at 60fps
+    kills: c.totalKills,
+    gold: goldEarned,
+    loot: lootSummary,
+    soldiersStart: soldiersAtStart,
+    soldiersLost: soldiersLost,
+    isDeath: !!isDeath,
+  };
+
+  if (!isDeath) spawnLootCascade(c.lootBag, goldEarned);
+
   c.totalKills = 0;
   c.lootBag = [];
+  c._soldiersAtStart = 0;
 }
 
 function getPhaseObjective(phase) {
@@ -17571,6 +17750,10 @@ function conquestPlayerAttack() {
   let arcHalf = PI * 0.3;
   let range = p.attackRange + (p.weapon === 1 ? 12 : 0);
   let dmg = floor(([15, 20, 25][p.weapon] || 15) * (typeof getNatBestiaryBonus === 'function' ? getNatBestiaryBonus() : 1));
+
+  // Legia soldier combat bonus: +15% per deployed soldier
+  let lg = state.legia;
+  if (lg && lg.deployed > 0) dmg = floor(dmg * (1 + lg.deployed * 0.15));
 
   // Check campfire morale bonus
   if (c.buildings.some(b => b.type === 'campfire')) dmg += 3;
