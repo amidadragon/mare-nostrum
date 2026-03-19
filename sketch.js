@@ -1714,6 +1714,7 @@ function drawInner() {
     updateVestaCrystals(dt);
     updateBlessing(dt);
     updateCats(dt);
+    updateCitizens();
     updateCooking(dt);
     updateWeather(dt);
     updateHarvestCombo(dt);
@@ -7820,6 +7821,8 @@ function drawWorldObjectsSorted() {
     items.push({ y: state.harvester.y, draw: drawHarvester });
   // Cats
   if (state.cats && fullyUnlocked) state.cats.forEach(cat => items.push({ y: cat.y, draw: () => drawOneCat(cat) }));
+  // Ambient citizens
+  if (state.citizens) state.citizens.forEach(c => items.push({ y: c.y, draw: () => drawOneCitizen(c) }));
   // Characters — gated by progression
   if (fullyUnlocked || prog.companionsAwakened.lares)
     items.push({ y: state.companion.y, draw: drawCompanion });
@@ -21093,6 +21096,7 @@ function saveGame() {
     tools: state.tools,
     cropSelect: state.cropSelect,
     cats: state.cats ? state.cats.map(c => ({ x: c.x, y: c.y, facing: c.facing, color: c.color })) : [],
+    citizens: state.citizens ? state.citizens.map(c => ({ x: c.x, y: c.y, variant: c.variant, facing: c.facing, speed: c.speed })) : [],
     plots: state.plots.map(p => ({ x: p.x, y: p.y, w: p.w, h: p.h, planted: p.planted, stage: p.stage, timer: p.timer, ripe: p.ripe, cropType: p.cropType || 'grain' })),
     buildings: state.buildings.map(b => ({ x: b.x, y: b.y, w: b.w, h: b.h, type: b.type, rot: b.rot })),
     trees: state.trees.map(t => ({ x: t.x, y: t.y, health: t.health, maxHealth: t.maxHealth, alive: t.alive, size: t.size, type: t.type })),
@@ -21553,6 +21557,17 @@ function loadGame() {
         });
       }
     }
+    // Restore citizens from save or init empty
+    if (d.citizens && d.citizens.length > 0) {
+      state.citizens = d.citizens.map(c => ({
+        x: c.x, y: c.y, vx: 0, vy: 0,
+        variant: c.variant, facing: c.facing,
+        state: 'idle', timer: floor(random(60, 300)),
+        speed: c.speed || 0.5, targetX: c.x, targetY: c.y,
+      }));
+    } else {
+      state.citizens = state.citizens || [];
+    }
     addFloatingText(width / 2, height * 0.4, 'GAME LOADED', C.crystalGlow);
   } catch(e) {
     addFloatingText(width / 2, height * 0.4, 'Load failed!', C.buildInvalid);
@@ -21791,6 +21806,129 @@ function drawOneChicken(ch) {
   rect(0, 7, 1, 1);
 
   pop();
+}
+
+// ─── AMBIENT CITIZENS ─────────────────────────────────────────────────
+function updateCitizens() {
+  if (!state.citizens) return;
+  let srx = getSurfaceRX(), sry = getSurfaceRY();
+  let cx = WORLD.islandCX, cy = WORLD.islandCY;
+
+  state.citizens.forEach(c => {
+    c.timer--;
+    if (c.state === 'idle') {
+      if (c.timer <= 0) {
+        let a = random(TWO_PI);
+        let r = random(0.15, 0.65);
+        c.targetX = cx + cos(a) * srx * r;
+        c.targetY = cy + sin(a) * sry * r;
+        c.state = 'walking';
+        c.timer = floor(random(120, 400));
+      }
+    } else if (c.state === 'walking') {
+      let dx = c.targetX - c.x, dy = c.targetY - c.y;
+      let d = sqrt(dx * dx + dy * dy);
+      if (d < 5 || c.timer <= 0) {
+        c.state = 'idle';
+        c.timer = floor(random(60, 300));
+        c.vx = 0; c.vy = 0;
+      } else {
+        c.vx = (dx / d) * c.speed;
+        c.vy = (dy / d) * c.speed;
+        c.x += c.vx;
+        c.y += c.vy;
+        c.facing = c.vx > 0 ? 1 : -1;
+      }
+    }
+    // Clamp to island
+    let ex = (c.x - cx) / srx, ey = (c.y - cy) / sry;
+    if (ex * ex + ey * ey > 0.7) {
+      c.x = cx + (c.x - cx) * 0.95;
+      c.y = cy + (c.y - cy) * 0.95;
+      c.state = 'idle';
+      c.timer = floor(random(60, 200));
+    }
+  });
+}
+
+function drawOneCitizen(c) {
+  let sx = w2sX(c.x), sy = w2sY(c.y);
+  if (sx < -30 || sx > width + 30 || sy < -30 || sy > height + 30) return;
+
+  push();
+  translate(sx, sy);
+  scale(c.facing, 1);
+  noStroke();
+
+  let lvl = state.islandLevel;
+  let colors = getCitizenColors(c.variant, lvl);
+
+  // Shadow
+  fill(0, 0, 0, 30);
+  ellipse(0, 2, 10, 4);
+
+  // Body (tunic)
+  fill(colors.tunic[0], colors.tunic[1], colors.tunic[2]);
+  rect(-3, -8, 6, 10);
+
+  // Head
+  fill(colors.skin[0], colors.skin[1], colors.skin[2]);
+  rect(-2, -12, 4, 4);
+
+  // Hair/headgear
+  fill(colors.hair[0], colors.hair[1], colors.hair[2]);
+  rect(-2, -13, 4, 2);
+
+  // Legs
+  fill(colors.tunic[0] - 20, colors.tunic[1] - 20, colors.tunic[2] - 20);
+  if (c.state === 'walking') {
+    let step = sin(frameCount * 0.15 + c.x) * 2;
+    rect(-2, 2, 2, 3);
+    rect(0 + step * 0.3, 2, 2, 3);
+  } else {
+    rect(-2, 2, 2, 3);
+    rect(1, 2, 2, 3);
+  }
+
+  // Variant-specific detail
+  if (c.variant === 'soldier') {
+    stroke(100, 80, 60);
+    strokeWeight(1);
+    line(3, -14, 3, 4);
+    noStroke();
+    fill(140, 60, 40);
+    rect(-4, -7, 2, 5);
+  } else if (c.variant === 'merchant') {
+    fill(colors.tunic[0] + 30, colors.tunic[1] + 20, colors.tunic[2]);
+    rect(3, -6, 3, 4);
+  } else if (c.variant === 'priest') {
+    fill(240, 235, 225);
+    rect(-1, -8, 2, 8);
+  }
+
+  pop();
+}
+
+function getCitizenColors(variant, lvl) {
+  let skin = [195, 165, 130];
+
+  if (lvl <= 8) {
+    if (variant === 'farmer')   return { skin, tunic: [140, 120, 80],  hair: [80, 60, 40] };
+    if (variant === 'merchant') return { skin, tunic: [160, 130, 70],  hair: [70, 50, 35] };
+    if (variant === 'soldier')  return { skin, tunic: [120, 100, 70],  hair: [90, 70, 50] };
+    if (variant === 'priest')   return { skin, tunic: [180, 170, 140], hair: [60, 50, 40] };
+  } else if (lvl <= 17) {
+    if (variant === 'farmer')   return { skin, tunic: [160, 140, 100], hair: [70, 55, 35] };
+    if (variant === 'merchant') return { skin, tunic: [180, 150, 80],  hair: [60, 45, 30] };
+    if (variant === 'soldier')  return { skin, tunic: [160, 50, 40],   hair: [100, 85, 65] };
+    if (variant === 'priest')   return { skin, tunic: [230, 225, 210], hair: [50, 40, 30] };
+  } else {
+    if (variant === 'farmer')   return { skin, tunic: [140, 160, 130], hair: [65, 55, 40] };
+    if (variant === 'merchant') return { skin, tunic: [170, 165, 120], hair: [55, 45, 35] };
+    if (variant === 'soldier')  return { skin, tunic: [140, 60, 50],   hair: [80, 180, 170] };
+    if (variant === 'priest')   return { skin, tunic: [210, 230, 225], hair: [60, 160, 150] };
+  }
+  return { skin, tunic: [150, 140, 120], hair: [70, 60, 45] };
 }
 
 // ─── FOUNTAIN ────────────────────────────────────────────────────────
@@ -23575,6 +23713,30 @@ function expandIsland() {
       height: random(12, 24),
       hue: random(0.7, 1.0),
       sway: random(TWO_PI),
+    });
+  }
+
+  // Ambient citizens — spawn based on island level
+  let targetCitizens = floor(state.islandLevel * 1.2);
+  while (state.citizens.length < targetCitizens) {
+    let ca = random(TWO_PI);
+    let cr = random(0.2, 0.7);
+    let ccx = cx + cos(ca) * getSurfaceRX() * cr;
+    let ccy = cy + sin(ca) * getSurfaceRY() * cr;
+    let variants = ['farmer', 'merchant', 'soldier', 'priest'];
+    let weights = state.islandLevel <= 8 ? [4,2,1,1] : state.islandLevel <= 17 ? [2,3,2,1] : [1,2,3,2];
+    let totalW = weights.reduce((a,b) => a+b, 0);
+    let roll = floor(random(totalW));
+    let vi = 0, acc = 0;
+    for (let i = 0; i < weights.length; i++) { acc += weights[i]; if (roll < acc) { vi = i; break; } }
+    state.citizens.push({
+      x: ccx, y: ccy, vx: 0, vy: 0,
+      variant: variants[vi],
+      facing: random() > 0.5 ? 1 : -1,
+      state: 'idle',
+      timer: floor(random(60, 300)),
+      speed: 0.4 + random(0.3),
+      targetX: ccx, targetY: ccy,
     });
   }
 
