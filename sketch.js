@@ -205,6 +205,63 @@ function getEra() {
   return lv <= 8 ? 'village' : lv <= 17 ? 'city' : 'atlantis';
 }
 
+let _eraPaletteCache = null;
+let _eraPaletteCacheFrame = -1;
+function getEraPalette() {
+  if (_eraPaletteCacheFrame === frameCount) return _eraPaletteCache;
+  let lvl = state.islandLevel || 1;
+  let ep;
+  if (lvl <= 8) {
+    ep = {
+      era: 1,
+      wallBase: [160, 130, 90],
+      wallAccent: [140, 115, 75],
+      roofBase: [180, 155, 100],
+      roofAccent: [150, 130, 85],
+      floorBase: [145, 130, 105],
+      doorColor: [110, 85, 55],
+      stoneBase: [155, 145, 125],
+      roadBase: [135, 120, 95],
+      roadLine: [115, 100, 75],
+      nightGlow: [255, 180, 80],
+      nightRadius: 40,
+    };
+  } else if (lvl <= 17) {
+    ep = {
+      era: 2,
+      wallBase: [200, 185, 160],
+      wallAccent: [185, 170, 145],
+      roofBase: [185, 95, 65],
+      roofAccent: [165, 80, 55],
+      floorBase: [195, 185, 168],
+      doorColor: [130, 100, 70],
+      stoneBase: [190, 180, 162],
+      roadBase: [175, 165, 148],
+      roadLine: [155, 145, 128],
+      nightGlow: [255, 200, 100],
+      nightRadius: 60,
+    };
+  } else {
+    ep = {
+      era: 3,
+      wallBase: [220, 215, 200],
+      wallAccent: [200, 195, 180],
+      roofBase: [170, 100, 70],
+      roofAccent: [80, 200, 180],
+      floorBase: [210, 205, 195],
+      doorColor: [100, 180, 165],
+      stoneBase: [215, 210, 198],
+      roadBase: [195, 190, 178],
+      roadLine: [80, 200, 180],
+      nightGlow: [80, 220, 200],
+      nightRadius: 90,
+    };
+  }
+  _eraPaletteCache = ep;
+  _eraPaletteCacheFrame = frameCount;
+  return ep;
+}
+
 // ─── STATE ────────────────────────────────────────────────────────────────
 let state;
 let cam = { x: 600, y: 400 };
@@ -1101,6 +1158,8 @@ function buildIsland() {
 
   // Player's first structure — campfire near island center
   state.buildings.push({ x: cx + 20, y: cy + 15, w: 16, h: 16, type: 'campfire', rot: 0 });
+
+  initCitizens();
 
   state.isInitialized = true;
 }
@@ -7918,6 +7977,7 @@ function drawOneBuilding(b) {
     let sy = w2sY(b.y);
     let bw = b.w;
     let bh = b.h;
+    let ep = getEraPalette();
 
     push();
     translate(sx, sy);
@@ -7930,16 +7990,16 @@ function drawOneBuilding(b) {
         // Shadow base
         fill(0, 0, 0, 30);
         rect(-bw / 2 + 1, -2, bw, 4, 1);
-        // Main wall face — warm limestone
-        fill(195, 185, 168);
+        // Main wall face — era-aware
+        fill(ep.wallBase[0], ep.wallBase[1], ep.wallBase[2]);
         rect(-bw / 2, -wallH, bw, wallH, 1);
         // Top capstone
-        fill(210, 200, 182);
+        fill(ep.wallBase[0] + 15, ep.wallBase[1] + 15, ep.wallBase[2] + 14);
         rect(-bw / 2, -wallH - 2, bw, 4, 1);
-        fill(215, 208, 192);
+        fill(ep.wallBase[0] + 20, ep.wallBase[1] + 23, ep.wallBase[2] + 24);
         rect(-bw / 2, -wallH - 2, bw, 1.5);
         // Bottom molding
-        fill(180, 170, 152);
+        fill(ep.wallAccent[0], ep.wallAccent[1], ep.wallAccent[2]);
         rect(-bw / 2, -2, bw, 3, 1);
         // Ashlar stone blocks with mortar lines
         stroke(155, 148, 132, 80);
@@ -7973,12 +8033,15 @@ function drawOneBuilding(b) {
       case 'floor':
         // Roman mosaic tile floor — decorative pattern
         noStroke();
-        // Base tile — warm marble
-        fill(185, 178, 162);
+        // Base tile — era-aware
+        fill(ep.floorBase[0], ep.floorBase[1], ep.floorBase[2]);
         rect(-bw / 2, -bh / 2, bw, bh, 1);
         // Mosaic tile grid — alternating colors
         let mTileColors = [
-          [195, 188, 172], [175, 168, 152], [185, 170, 145], [170, 162, 148]
+          [ep.floorBase[0] + 10, ep.floorBase[1] + 10, ep.floorBase[2] + 10],
+          [ep.floorBase[0] - 10, ep.floorBase[1] - 10, ep.floorBase[2] - 10],
+          [ep.floorBase[0], ep.floorBase[1] - 8, ep.floorBase[2] - 17],
+          [ep.floorBase[0] - 15, ep.floorBase[1] - 15, ep.floorBase[2] - 15]
         ];
         for (let ty = -bh / 2 + 1; ty < bh / 2; ty += 4) {
           for (let tx = -bw / 2 + 1; tx < bw / 2; tx += 4) {
@@ -8016,16 +8079,16 @@ function drawOneBuilding(b) {
         // Roman arched doorway — renders upward from placement point
         noStroke();
         let doorH = 30;
-        // Stone frame
-        fill(190, 182, 165);
+        // Stone frame — era-aware
+        fill(ep.stoneBase[0], ep.stoneBase[1], ep.stoneBase[2]);
         rect(-bw / 2, -doorH, bw, doorH, 1);
         // Arch top
-        fill(200, 192, 175);
+        fill(ep.stoneBase[0] + 10, ep.stoneBase[1] + 10, ep.stoneBase[2] + 10);
         arc(0, -doorH + 10, bw - 4, 18, PI, TWO_PI);
-        // Dark interior / door
-        fill(60, 40, 22);
+        // Dark interior / door — era-aware
+        fill(ep.doorColor[0] - 50, ep.doorColor[1] - 45, ep.doorColor[2] - 33);
         rect(-bw / 2 + 4, -doorH + 4, bw - 8, doorH - 8, 1);
-        fill(50, 32, 16);
+        fill(ep.doorColor[0] - 60, ep.doorColor[1] - 53, ep.doorColor[2] - 39);
         arc(0, -doorH + 10, bw - 10, 14, PI, TWO_PI);
         // Door planks
         stroke(72, 50, 28, 100);
@@ -8506,40 +8569,40 @@ function drawOneBuilding(b) {
         break;
 
       case 'temple':
-        // Roman columned temple — front facade
+        // Roman columned temple — era-aware facade
         noStroke();
         // Foundation steps
-        fill(160, 152, 138);
+        fill(ep.stoneBase[0] + 5, ep.stoneBase[1] + 7, ep.stoneBase[2] + 13);
         rect(-bw / 2 + 2, bh / 2 - 8, bw - 4, 4, 1);
-        fill(170, 162, 148);
+        fill(ep.stoneBase[0] + 15, ep.stoneBase[1] + 17, ep.stoneBase[2] + 23);
         rect(-bw / 2 + 4, bh / 2 - 14, bw - 8, 6, 1);
         // Stylobate platform
-        fill(180, 172, 158);
+        fill(ep.stoneBase[0] + 25, ep.stoneBase[1] + 27, ep.stoneBase[2] + 33);
         rect(-bw / 2, -bh / 2 + 18, bw, bh / 2 - 18, 1);
         // Cella
-        fill(188, 180, 165);
+        fill(ep.stoneBase[0] + 33, ep.stoneBase[1] + 35, ep.stoneBase[2] + 40);
         rect(-bw / 2 + 8, -bh / 2 + 4, bw - 16, bh / 2 + 8, 1);
         // 4 front columns
-        fill(200, 193, 178);
+        fill(ep.stoneBase[0] + 45, ep.stoneBase[1] + 48, ep.stoneBase[2] + 53);
         for (let tci = 0; tci < 4; tci++) {
           let tcpx = -bw / 2 + 6 + tci * (bw - 12) / 3;
           rect(tcpx - 2.5, -bh / 2 + 6, 5, bh / 2 + 10, 1);
-          stroke(175, 168, 153, 60);
+          stroke(ep.stoneBase[0] + 20, ep.stoneBase[1] + 23, ep.stoneBase[2] + 28, 60);
           strokeWeight(0.4);
           line(tcpx - 1, -bh / 2 + 8, tcpx - 1, bh / 2 - 18);
           line(tcpx + 1, -bh / 2 + 8, tcpx + 1, bh / 2 - 18);
           noStroke();
-          fill(205, 198, 183);
+          fill(ep.stoneBase[0] + 50, ep.stoneBase[1] + 53, ep.stoneBase[2] + 58);
           rect(tcpx - 4, -bh / 2 + 4, 8, 3, 1);
-          fill(195, 188, 173);
+          fill(ep.stoneBase[0] + 40, ep.stoneBase[1] + 43, ep.stoneBase[2] + 48);
           rect(tcpx - 3.5, bh / 2 - 20, 7, 2, 1);
-          fill(200, 193, 178);
+          fill(ep.stoneBase[0] + 45, ep.stoneBase[1] + 48, ep.stoneBase[2] + 53);
         }
         // Entablature
-        fill(192, 185, 170);
+        fill(ep.stoneBase[0] + 35, ep.stoneBase[1] + 35, ep.stoneBase[2] + 45);
         rect(-bw / 2 + 2, -bh / 2 + 2, bw - 4, 6, 1);
         // Pediment
-        fill(198, 190, 175);
+        fill(ep.roofAccent[0], ep.roofAccent[1], ep.roofAccent[2]);
         beginShape();
         vertex(-bw / 2 + 2, -bh / 2 + 2);
         vertex(0, -bh / 2 - 10);
@@ -8567,10 +8630,10 @@ function drawOneBuilding(b) {
         noStroke();
         fill(0, 0, 0, 25);
         rect(-bw / 2 + 2, bh / 2 - 4, bw, 5);
-        // Counter
-        fill(145, 110, 55);
+        // Counter — era-aware
+        fill(ep.wallBase[0], ep.wallBase[1], ep.wallBase[2]);
         rect(-bw / 2, -bh / 2 + 10, bw, bh / 2, 1);
-        fill(120, 90, 40);
+        fill(ep.wallAccent[0], ep.wallAccent[1], ep.wallAccent[2]);
         rect(-bw / 2 + 3, -bh / 2 + 20, 3, bh / 2 - 2, 1);
         rect(bw / 2 - 6, -bh / 2 + 20, 3, bh / 2 - 2, 1);
         // Goods on counter
@@ -8584,9 +8647,9 @@ function drawOneBuilding(b) {
         fill(120, 90, 40);
         rect(-bw / 2 + 1, -bh / 2 - 10, 3, 22, 1);
         rect(bw / 2 - 4, -bh / 2 - 10, 3, 22, 1);
-        // Striped awning
+        // Striped awning — era-aware
         for (let mai = 0; mai < 5; mai++) {
-          let maColor = mai % 2 === 0 ? [195, 55, 40] : [220, 205, 175];
+          let maColor = mai % 2 === 0 ? [ep.roofBase[0], ep.roofBase[1], ep.roofBase[2]] : [ep.wallBase[0] + 20, ep.wallBase[1] + 20, ep.wallBase[2] + 20];
           fill(maColor[0], maColor[1], maColor[2], 220);
           let mawx = -bw / 2 + 2 + mai * (bw - 4) / 5;
           rect(mawx, -bh / 2 - 10, (bw - 4) / 5, 10, 1);
@@ -8608,12 +8671,12 @@ function drawOneBuilding(b) {
         break;
 
       case 'forum':
-        // Roman public forum — tiled plaza with central fountain
+        // Roman public forum — era-aware tiled plaza
         noStroke();
-        fill(175, 168, 155);
+        fill(ep.stoneBase[0], ep.stoneBase[1], ep.stoneBase[2]);
         rect(-bw / 2, -bh / 2, bw, bh, 2);
         // Flagstone grid
-        stroke(155, 148, 135, 50);
+        stroke(ep.stoneBase[0] - 20, ep.stoneBase[1] - 20, ep.stoneBase[2] - 20, 50);
         strokeWeight(0.6);
         for (let ffy = -bh / 2 + 8; ffy < bh / 2; ffy += 8) {
           line(-bw / 2 + 2, ffy, bw / 2 - 2, ffy);
@@ -8622,8 +8685,8 @@ function drawOneBuilding(b) {
           line(ffx, -bh / 2 + 2, ffx, bh / 2 - 2);
         }
         noStroke();
-        // Border colonnade stubs
-        fill(188, 180, 165);
+        // Border colonnade stubs — era-aware
+        fill(ep.wallBase[0], ep.wallBase[1], ep.wallBase[2]);
         for (let ffci = 0; ffci < 5; ffci++) {
           let ffcpx = -bw / 2 + 5 + ffci * (bw - 10) / 4;
           rect(ffcpx - 1.5, -bh / 2, 3, 6, 1);
@@ -8763,13 +8826,13 @@ function drawOneBuilding(b) {
         break;
 
       case 'villa':
-        // Roman luxury villa — walled compound with garden
+        // Roman luxury villa — era-aware walled compound
         noStroke();
         // Outer wall
-        fill(175, 168, 155);
+        fill(ep.wallAccent[0], ep.wallAccent[1], ep.wallAccent[2]);
         rect(-bw / 2, -bh / 2, bw, bh, 2);
         // Interior courtyard
-        fill(188, 182, 168);
+        fill(ep.wallBase[0], ep.wallBase[1], ep.wallBase[2]);
         rect(-bw / 2 + 6, -bh / 2 + 6, bw - 12, bh - 12, 1);
         // Garden
         fill(60, 100, 45, 160);
@@ -8795,8 +8858,8 @@ function drawOneBuilding(b) {
         fill(50, 35, 18);
         rect(-5, bh / 2 - 10, 10, 8, 1);
         arc(0, bh / 2 - 10, 10, 8, PI, TWO_PI);
-        // Terracotta roof trim
-        fill(165, 88, 50, 180);
+        // Roof trim — era-aware
+        fill(ep.roofBase[0], ep.roofBase[1], ep.roofBase[2], 180);
         rect(-bw / 2, -bh / 2, bw, 6, 1);
         rect(-bw / 2, -bh / 2, 6, bh, 1);
         rect(bw / 2 - 6, -bh / 2, 6, bh, 1);
@@ -10426,13 +10489,14 @@ function drawPlayer() {
       noStroke();
     }
   } else {
+    let isRoman = state.progression && state.progression.homeIslandReached;
     drawPlayerShadow(s);
     drawPlayerFeet(s, legOff);
-    drawPlayerCape(fDir, p.moving);
-    drawPlayerBody();
+    drawPlayerCape(fDir, p.moving, isRoman);
+    drawPlayerBody(isRoman);
     drawPlayerArms(armSwing);
     drawPlayerTool(fDir, p.hotbarSlot, p.toolSwing);
-    drawPlayerHead(fDir, facingUp, a);
+    drawPlayerHead(fDir, facingUp, a, isRoman);
   }
 
   // Dash cross-flash
@@ -10478,41 +10542,77 @@ function drawPlayerFeet(s, legOff) {
   rect(1, s - 6 - legOff, 4, 1);
 }
 
-function drawPlayerCape(fDir, moving) {
-  // Flowing red cape — swaying with wind and movement
+function drawPlayerCape(fDir, moving, isRoman) {
   let windStr = moving ? 1.5 : 0.8;
   let capeWave1 = floor(sin(frameCount * 0.06) * 2 * windStr);
   let capeWave2 = floor(sin(frameCount * 0.09 + 1) * 1.5 * windStr);
   let capeLen = 17 + capeWave1 + (moving ? 3 : 0);
-  let capeX = -9 * fDir;
   let capeBlow = moving ? floor(sin(frameCount * 0.12) * 2) * -fDir : 0;
 
-  // Cape shadow layer (slightly offset for depth)
-  fill(110, 35, 28, 120);
-  rect(capeX + capeBlow, -4, 4 * fDir, capeLen + 1);
-  // Cape main fabric
-  fill(196, 64, 50, 210);
-  rect(capeX + capeBlow, -5, 4 * fDir, capeLen);
-  // Cape inner fold (darker stripe for fabric drape)
-  fill(160, 50, 40, 140);
-  rect(capeX + capeBlow + fDir, -3, 1 * fDir, capeLen - 3);
-  // Wind ripple highlight
-  fill(220, 85, 65, 60);
-  rect(capeX + capeBlow, -5 + floor(capeLen * 0.3), 3 * fDir, 2);
-  rect(capeX + capeBlow + capeWave2 * fDir * 0.3, -5 + floor(capeLen * 0.6), 2 * fDir, 2);
-  // Torn/frayed hem — ragged bottom edge
-  fill(130, 42, 32, 100);
-  rect(capeX + capeBlow, -5 + capeLen - 2, 1 * fDir, 2);
-  rect(capeX + capeBlow + 2 * fDir, -5 + capeLen - 1, 1 * fDir, 2);
-  rect(capeX + capeBlow + fDir, -5 + capeLen, 1 * fDir, 1);
+  if (isRoman) {
+    // Crimson cape — both shoulders, full Roman paludamentum
+    let capeXL = -9 * fDir;
+    let capeXR = 5 * fDir;
+    // Left drape
+    fill(110, 35, 28, 120);
+    rect(capeXL + capeBlow, -4, 4 * fDir, capeLen + 1);
+    fill(196, 64, 50, 210);
+    rect(capeXL + capeBlow, -5, 4 * fDir, capeLen);
+    fill(160, 50, 40, 140);
+    rect(capeXL + capeBlow + fDir, -3, 1 * fDir, capeLen - 3);
+    // Right drape
+    fill(110, 35, 28, 120);
+    rect(capeXR + capeBlow, -4, 4 * fDir, capeLen - 2);
+    fill(196, 64, 50, 210);
+    rect(capeXR + capeBlow, -5, 4 * fDir, capeLen - 3);
+    // Wind ripple highlights
+    fill(220, 85, 65, 60);
+    rect(capeXL + capeBlow, -5 + floor(capeLen * 0.3), 3 * fDir, 2);
+    rect(capeXR + capeBlow + capeWave2 * fDir * 0.3, -5 + floor(capeLen * 0.5), 2 * fDir, 2);
+    // Clean hem
+    fill(140, 45, 35, 80);
+    rect(capeXL + capeBlow, -5 + capeLen - 1, 3 * fDir, 1);
+    rect(capeXR + capeBlow, -5 + capeLen - 4, 3 * fDir, 1);
+  } else {
+    // Castaway green cape — left shoulder only, vine detail
+    let capeX = -9 * fDir;
+    // Cape shadow
+    fill(40, 70, 30, 120);
+    rect(capeX + capeBlow, -4, 4 * fDir, capeLen + 1);
+    // Cape main — muted olive green
+    fill(85, 120, 55, 210);
+    rect(capeX + capeBlow, -5, 4 * fDir, capeLen);
+    // Inner fold
+    fill(60, 90, 40, 140);
+    rect(capeX + capeBlow + fDir, -3, 1 * fDir, capeLen - 3);
+    // Vine detail — twisting line down the cape
+    fill(50, 100, 40, 100);
+    rect(capeX + capeBlow + fDir * 2, -2, 1, 3);
+    rect(capeX + capeBlow + fDir, 2, 1, 3);
+    rect(capeX + capeBlow + fDir * 2, 6, 1, 3);
+    // Vine leaf accents
+    fill(90, 150, 50, 90);
+    rect(capeX + capeBlow + fDir * 3, -1, 1, 1);
+    rect(capeX + capeBlow, 4, 1, 1);
+    rect(capeX + capeBlow + fDir * 3, 8, 1, 1);
+    // Wind ripple
+    fill(110, 150, 70, 60);
+    rect(capeX + capeBlow, -5 + floor(capeLen * 0.3), 3 * fDir, 2);
+    rect(capeX + capeBlow + capeWave2 * fDir * 0.3, -5 + floor(capeLen * 0.6), 2 * fDir, 2);
+    // Torn/frayed hem
+    fill(55, 80, 35, 100);
+    rect(capeX + capeBlow, -5 + capeLen - 2, 1 * fDir, 2);
+    rect(capeX + capeBlow + 2 * fDir, -5 + capeLen - 1, 1 * fDir, 2);
+    rect(capeX + capeBlow + fDir, -5 + capeLen, 1 * fDir, 1);
+  }
 }
 
-function drawPlayerBody() {
-  // Breathing animation — subtle chest expansion
+function drawPlayerBody(isRoman) {
   let breathe = sin(frameCount * 0.04) * 0.4;
   let chestW = 14 + floor(breathe);
 
-  // Tunica — warm crimson with torn detail
+  if (isRoman) {
+  // Crimson tunic with bronze lorica
   fill(175, 58, 44);
   rect(-floor(chestW / 2), -5, chestW, 18);
   // Tunica shadow fold
@@ -10553,6 +10653,28 @@ function drawPlayerBody() {
   fill(200, 175, 80, 60);
   rect(-8, -6, 2, 1);
   rect(6, -6, 2, 1);
+  } else {
+  // Castaway terracotta tunic
+  fill(196, 101, 74);
+  rect(-floor(chestW / 2), -5, chestW, 18);
+  fill(160, 80, 55, 60);
+  rect(-6, 4, 2, 8);
+  rect(4, 5, 2, 7);
+  fill(170, 88, 60, 80);
+  rect(-5, 12, 2, 1);
+  rect(2, 13, 3, 1);
+  rect(-2, 13, 1, 1);
+  fill(140, 120, 80);
+  rect(-7, 2, 14, 2);
+  fill(120, 100, 65);
+  rect(-1, 2, 2, 2);
+  fill(130, 95, 50);
+  rect(-9, -6, 4, 3);
+  fill(150, 115, 65, 60);
+  rect(-8, -6, 2, 1);
+  fill(212, 165, 116);
+  rect(5, -6, 4, 2);
+  }
 }
 
 function drawPlayerArms(armSwing) {
@@ -10620,7 +10742,7 @@ function drawPlayerTool(fDir, hs, toolSwingTimer) {
   }
 }
 
-function drawPlayerHead(fDir, facingUp, anim) {
+function drawPlayerHead(fDir, facingUp, anim, isRoman) {
   // Head — warm Mediterranean skin
   fill(212, 165, 116);
   rect(-5, -14, 10, 8);
@@ -10654,13 +10776,39 @@ function drawPlayerHead(fDir, facingUp, anim) {
     fill(85, 62, 42, 100);
     rect(-2, -18, 1, 1);
     rect(3, -17, 1, 1);
-    // Laurel wreath — gold-green leaves
-    fill(140, 160, 60);
+    if (isRoman) {
+    // Gold laurel wreath
+    fill(200, 170, 50);
     rect(-5, -15, 2, 1);
     rect(3, -15, 2, 1);
-    fill(160, 180, 70);
+    fill(220, 190, 60);
     rect(-4, -16, 2, 1);
     rect(2, -16, 2, 1);
+    fill(200, 170, 50);
+    rect(-1, -17, 2, 1);
+    // Gold leaf shimmer
+    fill(240, 210, 80, 80);
+    rect(-4, -15, 1, 1);
+    rect(3, -16, 1, 1);
+    } else {
+    // Living vine crown with flower pixels
+    fill(70, 120, 45);
+    rect(-5, -15, 2, 1);
+    rect(3, -15, 2, 1);
+    fill(90, 140, 55);
+    rect(-4, -16, 2, 1);
+    rect(2, -16, 2, 1);
+    rect(-1, -17, 2, 1);
+    // Tiny flower pixels
+    fill(220, 100, 120);
+    rect(-3, -16, 1, 1);
+    fill(240, 200, 80);
+    rect(1, -17, 1, 1);
+    // Vine tendrils
+    fill(60, 110, 40, 120);
+    rect(-6, -14, 1, 2);
+    rect(5, -14, 1, 2);
+    }
   } else {
     // Helmet — bronze with crest
     fill(196, 162, 70);
@@ -21616,7 +21764,7 @@ function loadGame() {
         speed: c.speed || 0.5, targetX: c.x, targetY: c.y,
       }));
     } else {
-      state.citizens = state.citizens || [];
+      initCitizens();
     }
     addFloatingText(width / 2, height * 0.4, 'GAME LOADED', C.crystalGlow);
   } catch(e) {
@@ -21899,6 +22047,40 @@ function updateCitizens() {
       c.timer = floor(random(60, 200));
     }
   });
+}
+
+function initCitizens() {
+  state.citizens = [];
+  let cap = state.islandLevel <= 4 ? 0 : min(floor(state.islandLevel * 1.2), 30);
+  for (let i = 0; i < cap; i++) spawnCitizen();
+}
+
+function spawnCitizen() {
+  let cx = WORLD.islandCX, cy = WORLD.islandCY;
+  let srx = getSurfaceRX(), sry = getSurfaceRY();
+  for (let att = 0; att < 20; att++) {
+    let a = random(TWO_PI);
+    let r = random(0.2, 0.7);
+    let x = cx + cos(a) * srx * r;
+    let y = cy + sin(a) * sry * r;
+    if (!isOnIsland(x, y)) continue;
+    let variants = ['farmer', 'merchant', 'soldier', 'priest'];
+    let weights = state.islandLevel <= 8 ? [4,2,1,1] : state.islandLevel <= 17 ? [2,3,2,1] : [1,2,3,2];
+    let totalW = weights.reduce((a,b) => a+b, 0);
+    let roll = floor(random(totalW));
+    let vi = 0, acc = 0;
+    for (let i = 0; i < weights.length; i++) { acc += weights[i]; if (roll < acc) { vi = i; break; } }
+    state.citizens.push({
+      x: x, y: y, vx: 0, vy: 0,
+      variant: variants[vi],
+      facing: random() > 0.5 ? 1 : -1,
+      state: 'idle',
+      timer: floor(random(60, 300)),
+      speed: 0.4 + random(0.3),
+      targetX: x, targetY: y,
+    });
+    return;
+  }
 }
 
 function drawOneCitizen(c) {
