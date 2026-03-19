@@ -32,33 +32,51 @@ const COMBAT_SKILLS = {
   whirlwind:  { cooldownMax: 300, key: '1', name: 'Whirlwind' },   // 5s
   shieldBash: { cooldownMax: 480, key: '2', name: 'Shield Bash' }, // 8s
   heal:       { cooldownMax: 900, key: '3', name: 'Heal' },        // 15s
+  battleCry:  { cooldownMax: 600, key: '4', name: 'Battle Cry' },  // 10s
+  charge:     { cooldownMax: 420, key: '5', name: 'War Charge' },  // 7s
+  fortify:    { cooldownMax: 720, key: '6', name: 'Fortify' },     // 12s
 };
 
 // Cooldown state (frames remaining)
-let _skillCooldowns = { whirlwind: 0, shieldBash: 0, heal: 0 };
+let _skillCooldowns = { whirlwind: 0, shieldBash: 0, heal: 0, battleCry: 0, charge: 0, fortify: 0 };
+
+// Fortify active timer — set when fortify fires, read in damage-taking code
+let _fortifyTimer = 0;
+// Battle cry active timer — boosts companion speed/damage
+let _battleCryTimer = 0;
 
 function activateSkill(name) {
   if (!state.conquest.active && !state.adventure.active) return;
   if (_skillCooldowns[name] > 0) return;
+  // Skills that require a skill point investment (level >= 1) to use
+  let skillGated = ['battleCry', 'charge', 'fortify'];
+  if (skillGated.includes(name) && getSkillLevel(name) < 1) return;
   let p = state.player;
 
   switch (name) {
     case 'whirlwind': {
       _skillCooldowns.whirlwind = COMBAT_SKILLS.whirlwind.cooldownMax;
+      let wLv = getSkillLevel('whirlwind');
+      // Lv3: CD -1s (60 frames)
+      if (wLv >= 3) _skillCooldowns.whirlwind -= 60;
       p.slashPhase = 12;
       let enemies = state.conquest.active ? state.conquest.enemies : (state.adventure.enemies || []);
+      // Lv2: radius +10px
+      let wRadius = 50 + (wLv >= 2 ? 10 : 0);
+      // Lv1: 20dmg, Lv2: 35dmg, Lv3: 35dmg + double knockback
+      let dmg = wLv >= 2 ? 35 : 20;
+      let kbMult = wLv >= 3 ? 2 : 1;
       for (let e of enemies) {
         if (e.state === 'dying' || e.state === 'dead') continue;
         let d = dist(p.x, p.y, e.x, e.y);
-        if (d <= 50 + (e.size || 10)) {
-          let dmg = 20;
+        if (d <= wRadius + (e.size || 10)) {
           e.hp -= dmg;
           e.flashTimer = 8;
           e.state = 'stagger';
           e.stateTimer = 10;
           let kba = atan2(e.y - p.y, e.x - p.x);
-          e.x += cos(kba) * 8;
-          e.y += sin(kba) * 8;
+          e.x += cos(kba) * 8 * kbMult;
+          e.y += sin(kba) * 8 * kbMult;
           _spawnDamageNumber(e.x, e.y, dmg, '#ff8800');
           _registerComboHit();
         }
@@ -72,6 +90,9 @@ function activateSkill(name) {
     }
     case 'shieldBash': {
       _skillCooldowns.shieldBash = COMBAT_SKILLS.shieldBash.cooldownMax;
+      let sbLv = getSkillLevel('shieldBash');
+      // Lv2: stun +30 frames (1.5s total), Lv3: +15 dmg on top
+      let stunFrames = sbLv >= 2 ? 90 : 60;
       let enemies = state.conquest.active ? state.conquest.enemies : (state.adventure.enemies || []);
       let nearest = null, nearD = Infinity;
       for (let e of enemies) {
@@ -80,14 +101,20 @@ function activateSkill(name) {
         if (d < nearD) { nearD = d; nearest = e; }
       }
       if (nearest && nearD < 60) {
-        nearest.stunTimer = 60; // 60 frames stun
+        nearest.stunTimer = stunFrames;
         nearest.state = 'stagger';
-        nearest.stateTimer = 60;
+        nearest.stateTimer = stunFrames;
         nearest.flashTimer = 10;
         let kba = atan2(nearest.y - p.y, nearest.x - p.x);
         nearest.x += cos(kba) * 12;
         nearest.y += sin(kba) * 12;
-        _spawnDamageNumber(nearest.x, nearest.y, 0, '#44aaff');
+        // Lv3: bonus damage
+        if (sbLv >= 3) {
+          nearest.hp -= 15;
+          _spawnDamageNumber(nearest.x, nearest.y, 15, '#44aaff');
+        } else {
+          _spawnDamageNumber(nearest.x, nearest.y, 0, '#44aaff');
+        }
         addFloatingText(w2sX(nearest.x), w2sY(nearest.y) - 30, 'STUNNED!', '#44aaff');
         spawnParticles(nearest.x, nearest.y, 'combat', 6);
         triggerScreenShake(3, 6);
@@ -100,10 +127,65 @@ function activateSkill(name) {
     }
     case 'heal': {
       _skillCooldowns.heal = COMBAT_SKILLS.heal.cooldownMax;
-      let healed = min(30, p.maxHp - p.hp);
-      p.hp = min(p.maxHp, p.hp + 30);
+      let hLv = getSkillLevel('heal');
+      // Lv1: 30 HP, Lv2: 50 HP, Lv3: 80 HP + CD -3s
+      let healAmt = hLv >= 3 ? 80 : hLv >= 2 ? 50 : 30;
+      if (hLv >= 3) _skillCooldowns.heal -= 180; // -3s at 60fps
+      let healed = min(healAmt, p.maxHp - p.hp);
+      p.hp = min(p.maxHp, p.hp + healAmt);
       spawnParticles(p.x, p.y, 'divine', 8);
       addFloatingText(w2sX(p.x), w2sY(p.y) - 30, '+' + healed + ' HP', '#44ff66');
+      break;
+    }
+    case 'battleCry': {
+      _skillCooldowns.battleCry = COMBAT_SKILLS.battleCry.cooldownMax;
+      let bcLv = getSkillLevel('battleCry');
+      // Lv1: companions +20% speed 10s (600 frames). Lv2: duration +30s, +25% dmg
+      _battleCryTimer = bcLv >= 2 ? 2400 : 600; // frames
+      spawnParticles(p.x, p.y, 'combat', 12);
+      triggerScreenShake(4, 8);
+      if (typeof snd !== 'undefined' && snd) snd.playSFX('whirlwind');
+      addFloatingText(w2sX(p.x), w2sY(p.y) - 35, 'BATTLE CRY!', '#ff4444');
+      break;
+    }
+    case 'charge': {
+      _skillCooldowns.charge = COMBAT_SKILLS.charge.cooldownMax;
+      let chLv = getSkillLevel('charge');
+      // Lv1: dash 80px. Lv2: +40px. Lv3: +25 dmg on contact
+      let chDist = chLv >= 2 ? 120 : 80;
+      let chAngle = typeof getFacingAngle === 'function' ? getFacingAngle() : 0;
+      let chTargetX = p.x + cos(chAngle) * chDist;
+      let chTargetY = p.y + sin(chAngle) * chDist;
+      p.x = chTargetX;
+      p.y = chTargetY;
+      p.invincTimer = max(p.invincTimer, 12);
+      // Stagger & optionally damage enemies near landing point
+      let enemies2 = state.conquest.active ? state.conquest.enemies : (state.adventure.enemies || []);
+      for (let e of enemies2) {
+        if (e.state === 'dying' || e.state === 'dead') continue;
+        if (dist(p.x, p.y, e.x, e.y) < 35 + (e.size || 10)) {
+          e.state = 'stagger'; e.stateTimer = 20; e.flashTimer = 6;
+          if (chLv >= 3) {
+            e.hp -= 25;
+            _spawnDamageNumber(e.x, e.y, 25, '#ffcc44');
+          }
+        }
+      }
+      spawnParticles(p.x, p.y, 'dash', 10);
+      triggerScreenShake(5, 10);
+      if (typeof snd !== 'undefined' && snd) snd.playSFX('dodge');
+      addFloatingText(w2sX(p.x), w2sY(p.y) - 30, 'CHARGE!', '#ffcc44');
+      break;
+    }
+    case 'fortify': {
+      _skillCooldowns.fortify = COMBAT_SKILLS.fortify.cooldownMax;
+      let fLv = getSkillLevel('fortify');
+      // Lv1: 30% dmg reduction for 5s (300 frames). Lv2: +5s, reflect 10 dmg
+      _fortifyTimer = fLv >= 2 ? 600 : 300;
+      spawnParticles(p.x, p.y, 'divine', 10);
+      triggerScreenShake(2, 4);
+      if (typeof snd !== 'undefined' && snd) snd.playSFX('shield_bash');
+      addFloatingText(w2sX(p.x), w2sY(p.y) - 30, 'FORTIFY!', '#aaaaff');
       break;
     }
   }
@@ -208,6 +290,11 @@ function updateCombatSystem(dt) {
     _comboTimer -= dt;
     if (_comboTimer <= 0) _comboCount = 0;
   }
+
+  // Fortify active timer
+  if (_fortifyTimer > 0) _fortifyTimer -= dt;
+  // Battle cry active timer
+  if (_battleCryTimer > 0) _battleCryTimer -= dt;
 
   // Damage number decay
   for (let i = _damageNumbers.length - 1; i >= 0; i--) {
@@ -332,12 +419,17 @@ function drawCombatOverlay() {
     textSize(7); textAlign(CENTER, CENTER);
     text('LV.' + level + '  ' + floor(xp) + '/' + needed + ' XP', width / 2, barY + barH / 2);
 
-    // Skill cooldown indicators (bottom-left, above controls bar)
+    // Skill cooldown indicators — only show skills the player has unlocked (level >= 1)
     let skY = height - 52;
     let skX = 12;
     textAlign(LEFT, TOP);
+    // Core skills (whirlwind/shieldBash/heal) always show when in combat context
+    // Gladiator/Praetor extras only show if unlocked
+    let alwaysShow = ['whirlwind', 'shieldBash', 'heal'];
     for (let name in COMBAT_SKILLS) {
       let sk = COMBAT_SKILLS[name];
+      let unlocked = alwaysShow.includes(name) || getSkillLevel(name) >= 1;
+      if (!unlocked) continue;
       let cd = _skillCooldowns[name];
       let ready = cd <= 0;
       fill(ready ? color(60, 180, 80, 200) : color(80, 60, 60, 160));
@@ -460,10 +552,48 @@ function getFishingLuckBonus() {
   return lv >= 3 ? 1.4 : lv >= 2 ? 1.25 : lv >= 1 ? 1.15 : 1.0;
 }
 
+// Naturalist's Codex completion bonuses
+function getNatBestiaryBonus() {
+  // +10% damage when all 8 enemy types defeated
+  if (!state || !state.codex || !state.codex.enemies) return 1.0;
+  return Object.keys(state.codex.enemies).length >= 8 ? 1.1 : 1.0;
+}
+function getNatFishingSpeedBonus() {
+  // +50% bite speed (shorter wait) when all 14 fish caught
+  if (!state || !state.codex || !state.codex.fish) return 1.0;
+  return Object.keys(state.codex.fish).length >= 14 ? 1.5 : 1.0;
+}
+function getNatBuildCostMult() {
+  // -20% build cost when all buildings built
+  if (!state || !state.codex || !state.codex.buildingsBuilt) return 1.0;
+  return Object.keys(state.codex.buildingsBuilt).length >= 20 ? 0.8 : 1.0;
+}
+
 // Companion energy regen bonus from Loyal Bond (extra per 60 frames)
 function getCompanionRegenBonus() {
   let lv = getSkillLevel('companionRegen');
   return lv >= 2 ? 0.05 : lv >= 1 ? 0.033 : 0;
+}
+
+// Fortify active? Returns damage reduction fraction (0–0.3)
+function getFortifyReduction() {
+  return _fortifyTimer > 0 ? 0.3 : 0;
+}
+
+// Fortify reflect damage (10 dmg if Lv2)
+function getFortifyReflect() {
+  return (_fortifyTimer > 0 && getSkillLevel('fortify') >= 2) ? 10 : 0;
+}
+
+// Battle cry speed multiplier for companions (1.0 if inactive)
+function getBattleCrySpeedMult() {
+  return _battleCryTimer > 0 ? 1.2 : 1.0;
+}
+
+// Battle cry damage multiplier for companions (1.0 if inactive, 1.25 at Lv2)
+function getBattleCryDamageMult() {
+  if (_battleCryTimer <= 0) return 1.0;
+  return getSkillLevel('battleCry') >= 2 ? 1.25 : 1.0;
 }
 
 function toggleSkillTree() {

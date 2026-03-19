@@ -4,12 +4,12 @@
 // ─── TRADE ROUTE DEFINITIONS ─────────────────────────────────────────────────
 
 const TRADE_GOODS = {
-  grain:   { name: 'Grain',   icon: '#ddcc44', goldPerTrip: 8 },
-  wood:    { name: 'Wood',    icon: '#aa8844', goldPerTrip: 6 },
-  stone:   { name: 'Stone',   icon: '#888888', goldPerTrip: 7 },
-  wine:    { name: 'Wine',    icon: '#884466', goldPerTrip: 12 },
-  fish:    { name: 'Fish',    icon: '#4488aa', goldPerTrip: 5 },
-  crystal: { name: 'Crystal', icon: '#44ffaa', goldPerTrip: 15 },
+  grain:   { name: 'Grain',   icon: '#ddcc44', goldPerTrip: 12 },
+  wood:    { name: 'Wood',    icon: '#aa8844', goldPerTrip: 10 },
+  stone:   { name: 'Stone',   icon: '#888888', goldPerTrip: 11 },
+  wine:    { name: 'Wine',    icon: '#884466', goldPerTrip: 18 },
+  fish:    { name: 'Fish',    icon: '#4488aa', goldPerTrip: 10 },
+  crystal: { name: 'Crystal', icon: '#44ffaa', goldPerTrip: 22 },
 };
 
 const MAX_TRADE_ROUTES = 3;
@@ -20,7 +20,7 @@ const TRADE_SHIP_SPEED = 0.4;
 
 const COLONY_SPECS = {
   agricultural: { name: 'Agricultural', desc: '+30% harvest from colony', color: '#88cc44' },
-  mining:       { name: 'Mining',       desc: '2x stone & iron',       color: '#aaaacc' },
+  mining:       { name: 'Mining',       desc: '+1.5/level stone daily, iron at lv5+', color: '#aaaacc' },
   trading:      { name: 'Trading',      desc: '2x gold from routes',   color: '#ddaa44' },
 };
 
@@ -231,7 +231,9 @@ function onDayTransitionEconomy() {
     // +30% harvest bonus applied at harvest time in sketch.js farm plot harvest code
   }
   if (state.colonySpec['conquest'] === 'mining') {
-    state.stone += floor(c.colonyLevel * 0.5);
+    let mineBonus = floor(c.colonyLevel * 1.5);
+    state.stone += mineBonus;
+    if (c.colonyLevel >= 5) state.ironOre = (state.ironOre || 0) + floor(c.colonyLevel * 0.5);
   }
 
   if (trade.net !== 0) {

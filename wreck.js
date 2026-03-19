@@ -430,25 +430,38 @@ function drawWreckIsland() {
   let t0 = frameCount * 0.01;
 
   // ─── DEEP WATER SHADOW beneath island ───
-  fill(10, 25, 45, 40);
-  ellipse(sx + 5, sy + sandRY + 8, sandRX * 2.0, 25);
+  fill(8, 18, 35, 50);
+  ellipse(sx + 6, sy + sandRY + 10, sandRX * 2.2, 30);
+  fill(10, 25, 45, 30);
+  ellipse(sx + 3, sy + sandRY + 6, sandRX * 2.0, 22);
 
   // ─── SHALLOW LAGOON — turquoise rings with wave distortion ───
-  for (let ring = 0; ring < 5; ring++) {
-    let ringScale = 1.35 - ring * 0.06;
+  for (let ring = 0; ring < 6; ring++) {
+    let ringScale = 1.38 - ring * 0.055;
     let ringRX = sandRX * ringScale;
-    let ringRY = sandRY * ringScale * 1.15;
-    let alpha = 90 + ring * 25;
-    let r = lerp(35, 95, ring / 4);
-    let g = lerp(110, 185, ring / 4);
-    let b = lerp(155, 200, ring / 4);
+    let ringRY = sandRY * ringScale * 1.18;
+    let alpha = 80 + ring * 28;
+    let r = lerp(25, 75, ring / 5);
+    let g = lerp(95, 175, ring / 5);
+    let b = lerp(140, 195, ring / 5);
     fill(r * bright, g * bright, b, alpha);
-    for (let row = -ringRY; row < ringRY; row += 3) {
+    for (let row = -ringRY; row < ringRY; row += 2) {
       let t = row / ringRY;
       let w2 = ringRX * sqrt(max(0, 1 - t * t));
-      let wave = sin(t0 * 2 + row * 0.06) * 3;
-      rect(floor(sx - w2 + wave), floor(sy + row), floor(w2 * 2), 3);
+      let wave = sin(t0 * 2 + row * 0.06) * 3 + sin(t0 * 1.3 + row * 0.1) * 1.5;
+      rect(floor(sx - w2 + wave), floor(sy + row), floor(w2 * 2), 2);
     }
+  }
+  // Underwater caustic light patterns
+  for (let c = 0; c < 8; c++) {
+    let ca = (c * 2.39996 + t0 * 0.5) % TWO_PI;
+    let cr = 0.6 + sin(c * 1.7 + t0) * 0.15;
+    let cpx = sx + cos(ca) * sandRX * cr;
+    let cpy = sy + sin(ca) * sandRY * cr * 0.6;
+    let cAlpha = (sin(t0 * 2.5 + c * 1.3) * 0.5 + 0.5) * 18 * bright;
+    fill(120, 220, 240, cAlpha);
+    rect(floor(cpx - 4), floor(cpy), 8, 2);
+    rect(floor(cpx - 2), floor(cpy - 2), 4, 6);
   }
 
   // ─── REEF / ROCKS in shallow water ───
@@ -459,15 +472,25 @@ function drawWreckIsland() {
   for (let rp of reefPositions) {
     let rrx = sx + rp[0] * sandRX * 1.15;
     let rry = sy + rp[1] * sandRY * 1.3;
-    // Dark rock
+    // Dark rock base with layered depth
+    fill(45 * bright, 40 * bright, 35);
+    rect(floor(rrx - 6), floor(rry - 2), 12, 8);
     fill(60 * bright, 55 * bright, 48);
-    rect(floor(rrx - 5), floor(rry - 3), 10, 6, 1);
+    rect(floor(rrx - 5), floor(rry - 3), 10, 6);
     fill(75 * bright, 70 * bright, 58);
-    rect(floor(rrx - 4), floor(rry - 3), 8, 3, 1);
-    // Water foam around rock
+    rect(floor(rrx - 4), floor(rry - 4), 8, 4);
+    // Top highlight
+    fill(90 * bright, 85 * bright, 70);
+    rect(floor(rrx - 3), floor(rry - 4), 6, 2);
+    // Water foam around rock — animated ring
     let foam = sin(t0 * 3 + rp[0] * 5) * 0.3 + 0.7;
-    fill(220, 240, 255, 40 * foam);
-    rect(floor(rrx - 7), floor(rry - 1), 14, 2);
+    fill(220, 240, 255, 50 * foam);
+    rect(floor(rrx - 8), floor(rry - 1), 16, 2);
+    fill(240, 250, 255, 30 * foam);
+    rect(floor(rrx - 7), floor(rry + 2), 14, 2);
+    // Algae on shaded side
+    fill(35, 70, 30, 80);
+    rect(floor(rrx - 5), floor(rry + 1), 4, 2);
   }
 
   // ─── WET SAND RING ───
@@ -485,38 +508,56 @@ function drawWreckIsland() {
   for (let row = -sandRY; row < sandRY; row += 2) {
     let t = row / sandRY;
     let w2 = sandRX * sqrt(max(0, 1 - t * t));
-    // Organic edge — multiple sine waves create natural coastline
     let wobble = sin(row * 0.06 + 0.7) * 6 + sin(row * 0.13 + 2.1) * 3 + sin(row * 0.21 + 4.5) * 2;
     w2 += wobble;
-    let edgeDarken = abs(t) > 0.5 ? (abs(t) - 0.5) * 30 : 0;
-    let r = (228 - edgeDarken) * bright;
-    let g = (208 - edgeDarken * 0.8) * bright;
-    let b2 = (158 - edgeDarken * 0.5);
+    let edgeDarken = abs(t) > 0.5 ? (abs(t) - 0.5) * 35 : 0;
+    // Warm sand gradient — lighter center, darker toward south
+    let centerBias = 1 - abs(t) * 0.12;
+    let r = (232 - edgeDarken) * bright * centerBias;
+    let g = (212 - edgeDarken * 0.8) * bright * centerBias;
+    let b2 = (160 - edgeDarken * 0.6);
     fill(r, g, b2);
     rect(floor(sx - w2), floor(sy + row), floor(w2 * 2), 2);
   }
 
-  // Sunlit highlight patch
-  for (let row = -sandRY * 0.35; row < sandRY * 0.15; row += 2) {
+  // Sunlit highlight patch — warm golden light from top-left
+  for (let row = -sandRY * 0.4; row < sandRY * 0.1; row += 2) {
     let t = row / sandRY;
-    let w2 = sandRX * 0.3 * sqrt(max(0, 1 - t * t * 8));
-    fill(245, 235, 200, 35 * bright);
-    rect(floor(sx - sandRX * 0.1 - w2), floor(sy + row), floor(w2 * 2), 2);
+    let w2 = sandRX * 0.35 * sqrt(max(0, 1 - t * t * 7));
+    fill(248, 238, 205, 40 * bright);
+    rect(floor(sx - sandRX * 0.15 - w2), floor(sy + row), floor(w2 * 2), 2);
+  }
+  // Secondary warm highlight — south-center
+  for (let row = sandRY * 0.05; row < sandRY * 0.35; row += 2) {
+    let t = (row - sandRY * 0.2) / (sandRY * 0.15);
+    let w2 = sandRX * 0.2 * sqrt(max(0, 1 - t * t));
+    fill(240, 225, 185, 22 * bright);
+    rect(floor(sx + sandRX * 0.1 - w2), floor(sy + row), floor(w2 * 2), 2);
   }
 
-  // ─── SAND TEXTURE ───
-  for (let i = 0; i < 55; i++) {
-    let angle = (i * 2.39996) % TWO_PI; // golden angle distribution
-    let r = ((i * 17 + 7) % 100) / 100 * 0.8;
+  // ─── SAND TEXTURE — ripples, pebbles, footprint-like marks ───
+  for (let i = 0; i < 65; i++) {
+    let angle = (i * 2.39996) % TWO_PI;
+    let r = ((i * 17 + 7) % 100) / 100 * 0.82;
     let px = sx + cos(angle) * sandRX * r;
     let py = sy + sin(angle) * sandRY * r * 0.5;
     let dx = (px - sx) / sandRX, dy = (py - sy) / sandRY;
-    if (dx * dx + dy * dy < 0.6) {
-      if (i % 4 === 0) { fill(205, 188, 140, 80); rect(floor(px), floor(py), 5, 2); }
-      else if (i % 4 === 1) { fill(235, 220, 180, 50); rect(floor(px), floor(py), 3, 1); }
-      else if (i % 4 === 2) { fill(195, 175, 125, 60); rect(floor(px), floor(py), 4, 2); }
-      else { fill(215, 200, 160, 40); rect(floor(px), floor(py), 2, 3); }
+    if (dx * dx + dy * dy < 0.65) {
+      if (i % 5 === 0) { fill(200, 182, 135, 90); rect(floor(px), floor(py), 6, 2); fill(215, 200, 158, 50); rect(floor(px + 1), floor(py - 1), 4, 1); }
+      else if (i % 5 === 1) { fill(238, 225, 185, 55); rect(floor(px), floor(py), 4, 2); }
+      else if (i % 5 === 2) { fill(190, 170, 120, 70); rect(floor(px), floor(py), 4, 2); rect(floor(px + 2), floor(py + 2), 3, 2); }
+      else if (i % 5 === 3) { fill(175, 158, 115, 50); rect(floor(px), floor(py), 2, 4); }
+      else { fill(220, 205, 168, 45); rect(floor(px), floor(py), 3, 1); }
     }
+  }
+  // Wind ripple lines across sand
+  for (let wr = 0; wr < 6; wr++) {
+    let wry = sy - sandRY * 0.2 + wr * sandRY * 0.12;
+    let wrx = sx - sandRX * 0.3 + wr * 15;
+    fill(210, 195, 155, 35);
+    rect(floor(wrx), floor(wry), floor(sandRX * 0.25), 1);
+    fill(240, 228, 195, 25);
+    rect(floor(wrx + 2), floor(wry - 1), floor(sandRX * 0.18), 1);
   }
 
   // ─── TIDE LINE — dark wet sand line around beach perimeter ───
@@ -533,38 +574,82 @@ function drawWreckIsland() {
     }
   }
 
-  // ─── DRIFTWOOD PILES — scattered larger pieces ───
-  let driftPiles = [[-0.4, 0.35], [0.55, 0.3], [-0.15, 0.4], [0.3, 0.38]];
+  // ─── DRIFTWOOD PILES — weathered, salt-bleached timber ───
+  let driftPiles = [[-0.4, 0.35], [0.55, 0.3], [-0.15, 0.4], [0.3, 0.38], [-0.55, 0.25], [0.2, 0.42]];
   for (let dp of driftPiles) {
     let dpx = sx + dp[0] * sandRX, dpy = sy + dp[1] * sandRY;
-    fill(95 * bright, 65 * bright, 32);
-    rect(floor(dpx - 10), floor(dpy), 20, 3);
-    rect(floor(dpx - 6), floor(dpy + 2), 14, 2);
-    fill(80 * bright, 55 * bright, 28);
-    rect(floor(dpx - 8), floor(dpy + 1), 6, 1);
+    // Shadow under wood
+    fill(170 * bright, 152 * bright, 110, 40);
+    rect(floor(dpx - 11), floor(dpy + 3), 22, 2);
+    // Main log — dark weathered
+    fill(85 * bright, 58 * bright, 28);
+    rect(floor(dpx - 12), floor(dpy), 24, 4);
+    // Grain lines
+    fill(100 * bright, 72 * bright, 35);
+    rect(floor(dpx - 10), floor(dpy), 20, 2);
+    // Salt-bleach highlight on top
+    fill(140 * bright, 115 * bright, 75, 60);
+    rect(floor(dpx - 8), floor(dpy - 1), 14, 1);
+    // Cross piece
+    fill(75 * bright, 50 * bright, 24);
+    rect(floor(dpx - 4), floor(dpy + 1), 10, 2);
+    // Knot detail
+    fill(65 * bright, 42 * bright, 20);
+    rect(floor(dpx + 3), floor(dpy + 1), 2, 2);
   }
 
   // ─── SEAWEED PATCHES on rocks and edges ───
-  let seaweedSpots = [[-0.6, 0.3], [0.7, 0.25], [-0.2, 0.42], [0.45, 0.38], [-0.85, 0.15]];
+  let seaweedSpots = [[-0.6, 0.3], [0.7, 0.25], [-0.2, 0.42], [0.45, 0.38], [-0.85, 0.15], [0.15, 0.35]];
   for (let sw of seaweedSpots) {
     let swx = sx + sw[0] * sandRX, swy = sy + sw[1] * sandRY;
-    let sway = sin(t0 * 2 + sw[0] * 5) * 1;
-    fill(40, 75, 35, 130);
-    rect(floor(swx - 3 + sway), floor(swy - 3), 2, 6);
-    rect(floor(swx + sway), floor(swy - 2), 2, 5);
-    rect(floor(swx + 3 + sway), floor(swy - 1), 2, 4);
-    fill(55, 95, 45, 100);
-    rect(floor(swx - 1 + sway), floor(swy - 4), 2, 3);
+    let sway = sin(t0 * 2 + sw[0] * 5) * 1.5;
+    // Dark seaweed fronds
+    fill(35, 65, 30, 140);
+    rect(floor(swx - 4 + sway), floor(swy - 4), 2, 8);
+    rect(floor(swx + sway), floor(swy - 3), 2, 7);
+    rect(floor(swx + 4 + sway), floor(swy - 2), 2, 6);
+    // Lighter tips
+    fill(50, 90, 40, 110);
+    rect(floor(swx - 4 + sway), floor(swy - 5), 2, 2);
+    rect(floor(swx + sway), floor(swy - 4), 2, 2);
+    // Wet sheen
+    fill(80, 130, 70, 40);
+    rect(floor(swx - 3 + sway), floor(swy - 3), 1, 4);
+  }
+
+  // ─── SCATTERED AMPHORA — Roman supply debris on the beach ───
+  let amphoraPos = [[0.2, -0.1], [-0.3, 0.15], [0.45, 0.2]];
+  for (let ap of amphoraPos) {
+    let apx = sx + ap[0] * sandRX, apy = sy + ap[1] * sandRY;
+    // Broken amphora on its side — terracotta
+    fill(165 * bright, 85 * bright, 55);
+    rect(floor(apx - 4), floor(apy - 3), 8, 6);
+    fill(185 * bright, 100 * bright, 65);
+    rect(floor(apx - 3), floor(apy - 4), 6, 2);
+    // Neck
+    fill(155 * bright, 78 * bright, 48);
+    rect(floor(apx - 2), floor(apy - 5), 4, 2);
+    // Broken rim highlight
+    fill(200 * bright, 125 * bright, 80);
+    rect(floor(apx - 1), floor(apy - 5), 2, 1);
+    // Handle stub
+    fill(145 * bright, 72 * bright, 42);
+    rect(floor(apx + 3), floor(apy - 2), 2, 3);
+    // Shadow
+    fill(0, 0, 0, 15);
+    rect(floor(apx - 5), floor(apy + 3), 10, 2);
   }
 
   // Shells, pebbles, coral scattered
-  let decoSeed = [[-65,8],[80,14],[-100,-12],[55,25],[30,18],[-90,20],[110,-5],[-40,30],[70,-15],[-20,-20]];
+  let decoSeed = [[-65,8],[80,14],[-100,-12],[55,25],[30,18],[-90,20],[110,-5],[-40,30],[70,-15],[-20,-20],[-50,-8],[95,10],[-75,22],[45,-12]];
   for (let i = 0; i < decoSeed.length; i++) {
     let dx = decoSeed[i][0], dy = decoSeed[i][1];
     let dsx = floor(sx + dx), dsy = floor(sy + dy);
-    if (i % 3 === 0) { fill(235, 225, 200); ellipse(dsx, dsy, 4, 3); fill(245, 238, 218); ellipse(dsx, dsy - 1, 2, 2); }
-    else if (i % 3 === 1) { fill(180, 165, 130); rect(dsx, dsy, 5, 3, 1); }
-    else { fill(215, 130, 110, 150); rect(dsx, dsy, 3, 4); rect(dsx + 2, dsy - 2, 2, 3); }
+    if (i % 5 === 0) { fill(235, 225, 200); rect(dsx - 2, dsy, 4, 3); fill(245, 238, 218); rect(dsx - 1, dsy, 2, 2); } // shell
+    else if (i % 5 === 1) { fill(170, 155, 125); rect(dsx, dsy, 4, 3); fill(190, 175, 145); rect(dsx + 1, dsy, 2, 2); } // flat pebble
+    else if (i % 5 === 2) { fill(210, 125, 105, 160); rect(dsx, dsy, 3, 4); rect(dsx + 2, dsy - 2, 2, 3); } // coral
+    else if (i % 5 === 3) { fill(220, 210, 190); rect(dsx, dsy, 2, 2); fill(200, 190, 165); rect(dsx + 2, dsy + 1, 2, 2); } // pebble pair
+    else { fill(140, 130, 110, 80); rect(dsx, dsy, 5, 2); fill(160, 150, 130, 60); rect(dsx + 1, dsy - 1, 3, 1); } // flat stone
   }
 
   // ─── SHORE FOAM — multi-layered animated waves ───
@@ -598,25 +683,58 @@ function drawWreckIsland() {
   }
 
   // ─── ROCKY OUTCROP — north side of island (dramatic cliff) ───
-  let rockX = sx - sandRX * 0.5, rockY = sy - sandRY * 0.6;
-  for (let row = 0; row < 25; row += 2) {
-    let rw = 40 - row * 1.2;
-    fill((85 - row) * bright, (78 - row) * bright, 65 - row * 0.5);
-    rect(floor(rockX - rw / 2), floor(rockY + row), floor(rw), 2);
+  let rockX = sx - sandRX * 0.5, rockY = sy - sandRY * 0.65;
+  // Cliff shadow
+  fill(0, 0, 0, 20);
+  rect(floor(rockX - 18), floor(rockY + 28), 40, 4);
+  // Main cliff mass
+  for (let row = 0; row < 30; row += 2) {
+    let rw = 48 - row * 1.3;
+    let rowOffset = sin(row * 0.4) * 2;
+    fill((90 - row * 0.8) * bright, (82 - row * 0.7) * bright, 68 - row * 0.4);
+    rect(floor(rockX - rw / 2 + rowOffset), floor(rockY + row), floor(rw), 2);
   }
-  fill(100 * bright, 92 * bright, 78);
-  rect(floor(rockX - 15), floor(rockY), 30, 4, 1);
-  // Rock texture lines
-  fill(70 * bright, 65 * bright, 55, 80);
-  rect(floor(rockX - 10), floor(rockY + 8), 20, 1);
-  rect(floor(rockX - 8), floor(rockY + 14), 16, 1);
+  // Flat top cap
+  fill(105 * bright, 95 * bright, 80);
+  rect(floor(rockX - 20), floor(rockY - 2), 40, 4);
+  fill(115 * bright, 105 * bright, 88);
+  rect(floor(rockX - 16), floor(rockY - 2), 32, 2);
+  // Crack details
+  fill(55 * bright, 50 * bright, 42, 100);
+  rect(floor(rockX - 8), floor(rockY + 4), 2, 14);
+  rect(floor(rockX + 5), floor(rockY + 6), 2, 10);
+  rect(floor(rockX - 3), floor(rockY + 10), 8, 1);
+  // Moss on shaded side
+  fill(45, 75, 35, 60);
+  rect(floor(rockX - 18), floor(rockY + 8), 6, 4);
+  rect(floor(rockX - 16), floor(rockY + 14), 4, 3);
+  // Light edge highlight (top-left light)
+  fill(130 * bright, 120 * bright, 100, 60);
+  rect(floor(rockX - 20), floor(rockY), 4, 8);
 
-  // Second rock cluster — east side
-  let rock2X = sx + sandRX * 0.6, rock2Y = sy - sandRY * 0.3;
-  for (let row = 0; row < 18; row += 2) {
-    let rw = 30 - row;
-    fill((80 - row) * bright, (72 - row) * bright, 60 - row * 0.5);
-    rect(floor(rock2X - rw / 2), floor(rock2Y + row), floor(rw), 2);
+  // Second rock cluster — east side (taller, more jagged)
+  let rock2X = sx + sandRX * 0.6, rock2Y = sy - sandRY * 0.35;
+  fill(0, 0, 0, 15);
+  rect(floor(rock2X - 14), floor(rock2Y + 22), 30, 3);
+  for (let row = 0; row < 22; row += 2) {
+    let rw = 34 - row * 1.1;
+    let jag = sin(row * 0.6 + 1.2) * 2;
+    fill((82 - row * 0.7) * bright, (74 - row * 0.6) * bright, 62 - row * 0.4);
+    rect(floor(rock2X - rw / 2 + jag), floor(rock2Y + row), floor(rw), 2);
+  }
+  // Top cap
+  fill(95 * bright, 88 * bright, 74);
+  rect(floor(rock2X - 14), floor(rock2Y - 1), 28, 3);
+  // Crack
+  fill(58 * bright, 52 * bright, 44, 80);
+  rect(floor(rock2X + 2), floor(rock2Y + 4), 2, 12);
+
+  // Third small rock — southwest
+  let rock3X = sx - sandRX * 0.2, rock3Y = sy + sandRY * 0.3;
+  for (let row = 0; row < 12; row += 2) {
+    let rw = 18 - row * 1.2;
+    fill((78 - row) * bright, (70 - row) * bright, 58 - row * 0.5);
+    rect(floor(rock3X - rw / 2), floor(rock3Y + row), floor(rw), 2);
   }
 
   // ─── TIDAL POOLS — small water pools on the beach ───
@@ -633,125 +751,236 @@ function drawWreckIsland() {
     rect(floor(ppx - 3), floor(ppy - 2), 4, 2);
   }
 
-  // ─── BROKEN TRIREME — scenery only, not repairable ───
+  // ─── BROKEN TRIREME — dramatic shipwreck scenery ───
   let triX = w2sX(cx - 80), triY = w2sY(cy - 20);
 
   push();
   translate(floor(triX), floor(triY));
-  rotate(-0.08); // tilted — beached at an angle
+  rotate(-0.1); // tilted — beached at a steep angle
 
-  // Always show as wrecked — dark weathered wood
-  let hullDark = [48, 30, 14];
-  let hullMid = [62, 40, 18];
-  let hullLight = [75, 50, 24];
+  let hullDark = [42, 26, 12];
+  let hullMid = [58, 38, 16];
+  let hullLight = [72, 48, 22];
+  let hullWet = [35, 22, 10];
 
-  // Sand piled against hull (buried effect)
-  fill(210 * bright, 192 * bright, 148);
+  // ── Ground shadow beneath hull
+  fill(0, 0, 0, 25);
+  rect(-72, 14, 132, 6);
+
+  // ── Sand piled against hull (buried effect, organic shape)
+  fill(215 * bright, 198 * bright, 152);
   beginShape();
-  vertex(-70, 12); vertex(-55, 8); vertex(-30, 14); vertex(0, 10);
-  vertex(30, 16); vertex(55, 12); vertex(60, 18); vertex(-70, 18);
+  vertex(-75, 10); vertex(-60, 6); vertex(-35, 12); vertex(-10, 8);
+  vertex(20, 14); vertex(45, 10); vertex(58, 14); vertex(62, 20); vertex(-75, 20);
+  endShape(CLOSE);
+  fill(205 * bright, 188 * bright, 142);
+  beginShape();
+  vertex(-68, 12); vertex(-40, 9); vertex(-15, 13); vertex(10, 11);
+  vertex(35, 15); vertex(50, 12); vertex(55, 18); vertex(-68, 18);
   endShape(CLOSE);
 
-  // Hull bottom — massive curved shape
+  // ── Hull bottom — massive broken shape, deeper colors
   fill(hullDark[0], hullDark[1], hullDark[2]);
   beginShape();
-  vertex(-65, -5); vertex(-55, -14); vertex(-30, -20);
-  vertex(0, -22); vertex(30, -20); vertex(50, -14); vertex(55, -5);
-  vertex(55, 12); vertex(-65, 12);
+  vertex(-68, -6); vertex(-58, -16); vertex(-32, -22);
+  vertex(0, -24); vertex(32, -22); vertex(52, -16); vertex(58, -6);
+  vertex(58, 14); vertex(-68, 14);
   endShape(CLOSE);
 
-  // Hull planking
+  // ── Hull planking — horizontal strakes with gaps
   fill(hullMid[0], hullMid[1], hullMid[2]);
-  rect(-60, -12, 110, 3);
-  rect(-55, -6, 105, 3);
-  rect(-50, 0, 100, 3);
-  rect(-48, 6, 96, 3);
+  rect(-62, -14, 116, 3);
+  rect(-58, -8, 112, 3);
+  rect(-54, -2, 108, 3);
+  rect(-52, 4, 104, 3);
+  // Gaps / missing planks — show dark interior
+  fill(hullDark[0] - 12, hullDark[1] - 8, hullDark[2] - 4);
+  rect(15, -14, 12, 3); // missing plank section
+  rect(-25, -2, 8, 3);
+  rect(35, 4, 10, 3);
 
-  // Ribs — exposed structural timbers
+  // ── Ribs — exposed structural timbers (some broken)
   fill(hullLight[0], hullLight[1], hullLight[2]);
   for (let i = -5; i <= 5; i++) {
     let ribX = i * 10;
-    let ribH = 30 - abs(i) * 2;
-    rect(ribX - 1, -20 + abs(i), 3, ribH);
+    let ribH = 32 - abs(i) * 2;
+    // Some ribs broken at different heights
+    if (i === 2 || i === -3) ribH = floor(ribH * 0.5);
+    rect(ribX - 1, -22 + abs(i), 3, ribH);
+    // Rib highlight
+    fill(hullLight[0] + 12, hullLight[1] + 8, hullLight[2] + 6, 60);
+    rect(ribX - 1, -22 + abs(i), 1, ribH);
+    fill(hullLight[0], hullLight[1], hullLight[2]);
   }
 
-  // Keel — spine of the ship
-  fill(hullDark[0] - 10, hullDark[1] - 8, hullDark[2] - 5);
-  rect(-60, -2, 115, 4);
+  // ── Keel — spine of the ship, prominent
+  fill(hullWet[0], hullWet[1], hullWet[2]);
+  rect(-64, -3, 122, 5);
+  fill(hullDark[0] + 5, hullDark[1] + 3, hullDark[2] + 2);
+  rect(-62, -2, 118, 2);
 
-  // Bow (front) — pointed, sticking up
+  // ── Bow (front) — pointed prow reaching skyward
   fill(hullMid[0], hullMid[1], hullMid[2]);
   beginShape();
-  vertex(-65, -5); vertex(-75, -15); vertex(-72, -28);
-  vertex(-65, -22); vertex(-60, -14);
+  vertex(-68, -6); vertex(-78, -18); vertex(-75, -34);
+  vertex(-68, -26); vertex(-62, -16);
   endShape(CLOSE);
-  // Ram (bronze, Roman trireme)
-  fill(140, 110, 50);
+  // Bow detail lines
+  fill(hullLight[0], hullLight[1], hullLight[2], 80);
+  rect(-74, -28, 3, 12);
+  // Ram (bronze, tarnished Roman trireme)
+  fill(125, 100, 42);
   beginShape();
-  vertex(-75, -15); vertex(-82, -12); vertex(-78, -8); vertex(-72, -10);
+  vertex(-78, -18); vertex(-86, -14); vertex(-82, -9); vertex(-75, -12);
   endShape(CLOSE);
-
-  // Stern ornament — broken
+  // Ram verdigris
+  fill(80, 115, 70, 70);
+  rect(-84, -14, 4, 3);
+  // Prow ornament — broken eagle/swan neck
+  fill(hullLight[0] + 10, hullLight[1] + 5, hullLight[2] + 3);
+  rect(-76, -36, 4, 6);
   fill(hullMid[0], hullMid[1], hullMid[2]);
-  rect(48, -18, 6, 14);
+  rect(-77, -38, 6, 4);
+
+  // ── Stern — broken, ornate carving visible
+  fill(hullMid[0], hullMid[1], hullMid[2]);
+  rect(50, -20, 8, 16);
   fill(hullLight[0], hullLight[1], hullLight[2]);
-  rect(50, -22, 4, 6);
+  rect(52, -24, 5, 6);
+  // Broken stern gallery
+  fill(hullDark[0] + 8, hullDark[1] + 5, hullDark[2] + 3);
+  rect(52, -18, 4, 2); // window-like opening
+  // Stern ornament — Roman scrollwork, broken
+  fill(130, 105, 45, 80);
+  rect(54, -24, 3, 3);
 
-  // Broken mast — always wrecked (scenery)
-  fill(80, 55, 25);
-  rect(-2, -28, 5, 20);
-  fill(90, 65, 30);
+  // ── Broken mast — splintered dramatically
+  fill(75, 52, 22);
+  rect(-3, -30, 6, 22);
+  // Splintered top
+  fill(85, 60, 28);
   beginShape();
-  vertex(-2, -28); vertex(0, -34); vertex(3, -30); vertex(5, -33); vertex(3, -28);
+  vertex(-3, -30); vertex(-1, -38); vertex(1, -32); vertex(3, -36); vertex(5, -34); vertex(3, -30);
   endShape(CLOSE);
-  // Fallen spar on deck
-  fill(70, 48, 22);
+  // Mast rings (bronze fittings)
+  fill(120, 95, 40, 100);
+  rect(-4, -28, 8, 2);
+  rect(-4, -20, 8, 2);
+
+  // Fallen spar on deck — angled
+  fill(65, 45, 20);
   push(); rotate(0.3);
-  rect(-5, -15, 40, 3);
+  rect(-8, -16, 45, 3);
+  // Spar rope binding
+  fill(140, 115, 65, 80);
+  rect(10, -16, 4, 3);
+  rect(25, -16, 4, 3);
   pop();
 
-  // Torn sail scrap on ground
-  fill(195, 180, 155, 100);
+  // ── Torn sail scraps — layered fabric
+  fill(190, 175, 150, 110);
   beginShape();
-  vertex(-30, 5); vertex(-5, 2); vertex(10, 8); vertex(-25, 12);
+  vertex(-32, 3); vertex(-5, 0); vertex(12, 6); vertex(-28, 14);
   endShape(CLOSE);
-  fill(145, 38, 28, 70);
-  rect(-22, 6, 18, 3);
+  // Red stripe on sail (Roman)
+  fill(145, 35, 25, 80);
+  rect(-24, 5, 20, 3);
+  // Second sail scrap — draped over gunwale
+  fill(185, 170, 145, 80);
+  beginShape();
+  vertex(20, -10); vertex(40, -14); vertex(42, -4); vertex(22, 0);
+  endShape(CLOSE);
+  fill(140, 32, 22, 60);
+  rect(24, -10, 14, 2);
 
-  // Oar stubs sticking out of hull
-  fill(90, 65, 35);
-  for (let i = 0; i < 4; i++) {
-    let ox = -40 + i * 22, oy = -8;
-    rect(ox, oy, 2, 12);
-    if (i < 2) { // broken oars
-      rect(ox - 8, oy + 10, 10, 2);
+  // ── Oar stubs sticking out of hull — broken at various angles
+  fill(85, 60, 30);
+  for (let i = 0; i < 5; i++) {
+    let ox = -42 + i * 20, oy = -9;
+    rect(ox, oy, 2, 14);
+    if (i < 3) {
+      push(); translate(ox, oy + 12);
+      rotate(0.2 + i * 0.15);
+      fill(78, 52, 25);
+      rect(0, 0, 12, 2);
+      pop();
     }
   }
+  // Oar blade fragment in sand (nearby)
+  fill(80, 55, 28);
+  rect(65, 8, 8, 14);
+  fill(70, 48, 24);
+  rect(66, 10, 6, 10);
 
-  // Barnacles on hull
-  fill(130, 125, 110, 100);
-  rect(-50, 6, 3, 3); rect(-30, 8, 2, 2);
-  rect(20, 7, 3, 2); rect(40, 5, 2, 3);
+  // ── Barnacles — clusters on waterline and below
+  fill(135, 128, 112, 120);
+  rect(-52, 5, 4, 4); rect(-48, 7, 3, 3);
+  rect(-30, 8, 3, 3); rect(-28, 6, 2, 4);
+  rect(18, 6, 4, 3); rect(22, 8, 3, 3);
+  rect(38, 4, 3, 4); rect(42, 6, 2, 3);
+  // Barnacle highlight
+  fill(155, 148, 132, 60);
+  rect(-52, 5, 2, 2); rect(18, 6, 2, 2);
 
-  // Wreck atmosphere — no repair bar, just dramatic scenery
-  // Barnacle and algae stains
-  fill(40, 60, 35, 60);
-  rect(-45, 4, 12, 3); rect(15, 6, 8, 2); rect(-20, 8, 10, 2);
+  // ── Algae stains — green-brown waterline marks
+  fill(38, 58, 32, 70);
+  rect(-48, 3, 14, 3); rect(12, 5, 10, 3); rect(-22, 7, 12, 2);
+  // Darker algae below waterline
+  fill(30, 48, 25, 50);
+  rect(-55, 8, 20, 3); rect(25, 9, 15, 2);
+
+  // ── Rope hanging from hull
+  fill(130, 108, 60, 90);
+  rect(-15, -16, 2, 22);
+  rect(-14, 4, 4, 2); // rope end coil
+  rect(30, -12, 2, 18);
 
   pop();
 
-  // ─── WRECKAGE DEBRIS in water ───
+  // ─── WRECKAGE DEBRIS floating in water ───
   let debrisPositions = [
     [-0.85, 0.4, 0.1], [-0.7, 0.7, -0.05], [0.75, 0.55, 0.15],
-    [0.9, 0.3, -0.08], [-0.6, -0.5, 0.12],
+    [0.9, 0.3, -0.08], [-0.6, -0.5, 0.12], [0.5, 0.8, 0.06],
+    [-0.95, 0.2, -0.1], [0.3, 0.9, 0.08],
   ];
-  for (let db of debrisPositions) {
+  for (let di = 0; di < debrisPositions.length; di++) {
+    let db = debrisPositions[di];
     let dbx = sx + db[0] * sandRX * 1.3;
     let dby = sy + db[1] * sandRY * 1.2;
-    let bob = sin(t0 * 1.5 + db[0] * 3) * 2;
-    fill(65 * bright, 42 * bright, 20);
-    rect(floor(dbx - 8), floor(dby + bob), 16, 3);
-    rect(floor(dbx - 5), floor(dby - 2 + bob), 10, 2);
+    let bob = sin(t0 * 1.5 + db[0] * 3) * 2.5;
+    let rot = sin(t0 * 0.8 + di * 2) * 0.05;
+    // Shadow on water
+    fill(15, 30, 50, 20);
+    rect(floor(dbx - 6), floor(dby + 4 + bob), 14, 2);
+    if (di % 3 === 0) {
+      // Plank debris
+      fill(60 * bright, 38 * bright, 18);
+      rect(floor(dbx - 10), floor(dby + bob), 20, 4);
+      fill(72 * bright, 48 * bright, 22);
+      rect(floor(dbx - 8), floor(dby - 1 + bob), 16, 2);
+      // Wet sheen
+      fill(90 * bright, 70 * bright, 35, 40);
+      rect(floor(dbx - 6), floor(dby - 1 + bob), 10, 1);
+    } else if (di % 3 === 1) {
+      // Barrel / crate fragment
+      fill(55 * bright, 35 * bright, 15);
+      rect(floor(dbx - 5), floor(dby - 3 + bob), 10, 8);
+      fill(70 * bright, 45 * bright, 20);
+      rect(floor(dbx - 4), floor(dby - 2 + bob), 8, 2);
+      // Iron band
+      fill(90, 82, 65, 80);
+      rect(floor(dbx - 5), floor(dby + bob), 10, 1);
+    } else {
+      // Rope + cloth tangle
+      fill(130, 108, 58, 70);
+      rect(floor(dbx - 6), floor(dby + bob), 12, 2);
+      fill(175, 160, 135, 50);
+      rect(floor(dbx - 4), floor(dby - 2 + bob), 8, 3);
+    }
+    // Foam ring around floating debris
+    let fmAlpha = 25 + sin(t0 * 2 + di) * 10;
+    fill(220, 235, 250, fmAlpha);
+    rect(floor(dbx - 12), floor(dby + 2 + bob), 24, 2);
   }
 
   // ─── RAFT CONSTRUCTION ZONE — south shore ───
@@ -881,13 +1110,40 @@ function drawWreckIsland() {
     }
   }
 
-  // ─── AMBIENT MIST over water (atmospheric) ───
-  for (let m = 0; m < 4; m++) {
-    let mx = sx + sin(t0 * 0.3 + m * 1.8) * sandRX * 1.3;
-    let my = sy + sandRY * 0.8 + cos(t0 * 0.2 + m * 2.3) * 15;
-    let ma = 15 + sin(t0 * 0.5 + m) * 8;
-    fill(200, 220, 240, ma * bright);
-    ellipse(mx, my, 80 + m * 20, 12);
+  // ─── AMBIENT MIST over water (atmospheric, layered) ───
+  for (let m = 0; m < 6; m++) {
+    let mx = sx + sin(t0 * 0.3 + m * 1.4) * sandRX * 1.4;
+    let my = sy + sandRY * 0.7 + cos(t0 * 0.2 + m * 2.1) * 18;
+    let ma = 12 + sin(t0 * 0.4 + m * 0.8) * 7;
+    fill(195, 218, 238, ma * bright);
+    ellipse(mx, my, 90 + m * 18, 10 + m * 2);
+  }
+  // Low mist along waterline — eerie morning feel
+  for (let m = 0; m < 3; m++) {
+    let mx = sx + sin(t0 * 0.15 + m * 2.5) * sandRX * 0.8;
+    let my = sy + sandRY * 0.45 + m * 8;
+    let ma = 8 + sin(t0 * 0.3 + m * 1.5) * 5;
+    fill(210, 225, 240, ma * bright);
+    ellipse(mx, my, 120, 8);
+  }
+
+  // ─── WAVE CRESTS — rolling breakers at island edge ───
+  let waveTime = t0 * 2.5;
+  for (let wv = 0; wv < 3; wv++) {
+    let wvPhase = waveTime + wv * 2.2;
+    let wvProgress = (wvPhase % 6.28) / 6.28;
+    let wvY = sy + sandRY * (0.7 + wvProgress * 0.5);
+    let wvAlpha = sin(wvProgress * PI) * 35;
+    if (wvAlpha > 2) {
+      let wvWidth = sandRX * (1.2 - wvProgress * 0.3);
+      fill(230, 242, 255, wvAlpha);
+      for (let wx = -wvWidth; wx < wvWidth; wx += 4) {
+        let wt = wx / wvWidth;
+        let curve = sqrt(max(0, 1 - wt * wt));
+        let localWave = sin(wx * 0.08 + wvPhase) * 2;
+        rect(floor(sx + wx), floor(wvY + localWave * curve), 4, 2);
+      }
+    }
   }
 }
 

@@ -39,3 +39,9 @@ Pattern established in audit pass 4: horizon-clamped distant rendering functions
 
 ## 10. Island state field naming consistency
 Hyperborea: state field is `frostNodes` but save/load used `iceNodes` (BUG-026). When saving island loot, cross-reference the field name against `initState()`. Do not invent names — copy from the object literal.
+
+## 11. Island interact handler location (as of 2026-03-19 visual redesign)
+`handleVulcanInteract`, `handleHyperboreInteract`, `handlePlentyInteract`, `handleNecropolisInteract` were moved from sketch.js to islands.js (+276 lines). Call sites remain in sketch.js keyPressed at lines 18517/18521/18525/18529. If any future modularization moves these again, ensure both the function definitions AND the call sites are updated together.
+
+## 12. `shakeTimer` global used in islands.js
+islands.js uses the `shakeTimer` global (declared at sketch.js:186). This is safe as long as islands.js is loaded after sketch.js. Do not rename or localize this variable.

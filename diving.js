@@ -1,4 +1,4 @@
-// ═══ MARE NOSTRUM — DIVING SYSTEM (In-World) ════════════════════════════════
+// === MARE NOSTRUM — DIVING SYSTEM (In-World) ==============================
 // Diving happens in the SAME world space as the island. When you dive,
 // underwater entities spawn in the shallow water zone around the island.
 // The camera stays the same, player moves with WASD, blue tint overlay.
@@ -13,9 +13,52 @@ const DIVE_TREASURES = [
   { type: 'ancient_helm', name: "Neptune's Helm", value: 100, rarity: 0.015, col: [100, 200, 180] },
 ];
 
+// Pixel-art fish sprite definitions (each row is a horizontal line of [r,g,b] blocks)
+// Fish are drawn at 2x2 pixel blocks to match the game's P=2 grid
+const FISH_SPRITES = {
+  roman_bass: {
+    w: 8, h: 5,
+    frames: [
+      // frame 0 — tail up
+      [
+        [0,0,0,0, 0,0,0,0, 90,120,180,255, 90,120,180,255, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        [60,100,160,255, 60,100,160,255, 80,130,200,255, 80,130,200,255, 80,130,200,255, 80,130,200,255, 0,0,0,0, 0,0,0,0],
+        [60,100,160,255, 80,130,200,255, 100,150,220,255, 100,150,220,255, 100,150,220,255, 80,130,200,255, 60,90,140,255, 0,0,0,0],
+        [0,0,0,0, 80,130,200,255, 100,150,220,255, 120,170,230,255, 100,150,220,255, 80,130,200,255, 255,255,255,255, 0,0,0,0],
+        [0,0,0,0, 0,0,0,0, 80,130,200,255, 80,130,200,255, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+      ],
+      // frame 1 — tail down
+      [
+        [0,0,0,0, 0,0,0,0, 80,130,200,255, 80,130,200,255, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        [0,0,0,0, 80,130,200,255, 100,150,220,255, 100,150,220,255, 100,150,220,255, 80,130,200,255, 255,255,255,255, 0,0,0,0],
+        [60,100,160,255, 80,130,200,255, 100,150,220,255, 120,170,230,255, 100,150,220,255, 80,130,200,255, 60,90,140,255, 0,0,0,0],
+        [60,100,160,255, 60,100,160,255, 80,130,200,255, 80,130,200,255, 80,130,200,255, 80,130,200,255, 0,0,0,0, 0,0,0,0],
+        [0,0,0,0, 0,0,0,0, 0,0,0,0, 90,120,180,255, 90,120,180,255, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+      ],
+    ],
+  },
+  golden_wrasse: {
+    w: 7, h: 4,
+    tint: [200, 160, 40],
+  },
+  coral_damsel: {
+    w: 6, h: 4,
+    tint: [200, 100, 60],
+  },
+  emerald_goby: {
+    w: 6, h: 3,
+    tint: [80, 170, 90],
+  },
+};
+
+// Transition state
+let _diveTransition = { active: false, timer: 0, maxTime: 30, entering: true };
+// Ambient particles (light rays, bubbles, current drift)
+let _diveAmbient = { rays: [], ventBubbles: [], currentParticles: [] };
+
 function initDiveWorld() {
   let d = state.diving;
-  if (d.treasures.length > 0) return; // already populated
+  if (d.treasures.length > 0) return;
 
   let cx = WORLD.islandCX, cy = WORLD.islandCY;
   let srx = state.islandRX, sry = state.islandRY;
@@ -23,7 +66,7 @@ function initDiveWorld() {
   // Scatter treasures in the shallow water ring around the island
   for (let i = 0; i < 20; i++) {
     let angle = random(TWO_PI);
-    let rim = random(1.05, 1.6); // just outside island edge
+    let rim = random(1.05, 1.6);
     let tx = cx + cos(angle) * srx * rim;
     let ty = cy + sin(angle) * sry * 0.45 * rim;
 
@@ -41,14 +84,41 @@ function initDiveWorld() {
     });
   }
 
-  // Scatter sea creatures
-  for (let i = 0; i < 25; i++) {
+  // Scatter sea creatures — fish use distinct sprite types, schools group together
+  let fishTypes = ['roman_bass', 'golden_wrasse', 'coral_damsel', 'emerald_goby'];
+  let schoolCenters = [];
+  // Create 4-5 school centers
+  for (let s = 0; s < 5; s++) {
     let angle = random(TWO_PI);
-    let rim = random(1.0, 1.8);
-    let cx2 = cx + cos(angle) * srx * rim;
-    let cy2 = cy + sin(angle) * sry * 0.45 * rim;
-    let types = ['fish','fish','fish','jellyfish','turtle','octopus','seahorse'];
-    let type = types[floor(random(types.length))];
+    let rim = random(1.1, 1.6);
+    schoolCenters.push({
+      x: cx + cos(angle) * srx * rim,
+      y: cy + sin(angle) * sry * 0.45 * rim,
+      fishType: fishTypes[s % fishTypes.length],
+      id: s,
+    });
+  }
+
+  for (let i = 0; i < 30; i++) {
+    let isSchool = i < 20;
+    let school = isSchool ? schoolCenters[floor(random(schoolCenters.length))] : null;
+    let angle, rim, cx2, cy2, type, fishSprite;
+
+    if (isSchool) {
+      cx2 = school.x + random(-40, 40);
+      cy2 = school.y + random(-20, 20);
+      type = 'fish';
+      fishSprite = school.fishType;
+    } else {
+      angle = random(TWO_PI);
+      rim = random(1.0, 1.8);
+      cx2 = cx + cos(angle) * srx * rim;
+      cy2 = cy + sin(angle) * sry * 0.45 * rim;
+      let types = ['fish','jellyfish','turtle','octopus','seahorse'];
+      type = types[floor(random(types.length))];
+      fishSprite = type === 'fish' ? fishTypes[floor(random(fishTypes.length))] : null;
+    }
+
     let colors = {
       fish: [[60,140,200],[200,160,40],[120,200,120],[200,100,60],[180,80,140]],
       jellyfish: [[180,120,255],[255,150,200]],
@@ -63,29 +133,73 @@ function initDiveWorld() {
       vx: (random() > 0.5 ? 1 : -1) * spd * random(0.5, 1.2),
       vy: random(-0.1, 0.1),
       type, col, frame: random(TWO_PI),
-      homeX: cx2, homeY: cy2, // wander around home
+      homeX: cx2, homeY: cy2,
+      fishSprite: fishSprite,
+      schoolId: isSchool ? school.id : -1,
     });
   }
 
-  // Seabed decorations
-  for (let i = 0; i < 50; i++) {
+  // Rare glowing deep-sea fish (1-2 max)
+  for (let i = 0; i < 2; i++) {
+    let angle = random(TWO_PI);
+    let rim = random(1.4, 1.8);
+    let gx = cx + cos(angle) * srx * rim;
+    let gy = cy + sin(angle) * sry * 0.45 * rim;
+    d.creatures.push({
+      x: gx, y: gy,
+      vx: random(-0.2, 0.2), vy: random(-0.05, 0.05),
+      type: 'glowfish', col: [40, 255, 200], frame: random(TWO_PI),
+      homeX: gx, homeY: gy, fishSprite: null, schoolId: -1,
+    });
+  }
+
+  // Seabed decorations — expanded with terrain features
+  let decoTypes = [
+    'sand','sand','rock','coral','seagrass','seagrass','shell',
+    'barnacle_rock','ruin_column','ruin_arch','sunken_amphora',
+    'shipwreck_plank','treasure_chest','vent',
+  ];
+  for (let i = 0; i < 70; i++) {
     let angle = random(TWO_PI);
     let rim = random(1.0, 1.7);
     let sx = cx + cos(angle) * srx * rim;
     let sy = cy + sin(angle) * sry * 0.45 * rim;
-    let types = ['sand','sand','rock','coral','seagrass','seagrass','shell'];
+    // Rare types only spawn a few
+    let typeIdx = floor(random(decoTypes.length));
+    let dtype = decoTypes[typeIdx];
+    // Limit rare terrain features
+    if (dtype === 'ruin_column' && i > 55) dtype = 'rock';
+    if (dtype === 'ruin_arch' && i > 58) dtype = 'rock';
+    if (dtype === 'sunken_amphora' && i > 60) dtype = 'coral';
+    if (dtype === 'shipwreck_plank' && i > 62) dtype = 'sand';
+    if (dtype === 'treasure_chest' && i > 64) dtype = 'shell';
+    if (dtype === 'vent' && i > 66) dtype = 'sand';
     d.seabed.push({
       x: sx, y: sy,
-      type: types[floor(random(types.length))],
+      type: dtype,
       size: random(6, 18), sway: random(TWO_PI),
+      variant: floor(random(3)),
     });
   }
+
+  // Init ambient light rays
+  _diveAmbient.rays = [];
+  for (let i = 0; i < 6; i++) {
+    _diveAmbient.rays.push({
+      x: random(width), speed: random(0.15, 0.4),
+      w: random(8, 20), alpha: random(0.03, 0.08),
+      phase: random(TWO_PI),
+    });
+  }
+
+  // Init seabed vent bubble sources
+  _diveAmbient.ventBubbles = [];
+  _diveAmbient.currentParticles = [];
 }
 
 function startDive() {
   let d = state.diving;
-  if (d.active) { exitDive(); return; } // toggle
-  // Must be in shallow water or near water
+  if (d.active) { exitDive(); return; }
   let inShallow = typeof isInShallows === 'function' && isInShallows(state.player.x, state.player.y);
   let nearWater = !isOnIsland(state.player.x, state.player.y);
   if (!inShallow && !nearWater) {
@@ -96,6 +210,20 @@ function startDive() {
   d.breath = d.maxBreath + d.lungCapacity * 25;
   d.totalDives++;
   initDiveWorld();
+
+  // Splash transition
+  _diveTransition = { active: true, timer: 0, maxTime: 25, entering: true };
+  // Spawn splash particles at player position
+  let px = state.player.x, py = state.player.y;
+  for (let i = 0; i < 12; i++) {
+    particles.push({
+      x: px + random(-10, 10), y: py + random(-5, 5),
+      vx: random(-1.5, 1.5), vy: random(-2, 0.5),
+      life: 20 + random(10), maxLife: 30, type: 'bubble',
+      r: 180, g: 230, b: 255, size: random(2, 6), world: true,
+    });
+  }
+
   addFloatingText(width / 2, height * 0.25, 'DIVING', '#66ccff');
   if (typeof unlockJournal === 'function') unlockJournal('first_dive');
   if (typeof snd !== 'undefined' && snd) snd.playSFX('water');
@@ -105,6 +233,9 @@ function exitDive() {
   let d = state.diving;
   if (!d.active) return;
   d.active = false;
+
+  // Surface transition
+  _diveTransition = { active: true, timer: 0, maxTime: 20, entering: false };
 
   let collected = d.treasures.filter(t => t.collected);
   let lootValue = 0;
@@ -130,6 +261,15 @@ function exitDive() {
 
 function updateDiving(dt) {
   let d = state.diving;
+
+  // Update transition even when not actively diving
+  if (_diveTransition.active) {
+    _diveTransition.timer += dt;
+    if (_diveTransition.timer >= _diveTransition.maxTime) {
+      _diveTransition.active = false;
+    }
+  }
+
   if (!d.active) return;
 
   // Breath
@@ -148,11 +288,9 @@ function updateDiving(dt) {
     return;
   }
 
-  // Player moves normally (handled by updatePlayer), but slower underwater
-  // We just track diving state here
+  let px = state.player.x, py = state.player.y;
 
   // Collect nearby treasures
-  let px = state.player.x, py = state.player.y;
   for (let t of d.treasures) {
     if (t.collected || t.respawnTimer > 0) continue;
     if (abs(px - t.x) < 22 && abs(py - t.y) < 22) {
@@ -166,14 +304,14 @@ function updateDiving(dt) {
   for (let t of d.treasures) {
     if (t.collected) {
       t.respawnTimer = (t.respawnTimer || 0) + dt;
-      if (t.respawnTimer > 3600) { // ~60 seconds
+      if (t.respawnTimer > 3600) {
         t.collected = false;
         t.respawnTimer = 0;
       }
     }
   }
 
-  // Update creatures — they swim around their home area
+  // Update creatures — school fish steer toward neighbors
   for (let c of d.creatures) {
     c.x += c.vx * dt;
     c.y += c.vy * dt;
@@ -186,30 +324,47 @@ function updateDiving(dt) {
       c.vx += (dx / dd) * 0.02;
       c.vy += (dy / dd) * 0.01;
     }
-    // Random direction change
+
+    // School cohesion — fish with same schoolId steer toward school center
+    if (c.schoolId >= 0 && random() < 0.02) {
+      let sx = 0, sy = 0, cnt = 0;
+      for (let o of d.creatures) {
+        if (o.schoolId === c.schoolId && o !== c) {
+          sx += o.x; sy += o.y; cnt++;
+        }
+      }
+      if (cnt > 0) {
+        sx /= cnt; sy /= cnt;
+        let sdx = sx - c.x, sdy = sy - c.y;
+        let sd = sqrt(sdx * sdx + sdy * sdy);
+        if (sd > 20 && sd < 200) {
+          c.vx += (sdx / sd) * 0.08;
+          c.vy += (sdy / sd) * 0.04;
+        }
+      }
+    }
+
     if (random() < 0.005) {
       c.vx += random(-0.3, 0.3);
       c.vy += random(-0.1, 0.1);
     }
-    // Clamp speed
     let spd = sqrt(c.vx * c.vx + c.vy * c.vy);
-    let maxSpd = 1.2;
+    let maxSpd = c.type === 'glowfish' ? 0.4 : 1.2;
     if (spd > maxSpd) { c.vx *= maxSpd / spd; c.vy *= maxSpd / spd; }
 
-    // Flee from player
+    // Flee from player (glowfish flee further)
+    let fleeRange = c.type === 'glowfish' ? 80 : 50;
     let cdx = c.x - px, cdy = c.y - py;
     let cd = sqrt(cdx * cdx + cdy * cdy);
-    if (cd < 50 && cd > 0) {
+    if (cd < fleeRange && cd > 0) {
       c.vx += (cdx / cd) * 0.15;
       c.vy += (cdy / cd) * 0.05;
     }
   }
 
-  // Sea enemies — hostile creatures that attack the diver
+  // Sea enemies
   if (!d.seaEnemies) d.seaEnemies = [];
-  // Spawn enemies — max 3, spawn on dive start or periodically
   if (d.seaEnemies.length === 0 && d.totalDives > 0) {
-    // Spawn initial enemies on first frame of dive
     for (let i = 0; i < 2; i++) {
       let angle = random(TWO_PI);
       let spawnDist = 150 + random(100);
@@ -237,11 +392,9 @@ function updateDiving(dt) {
       size: s.size, type: type, attackTimer: 0, flashTimer: 0,
     });
   }
-  // Update sea enemies
   for (let e of d.seaEnemies) {
     if (e.hp <= 0) continue;
     if (e.flashTimer > 0) e.flashTimer -= dt;
-    // Chase player
     let edx = px - e.x, edy = py - e.y;
     let ed = sqrt(edx * edx + edy * edy);
     if (ed > 0 && ed < 200) {
@@ -252,7 +405,6 @@ function updateDiving(dt) {
     if (espd > e.spd) { e.vx *= e.spd / espd; e.vy *= e.spd / espd; }
     e.x += e.vx * dt; e.y += e.vy * dt;
     e.attackTimer -= dt;
-    // Attack player on contact
     if (ed < 20 && e.attackTimer <= 0) {
       state.player.hp -= e.dmg;
       e.attackTimer = 60;
@@ -260,15 +412,12 @@ function updateDiving(dt) {
       if (typeof snd !== 'undefined' && snd) snd.playSFX('player_hurt');
       if (state.player.hp <= 0) { exitDive(); addFloatingText(width / 2, height * 0.25, 'Dragged to surface!', '#ff6644'); }
     }
-    // Player can attack them
     if (e.hp > 0 && state.player.slashPhase > 0 && ed < state.player.attackRange + e.size && e.flashTimer <= 0) {
       e.hp -= state.player.attackDamage;
       e.flashTimer = 8;
       addFloatingText(w2sX(e.x), w2sY(e.y) - 10, '-' + state.player.attackDamage, '#ffcc44');
-      // Knockback
       if (ed > 0) { e.vx += (e.x - px) / ed * 3; e.vy += (e.y - py) / ed * 3; }
       if (e.hp <= 0) {
-        // Loot drop
         let loot = e.type === 'shark' ? 'rareHide' : e.type === 'crab_giant' ? 'ironOre' : 'fish';
         let amt = e.type === 'shark' ? 2 : 1;
         state[loot] = (state[loot] || 0) + amt;
@@ -278,14 +427,13 @@ function updateDiving(dt) {
       }
     }
   }
-  // Mark dead enemies for removal — give 15 frame death animation
   for (let e of d.seaEnemies) {
     if (e.hp <= 0 && !e._deathTimer) e._deathTimer = 15;
     if (e._deathTimer > 0) e._deathTimer -= dt;
   }
   d.seaEnemies = d.seaEnemies.filter(e => e.hp > 0 || (e._deathTimer && e._deathTimer > 0));
 
-  // Player breath bubbles (world particles)
+  // Player breath bubbles
   if (frameCount % 25 === 0) {
     particles.push({
       x: px + random(-4, 4), y: py - 5,
@@ -294,133 +442,379 @@ function updateDiving(dt) {
       r: 180, g: 220, b: 255, size: random(2, 5), world: true,
     });
   }
-}
 
-// Draw underwater overlay + entities (called from normal island draw pipeline)
-function drawDivingOverlay() {
-  let d = state.diving;
-  if (!d.active) return;
-
-  // Blue water tint over everything
-  noStroke();
-  fill(10, 40, 80, 90);
-  rect(0, 0, width, height);
-
-  // Sandy seabed ground — gradient from mid-screen to bottom
-  let seabedTop = height * 0.6;
-  for (let band = 0; band < 6; band++) {
-    let y = seabedTop + band * (height - seabedTop) / 6;
-    let d2 = band / 5;
-    fill(lerp(60, 35, d2), lerp(80, 55, d2), lerp(55, 35, d2), 60 + d2 * 40);
-    rect(0, y, width, (height - seabedTop) / 6 + 2);
-  }
-  // Sand texture — scattered dots
-  fill(120, 110, 80, 25);
-  for (let i = 0; i < 30; i++) {
-    let sx = (i * 47 + floor(state.player.x * 0.3)) % width;
-    let sy = seabedTop + 20 + (i * 31) % floor(height - seabedTop - 20);
-    rect(sx, sy, 2 + (i % 3), 1);
-  }
-  // Distant coral reef silhouettes at seabed
-  fill(80, 40, 50, 40);
-  for (let i = 0; i < 8; i++) {
-    let rx = (i * 173 + floor(state.player.x * 0.2)) % (width + 100) - 50;
-    let rh = 15 + (i * 7) % 20;
-    rect(rx, height - rh - 10, 20 + (i % 3) * 8, rh, 3);
-    fill(60, 90, 45, 35);
-    rect(rx + 5, height - rh - 15, 8, 8, 2);
-    fill(80, 40, 50, 40);
-  }
-
-  // Caustic light patterns
-  let bright = typeof getSkyBrightness === 'function' ? getSkyBrightness() : 0.5;
-  for (let i = 0; i < 12; i++) {
-    let cx = w2sX(state.player.x + sin(frameCount * 0.01 + i * 2.1) * 200 - 100);
-    let cy = w2sY(state.player.y + cos(frameCount * 0.013 + i * 1.7) * 150 - 75);
-    let sz = 15 + sin(frameCount * 0.03 + i) * 8;
-    fill(120, 200, 255, 12 * bright);
-    beginShape();
-    vertex(cx, cy - sz); vertex(cx + sz * 0.7, cy);
-    vertex(cx, cy + sz); vertex(cx - sz * 0.7, cy);
-    endShape(CLOSE);
-  }
-
-  // Draw seabed objects
-  for (let s of d.seabed) {
-    let sx = w2sX(s.x), sy = w2sY(s.y);
-    if (sx < -30 || sx > width + 30 || sy < -30 || sy > height + 30) continue;
-    switch (s.type) {
-      case 'coral':
-        let sway = sin(frameCount * 0.03 + s.sway) * 2;
-        for (let b = 0; b < 3; b++) {
-          fill(255, 70 + b * 30, 70, 160);
-          let bx = sx - 5 + b * 5 + sway;
-          rect(floor(bx), floor(sy - s.size * 0.6 - b * 2), 3, floor(s.size * 0.5 + b * 2));
-          fill(255, 110 + b * 20, 90, 180);
-          ellipse(floor(bx + 1), floor(sy - s.size * 0.6 - b * 2), 5, 4);
-        }
-        break;
-      case 'seagrass':
-        let gsway = sin(frameCount * 0.04 + s.sway) * 4;
-        fill(35, 115, 45, 140);
-        for (let bl = 0; bl < 4; bl++) {
-          rect(floor(sx - 4 + bl * 3 + gsway * (bl * 0.3 + 0.4)), floor(sy - s.size), 2, floor(s.size));
-        }
-        break;
-      case 'shell':
-        fill(220, 200, 180, 130);
-        ellipse(sx, sy, s.size * 0.5, s.size * 0.3);
-        break;
-      case 'rock':
-        fill(60, 55, 48, 120);
-        rect(floor(sx - s.size / 2), floor(sy - s.size / 3), floor(s.size), floor(s.size * 0.5), 2);
-        break;
+  // Seabed vent bubbles — from vent decorations
+  if (frameCount % 15 === 0) {
+    for (let s of d.seabed) {
+      if (s.type === 'vent' && random() < 0.3) {
+        particles.push({
+          x: s.x + random(-3, 3), y: s.y,
+          vx: random(-0.05, 0.05), vy: -random(0.4, 1.0),
+          life: 50, maxLife: 50, type: 'bubble',
+          r: 160, g: 210, b: 240, size: random(2, 4), world: true,
+        });
+      }
     }
   }
 
-  // Draw treasures
+  // Underwater current drift particles
+  if (frameCount % 8 === 0 && _diveAmbient.currentParticles.length < 15) {
+    _diveAmbient.currentParticles.push({
+      x: random(width), y: random(height),
+      vx: 0.3 + random(0.2), vy: random(-0.1, 0.1),
+      life: 80 + random(40), size: random(1, 3),
+    });
+  }
+  for (let i = _diveAmbient.currentParticles.length - 1; i >= 0; i--) {
+    let p = _diveAmbient.currentParticles[i];
+    p.x += p.vx; p.y += p.vy; p.life--;
+    if (p.life <= 0 || p.x > width + 10) {
+      _diveAmbient.currentParticles.splice(i, 1);
+    }
+  }
+}
+
+// --- DRAWING ---
+
+function _diveBlueShift(r, g, b, depth) {
+  return [
+    floor(lerp(r, 12, depth * 0.35)),
+    floor(lerp(g, 35, depth * 0.25)),
+    floor(lerp(b, 75, depth * 0.15)),
+  ];
+}
+
+function drawDivingOverlay() {
+  let d = state.diving;
+  if (!d.active) return;
+  let bright = typeof getSkyBrightness === 'function' ? getSkyBrightness() : 0.5;
+
+  noStroke();
+
+  // --- Depth fog: darker blue further from surface (top=lighter, bottom=darker) ---
+  for (let band = 0; band < 8; band++) {
+    let by = band * height / 8;
+    let bh = height / 8 + 1;
+    let depthFrac = band / 7;
+    let fogR = floor(lerp(15, 5, depthFrac));
+    let fogG = floor(lerp(50, 20, depthFrac));
+    let fogB = floor(lerp(90, 50, depthFrac));
+    let fogA = floor(lerp(60, 120, depthFrac) * bright);
+    fill(fogR, fogG, fogB, fogA);
+    rect(0, floor(by), width, floor(bh));
+  }
+
+  // --- Sandy seabed terrain ---
+  let seabedTop = floor(height * 0.58);
+  // Undulating sand floor (pixel-art dunes)
+  for (let sx = 0; sx < width; sx += 2) {
+    let worldX = sx + floor(state.player.x * 0.3);
+    let duneH = floor(sin(worldX * 0.02) * 6 + sin(worldX * 0.05 + 1.3) * 3 + 10);
+    let sandY = height - duneH;
+    // Sand base
+    fill(140, 120, 75, 80);
+    rect(sx, floor(sandY), 2, duneH);
+    // Lighter sand highlight
+    if ((worldX + floor(state.player.y * 0.1)) % 8 < 2) {
+      fill(170, 150, 100, 50);
+      rect(sx, floor(sandY), 2, 2);
+    }
+    // Dark sand shadow in dune troughs
+    if (duneH < 8) {
+      fill(80, 65, 40, 40);
+      rect(sx, floor(sandY), 2, 2);
+    }
+  }
+
+  // Sand grain texture — pixel dots
+  fill(160, 140, 95, 30);
+  for (let i = 0; i < 40; i++) {
+    let gx = (i * 47 + floor(state.player.x * 0.3)) % width;
+    let gy = height - 4 - (i * 31) % 18;
+    rect(floor(gx), floor(gy), 2, 2);
+  }
+
+  // --- Distant reef silhouettes (pixel-art, no rounded corners) ---
+  for (let i = 0; i < 10; i++) {
+    let rx = (i * 137 + floor(state.player.x * 0.15)) % (width + 80) - 40;
+    let rh = 12 + (i * 7) % 18;
+    // Reef body
+    fill(60, 35, 45, 35);
+    rect(floor(rx), floor(height - rh - 8), floor(16 + (i % 4) * 6), floor(rh));
+    // Reef top — jagged pixel blocks
+    fill(70, 40, 55, 30);
+    rect(floor(rx + 2), floor(height - rh - 12), 4, 4);
+    rect(floor(rx + 8), floor(height - rh - 10), 6, 4);
+    // Coral tuft on top
+    fill(45, 85, 40, 30);
+    rect(floor(rx + 4), floor(height - rh - 14), 4, 4);
+  }
+
+  // --- Light rays from surface (animated diagonal bright rects) ---
+  for (let ray of _diveAmbient.rays) {
+    let rx = (ray.x + frameCount * ray.speed) % (width + 60) - 30;
+    let rw = floor(ray.w);
+    let rAlpha = floor(ray.alpha * 255 * bright);
+    // Ray is a series of diagonal 2px rects descending from top
+    fill(120, 200, 255, rAlpha);
+    for (let ry = 0; ry < height; ry += 4) {
+      let xOff = floor(ry * 0.3 + sin(ray.phase + ry * 0.01) * 4);
+      let fade = 1.0 - (ry / height) * 0.7;
+      fill(120, 200, 255, floor(rAlpha * fade));
+      rect(floor(rx + xOff), ry, rw, 4);
+    }
+  }
+
+  // --- Caustic light patterns (pixel diamond shapes) ---
+  for (let i = 0; i < 10; i++) {
+    let ccx = w2sX(state.player.x + sin(frameCount * 0.01 + i * 2.1) * 200 - 100);
+    let ccy = w2sY(state.player.y + cos(frameCount * 0.013 + i * 1.7) * 150 - 75);
+    let sz = floor(12 + sin(frameCount * 0.03 + i) * 6);
+    let ca = floor(10 * bright);
+    if (ca < 1) continue;
+    fill(120, 200, 255, ca);
+    // Diamond as 4 pixel rects instead of beginShape
+    rect(floor(ccx - 1), floor(ccy - sz), 2, floor(sz));
+    rect(floor(ccx - 1), floor(ccy), 2, floor(sz));
+    rect(floor(ccx - sz * 0.6), floor(ccy - 1), floor(sz * 0.6), 2);
+    rect(floor(ccx), floor(ccy - 1), floor(sz * 0.6), 2);
+  }
+
+  // --- Current drift particles ---
+  fill(100, 180, 220, 20);
+  for (let p of _diveAmbient.currentParticles) {
+    let fade = p.life > 60 ? 1 : p.life / 60;
+    fill(100, 180, 220, floor(20 * fade));
+    rect(floor(p.x), floor(p.y), floor(p.size) * 2, 2);
+  }
+
+  // --- Seabed objects (pixel-art only, no ellipse) ---
+  for (let s of d.seabed) {
+    let sx = w2sX(s.x), sy = w2sY(s.y);
+    if (sx < -30 || sx > width + 30 || sy < -30 || sy > height + 30) continue;
+    let fx = floor(sx), fy = floor(sy), fs = floor(s.size);
+    switch (s.type) {
+      case 'coral': {
+        let sway = floor(sin(frameCount * 0.03 + s.sway) * 2);
+        // Coral branches — pixel rects
+        let colors = [[255,70,70],[255,110,90],[255,140,60],[220,50,80]];
+        for (let b = 0; b < 3; b++) {
+          let cc = colors[(s.variant + b) % colors.length];
+          fill(cc[0], cc[1], cc[2], 160);
+          let bx = fx - 4 + b * 4 + sway;
+          let bh = floor(fs * 0.5 + b * 2);
+          rect(bx, fy - bh, 2, bh);
+          // Coral tip — 2px block
+          fill(cc[0] + 30, cc[1] + 20, cc[2], 180);
+          rect(bx, fy - bh - 2, 4, 2);
+        }
+        break;
+      }
+      case 'seagrass': {
+        let gsway = floor(sin(frameCount * 0.04 + s.sway) * 3);
+        for (let bl = 0; bl < 4; bl++) {
+          let gf = (bl % 2 === 0) ? 0.3 : 0.6;
+          fill(35, 100 + bl * 8, 45, 140);
+          rect(fx - 4 + bl * 3 + floor(gsway * gf), fy - fs, 2, fs);
+          // Darker base
+          fill(25, 80, 35, 100);
+          rect(fx - 4 + bl * 3 + floor(gsway * gf), fy - 2, 2, 2);
+        }
+        break;
+      }
+      case 'shell':
+        // Pixel shell — small rect cluster
+        fill(210, 195, 170, 130);
+        rect(fx - 2, fy - 1, 4, 2);
+        fill(230, 215, 190, 100);
+        rect(fx - 1, fy - 2, 2, 2);
+        break;
+      case 'rock':
+        // Chunky pixel rock
+        fill(55, 50, 42, 130);
+        rect(fx - floor(fs / 2), fy - floor(fs / 3), fs, floor(fs * 0.5));
+        // Highlight edge
+        fill(75, 68, 58, 80);
+        rect(fx - floor(fs / 2), fy - floor(fs / 3), fs, 2);
+        // Shadow base
+        fill(35, 30, 25, 60);
+        rect(fx - floor(fs / 2) + 2, fy - floor(fs / 3) + floor(fs * 0.5) - 2, fs - 4, 2);
+        break;
+      case 'barnacle_rock': {
+        // Rocky outcrop with barnacle dots
+        let rw = fs + 4, rh = floor(fs * 0.6);
+        fill(50, 48, 40, 140);
+        rect(fx - floor(rw / 2), fy - rh, rw, rh);
+        fill(65, 60, 50, 120);
+        rect(fx - floor(rw / 2), fy - rh, rw, 2);
+        // Barnacles — tiny light dots
+        fill(180, 175, 160, 100);
+        for (let bi = 0; bi < 4; bi++) {
+          rect(fx - floor(rw / 2) + 2 + bi * floor(rw / 4), fy - floor(rh * 0.6), 2, 2);
+        }
+        break;
+      }
+      case 'ruin_column': {
+        // Fallen Roman column segment
+        let cw = 6, ch = floor(fs * 1.2);
+        fill(160, 155, 140, 120);
+        rect(fx - 3, fy - ch, cw, ch);
+        // Fluting detail (vertical grooves)
+        fill(130, 125, 110, 80);
+        rect(fx - 1, fy - ch + 2, 2, ch - 4);
+        // Capital fragment
+        fill(175, 170, 155, 110);
+        rect(fx - 5, fy - ch - 2, 10, 4);
+        // Moss/algae on top
+        fill(40, 90, 50, 60);
+        rect(fx - 4, fy - ch - 2, 4, 2);
+        break;
+      }
+      case 'ruin_arch': {
+        // Sunken archway — two columns + lintel
+        fill(150, 145, 130, 100);
+        rect(fx - 10, fy - 14, 4, 14); // left column
+        rect(fx + 6, fy - 14, 4, 14);  // right column
+        rect(fx - 10, fy - 16, 20, 4);  // lintel
+        // Algae draping
+        fill(35, 85, 45, 50);
+        rect(fx - 6, fy - 14, 2, 6);
+        rect(fx + 2, fy - 12, 2, 8);
+        break;
+      }
+      case 'sunken_amphora': {
+        // Amphora on its side — pixel terracotta
+        fill(170, 105, 55, 160);
+        rect(fx - 5, fy - 4, 10, 6);
+        fill(190, 120, 65, 140);
+        rect(fx - 4, fy - 3, 8, 4);
+        // Neck
+        fill(155, 95, 50, 150);
+        rect(fx + 5, fy - 3, 4, 3);
+        // Handle
+        fill(140, 85, 45, 120);
+        rect(fx - 2, fy - 6, 2, 2);
+        break;
+      }
+      case 'shipwreck_plank': {
+        // Waterlogged timber plank
+        fill(65, 50, 30, 110);
+        rect(fx - 8, fy - 2, 16, 3);
+        fill(75, 58, 35, 90);
+        rect(fx - 7, fy - 2, 14, 2);
+        // Nail
+        fill(100, 95, 80, 80);
+        rect(fx + 4, fy - 3, 2, 2);
+        break;
+      }
+      case 'treasure_chest': {
+        // Pixel treasure chest
+        fill(90, 65, 30, 160);
+        rect(fx - 5, fy - 5, 10, 6);
+        // Lid
+        fill(100, 75, 35, 150);
+        rect(fx - 6, fy - 7, 12, 3);
+        // Metal band
+        fill(170, 160, 80, 120);
+        rect(fx - 5, fy - 4, 10, 2);
+        // Keyhole
+        fill(50, 40, 20, 140);
+        rect(fx - 1, fy - 3, 2, 2);
+        // Sparkle
+        if (sin(frameCount * 0.06 + s.sway) > 0.5) {
+          fill(255, 230, 120, 80);
+          rect(fx - 7, fy - 8, 2, 2);
+          rect(fx + 5, fy - 8, 2, 2);
+        }
+        break;
+      }
+      case 'vent': {
+        // Seabed vent — dark crack with warmth
+        fill(30, 25, 20, 100);
+        rect(fx - 3, fy - 1, 6, 2);
+        fill(40, 30, 25, 80);
+        rect(fx - 2, fy - 2, 4, 2);
+        // Warm glow
+        let ventPulse = sin(frameCount * 0.05 + s.sway) * 0.3 + 0.7;
+        fill(180, 80, 30, floor(20 * ventPulse));
+        rect(fx - 4, fy - 3, 8, 4);
+        break;
+      }
+    }
+  }
+
+  // --- Draw treasures (pixel-art, rect-only) ---
   for (let t of d.treasures) {
     if (t.collected) continue;
     let tx = w2sX(t.x), ty = w2sY(t.y);
     if (tx < -20 || tx > width + 20 || ty < -20 || ty > height + 20) continue;
 
-    // Depth cue
     let _td = dist(state.player.x, state.player.y, t.x, t.y);
     let _tDepth = constrain(_td / 200, 0, 1);
-    let _tBlue = _tDepth * 0.3; // blue shift amount
     let sparkle = sin(frameCount * 0.08 + t.sparkle) * 0.3 + 0.7;
-    // Glow (blue-shifted by depth)
-    fill(lerp(t.col[0], 15, _tBlue), lerp(t.col[1], 40, _tBlue), lerp(t.col[2], 80, _tBlue), 25);
-    let _tScale = lerp(1.0, 0.75, _tDepth);
-    ellipse(tx, ty, 20 * _tScale, 18 * _tScale);
-    // Item (blue-shifted)
-    fill(lerp(t.col[0], 15, _tBlue) * sparkle, lerp(t.col[1], 40, _tBlue) * sparkle, lerp(t.col[2] || 200, 80, _tBlue), 200);
+    let bc = _diveBlueShift(t.col[0], t.col[1], t.col[2], _tDepth);
+
+    // Glow rect
+    fill(bc[0], bc[1], bc[2], 20);
+    rect(floor(tx) - 8, floor(ty) - 7, 16, 14);
+
+    let cr = floor(bc[0] * sparkle), cg = floor(bc[1] * sparkle), cb = floor(bc[2]);
+    fill(cr, cg, cb, 200);
+
     switch (t.type) {
       case 'pearl':
-        ellipse(tx, ty, 7, 7);
-        fill(255, 255, 255, 100); ellipse(tx - 1, ty - 1, 3, 3);
+        // Pixel pearl — 3x3 block with highlight
+        rect(floor(tx) - 2, floor(ty) - 2, 4, 4);
+        fill(255, 255, 255, 120);
+        rect(floor(tx) - 2, floor(ty) - 2, 2, 2);
         break;
       case 'sponge':
-        rect(floor(tx - 5), floor(ty - 4), 10, 8, 2);
+        rect(floor(tx) - 4, floor(ty) - 3, 8, 6);
+        // Sponge holes
+        fill(bc[0] - 30, bc[1] - 30, bc[2] - 20, 100);
+        rect(floor(tx) - 2, floor(ty) - 1, 2, 2);
+        rect(floor(tx) + 1, floor(ty) - 2, 2, 2);
         break;
       case 'coral_piece':
-        for (let ci = 0; ci < 3; ci++) rect(floor(tx - 4 + ci * 4), floor(ty - 4 - ci), 3, 6 + ci);
+        for (let ci = 0; ci < 3; ci++) rect(floor(tx) - 4 + ci * 4, floor(ty) - 4 - ci, 3, 6 + ci);
         break;
       case 'amphora':
-        ellipse(tx, ty, 10, 13);
-        fill(160, 100, 40); rect(floor(tx - 3), floor(ty - 8), 6, 4, 1);
+        // Pixel amphora — rect body + neck
+        fill(cr, cg, cb, 200);
+        rect(floor(tx) - 4, floor(ty) - 5, 8, 10);
+        fill(cr + 15, cg + 10, cb, 180);
+        rect(floor(tx) - 3, floor(ty) - 4, 6, 8);
+        fill(floor(bc[0] * 0.8), floor(bc[1] * 0.7), floor(bc[2] * 0.6), 180);
+        rect(floor(tx) - 2, floor(ty) - 7, 4, 3);
+        // Handles
+        fill(cr - 20, cg - 15, cb - 10, 150);
+        rect(floor(tx) - 5, floor(ty) - 5, 2, 4);
+        rect(floor(tx) + 3, floor(ty) - 5, 2, 4);
         break;
       case 'gold_coin':
-        fill(220, 190, 60); ellipse(tx, ty, 8, 7);
-        fill(240, 210, 80); ellipse(tx, ty, 6, 5);
+        fill(220, 190, 60, 200);
+        rect(floor(tx) - 3, floor(ty) - 3, 6, 6);
+        fill(240, 210, 80, 180);
+        rect(floor(tx) - 2, floor(ty) - 2, 4, 4);
+        // Embossed detail
+        fill(200, 170, 50, 100);
+        rect(floor(tx) - 1, floor(ty) - 1, 2, 2);
         break;
       case 'ancient_helm':
         fill(80, 180, 160, 200);
-        rect(floor(tx - 7), floor(ty - 6), 14, 10, 2);
-        fill(100, 210, 190); rect(floor(tx - 5), floor(ty - 8), 10, 4, 1);
-        // Legendary glow
-        fill(100, 255, 220, 10 + sin(frameCount * 0.1) * 8);
-        ellipse(tx, ty, 30, 28);
+        rect(floor(tx) - 6, floor(ty) - 5, 12, 8);
+        fill(100, 210, 190);
+        rect(floor(tx) - 4, floor(ty) - 7, 8, 3);
+        // Crest
+        fill(60, 150, 130, 160);
+        rect(floor(tx) - 2, floor(ty) - 9, 4, 3);
+        // Legendary glow — pulsing pixel border
+        let glowA = floor(8 + sin(frameCount * 0.1) * 6);
+        fill(100, 255, 220, glowA);
+        rect(floor(tx) - 10, floor(ty) - 9, 20, 2);
+        rect(floor(tx) - 10, floor(ty) + 3, 20, 2);
+        rect(floor(tx) - 10, floor(ty) - 9, 2, 14);
+        rect(floor(tx) + 8, floor(ty) - 9, 2, 14);
         break;
     }
     // Collect hint when near
@@ -428,150 +822,225 @@ function drawDivingOverlay() {
     if (pd < 30) {
       fill(255, 255, 200, 150 + sin(frameCount * 0.1) * 40);
       textSize(7); textAlign(CENTER);
-      text(t.name, tx, ty - 14);
+      text(t.name, floor(tx), floor(ty) - 14);
       textAlign(LEFT, TOP);
     }
   }
 
-  // Draw creatures
+  // --- Draw creatures (pixel-art sprites, rect-only) ---
   for (let c of d.creatures) {
     let cx = w2sX(c.x), cy = w2sY(c.y);
     if (cx < -20 || cx > width + 20 || cy < -20 || cy > height + 20) continue;
     let flipX = c.vx < 0 ? -1 : 1;
-    // Depth cue: distance from player affects scale and blue tint
     let _cd = dist(state.player.x, state.player.y, c.x, c.y);
-    let _depthF = constrain(_cd / 200, 0, 1); // 0=close, 1=far
+    let _depthF = constrain(_cd / 200, 0, 1);
     let _dScale = lerp(1.0, 0.7, _depthF);
-    push(); translate(cx, cy); scale(flipX * _dScale, _dScale); noStroke();
+
+    push(); translate(floor(cx), floor(cy)); scale(flipX * _dScale, _dScale); noStroke();
+
     switch (c.type) {
       case 'fish':
-        fill(c.col[0], c.col[1], c.col[2], 180);
-        ellipse(0, 0, 8, 4);
-        let tw = sin(frameCount * 0.15 + c.frame) * 2;
-        triangle(-4, 0, -7, -2 + tw, -7, 2 + tw);
-        fill(255); ellipse(2, -0.5, 1.5, 1.5);
+        _drawPixelFish(c, _depthF);
         break;
-      case 'jellyfish':
-        let jb = sin(frameCount * 0.06 + c.frame) * 2;
-        fill(c.col[0], c.col[1], c.col[2], 120);
-        ellipse(0, jb, 10, 6);
-        stroke(c.col[0], c.col[1], c.col[2], 60); strokeWeight(0.7);
+      case 'glowfish':
+        _drawGlowFish(c);
+        break;
+      case 'jellyfish': {
+        let jb = floor(sin(frameCount * 0.06 + c.frame) * 2);
+        // Bell — pixel rect dome
+        fill(c.col[0], c.col[1], c.col[2], 100);
+        rect(-4, jb - 2, 8, 4);
+        fill(c.col[0], c.col[1], c.col[2], 80);
+        rect(-3, jb - 4, 6, 2);
+        // Inner glow
+        fill(c.col[0] + 40, c.col[1] + 30, c.col[2] + 20, 50);
+        rect(-2, jb - 1, 4, 2);
+        // Tentacles — pixel vertical lines
         for (let t = -2; t <= 2; t++) {
-          let sw = sin(frameCount * 0.04 + c.frame + t) * 3;
-          line(t * 2, 3 + jb, t * 2 + sw, 10 + jb);
+          let sw = floor(sin(frameCount * 0.04 + c.frame + t) * 2);
+          fill(c.col[0], c.col[1], c.col[2], 50);
+          rect(t * 2 + sw, 2 + jb, 2, 6 + abs(t));
         }
-        noStroke();
         break;
-      case 'turtle':
-        fill(c.col[0], c.col[1], c.col[2]); ellipse(0, 0, 14, 9);
-        fill(c.col[0] + 20, c.col[1] + 15, c.col[2] + 10); ellipse(0, 0, 10, 6);
-        fill(c.col[0] - 10, c.col[1], c.col[2] - 10); ellipse(6, 0, 5, 4);
-        let fl = sin(frameCount * 0.08 + c.frame) * 3;
+      }
+      case 'turtle': {
+        // Shell — pixel rect
+        fill(c.col[0], c.col[1], c.col[2]);
+        rect(-6, -4, 12, 7);
+        // Shell pattern
+        fill(c.col[0] + 20, c.col[1] + 15, c.col[2] + 10);
+        rect(-4, -3, 8, 5);
+        // Shell detail
+        fill(c.col[0] - 15, c.col[1] - 10, c.col[2] - 10, 100);
+        rect(-2, -2, 2, 3);
+        rect(1, -2, 2, 3);
+        // Head
+        fill(c.col[0] - 10, c.col[1], c.col[2] - 10);
+        rect(6, -2, 4, 3);
+        // Flippers (animated)
+        let fl = floor(sin(frameCount * 0.08 + c.frame) * 2);
         fill(c.col[0] - 10, c.col[1] - 10, c.col[2] - 10);
-        ellipse(2, -5 + fl, 6, 3); ellipse(2, 5 - fl, 6, 3);
+        rect(1, -5 + fl, 4, 2);
+        rect(1, 3 - fl, 4, 2);
         break;
-      case 'octopus':
-        fill(c.col[0], c.col[1], c.col[2], 170); ellipse(0, -2, 10, 7);
-        stroke(c.col[0], c.col[1], c.col[2], 120); strokeWeight(1.5); noFill();
+      }
+      case 'octopus': {
+        // Head
+        fill(c.col[0], c.col[1], c.col[2], 170);
+        rect(-4, -4, 8, 5);
+        // Tentacles — pixel arms
         for (let t = 0; t < 5; t++) {
-          let ta = -PI * 0.5 + (t / 4) * PI;
-          let sw = sin(frameCount * 0.05 + c.frame + t) * 3;
-          line(cos(ta) * 3, 2, cos(ta) * 7 + sw, 8);
+          let tx = -4 + t * 2;
+          let sw = floor(sin(frameCount * 0.05 + c.frame + t) * 2);
+          fill(c.col[0], c.col[1], c.col[2], 120);
+          rect(tx + sw, 1, 2, 4 + (t % 2) * 2);
         }
-        noStroke();
-        fill(255, 220, 100); ellipse(-2, -3, 2, 2.5); ellipse(2, -3, 2, 2.5);
+        // Eyes
+        fill(255, 220, 100);
+        rect(-3, -3, 2, 2);
+        rect(1, -3, 2, 2);
         break;
-      case 'seahorse':
+      }
+      case 'seahorse': {
+        let sb = floor(sin(frameCount * 0.04 + c.frame) * 1);
         fill(c.col[0], c.col[1], c.col[2], 180);
-        let sb = sin(frameCount * 0.04 + c.frame) * 1.5;
-        ellipse(0, sb, 5, 4); ellipse(0, sb + 3, 4, 3); ellipse(0, sb - 3, 4, 3);
-        fill(0); ellipse(1, sb - 2, 1, 1);
+        // Head
+        rect(-1, sb - 4, 4, 3);
+        // Body segments
+        rect(-1, sb - 1, 3, 2);
+        rect(0, sb + 1, 3, 2);
+        rect(0, sb + 3, 2, 2);
+        // Tail curl
+        rect(-1, sb + 5, 2, 2);
+        // Eye
+        fill(0);
+        rect(1, sb - 3, 2, 2);
+        // Dorsal fin
+        fill(c.col[0] + 20, c.col[1] + 15, c.col[2], 120);
+        rect(-2, sb - 2, 2, 3);
         break;
+      }
     }
-    // Blue depth haze overlay
+
+    // Blue depth haze overlay (pixel rect)
     if (_depthF > 0.15) {
-      fill(15, 40, 80, 50 * _depthF);
-      noStroke();
-      ellipse(0, 0, 16, 12);
+      fill(12, 35, 75, floor(50 * _depthF));
+      rect(-8, -6, 16, 12);
     }
     pop();
   }
 
-  // Draw sea enemies
+  // --- Draw sea enemies (pixel-art, rect-only for new shapes) ---
   if (d.seaEnemies) {
     for (let e of d.seaEnemies) {
       if (e.hp <= 0 && (!e._deathTimer || e._deathTimer <= 0)) continue;
       let ex = w2sX(e.x), ey = w2sY(e.y);
       if (ex < -30 || ex > width + 30 || ey < -30 || ey > height + 30) continue;
-      push(); translate(ex, ey); noStroke();
+      push(); translate(floor(ex), floor(ey)); noStroke();
       let flipX = e.vx < 0 ? -1 : 1;
       let deathScale = (e.hp <= 0 && e._deathTimer) ? max(0.1, e._deathTimer / 15) : 1;
       scale(flipX * deathScale, deathScale);
       if (e.hp <= 0) { drawingContext.globalAlpha = deathScale; }
       let flash = e.flashTimer > 0 && floor(e.flashTimer) % 4 < 2;
+
       if (e.type === 'shark') {
-        fill(flash ? 255 : 100, flash ? 100 : 100, flash ? 100 : 110);
-        // Body
-        beginShape();
-        vertex(-14, 0); vertex(-8, -5); vertex(6, -3); vertex(14, 0);
-        vertex(6, 4); vertex(-8, 5);
-        endShape(CLOSE);
+        let bc = flash ? [255, 100, 100] : [90, 95, 105];
+        // Body — blocky pixel shark
+        fill(bc[0], bc[1], bc[2]);
+        rect(-12, -3, 24, 6);
+        fill(bc[0] - 10, bc[1] - 5, bc[2]);
+        rect(-10, -2, 20, 4);
         // Dorsal fin
-        fill(flash ? 255 : 80, 80, 90);
-        triangle(0, -3, -4, -10, 4, -3);
+        fill(bc[0] - 20, bc[1] - 15, bc[2] - 10);
+        rect(-2, -6, 4, 4);
+        rect(-1, -8, 2, 2);
         // Tail
-        let tw = sin(frameCount * 0.12) * 3;
-        triangle(-14, 0, -20, -5 + tw, -20, 5 + tw);
+        let tw = floor(sin(frameCount * 0.12) * 2);
+        fill(bc[0] - 10, bc[1] - 5, bc[2]);
+        rect(-14, -3 + tw, 4, 2);
+        rect(-16, -5 + tw, 2, 4);
+        rect(-14, 1 + tw, 4, 2);
+        // Belly lighter
+        fill(bc[0] + 30, bc[1] + 25, bc[2] + 20, 100);
+        rect(-8, 1, 16, 2);
         // Eye
-        fill(0); ellipse(8, -1, 2, 2);
-        fill(255, 50, 50, 100); ellipse(8, -1, 1, 1);
+        fill(0);
+        rect(8, -2, 2, 2);
+        fill(255, 40, 40, 120);
+        rect(8, -2, 2, 2);
       } else if (e.type === 'eel') {
-        fill(flash ? 255 : 60, flash ? 120 : 80, flash ? 60 : 30);
-        let eelWave = sin(frameCount * 0.1) * 3;
+        let bc = flash ? [255, 120, 60] : [55, 75, 28];
+        // Segmented body — pixel blocks in wave
         for (let seg = -3; seg <= 3; seg++) {
-          let segY = sin(frameCount * 0.1 + seg * 0.8) * 2;
-          ellipse(seg * 4, segY + eelWave * (seg * 0.2), 5, 4);
+          let segY = floor(sin(frameCount * 0.1 + seg * 0.8) * 2);
+          fill(bc[0], bc[1], bc[2]);
+          rect(seg * 4 - 2, segY - 2, 4, 3);
+          // Belly stripe
+          fill(bc[0] + 40, bc[1] + 30, bc[2] + 20, 100);
+          rect(seg * 4 - 1, segY, 2, 2);
         }
-        fill(255, 200, 0); ellipse(12, eelWave * 0.6, 2, 2);
+        // Eye (glowing yellow)
+        fill(255, 200, 0);
+        rect(12, floor(sin(frameCount * 0.1 + 2.4) * 2) - 2, 2, 2);
       } else if (e.type === 'crab_giant') {
-        fill(flash ? 255 : 180, flash ? 100 : 60, flash ? 60 : 30);
-        ellipse(0, 0, 16, 10);
-        // Claws
-        let clawOpen = sin(frameCount * 0.08) * 2;
-        rect(-12, -4, 4, 3 + clawOpen);
-        rect(-12, 0, 4, 3);
-        rect(8, -4, 4, 3 + clawOpen);
-        rect(8, 0, 4, 3);
+        let bc = flash ? [255, 100, 60] : [175, 58, 28];
+        // Body — wide pixel rect
+        fill(bc[0], bc[1], bc[2]);
+        rect(-7, -4, 14, 7);
+        // Shell detail
+        fill(bc[0] + 20, bc[1] + 10, bc[2] + 5, 120);
+        rect(-5, -3, 10, 5);
+        // Claws — blocky pixel pincers
+        let clawOpen = floor(sin(frameCount * 0.08) * 2);
+        fill(bc[0] - 10, bc[1] - 5, bc[2]);
+        rect(-12, -4, 4, 3);
+        rect(-12, -1 + clawOpen, 4, 2);
+        rect(8, -4, 4, 3);
+        rect(8, -1 + clawOpen, 4, 2);
         // Legs
         for (let l = -2; l <= 2; l++) {
           if (l === 0) continue;
-          rect(l * 5, 5, 2, 4);
+          fill(bc[0] - 15, bc[1] - 10, bc[2] - 5);
+          rect(l * 4, 3, 2, 4);
         }
-        fill(0); ellipse(-3, -2, 2, 2); ellipse(3, -2, 2, 2);
+        // Eyes
+        fill(0);
+        rect(-3, -3, 2, 2);
+        rect(1, -3, 2, 2);
       }
+
       // HP bar
       if (e.hp > 0 && e.hp < e.maxHp) {
         let frac = max(0, e.hp / e.maxHp);
-        fill(30, 10, 10, 160); rect(-12, -e.size - 6, 24, 3, 1);
-        fill(lerp(220, 60, frac), lerp(40, 200, frac), 30); rect(-12, -e.size - 6, 24 * frac, 3, 1);
+        fill(30, 10, 10, 160);
+        rect(-12, -e.size - 6, 24, 3);
+        fill(floor(lerp(220, 60, frac)), floor(lerp(40, 200, frac)), 30);
+        rect(-12, -e.size - 6, floor(24 * frac), 3);
       }
       drawingContext.globalAlpha = 1;
       pop();
     }
   }
 
-  // Breath HUD
+  // --- Blue tint color shift overlay (subtle, on top of everything in-world) ---
+  fill(8, 30, 65, 25);
+  rect(0, 0, width, height);
+
+  // --- Breath HUD ---
   let barW = 100, barH = 8;
-  let barX = width / 2 - barW / 2, barY = 15;
+  let barX = floor(width / 2 - barW / 2), barY = 15;
   fill(0, 0, 0, 140);
-  rect(barX - 2, barY - 2, barW + 4, barH + 4, 3);
+  rect(barX - 2, barY - 2, barW + 4, barH + 4);
   fill(20, 40, 70);
-  rect(barX, barY, barW, barH, 2);
+  rect(barX, barY, barW, barH);
   let breathFrac = d.breath / (d.maxBreath + d.lungCapacity * 25);
-  fill(breathFrac > 0.3 ? color(60, 180, 220) : color(220, 60, 40));
-  rect(barX, barY, barW * breathFrac, barH, 2);
+  fill(breathFrac > 0.3 ? 60 : 220, breathFrac > 0.3 ? 180 : 60, breathFrac > 0.3 ? 220 : 40);
+  rect(barX, barY, floor(barW * breathFrac), barH);
+  // Pixel breath pip marks
+  fill(255, 255, 255, 40);
+  for (let pip = 1; pip < 4; pip++) rect(barX + floor(barW * pip / 4), barY, 1, barH);
   fill(255, 255, 255, 180); textSize(7); textAlign(CENTER, CENTER);
-  text('BREATH', width / 2, barY + barH / 2);
+  text('BREATH', floor(width / 2), barY + floor(barH / 2));
 
   // Dive loot count
   let collected = d.treasures.filter(t => t.collected).length;
@@ -580,11 +1049,110 @@ function drawDivingOverlay() {
     text('Loot: ' + collected, barX - 60, barY + 2);
   }
 
+  // Depth indicator
+  fill(100, 180, 220, 120); textSize(7); textAlign(RIGHT);
+  let depthLabel = d.depth === 0 ? 'Shallow' : d.depth === 1 ? 'Mid' : 'Deep';
+  text(depthLabel, barX + barW + 50, barY + 2);
+
   // Surface hint
-  fill(100, 200, 255, 80 + sin(frameCount * 0.06) * 40);
+  fill(100, 200, 255, floor(80 + sin(frameCount * 0.06) * 40));
   textSize(8); textAlign(CENTER);
-  text('[D] Surface  |  Walk onto land to exit', width / 2, height - 12);
+  text('[D] Surface  |  Walk onto land to exit', floor(width / 2), height - 12);
   textAlign(LEFT, TOP);
+
+  // --- Dive transition overlay ---
+  _drawDiveTransition();
+}
+
+function _drawPixelFish(c, depthF) {
+  let animFrame = floor(frameCount * 0.08 + c.frame) % 2;
+  let bc = _diveBlueShift(c.col[0], c.col[1], c.col[2], depthF);
+
+  // Generic pixel fish sprite (all use rect blocks)
+  let tailY = floor(sin(frameCount * 0.15 + c.frame) * 2);
+
+  // Body (6x3 pixel blocks)
+  fill(bc[0], bc[1], bc[2], 180);
+  rect(-4, -2, 8, 4);
+  // Belly highlight
+  fill(min(255, bc[0] + 30), min(255, bc[1] + 25), min(255, bc[2] + 20), 120);
+  rect(-3, 0, 6, 2);
+  // Dorsal accent
+  fill(max(0, bc[0] - 25), max(0, bc[1] - 20), max(0, bc[2] - 15), 150);
+  rect(-2, -3, 4, 2);
+
+  // Tail (animated)
+  fill(bc[0], bc[1], bc[2], 160);
+  rect(-6, -1 + tailY, 2, 2);
+  rect(-8, -2 + tailY, 2, 4);
+
+  // Eye
+  fill(255, 255, 255, 200);
+  rect(2, -1, 2, 2);
+  fill(0, 0, 0, 200);
+  rect(2, -1, 2, 2);
+  // Eye highlight
+  fill(255, 255, 255, 150);
+  rect(2, -1, 1, 1);
+}
+
+function _drawGlowFish(c) {
+  let pulse = sin(frameCount * 0.06 + c.frame) * 0.3 + 0.7;
+
+  // Glow aura
+  fill(40, 255, 200, floor(15 * pulse));
+  rect(-8, -6, 16, 10);
+  fill(40, 255, 200, floor(8 * pulse));
+  rect(-10, -8, 20, 14);
+
+  // Body
+  fill(30, 200, 160, 200);
+  rect(-3, -2, 6, 3);
+  // Bioluminescent spots
+  fill(80, 255, 220, floor(180 * pulse));
+  rect(-2, -1, 2, 2);
+  rect(1, 0, 2, 2);
+  // Eye (bright)
+  fill(200, 255, 240);
+  rect(2, -1, 2, 2);
+  // Tail
+  let tw = floor(sin(frameCount * 0.1 + c.frame) * 1);
+  fill(40, 220, 180, 150);
+  rect(-5, -1 + tw, 2, 2);
+
+  // Light trail particles
+  if (frameCount % 12 === 0) {
+    fill(40, 255, 200, 40);
+    rect(-6, floor(random(-2, 2)), 2, 2);
+  }
+}
+
+function _drawDiveTransition() {
+  if (!_diveTransition.active) return;
+  let t = _diveTransition.timer / _diveTransition.maxTime;
+  let alpha;
+  if (_diveTransition.entering) {
+    // Entering water: flash of white-blue that fades
+    alpha = floor((1 - t) * 180);
+    fill(20, 60, 120, alpha);
+    rect(0, 0, width, height);
+    // Splash rings — expanding pixel rects from center
+    let ringSize = floor(t * 80);
+    fill(180, 220, 255, floor((1 - t) * 100));
+    let rcx = floor(width / 2), rcy = floor(height / 2);
+    rect(rcx - ringSize, rcy - 2, ringSize * 2, 4);
+    rect(rcx - 2, rcy - ringSize, 4, ringSize * 2);
+    // Smaller inner ring
+    let ring2 = floor(t * 50);
+    fill(200, 240, 255, floor((1 - t) * 60));
+    rect(rcx - ring2, rcy - 1, ring2 * 2, 2);
+    rect(rcx - 1, rcy - ring2, 2, ring2 * 2);
+  } else {
+    // Exiting water: blue fades to clear
+    alpha = floor((1 - t) * 120);
+    fill(15, 45, 85, alpha);
+    rect(0, 0, width, height);
+  }
 }
 
 // Dive prompt shown when near water
@@ -594,9 +1162,9 @@ function drawDivePrompt() {
   let inShallow = typeof isInShallows === 'function' && isInShallows(state.player.x, state.player.y);
   if (!inShallow) return;
 
-  fill(100, 200, 255, 160 + sin(frameCount * 0.07) * 40);
+  fill(100, 200, 255, floor(160 + sin(frameCount * 0.07) * 40));
   noStroke(); textSize(10); textAlign(CENTER);
-  text('[D] Dive', width / 2, height - 60);
+  text('[D] Dive', floor(width / 2), height - 60);
   textAlign(LEFT, TOP);
 }
 

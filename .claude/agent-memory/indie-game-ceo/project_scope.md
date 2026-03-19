@@ -34,10 +34,20 @@ type: project
 4. Fishing tension — bobber dip animation, splash particle burst, miss message (15 lines)
 5. Storm visual — full-screen dark overlay + 4 large foreground clouds covering y 0.26-0.32
 
-**Sprint 3 Visual Priorities (from CEO_SPRINT3.md, March 2026):**
-1. Tree flicker fix — floor(sway * t_frac) at line 11934 and 11961. 2 lines. Root cause confirmed: non-integer layerSway causes per-layer pixel edge snapping.
-2. HUD visible during dialogue — add `if (dialogState.active) return;` at top of drawHUD() (line 16928). 1 line. drawHUD() only guards photoMode.
-3. Ruins detail — add headless statue + amphora + mosaic tile fragment to drawRuins() after line 6529. ~30 lines. Ruins are architecturally correct but narratively silent; no Roman-specific markers.
+**Sprint 3 Visual Priorities (from CEO_SPRINT3.md, March 2026) — SHIPPED:**
+1. Tree flicker fix — floor(sway * t_frac) at line 11934 and 11961. DONE.
+2. HUD visible during dialogue — `if (dialogState.active) return;` at top of drawHUD(). DONE.
+3. Ruins detail — headless statue + amphora + mosaic tile fragment added to drawRuins(). DONE.
+4. Cook/Fisherman NPCs added — save/load wired. Iron ore from quarrier at level 7+. DONE.
+5. Ports converted to derived values — always recomputed on load. DONE.
+6. Ambient ships closer/larger. Storm darkening overlay. 3 tree types. First git commit. DONE.
+
+**Playtest results (2026-03-19): 8/8 PASS, 0 errors, 4 bugs found:**
+1. Arena Isle label renders twice — drawArenaIsleDistant() + drawArenaDistantLabel() both draw it (lines 13061, 12968). Fix: delete label block from drawArenaIsleDistant() (10 deletions).
+2. Quest tracker clips right edge — rx = width-220, rw=208 insufficient for long strings. Fix: widen to rx=width-240, rw=228 + textWidth truncation loop at narrative.js line 809.
+3. Cloud shapes repetitive — deferred, background atmosphere, low moment-to-moment impact.
+4. Menu click targets imprecise — hitbox symmetric around iy but text renders above iy. Fix: align hitbox to textTop = iy - itemSize*0.8, increase hitPad to 20. (menu.js line 481-483)
+CEO_CYCLE_4.md has code-level specifics for all 3 active fixes.
 
 **What's been cut (do not re-add):**
 - Fleet/pirate raid system (state.fleet, state.pirateRaid defined but no logic) — too large for scope

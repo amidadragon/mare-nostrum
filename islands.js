@@ -43,34 +43,108 @@ function drawVulcanIsland() {
   let v = state.vulcan, ix = w2sX(v.isleX), iy = w2sY(v.isleY);
   if (ix < -500 || ix > width + 500 || iy < -500 || iy > height + 500) return;
   push(); noStroke();
-  fill(20, 10, 5, 50); ellipse(ix + 4, iy + 6, v.isleRX * 2.15, v.isleRY * 2.15);
-  fill(80, 40, 20, 40); ellipse(ix, iy, v.isleRX * 2.1, v.isleRY * 2.1);
-  fill(50, 42, 35); ellipse(ix, iy, v.isleRX * 2, v.isleRY * 2);
-  fill(30, 28, 25); ellipse(ix, iy, v.isleRX * 1.85, v.isleRY * 1.85);
-  fill(40, 35, 30); ellipse(ix, iy, v.isleRX * 1.7, v.isleRY * 1.7);
-  fill(50, 45, 38, 80); for (let i = 0; i < 15; i++) { let a = (i / 15) * TWO_PI + i * 1.7, r = (i % 4 + 2) * v.isleRX * 0.1; ellipse(ix + cos(a) * r, iy + sin(a) * r * 0.69, 10, 5); }
-  fill(55, 48, 40); ellipse(ix, iy - 10, 120, 80); fill(65, 55, 45); ellipse(ix, iy - 15, 80, 55);
-  fill(35, 25, 20); ellipse(ix, iy - 18, 40, 28);
-  let glow = sin(frameCount * 0.04) * 0.3 + 0.7;
-  fill(255, 80, 20, 60 * glow); ellipse(ix, iy - 18, 30, 20); fill(255, 140, 40, 40 * glow); ellipse(ix, iy - 18, 50, 35);
-  if (v.active || dist(ix, iy, width / 2, height / 2) < 600) { for (let lp of v.lavaPools) { let lx = w2sX(lp.x), ly = w2sY(lp.y), pulse = sin(frameCount * 0.06 + lp.phase) * 0.2 + 0.8; fill(180, 50, 10, 120 * pulse); ellipse(lx, ly, lp.r * 2, lp.r * 1.4); fill(255, 120, 30, 80 * pulse); ellipse(lx, ly, lp.r * 1.4, lp.r); fill(255, 200, 60, 50 * pulse); ellipse(lx, ly, lp.r * 0.7, lp.r * 0.5); } }
-  let hr = state.time / 60; if (hr > 19 || hr < 5) { fill(255, 40, 10, 15 + sin(frameCount * 0.02) * 5); ellipse(ix, iy, v.isleRX * 2.3, v.isleRY * 2.3); }
+  let vt = frameCount * 0.01;
+  // Deep lava-lit ocean shadow
+  fill(15, 5, 2, 55); ellipse(ix + 5, iy + 8, v.isleRX * 2.2, v.isleRY * 2.2);
+  // Heated water glow around island
+  let heatPulse = sin(vt * 3) * 0.15 + 0.85;
+  fill(120, 30, 5, 20 * heatPulse); ellipse(ix, iy, v.isleRX * 2.15, v.isleRY * 2.15);
+  // Outer volcanic rim — dark basalt
+  fill(45, 38, 30); ellipse(ix, iy, v.isleRX * 2, v.isleRY * 2);
+  // Scorched earth bands — using scanline fill for crunchy look
+  for (let row = -v.isleRY; row < v.isleRY; row += 2) {
+    let t = row / v.isleRY;
+    let w2 = v.isleRX * sqrt(max(0, 1 - t * t));
+    let wobble = sin(row * 0.08 + 1.2) * 3;
+    // Gradient from dark obsidian (outer) to ashen grey (inner)
+    let band = abs(t);
+    let r = lerp(38, 52, 1 - band);
+    let g = lerp(30, 42, 1 - band);
+    let b = lerp(22, 35, 1 - band);
+    fill(r, g, b);
+    rect(floor(ix - w2 + wobble), floor(iy + row), floor(w2 * 2), 2);
+  }
+  // Lava veins running through terrain
+  for (let lv = 0; lv < 8; lv++) {
+    let la = (lv / 8) * TWO_PI + lv * 0.6;
+    let lr = v.isleRX * (0.3 + (lv % 3) * 0.15);
+    let lx1 = ix + cos(la) * lr * 0.3;
+    let ly1 = iy + sin(la) * lr * 0.3 * 0.69;
+    let lx2 = ix + cos(la) * lr;
+    let ly2 = iy + sin(la) * lr * 0.69;
+    let lvGlow = sin(vt * 4 + lv * 1.5) * 0.3 + 0.7;
+    fill(200, 60, 10, 50 * lvGlow);
+    for (let seg = 0; seg < 6; seg++) {
+      let st = seg / 6;
+      let segX = lerp(lx1, lx2, st) + sin(seg * 1.3 + la) * 3;
+      let segY = lerp(ly1, ly2, st) + cos(seg * 1.1 + la) * 2;
+      rect(floor(segX), floor(segY), 3, 2);
+    }
+  }
+  // Volcanic rock texture — jagged scattered stones
+  for (let i = 0; i < 20; i++) {
+    let ra = (i * 2.39996) % TWO_PI;
+    let rr = ((i * 23 + 5) % 80) / 100 * 0.7;
+    let rpx = ix + cos(ra) * v.isleRX * rr;
+    let rpy = iy + sin(ra) * v.isleRY * rr * 0.69;
+    if (i % 3 === 0) { fill(25, 20, 15, 100); rect(floor(rpx), floor(rpy), 6, 4); fill(35, 28, 22, 80); rect(floor(rpx + 1), floor(rpy), 4, 2); }
+    else if (i % 3 === 1) { fill(60, 48, 35, 70); rect(floor(rpx), floor(rpy), 4, 3); }
+    else { fill(20, 15, 12, 90); rect(floor(rpx), floor(rpy), 8, 2); }
+  }
+  // Central volcano cone — layered
+  fill(48, 40, 32); ellipse(ix, iy - 8, 130, 90);
+  fill(55, 45, 36); ellipse(ix, iy - 12, 100, 68);
+  fill(62, 52, 42); ellipse(ix, iy - 16, 72, 50);
+  // Crater rim
+  fill(45, 35, 28); ellipse(ix, iy - 18, 48, 32);
+  // Crater interior — glowing
+  fill(30, 20, 14); ellipse(ix, iy - 18, 36, 24);
+  let glow = sin(vt * 4) * 0.3 + 0.7;
+  fill(255, 70, 15, 70 * glow); ellipse(ix, iy - 18, 28, 18);
+  fill(255, 130, 35, 50 * glow); ellipse(ix, iy - 18, 44, 30);
+  fill(255, 200, 60, 25 * glow); ellipse(ix, iy - 18, 56, 38);
+  // Lava pools
+  if (v.active || dist(ix, iy, width / 2, height / 2) < 600) {
+    for (let lp of v.lavaPools) {
+      let lx = w2sX(lp.x), ly = w2sY(lp.y);
+      let pulse = sin(frameCount * 0.06 + lp.phase) * 0.2 + 0.8;
+      // Dark crust rim
+      fill(35, 22, 10, 140); ellipse(lx, ly, lp.r * 2.3, lp.r * 1.6);
+      // Molten lava layers
+      fill(160, 40, 8, 130 * pulse); ellipse(lx, ly, lp.r * 2, lp.r * 1.4);
+      fill(230, 100, 20, 90 * pulse); ellipse(lx, ly, lp.r * 1.4, lp.r);
+      fill(255, 180, 50, 60 * pulse); ellipse(lx, ly, lp.r * 0.8, lp.r * 0.5);
+      // Bright hotspot
+      fill(255, 240, 120, 30 * pulse); ellipse(lx - 2, ly - 1, lp.r * 0.4, lp.r * 0.3);
+    }
+  }
+  // Night glow — lava lights up surrounding ocean
+  let hr = state.time / 60;
+  if (hr > 19 || hr < 5) {
+    fill(255, 35, 8, 18 + sin(vt * 2) * 6); ellipse(ix, iy, v.isleRX * 2.4, v.isleRY * 2.4);
+    fill(255, 80, 20, 8); ellipse(ix, iy, v.isleRX * 2.8, v.isleRY * 2.8);
+  }
   // Forge altar at crater center
   let crackGlow = sin(frameCount * 0.07) * 0.5 + 0.5;
   let forged = state.narrativeFlags && state.narrativeFlags['forge_vulcan_blade'];
-  // Platform
-  fill(22, 18, 14); rect(ix - 14, iy - 32, 28, 10);
-  fill(35, 28, 22); rect(ix - 11, iy - 40, 22, 10);
-  // Anvil block
-  fill(28, 24, 20); rect(ix - 7, iy - 46, 14, 7);
-  fill(42, 36, 30); rect(ix - 5, iy - 45, 10, 5);
-  // Glowing cracks
-  fill(255, forged ? 200 : 80, 0, floor((80 + crackGlow * 120)));
-  rect(ix - 10, iy - 33, 4, 1); rect(ix - 3, iy - 33, 6, 1); rect(ix + 6, iy - 33, 3, 1);
-  rect(ix - 7, iy - 31, 3, 1); rect(ix + 2, iy - 31, 5, 1);
+  // Stepped platform — basalt blocks
+  fill(18, 15, 10); rect(ix - 16, iy - 30, 32, 12);
+  fill(25, 20, 16); rect(ix - 13, iy - 32, 26, 4);
+  fill(32, 26, 20); rect(ix - 12, iy - 40, 24, 10);
+  fill(38, 30, 24); rect(ix - 10, iy - 42, 20, 4);
+  // Anvil block — obsidian
+  fill(22, 18, 14); rect(ix - 8, iy - 48, 16, 8);
+  fill(38, 32, 26); rect(ix - 6, iy - 47, 12, 5);
+  fill(48, 40, 32); rect(ix - 5, iy - 46, 10, 2);
+  // Glowing cracks in platform
+  fill(255, forged ? 200 : 70, 0, floor(70 + crackGlow * 130));
+  rect(ix - 12, iy - 33, 4, 1); rect(ix - 4, iy - 33, 8, 1); rect(ix + 8, iy - 33, 3, 1);
+  rect(ix - 9, iy - 31, 3, 1); rect(ix + 1, iy - 31, 6, 1);
+  rect(ix - 6, iy - 29, 5, 1); rect(ix + 4, iy - 29, 4, 1);
   // Forge glow halo
-  fill(255, forged ? 180 : 60, 0, floor(30 * crackGlow));
-  ellipse(ix, iy - 36, 36, 22);
+  fill(255, forged ? 170 : 50, 0, floor(35 * crackGlow));
+  ellipse(ix, iy - 38, 42, 26);
+  if (forged) { fill(255, 200, 80, floor(15 * crackGlow)); ellipse(ix, iy - 38, 60, 36); }
   pop();
 }
 function drawVulcanEntities() {
@@ -145,14 +219,87 @@ function drawHyperboreIsland() {
   let h = state.hyperborea, ix = w2sX(h.isleX), iy = w2sY(h.isleY);
   if (ix < -500 || ix > width + 500 || iy < -500 || iy > height + 500) return;
   push(); noStroke();
-  fill(20, 40, 60, 50); ellipse(ix + 4, iy + 6, h.isleRX * 2.15, h.isleRY * 2.15);
-  fill(60, 120, 160, 50); ellipse(ix, iy, h.isleRX * 2.1, h.isleRY * 2.1);
-  fill(180, 210, 230); ellipse(ix, iy, h.isleRX * 2, h.isleRY * 2);
-  fill(220, 235, 245); ellipse(ix, iy, h.isleRX * 1.85, h.isleRY * 1.85);
-  fill(235, 245, 255); ellipse(ix, iy, h.isleRX * 1.7, h.isleRY * 1.7);
-  fill(180, 220, 240, 80); for (let i = 0; i < 10; i++) { let a = (i / 10) * TWO_PI + i * 2.1, r = (i % 3 + 2) * h.isleRX * 0.12; ellipse(ix + cos(a) * r, iy + sin(a) * r * 0.69, 14, 7); }
-  fill(200, 220, 240); ellipse(ix - 20, iy - 15, 80, 55); fill(210, 230, 245); ellipse(ix - 20, iy - 20, 55, 38); fill(245, 250, 255); ellipse(ix - 20, iy - 25, 30, 20);
-  if (h.auroraBorealis > 0) { let a = h.auroraBorealis; for (let i = 0; i < 5; i++) { let wave = sin(frameCount * 0.015 + i * 0.8) * 40; let col = i % 2 === 0 ? [60, 255, 150] : [100, 180, 255]; fill(col[0], col[1], col[2], 12 * a); ellipse(ix + wave + (i - 2) * 50, iy - h.isleRY * 0.8 - i * 15, 120 + i * 20, 15); } }
+  let ht = frameCount * 0.01;
+  // Icy water shadow
+  fill(15, 30, 55, 50); ellipse(ix + 4, iy + 7, h.isleRX * 2.18, h.isleRY * 2.18);
+  // Frozen sea rim — ice shelf edges
+  fill(140, 180, 210, 60); ellipse(ix, iy, h.isleRX * 2.12, h.isleRY * 2.12);
+  // Snow terrain — scanline rendering for crisp pixel look
+  for (let row = -h.isleRY; row < h.isleRY; row += 2) {
+    let t = row / h.isleRY;
+    let w2 = h.isleRX * sqrt(max(0, 1 - t * t));
+    let wobble = sin(row * 0.07 + 0.9) * 3 + sin(row * 0.15 + 2.5) * 1.5;
+    // Snow gradient — bluish at edges, bright white center
+    let band = abs(t);
+    let edgeFade = max(0, band - 0.6) * 2.5;
+    let r = lerp(240, 175, edgeFade);
+    let g = lerp(248, 210, edgeFade);
+    let b = lerp(255, 235, edgeFade);
+    fill(r, g, b);
+    rect(floor(ix - w2 + wobble), floor(iy + row), floor(w2 * 2), 2);
+  }
+  // Ice cracks across surface
+  for (let cr = 0; cr < 6; cr++) {
+    let ca = (cr / 6) * TWO_PI + cr * 0.8;
+    let cLen = h.isleRX * (0.2 + (cr % 3) * 0.12);
+    fill(160, 200, 230, 50);
+    for (let seg = 0; seg < 5; seg++) {
+      let st = seg / 5;
+      let crx = ix + cos(ca) * cLen * st + sin(seg * 1.5 + ca) * 2;
+      let cry = iy + sin(ca) * cLen * st * 0.69 + cos(seg * 1.2) * 1;
+      rect(floor(crx), floor(cry), 3, 1);
+    }
+  }
+  // Snow drifts texture
+  for (let i = 0; i < 12; i++) {
+    let sa = (i * 2.39996) % TWO_PI;
+    let sr = ((i * 19 + 3) % 70) / 100 * 0.65;
+    let spx = ix + cos(sa) * h.isleRX * sr;
+    let spy = iy + sin(sa) * h.isleRY * sr * 0.69;
+    fill(248, 252, 255, 60);
+    rect(floor(spx), floor(spy), 8, 2);
+    fill(230, 242, 252, 40);
+    rect(floor(spx + 2), floor(spy + 2), 6, 2);
+  }
+  // Glacier / ice mountain — layered angular shape
+  fill(185, 215, 235); ellipse(ix - 18, iy - 12, 90, 62);
+  fill(200, 225, 242); ellipse(ix - 18, iy - 18, 65, 45);
+  // Ice peak highlights
+  fill(230, 242, 252); ellipse(ix - 18, iy - 24, 40, 28);
+  fill(245, 250, 255); ellipse(ix - 18, iy - 28, 22, 16);
+  // Ice facets — angular pixel highlights
+  fill(200, 230, 248, 80);
+  rect(floor(ix - 35), floor(iy - 16), 6, 2);
+  rect(floor(ix - 28), floor(iy - 22), 4, 2);
+  fill(170, 205, 230, 60);
+  rect(floor(ix - 8), floor(iy - 18), 4, 6);
+  // Frozen boulders scattered
+  let iceRocks = [[-0.5, 0.3], [0.4, 0.2], [-0.3, -0.4], [0.6, -0.2], [0.2, 0.5]];
+  for (let ir of iceRocks) {
+    let irx = ix + ir[0] * h.isleRX * 0.7;
+    let iry = iy + ir[1] * h.isleRY * 0.5;
+    fill(170, 195, 215); rect(floor(irx - 4), floor(iry - 2), 8, 6);
+    fill(195, 215, 232); rect(floor(irx - 3), floor(iry - 3), 6, 4);
+    fill(220, 235, 248, 80); rect(floor(irx - 2), floor(iry - 3), 3, 2);
+  }
+  // Aurora borealis — improved with flowing curtains
+  if (h.auroraBorealis > 0) {
+    let a = h.auroraBorealis;
+    for (let i = 0; i < 7; i++) {
+      let wave = sin(frameCount * 0.012 + i * 0.7) * 50;
+      let wave2 = sin(frameCount * 0.008 + i * 1.2) * 20;
+      let cols = [[50, 255, 140], [80, 200, 255], [100, 255, 180], [60, 180, 255], [90, 255, 160], [70, 220, 255], [110, 240, 180]];
+      let col = cols[i];
+      let al = (10 + sin(frameCount * 0.02 + i * 0.5) * 4) * a;
+      fill(col[0], col[1], col[2], al);
+      let ax = ix + wave + (i - 3) * 45 + wave2;
+      let ay = iy - h.isleRY * 0.85 - i * 12;
+      rect(floor(ax - 50), floor(ay), 100, 2);
+      fill(col[0], col[1], col[2], al * 0.5);
+      rect(floor(ax - 40), floor(ay + 4), 80, 2);
+      rect(floor(ax - 30), floor(ay - 4), 60, 2);
+    }
+  }
   pop();
 }
 function drawHyperboreEntities() {
@@ -249,15 +396,80 @@ function drawPlentyIsland() {
   let pl = state.plenty, ix = w2sX(pl.isleX), iy = w2sY(pl.isleY);
   if (ix < -500 || ix > width + 500 || iy < -500 || iy > height + 500) return;
   push(); noStroke();
-  fill(10, 60, 40, 40); ellipse(ix + 4, iy + 6, pl.isleRX * 2.15, pl.isleRY * 2.15);
-  fill(40, 180, 160, 60); ellipse(ix, iy, pl.isleRX * 2.12, pl.isleRY * 2.12);
-  fill(240, 230, 200); ellipse(ix, iy, pl.isleRX * 2, pl.isleRY * 2);
-  fill(230, 215, 175); ellipse(ix, iy, pl.isleRX * 1.92, pl.isleRY * 1.92);
-  fill(35, 130, 50); ellipse(ix, iy, pl.isleRX * 1.82, pl.isleRY * 1.82);
-  fill(25, 110, 40); ellipse(ix, iy, pl.isleRX * 1.65, pl.isleRY * 1.65);
-  fill(45, 150, 60, 100); for (let i = 0; i < 12; i++) { let a = (i / 12) * TWO_PI + i * 1.3, r = (i % 4 + 1.5) * pl.isleRX * 0.11; ellipse(ix + cos(a) * r, iy + sin(a) * r * 0.69, 18, 10); }
-  fill(30, 120, 45); ellipse(ix + 10, iy - 10, 100, 70); fill(40, 140, 55); ellipse(ix + 10, iy - 15, 70, 48);
-  for (let wf of pl.waterfalls) { let wx = w2sX(wf.x), wy = w2sY(wf.y); fill(100, 200, 220, 80 + sin(frameCount * 0.1) * 20); rect(floor(wx) - 3, floor(wy), 6, wf.h); fill(180, 230, 240, 40); ellipse(wx, wy + wf.h + 3, 14, 6); }
+  let pt = frameCount * 0.01;
+  // Tropical lagoon shadow
+  fill(8, 50, 35, 45); ellipse(ix + 4, iy + 7, pl.isleRX * 2.18, pl.isleRY * 2.18);
+  // Turquoise lagoon ring
+  fill(35, 170, 150, 65); ellipse(ix, iy, pl.isleRX * 2.14, pl.isleRY * 2.14);
+  fill(50, 190, 170, 45); ellipse(ix, iy, pl.isleRX * 2.08, pl.isleRY * 2.08);
+  // Sandy beach ring — scanline
+  for (let row = -pl.isleRY; row < pl.isleRY; row += 2) {
+    let t = row / pl.isleRY;
+    let w2 = pl.isleRX * sqrt(max(0, 1 - t * t));
+    let wobble = sin(row * 0.06 + 0.5) * 4 + sin(row * 0.14 + 1.8) * 2;
+    // Beach band at edge, jungle interior
+    let band = sqrt(max(0, 1 - t * t));
+    let edgeDist = w2 / pl.isleRX;
+    fill(235, 222, 192);
+    rect(floor(ix - w2 + wobble), floor(iy + row), floor(w2 * 2), 2);
+  }
+  // Inner jungle canopy — lush green scanline fill
+  for (let row = -pl.isleRY * 0.88; row < pl.isleRY * 0.88; row += 2) {
+    let t = row / (pl.isleRY * 0.88);
+    let w2 = pl.isleRX * 0.88 * sqrt(max(0, 1 - t * t));
+    let wobble = sin(row * 0.07 + 2.2) * 3;
+    let greenVar = sin(row * 0.12 + pt) * 8;
+    fill(30 + greenVar, 125 + greenVar * 0.5, 45);
+    rect(floor(ix - w2 + wobble), floor(iy + row), floor(w2 * 2), 2);
+  }
+  // Jungle texture — canopy patches with depth
+  for (let i = 0; i < 18; i++) {
+    let ja = (i * 2.39996) % TWO_PI;
+    let jr = ((i * 13 + 7) % 75) / 100 * 0.7;
+    let jpx = ix + cos(ja) * pl.isleRX * jr;
+    let jpy = iy + sin(ja) * pl.isleRY * jr * 0.69;
+    if (i % 4 === 0) { fill(40, 150, 58, 90); ellipse(jpx, jpy, 16, 10); fill(50, 165, 68, 60); ellipse(jpx - 2, jpy - 2, 10, 6); }
+    else if (i % 4 === 1) { fill(25, 105, 38, 80); rect(floor(jpx), floor(jpy), 10, 6); }
+    else if (i % 4 === 2) { fill(55, 160, 65, 70); ellipse(jpx, jpy, 12, 8); }
+    else { fill(35, 135, 50, 100); rect(floor(jpx - 3), floor(jpy), 6, 4); fill(45, 155, 55, 60); rect(floor(jpx - 2), floor(jpy - 2), 4, 3); }
+  }
+  // Flower clusters in canopy — tropical bursts
+  let flowerSpots = [[-0.3, -0.2], [0.4, -0.15], [-0.15, 0.25], [0.3, 0.3], [-0.5, 0.1], [0.5, -0.3]];
+  for (let fs of flowerSpots) {
+    let fpx = ix + fs[0] * pl.isleRX * 0.7;
+    let fpy = iy + fs[1] * pl.isleRY * 0.5;
+    let fPhase = sin(pt * 2 + fs[0] * 5);
+    if (fPhase > 0) { fill(255, 180, 40, 120); rect(floor(fpx), floor(fpy), 3, 3); }
+    else { fill(255, 80, 100, 100); rect(floor(fpx), floor(fpy), 2, 3); }
+    fill(255, 220, 60, 60); rect(floor(fpx + 3), floor(fpy + 1), 2, 2);
+  }
+  // Central hill / ridge
+  fill(28, 118, 42); ellipse(ix + 8, iy - 8, 110, 75);
+  fill(35, 138, 52); ellipse(ix + 8, iy - 14, 78, 52);
+  fill(45, 155, 62); ellipse(ix + 8, iy - 18, 50, 34);
+  // Sunlit canopy highlight
+  fill(60, 180, 70, 40); ellipse(ix - 5, iy - 16, 30, 20);
+  // Waterfalls with mist
+  for (let wf of (pl.waterfalls || [])) {
+    let wx = w2sX(wf.x), wy = w2sY(wf.y);
+    // Rock face behind waterfall
+    fill(65, 55, 40); rect(floor(wx - 5), floor(wy - 4), 10, wf.h + 4);
+    fill(80, 68, 50); rect(floor(wx - 4), floor(wy - 3), 8, wf.h + 2);
+    // Animated water stream
+    for (let wi = 0; wi < wf.h; wi += 2) {
+      let shimmer = sin(pt * 12 + wi * 0.4) * 1.5;
+      fill(90, 195, 215, 160 - wi);
+      rect(floor(wx + shimmer) - 2, floor(wy) + wi, 4, 2);
+      fill(140, 220, 235, 80 - wi * 0.5);
+      rect(floor(wx + shimmer) - 3, floor(wy) + wi, 6, 2);
+    }
+    // Pool at base
+    fill(70, 175, 195, 90); ellipse(wx, wy + wf.h + 4, 18, 8);
+    fill(110, 205, 225, 50); ellipse(wx, wy + wf.h + 3, 12, 5);
+    // Mist spray
+    let mAlpha = 20 + sin(pt * 6) * 8;
+    fill(200, 225, 240, mAlpha); ellipse(wx, wy + wf.h - 2, 22, 10);
+  }
   pop();
 }
 function drawPlentyEntities() {
@@ -326,16 +538,80 @@ function drawNecropolisIsland() {
   let n = state.necropolis, ix = w2sX(n.isleX), iy = w2sY(n.isleY);
   if (ix < -500 || ix > width + 500 || iy < -500 || iy > height + 500) return;
   push(); noStroke();
-  fill(10, 5, 20, 60); ellipse(ix + 4, iy + 6, n.isleRX * 2.15, n.isleRY * 2.15);
-  fill(30, 20, 50, 50); ellipse(ix, iy, n.isleRX * 2.1, n.isleRY * 2.1);
-  fill(50, 40, 55); ellipse(ix, iy, n.isleRX * 2, n.isleRY * 2);
-  fill(40, 35, 45); ellipse(ix, iy, n.isleRX * 1.85, n.isleRY * 1.85);
-  fill(35, 30, 40); ellipse(ix, iy, n.isleRX * 1.7, n.isleRY * 1.7);
-  fill(50, 45, 35, 60); for (let i = 0; i < 10; i++) { let a = (i / 10) * TWO_PI + i * 2.3, r = (i % 3 + 2) * n.isleRX * 0.11; ellipse(ix + cos(a) * r, iy + sin(a) * r * 0.69, 10, 5); }
-  fill(55, 48, 60); rect(floor(ix) - 25, floor(iy) - 20, 50, 30); fill(65, 58, 70); rect(floor(ix) - 20, floor(iy) - 28, 40, 12);
-  fill(75, 68, 80); rect(floor(ix) - 22, floor(iy) - 28, 4, 28); rect(floor(ix) + 18, floor(iy) - 28, 4, 28);
-  let glow = sin(frameCount * 0.03) * 0.3 + 0.5; fill(120, 60, 180, 15 * glow); ellipse(ix, iy, n.isleRX * 2.2, n.isleRY * 2.2);
-  if (n.active) { fill(0, 0, 10, 30 * n.darkAura); ellipse(ix, iy, n.isleRX * 2.5, n.isleRY * 2.5); }
+  let nt = frameCount * 0.01;
+  // Ghostly shadow — deeper, more ominous
+  fill(8, 3, 18, 65); ellipse(ix + 5, iy + 8, n.isleRX * 2.22, n.isleRY * 2.22);
+  // Spectral purple glow around island
+  let ghostPulse = sin(nt * 2) * 0.2 + 0.8;
+  fill(80, 40, 130, 18 * ghostPulse); ellipse(ix, iy, n.isleRX * 2.18, n.isleRY * 2.18);
+  // Dead earth terrain — scanline fill
+  for (let row = -n.isleRY; row < n.isleRY; row += 2) {
+    let t = row / n.isleRY;
+    let w2 = n.isleRX * sqrt(max(0, 1 - t * t));
+    let wobble = sin(row * 0.07 + 1.8) * 3 + sin(row * 0.13 + 3.5) * 2;
+    // Ashen grey-purple gradient
+    let band = abs(t);
+    let r = lerp(42, 52, 1 - band);
+    let g = lerp(35, 42, 1 - band);
+    let b = lerp(48, 58, 1 - band);
+    fill(r, g, b);
+    rect(floor(ix - w2 + wobble), floor(iy + row), floor(w2 * 2), 2);
+  }
+  // Dead grass / barren patches
+  for (let i = 0; i < 15; i++) {
+    let ga = (i * 2.39996) % TWO_PI;
+    let gr = ((i * 17 + 11) % 70) / 100 * 0.65;
+    let gpx = ix + cos(ga) * n.isleRX * gr;
+    let gpy = iy + sin(ga) * n.isleRY * gr * 0.69;
+    if (i % 3 === 0) { fill(38, 32, 28, 80); rect(floor(gpx), floor(gpy), 6, 2); }
+    else if (i % 3 === 1) { fill(55, 48, 55, 60); rect(floor(gpx), floor(gpy), 4, 4); fill(48, 40, 48, 40); rect(floor(gpx + 1), floor(gpy + 1), 2, 2); }
+    else { fill(45, 40, 42, 70); rect(floor(gpx), floor(gpy), 8, 2); }
+  }
+  // Ghostly ground veins — glowing fissures
+  for (let fv = 0; fv < 5; fv++) {
+    let fa = (fv / 5) * TWO_PI + fv * 1.2;
+    let fLen = n.isleRX * (0.2 + (fv % 3) * 0.15);
+    let fGlow = sin(nt * 3 + fv * 1.8) * 0.3 + 0.5;
+    fill(120, 60, 180, 30 * fGlow);
+    for (let seg = 0; seg < 5; seg++) {
+      let st = seg / 5;
+      let fx = ix + cos(fa) * fLen * st + sin(seg * 1.4 + fa) * 2;
+      let fy = iy + sin(fa) * fLen * st * 0.69;
+      rect(floor(fx), floor(fy), 3, 1);
+    }
+  }
+  // Gravestones / broken pillars scattered across surface
+  let graveSpots = [[-0.4, 0.2], [0.5, 0.15], [-0.2, -0.3], [0.35, -0.25], [-0.55, -0.1], [0.6, 0.3], [-0.1, 0.4], [0.15, -0.45]];
+  for (let gs of graveSpots) {
+    let gsx = ix + gs[0] * n.isleRX * 0.7;
+    let gsy = iy + gs[1] * n.isleRY * 0.5;
+    // Stone base
+    fill(62, 55, 68); rect(floor(gsx - 3), floor(gsy - 2), 6, 4);
+    // Upright stone / broken pillar
+    fill(72, 65, 78); rect(floor(gsx - 2), floor(gsy - 8), 4, 8);
+    // Top — some pointed, some broken flat
+    if (gs[0] > 0) { fill(78, 70, 85); rect(floor(gsx - 1), floor(gsy - 10), 2, 3); }
+    else { fill(68, 60, 75); rect(floor(gsx - 2), floor(gsy - 9), 4, 2); }
+  }
+  // Central mausoleum — larger, more imposing
+  fill(48, 42, 55); rect(floor(ix) - 28, floor(iy) - 18, 56, 32);
+  fill(58, 52, 65); rect(floor(ix) - 24, floor(iy) - 26, 48, 12);
+  // Roof / pediment
+  fill(65, 58, 72); rect(floor(ix) - 28, floor(iy) - 28, 56, 4);
+  fill(72, 64, 78); rect(floor(ix) - 22, floor(iy) - 32, 44, 6);
+  // Columns
+  fill(78, 70, 85); rect(floor(ix) - 26, floor(iy) - 26, 4, 26); rect(floor(ix) + 22, floor(iy) - 26, 4, 26);
+  fill(85, 76, 92); rect(floor(ix) - 14, floor(iy) - 24, 3, 22); rect(floor(ix) + 11, floor(iy) - 24, 3, 22);
+  // Dark entrance
+  fill(20, 15, 28); rect(floor(ix) - 6, floor(iy) - 8, 12, 14);
+  // Entrance glow
+  let eGlow = sin(nt * 3) * 0.3 + 0.5;
+  fill(120, 60, 180, 25 * eGlow); rect(floor(ix) - 4, floor(iy) - 6, 8, 10);
+  // Overall eerie aura
+  let glow = sin(nt * 3) * 0.3 + 0.5;
+  fill(110, 55, 170, 12 * glow); ellipse(ix, iy, n.isleRX * 2.2, n.isleRY * 2.2);
+  // Active dark overlay
+  if (n.active) { fill(0, 0, 10, 25 * (n.darkAura || 0.3)); ellipse(ix, iy, n.isleRX * 2.5, n.isleRY * 2.5); }
   pop();
 }
 function drawNecropolisEntities() {

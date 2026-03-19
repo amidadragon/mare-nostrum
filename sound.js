@@ -65,6 +65,20 @@ class SoundManager {
     this._whaleTimer = 0;
     // Storm ambient
     this._thunderTimer = 0;
+    // Bass drone oscillator (foundation for harmony)
+    this._droneOsc = null;
+    this._droneGain = null;
+    this._droneTarget = 0;
+    // Rhythmic pulse oscillator (subtle heartbeat underneath music)
+    this._pulseOsc = null;
+    this._pulseGain = null;
+    this._pulseTimer = 0;
+    // Mode crossfade
+    this._lyreVolMult = 1.0;
+    this._lyreFadeDir = 0; // -1 fading out, 1 fading in, 0 steady
+    this._lyrePendingMode = null;
+    // Dynamic context
+    this._lyreContext = 'default'; // farming, combat, night, rain, ocean
   }
 
   init() {
@@ -131,6 +145,28 @@ class SoundManager {
         this._lyreVoices.push(osc);
         this._lyreGains.push(gain);
       }
+
+      // Bass drone: triangle oscillator for warm harmonic foundation
+      this._droneOsc = new p5.Oscillator('triangle');
+      this._droneGain = new p5.Gain();
+      this._droneOsc.disconnect();
+      this._droneOsc.connect(this._droneGain);
+      this._droneGain.connect();
+      this._droneGain.amp(0);
+      this._droneOsc.start();
+      this._droneOsc.freq(146.8); // D3 — one octave below lyre root
+      this._droneOsc.amp(1.0);
+
+      // Rhythmic pulse: sine sub-tone for gentle heartbeat feel
+      this._pulseOsc = new p5.Oscillator('sine');
+      this._pulseGain = new p5.Gain();
+      this._pulseOsc.disconnect();
+      this._pulseOsc.connect(this._pulseGain);
+      this._pulseGain.connect();
+      this._pulseGain.amp(0);
+      this._pulseOsc.start();
+      this._pulseOsc.freq(146.8);
+      this._pulseOsc.amp(1.0);
 
       // SFX pool: 4 oscillators (osc at full amp, volume via gain node only)
       for (let i = 0; i < 4; i++) {
@@ -413,13 +449,13 @@ class SoundManager {
     }
   }
 
-  // --- LYRE MODE API ---
+  // --- LYRE MODE API (with crossfade) ---
   setLyreMode(mode) {
-    if (mode === this._lyreMode) return;
-    this._lyreMode = mode;
-    this._lyreNoteIdx = 0;
-    this._lyrePhrase = 0;
-    this._lyreTimer = 0;
+    if (mode === this._lyreMode && !this._lyrePendingMode) return;
+    if (this._lyrePendingMode === mode) return;
+    // Start fade-out, then switch
+    this._lyrePendingMode = mode;
+    this._lyreFadeDir = -1;
   }
 
   // --- ROMAN LYRE --- Procedural background music ---
@@ -430,134 +466,332 @@ class SoundManager {
 
     // Auto-detect lyre mode from game state
     if (typeof gameScreen !== 'undefined' && (gameScreen === 'menu' || gameScreen === 'settings' || gameScreen === 'credits')) {
-      if (this._lyreMode !== 'menu') this.setLyreMode('menu');
+      if (this._lyreMode !== 'menu' && !this._lyrePendingMode) this.setLyreMode('menu');
     } else if (typeof state !== 'undefined') {
-      if (state.necropolis && state.necropolis.active) {
-        if (this._lyreMode !== 'eerie') this.setLyreMode('eerie');
-      } else if (state.conquest && state.conquest.active) {
-        if (this._lyreMode !== 'tense') this.setLyreMode('tense');
-      } else if (state.festival) {
-        if (this._lyreMode !== 'celebration') this.setLyreMode('celebration');
-      } else if (state.rowing && state.rowing.active) {
-        if (this._lyreMode !== 'sailing') this.setLyreMode('sailing');
-      } else if (state.time >= 1200 || state.time < 300) {
-        if (this._lyreMode !== 'night') this.setLyreMode('night');
-      } else {
-        if (this._lyreMode !== 'peaceful') this.setLyreMode('peaceful');
-      }
+      let target = 'peaceful';
+      if (state.necropolis && state.necropolis.active) target = 'eerie';
+      else if (state.conquest && state.conquest.active) target = 'tense';
+      else if (state.festival) target = 'celebration';
+      else if (state.rowing && state.rowing.active) target = 'sailing';
+      else if (state.time >= 1200 || state.time < 300) target = 'night';
+      if (this._lyreMode !== target && !this._lyrePendingMode) this.setLyreMode(target);
     }
+
+    // Detect gameplay context for dynamic ornaments
+    if (typeof state !== 'undefined') {
+      let ctx = 'default';
+      if (typeof stormActive !== 'undefined' && stormActive) ctx = 'rain';
+      else if (state.rowing && state.rowing.active) ctx = 'ocean';
+      else if (state.conquest && state.conquest.active) ctx = 'combat';
+      else if (state.time >= 1200 || state.time < 300) ctx = 'night';
+      else if (state.farming && state.farming.growing > 0) ctx = 'farming';
+      this._lyreContext = ctx;
+    }
+
+    // Handle crossfade
+    if (this._lyreFadeDir === -1) {
+      this._lyreVolMult = max(0, this._lyreVolMult - 0.04);
+      if (this._lyreVolMult <= 0) {
+        // Switch mode at silence
+        this._lyreMode = this._lyrePendingMode || this._lyreMode;
+        this._lyrePendingMode = null;
+        this._lyreNoteIdx = 0;
+        this._lyrePhrase = 0;
+        this._lyreTimer = 8;
+        this._lyreFadeDir = 1;
+      }
+    } else if (this._lyreFadeDir === 1) {
+      this._lyreVolMult = min(1, this._lyreVolMult + 0.03);
+      if (this._lyreVolMult >= 1) this._lyreFadeDir = 0;
+    }
+
+    // Update bass drone
+    this._updateDrone(musicVol);
+    // Update rhythmic pulse
+    this._updatePulse(musicVol);
 
     this._lyreTimer--;
     if (this._lyreTimer > 0) return;
 
-    // Dorian: D E F G A Bb C D E F G A
-    let dorian = [293.7, 329.6, 349.2, 392.0, 440.0, 466.2, 523.3, 587.3, 659.3, 698.5, 784.0, 880.0];
-    // Phrygian on D: D Eb F G A Bb C (flat 2nd for tension)
+    // D Dorian: D E F G A B C (extended two octaves)
+    let dorian = [293.7, 329.6, 349.2, 392.0, 440.0, 493.9, 523.3, 587.3, 659.3, 698.5, 784.0, 880.0];
+    // D Phrygian: D Eb F G A Bb C
     let phrygian = [293.7, 311.1, 349.2, 392.0, 440.0, 466.2, 523.3, 587.3, 622.3, 698.5, 784.0, 880.0];
+    // D Aeolian (natural minor): D E F G A Bb C — for eerie
+    let aeolian = [293.7, 329.6, 349.2, 392.0, 440.0, 466.2, 523.3, 587.3, 659.3, 698.5, 784.0, 880.0];
 
     let scale, phrases;
 
     if (this._lyreMode === 'menu') {
       scale = dorian;
-      // Contemplative: 2-3 notes per phrase, long pauses, very quiet
+      // Contemplative standalone piece — beautiful slow phrases with harmonic depth
       phrases = [
-        [[0,80,0.3,0],[-1,120,0,0],[4,90,0.25,1],[-1,180,0,0]],
-        [[3,90,0.28,0],[-1,150,0,0],[0,100,0.22,1],[-1,200,0,0]],
-        [[4,100,0.25,0],[7,80,0.20,1],[-1,160,0,0],[4,90,0.22,0],[-1,220,0,0]],
-        [[0,110,0.26,0],[-1,140,0,0],[3,80,0.22,1],[0,100,0.20,2],[-1,250,0,0]],
+        // Opening: gentle D-A open fifth, then melodic descent
+        [[0,100,0.30,0],[4,100,0.20,1],[-1,60,0,0],[7,90,0.25,0],[-1,50,0,0],
+         [5,80,0.22,1],[4,90,0.28,0],[-1,40,0,0],[3,85,0.24,0],[2,95,0.20,1],[-1,70,0,0],
+         [0,120,0.26,0],[4,120,0.18,2],[-1,200,0,0]],
+        // Rising hope: stepwise ascent with thirds harmony
+        [[0,90,0.25,0],[2,90,0.18,1],[-1,40,0,0],[2,80,0.26,0],[4,80,0.18,1],[-1,35,0,0],
+         [4,90,0.28,0],[5,90,0.20,1],[-1,30,0,0],[5,85,0.25,0],[7,85,0.18,1],[-1,50,0,0],
+         [4,100,0.22,0],[2,110,0.18,1],[0,130,0.26,0],[-1,220,0,0]],
+        // Echoing question: voice 0 melody, voice 1 echoes 2 beats later
+        [[4,80,0.28,0],[-1,30,0,0],[7,75,0.22,0],[4,80,0.18,1],[-1,25,0,0],
+         [5,90,0.24,0],[7,75,0.16,1],[-1,40,0,0],[4,85,0.22,0],[5,90,0.15,1],[-1,50,0,0],
+         [3,110,0.26,0],[0,130,0.20,2],[-1,250,0,0]],
+        // Gentle waltz: flowing 3-feel with open voicing
+        [[0,70,0.24,0],[4,70,0.16,1],[7,70,0.12,2],[-1,30,0,0],
+         [5,65,0.22,0],[-1,30,0,0],[4,65,0.20,0],[-1,25,0,0],
+         [3,70,0.24,0],[5,70,0.16,1],[7,70,0.12,2],[-1,30,0,0],
+         [2,65,0.22,0],[-1,30,0,0],[0,80,0.26,0],[-1,180,0,0]],
+        // Bittersweet: minor inflection with resolution
+        [[4,95,0.26,0],[-1,40,0,0],[3,85,0.24,0],[2,85,0.18,1],[-1,35,0,0],
+         [1,90,0.22,0],[-1,50,0,0],[2,80,0.24,0],[4,80,0.18,1],[-1,40,0,0],
+         [0,120,0.28,0],[4,120,0.20,2],[-1,200,0,0]],
+        // Spacious: widely spaced single notes, each one a jewel
+        [[7,110,0.22,0],[-1,80,0,0],[4,100,0.20,1],[-1,90,0,0],
+         [0,130,0.26,0],[-1,100,0,0],[3,100,0.22,0],[-1,80,0,0],
+         [4,120,0.24,0],[0,120,0.16,2],[-1,280,0,0]],
+        // Closing: descending arc, fading to silence
+        [[7,80,0.24,0],[5,80,0.16,1],[-1,30,0,0],[5,75,0.22,0],[4,75,0.16,1],[-1,35,0,0],
+         [4,80,0.24,0],[3,80,0.16,1],[-1,30,0,0],[3,75,0.22,0],[2,75,0.14,1],[-1,40,0,0],
+         [0,130,0.28,0],[4,130,0.18,2],[-1,300,0,0]],
+        // Arpeggio bloom: root position chord slowly arpeggiated
+        [[0,90,0.22,0],[-1,20,0,0],[2,85,0.20,0],[-1,20,0,0],[4,80,0.24,0],[-1,20,0,0],
+         [7,90,0.26,0],[4,90,0.18,1],[-1,60,0,0],
+         [5,80,0.22,0],[-1,20,0,0],[3,85,0.20,0],[-1,20,0,0],[0,100,0.26,0],[-1,240,0,0]],
       ];
     } else if (this._lyreMode === 'tense') {
       scale = phrygian;
+      // Driving Phrygian urgency — rhythmic, dark, relentless
       phrases = [
-        [[0,25,0.7,0],[1,25,0.6,1],[3,30,0.8,0],[4,25,0.7,1],[5,30,0.6,0],[-1,10,0,0],
-         [3,25,0.7,0],[1,25,0.6,1],[0,35,0.8,0],[-1,30,0,0]],
-        [[0,20,0.6,0],[0,80,0.3,2],[3,20,0.7,0],[4,25,0.8,1],[7,30,0.9,0],[-1,15,0,0],
-         [5,25,0.6,0],[4,20,0.7,1],[3,25,0.6,0],[0,30,0.7,0],[-1,25,0,0]],
-        [[7,20,0.8,0],[5,20,0.6,1],[-1,8,0,0],[4,20,0.7,0],[1,20,0.6,1],[0,25,0.8,0],[-1,12,0,0],
-         [3,20,0.7,0],[4,25,0.7,1],[7,30,0.8,0],[-1,40,0,0]],
+        // Hammered ostinato: repeated root with chromatic neighbor
+        [[0,20,0.75,0],[1,20,0.55,1],[0,20,0.70,0],[3,25,0.65,1],[4,30,0.80,0],[-1,8,0,0],
+         [3,20,0.65,0],[1,20,0.55,1],[0,30,0.75,0],[-1,12,0,0],
+         [0,20,0.70,0],[4,25,0.80,1],[7,30,0.90,0],[-1,25,0,0]],
+        // Ascending menace: chromatic creep up with drone
+        [[0,60,0.30,2],[0,20,0.65,0],[1,20,0.60,0],[3,20,0.70,0],[4,20,0.75,0],[-1,10,0,0],
+         [5,25,0.70,0],[4,20,0.65,1],[3,20,0.60,0],[1,25,0.70,1],[0,30,0.75,0],[-1,20,0,0]],
+        // Stabbing chords: parallel fifths moving down
+        [[7,18,0.80,0],[4,18,0.65,1],[-1,6,0,0],[5,18,0.75,0],[3,18,0.60,1],[-1,6,0,0],
+         [4,18,0.75,0],[1,18,0.60,1],[-1,6,0,0],[3,18,0.70,0],[0,18,0.65,1],[-1,10,0,0],
+         [0,25,0.80,0],[4,25,0.65,1],[7,35,0.85,0],[-1,30,0,0]],
+        // Driving rhythm: syncopated accents
+        [[0,15,0.80,0],[-1,5,0,0],[0,15,0.50,1],[-1,10,0,0],[3,15,0.70,0],[4,20,0.80,1],[-1,5,0,0],
+         [5,15,0.65,0],[-1,5,0,0],[4,15,0.70,0],[3,20,0.75,1],[0,25,0.80,0],[-1,8,0,0],
+         [1,15,0.65,0],[0,30,0.80,1],[-1,25,0,0]],
+        // Cascading descent: rapid falling scales
+        [[7,15,0.80,0],[5,15,0.70,1],[4,15,0.75,0],[3,15,0.65,1],[1,15,0.70,0],[0,20,0.80,1],[-1,10,0,0],
+         [0,80,0.25,2],[3,20,0.70,0],[4,20,0.75,1],[7,25,0.85,0],[5,20,0.70,1],[3,30,0.75,0],[-1,30,0,0]],
+        // War march: heavy emphasis on beats 1 and 3
+        [[0,25,0.85,0],[0,25,0.30,2],[-1,20,0,0],[3,20,0.60,1],[-1,5,0,0],
+         [4,25,0.85,0],[-1,20,0,0],[1,20,0.60,1],[-1,5,0,0],
+         [0,25,0.80,0],[7,25,0.65,1],[-1,8,0,0],[5,20,0.70,0],[3,25,0.75,1],[0,35,0.85,0],[-1,35,0,0]],
+        // Flurry: rapid alternation building tension
+        [[0,12,0.70,0],[1,12,0.60,1],[0,12,0.70,0],[1,12,0.60,1],[0,12,0.70,0],[3,12,0.65,1],[-1,5,0,0],
+         [4,12,0.75,0],[5,12,0.65,1],[4,12,0.75,0],[5,12,0.65,1],[7,20,0.85,0],[4,20,0.70,1],[-1,8,0,0],
+         [0,30,0.80,0],[-1,30,0,0]],
+        // Resolution: brief moment of clarity before next assault
+        [[4,30,0.70,0],[3,30,0.60,1],[0,40,0.75,0],[-1,20,0,0],
+         [0,80,0.30,2],[3,25,0.65,0],[4,25,0.70,1],[7,30,0.80,0],[-1,15,0,0],
+         [5,25,0.65,0],[4,20,0.60,1],[0,35,0.75,0],[-1,35,0,0]],
       ];
     } else if (this._lyreMode === 'eerie') {
-      scale = dorian;
+      scale = aeolian;
+      // Necropolis: sparse, unsettling, chromatic surprises
       phrases = [
-        [[0,90,0.4,0],[-1,60,0,0],[3,80,0.3,1],[-1,80,0,0],[0,100,0.3,2],[-1,100,0,0]],
-        [[5,80,0.35,0],[-1,70,0,0],[3,90,0.3,0],[-1,90,0,0],[0,110,0.25,1],[-1,120,0,0]],
-        [[0,100,0.3,0],[0,150,0.15,2],[-1,50,0,0],[1,80,0.3,0],[-1,100,0,0],[0,90,0.25,1],[-1,130,0,0]],
+        // Hollow fifths with dissonant neighbor
+        [[0,100,0.35,0],[-1,60,0,0],[3,90,0.28,1],[-1,50,0,0],
+         [1,110,0.32,0],[-1,70,0,0],[0,120,0.25,2],[-1,100,0,0]],
+        // Ghost melody: high register, fading echoes
+        [[7,80,0.25,0],[-1,50,0,0],[5,90,0.22,1],[-1,60,0,0],
+         [4,100,0.20,0],[-1,80,0,0],[3,110,0.18,1],[-1,90,0,0],[0,130,0.22,0],[-1,120,0,0]],
+        // Tritone tension: unsettling interval
+        [[0,90,0.30,0],[0,150,0.12,2],[-1,40,0,0],[3,80,0.25,0],[-1,30,0,0],
+         [6,100,0.28,1],[-1,70,0,0],[5,90,0.22,0],[-1,60,0,0],[0,110,0.25,1],[-1,130,0,0]],
+        // Whispered notes: very quiet, barely there
+        [[4,120,0.18,0],[-1,100,0,0],[3,110,0.15,1],[-1,80,0,0],
+         [1,130,0.18,0],[-1,100,0,0],[0,150,0.15,2],[-1,150,0,0]],
+        // Sudden loud note then silence
+        [[0,60,0.40,0],[-1,120,0,0],[5,80,0.20,1],[-1,150,0,0],
+         [4,70,0.35,0],[-1,200,0,0]],
+        // Descending chromatic fragment
+        [[5,80,0.28,0],[4,80,0.25,1],[-1,40,0,0],[3,80,0.22,0],[2,80,0.20,1],[-1,40,0,0],
+         [1,90,0.25,0],[0,100,0.28,2],[-1,130,0,0]],
+        // Two voices in dissonant seconds
+        [[0,100,0.28,0],[1,100,0.22,1],[-1,80,0,0],[3,90,0.25,0],[4,90,0.20,1],[-1,70,0,0],
+         [0,120,0.22,0],[-1,120,0,0]],
+        // Low drone with isolated high pings
+        [[0,180,0.15,2],[7,60,0.25,0],[-1,100,0,0],[9,50,0.20,0],[-1,120,0,0],
+         [7,70,0.22,0],[-1,80,0,0],[4,80,0.20,1],[-1,130,0,0]],
       ];
     } else if (this._lyreMode === 'celebration') {
-      // Festival mode: fast tempo, trills, wide intervals, bright and joyful
       scale = dorian;
+      // Festival: fast, joyful, dancing rhythms with ornamental trills
       phrases = [
-        [[4,20,0.8,0],[7,20,0.7,1],[4,20,0.6,0],[5,20,0.7,1],[7,25,0.8,0],[9,20,0.7,1],[-1,10,0,0],
-         [7,20,0.7,0],[5,20,0.6,1],[4,25,0.8,0],[2,20,0.6,0],[4,30,0.7,1],[-1,20,0,0]],
-        [[0,15,0.7,0],[2,15,0.6,1],[4,15,0.7,0],[7,20,0.8,1],[9,20,0.7,0],[7,15,0.6,1],[-1,8,0,0],
-         [4,15,0.7,0],[2,15,0.6,1],[0,20,0.7,0],[4,25,0.8,1],[7,30,0.9,0],[-1,25,0,0]],
-        [[7,15,0.8,0],[7,15,0.6,1],[5,15,0.7,0],[4,20,0.7,1],[2,15,0.6,0],[4,15,0.7,1],[-1,10,0,0],
-         [5,15,0.7,0],[7,20,0.8,1],[9,25,0.9,0],[7,20,0.7,0],[4,30,0.8,1],[-1,30,0,0]],
-        // Trill phrase: rapid alternation 4-5-4-5 then leap up
-        [[4,10,0.7,0],[5,10,0.6,1],[4,10,0.7,0],[5,10,0.6,1],[4,10,0.7,0],[5,10,0.7,1],[-1,6,0,0],
-         [7,15,0.8,0],[9,15,0.7,1],[11,20,0.9,0],[-1,8,0,0],[7,15,0.7,0],[4,20,0.8,1],[-1,20,0,0]],
-        // Wide leaps: octave jumps with harmony
-        [[0,12,0.8,0],[7,12,0.7,1],[-1,6,0,0],[0,12,0.7,0],[4,12,0.8,1],[7,15,0.9,0],[9,12,0.7,1],[-1,6,0,0],
-         [11,15,0.9,0],[9,12,0.7,1],[7,12,0.8,0],[4,15,0.7,1],[0,20,0.8,0],[-1,25,0,0]],
+        // Opening dance: ascending melody with rhythmic bounce
+        [[4,18,0.80,0],[7,18,0.65,1],[4,15,0.55,0],[5,18,0.70,1],[7,22,0.80,0],[9,18,0.65,1],[-1,8,0,0],
+         [7,18,0.70,0],[5,15,0.55,1],[4,22,0.80,0],[2,18,0.55,0],[4,25,0.70,1],[-1,18,0,0]],
+        // Leaping joy: wide intervals, bright register
+        [[0,14,0.70,0],[4,14,0.55,1],[7,18,0.80,0],[9,18,0.65,1],[11,22,0.85,0],[-1,6,0,0],
+         [9,14,0.65,0],[7,14,0.55,1],[4,18,0.70,0],[7,22,0.80,1],[9,28,0.85,0],[-1,22,0,0]],
+        // Trill ornament: rapid neighbor-tone alternation
+        [[4,10,0.70,0],[5,10,0.55,1],[4,10,0.70,0],[5,10,0.55,1],[4,10,0.70,0],[5,10,0.60,1],[-1,5,0,0],
+         [7,14,0.80,0],[9,14,0.65,1],[11,18,0.85,0],[-1,6,0,0],[7,14,0.65,0],[4,18,0.80,1],[-1,18,0,0]],
+        // Descending garland: cascading scale with harmony
+        [[11,14,0.80,0],[9,14,0.65,1],[7,14,0.75,0],[5,14,0.60,1],[4,14,0.70,0],[2,14,0.55,1],[-1,6,0,0],
+         [0,18,0.75,0],[4,18,0.60,1],[7,22,0.80,0],[9,18,0.65,1],[11,25,0.85,0],[-1,20,0,0]],
+        // Stomping dance: heavy downbeats with pickup notes
+        [[0,22,0.85,0],[4,22,0.60,1],[-1,10,0,0],[3,12,0.55,0],[4,22,0.85,1],[7,22,0.60,0],[-1,10,0,0],
+         [5,12,0.55,0],[7,22,0.85,0],[4,22,0.60,1],[-1,10,0,0],[2,12,0.55,0],[0,25,0.80,1],[-1,18,0,0]],
+        // Call and response: melody then answer
+        [[4,14,0.70,0],[5,14,0.60,0],[7,18,0.80,0],[-1,12,0,0],
+         [7,14,0.70,1],[5,14,0.60,1],[4,18,0.80,1],[-1,12,0,0],
+         [4,14,0.70,0],[7,14,0.60,0],[9,18,0.80,0],[11,22,0.85,1],[-1,18,0,0]],
+        // Spinning: circular melodic pattern
+        [[4,12,0.70,0],[7,12,0.60,1],[9,12,0.70,0],[7,12,0.60,1],
+         [4,12,0.70,0],[7,12,0.60,1],[9,12,0.70,0],[11,14,0.80,1],[-1,5,0,0],
+         [9,12,0.65,0],[7,12,0.55,1],[4,14,0.70,0],[0,18,0.80,1],[-1,18,0,0]],
+        // Grand finale: ascending octaves with full harmony
+        [[0,12,0.80,0],[4,12,0.55,1],[7,12,0.40,2],[-1,5,0,0],
+         [2,12,0.75,0],[5,12,0.55,1],[-1,5,0,0],
+         [4,14,0.80,0],[7,14,0.60,1],[9,14,0.45,2],[-1,5,0,0],
+         [7,14,0.85,0],[9,14,0.60,1],[11,18,0.90,0],[-1,8,0,0],
+         [7,14,0.70,0],[4,18,0.80,1],[0,22,0.85,0],[-1,25,0,0]],
+        // Drone dance: pedal tone underneath moving melody
+        [[0,80,0.20,2],[4,14,0.70,0],[5,14,0.60,1],[7,14,0.70,0],[9,14,0.60,1],[-1,5,0,0],
+         [7,14,0.70,0],[5,14,0.55,1],[4,14,0.70,0],[2,14,0.55,1],[-1,5,0,0],
+         [4,18,0.80,0],[7,22,0.70,1],[-1,20,0,0]],
+        // Ending flourish: fast ascending arpeggio
+        [[0,10,0.60,0],[2,10,0.50,1],[4,10,0.65,0],[5,10,0.50,1],[7,10,0.70,0],[9,10,0.55,1],
+         [11,14,0.85,0],[9,14,0.65,1],[7,14,0.70,0],[4,18,0.80,1],[0,22,0.85,0],[-1,25,0,0]],
       ];
     } else if (this._lyreMode === 'night') {
-      // Night mode: long sustained notes, wide spacing, bass drone on voice 2
       scale = dorian;
+      // Night: haunting, sparse, minor-inflected, long sustains with bell-like quality
       phrases = [
-        [[0,130,0.35,0],[0,200,0.12,2],[-1,80,0,0],[3,110,0.30,1],[-1,100,0,0],
-         [4,140,0.28,0],[-1,120,0,0],[0,160,0.20,2],[-1,150,0,0]],
-        [[5,120,0.30,0],[0,220,0.10,2],[-1,90,0,0],[3,130,0.25,1],[-1,110,0,0],
-         [0,150,0.28,0],[-1,140,0,0]],
-        [[4,100,0.30,0],[3,110,0.25,1],[0,200,0.10,2],[-1,100,0,0],[0,130,0.25,0],[-1,130,0,0],
-         [2,110,0.22,1],[0,160,0.28,0],[-1,180,0,0]],
-        // Sparse single notes with long drone underneath
-        [[7,140,0.25,0],[0,250,0.10,2],[-1,120,0,0],[4,120,0.22,1],[-1,140,0,0],
-         [3,130,0.20,0],[-1,160,0,0],[0,180,0.25,0],[0,200,0.08,2],[-1,200,0,0]],
-        // Very sparse — just two high notes over bass
-        [[4,160,0.22,0],[0,280,0.08,2],[-1,180,0,0],[5,140,0.20,1],[-1,220,0,0]],
+        // Opening stillness: D drone with floating A above
+        [[0,150,0.30,0],[0,220,0.10,2],[-1,80,0,0],[4,120,0.25,1],[-1,70,0,0],
+         [3,130,0.22,0],[-1,60,0,0],[2,140,0.20,1],[0,160,0.18,2],[-1,150,0,0]],
+        // Moonlit melody: gentle ascending then falling back
+        [[0,120,0.28,0],[-1,50,0,0],[2,100,0.24,1],[-1,40,0,0],[4,110,0.26,0],[-1,50,0,0],
+         [5,120,0.28,1],[-1,60,0,0],[4,130,0.24,0],[-1,50,0,0],[2,110,0.22,1],[-1,40,0,0],
+         [0,160,0.26,0],[0,200,0.08,2],[-1,160,0,0]],
+        // Lullaby fragment: two voices in gentle thirds
+        [[4,110,0.24,0],[2,110,0.18,1],[-1,50,0,0],[3,100,0.22,0],[0,100,0.16,1],[-1,50,0,0],
+         [2,110,0.24,0],[0,110,0.18,1],[-1,60,0,0],[0,140,0.26,0],[4,140,0.18,2],[-1,180,0,0]],
+        // Starlight: isolated high notes over low drone
+        [[0,200,0.10,2],[7,100,0.22,0],[-1,100,0,0],[5,90,0.18,1],[-1,120,0,0],
+         [4,110,0.20,0],[-1,100,0,0],[7,120,0.22,1],[-1,160,0,0]],
+        // Nocturne: flowing melody with wide intervals
+        [[4,120,0.25,0],[-1,40,0,0],[7,100,0.22,1],[-1,50,0,0],[5,110,0.24,0],[-1,40,0,0],
+         [3,120,0.22,1],[-1,50,0,0],[0,150,0.28,0],[4,150,0.18,2],[-1,180,0,0]],
+        // Echo: each note repeated softer
+        [[4,90,0.28,0],[-1,30,0,0],[4,90,0.14,1],[-1,50,0,0],
+         [7,80,0.25,0],[-1,30,0,0],[7,80,0.12,1],[-1,60,0,0],
+         [5,100,0.26,0],[-1,30,0,0],[5,100,0.13,1],[-1,70,0,0],
+         [0,140,0.22,0],[-1,150,0,0]],
+        // Deep night: very sparse, bass-heavy
+        [[0,180,0.12,2],[-1,100,0,0],[3,140,0.20,0],[-1,120,0,0],
+         [0,200,0.10,2],[-1,80,0,0],[4,120,0.18,1],[-1,150,0,0],[0,160,0.15,0],[-1,200,0,0]],
+        // Wistful: minor seconds creating gentle tension
+        [[4,100,0.24,0],[3,100,0.18,1],[-1,50,0,0],[2,110,0.22,0],[1,110,0.16,1],[-1,60,0,0],
+         [0,140,0.26,0],[4,140,0.18,2],[-1,70,0,0],[2,120,0.20,0],[-1,80,0,0],
+         [0,160,0.24,0],[-1,180,0,0]],
+        // Firefly: tiny bright notes scattered high
+        [[9,60,0.18,0],[-1,100,0,0],[7,70,0.16,1],[-1,90,0,0],
+         [0,180,0.08,2],[11,50,0.15,0],[-1,120,0,0],[9,60,0.16,1],[-1,100,0,0],
+         [7,80,0.18,0],[-1,80,0,0],[4,100,0.20,1],[0,130,0.22,0],[-1,200,0,0]],
+        // Closing: descending to rest
+        [[5,110,0.22,0],[-1,50,0,0],[4,100,0.20,1],[-1,50,0,0],
+         [3,110,0.22,0],[-1,50,0,0],[2,100,0.18,1],[-1,50,0,0],
+         [0,160,0.26,0],[0,160,0.14,2],[-1,220,0,0]],
       ];
     } else if (this._lyreMode === 'sailing') {
-      // Sailing: adventurous, ascending contour, pentatonic feel (D E G A B = 0,1,3,4,5 in dorian)
       scale = dorian;
+      // Sailing: adventurous, pentatonic feel, wave-like contour, call of the sea
       phrases = [
-        // Ascending run with momentum
-        [[0,35,0.7,0],[1,30,0.6,1],[3,30,0.7,0],[4,35,0.8,1],[7,40,0.9,0],[-1,15,0,0],
-         [4,30,0.6,0],[3,35,0.7,1],[4,40,0.8,0],[7,50,0.7,1],[-1,40,0,0]],
-        // Call and response: voice 0 ascends, voice 1 answers
-        [[0,40,0.7,0],[3,35,0.6,0],[4,35,0.7,0],[-1,20,0,0],
-         [7,40,0.7,1],[4,35,0.6,1],[3,40,0.7,1],[-1,15,0,0],
-         [4,45,0.8,0],[7,50,0.7,1],[9,55,0.8,0],[-1,50,0,0]],
-        // Rolling wave rhythm with bass anchor
-        [[0,50,0.6,0],[0,100,0.15,2],[4,30,0.7,0],[7,30,0.6,1],[4,30,0.7,0],[3,35,0.6,1],[-1,12,0,0],
-         [4,30,0.7,0],[7,35,0.8,0],[9,40,0.7,1],[7,45,0.6,0],[-1,60,0,0]],
-        // Triumphant high phrase
-        [[4,30,0.6,0],[7,30,0.7,1],[9,35,0.8,0],[11,40,0.9,0],[9,30,0.7,1],[-1,10,0,0],
-         [7,35,0.7,0],[4,40,0.6,1],[0,50,0.7,0],[-1,70,0,0]],
+        // Ascending horizon: rising momentum
+        [[0,35,0.70,0],[1,30,0.55,1],[3,30,0.70,0],[4,35,0.75,1],[7,40,0.85,0],[-1,12,0,0],
+         [4,30,0.55,0],[3,35,0.65,1],[4,40,0.75,0],[7,50,0.70,1],[-1,35,0,0]],
+        // Wave rhythm: rolling up and down like the sea
+        [[0,40,0.65,0],[3,35,0.55,0],[4,30,0.65,0],[7,35,0.75,0],[4,30,0.60,0],[3,35,0.55,0],[-1,10,0,0],
+         [0,40,0.65,0],[4,35,0.55,1],[7,40,0.75,0],[9,45,0.70,1],[-1,35,0,0]],
+        // Shanty call: bold melodic statement
+        [[4,35,0.75,0],[4,35,0.55,1],[-1,10,0,0],[7,30,0.70,0],[9,35,0.80,0],[-1,12,0,0],
+         [7,30,0.65,1],[4,35,0.70,0],[-1,10,0,0],[3,30,0.60,0],[0,40,0.70,1],[-1,15,0,0],
+         [4,40,0.75,0],[7,45,0.80,1],[-1,40,0,0]],
+        // Response: answering phrase, descending
+        [[9,30,0.70,0],[7,30,0.60,1],[-1,8,0,0],[7,30,0.65,0],[4,30,0.55,1],[-1,8,0,0],
+         [4,35,0.70,0],[3,30,0.55,0],[0,40,0.75,1],[-1,15,0,0],
+         [3,30,0.60,0],[4,35,0.70,1],[7,45,0.80,0],[-1,45,0,0]],
+        // Wind in sails: soaring high melody
+        [[7,30,0.70,0],[9,30,0.60,1],[11,35,0.80,0],[-1,10,0,0],
+         [9,28,0.65,0],[7,28,0.55,1],[4,30,0.70,0],[-1,8,0,0],
+         [7,32,0.75,0],[9,35,0.80,1],[11,40,0.85,0],[-1,12,0,0],
+         [9,30,0.65,0],[7,35,0.70,1],[4,45,0.65,0],[-1,45,0,0]],
+        // Bass anchor: deep notes with dancing upper voice
+        [[0,70,0.20,2],[4,25,0.65,0],[7,25,0.55,1],[4,25,0.65,0],[3,30,0.55,1],[-1,8,0,0],
+         [4,25,0.65,0],[7,30,0.75,0],[9,35,0.65,1],[7,40,0.55,0],[-1,50,0,0]],
+        // Arrival fanfare: triumphant ascending
+        [[0,30,0.70,0],[4,30,0.55,1],[-1,8,0,0],[4,30,0.75,0],[7,30,0.55,1],[-1,8,0,0],
+         [7,35,0.80,0],[9,35,0.60,1],[-1,8,0,0],[9,30,0.75,0],[11,35,0.85,0],[-1,10,0,0],
+         [9,28,0.65,1],[7,30,0.70,0],[4,40,0.60,1],[0,50,0.70,0],[-1,60,0,0]],
+        // Rocking lullaby: gentle sea sway
+        [[4,45,0.60,0],[7,40,0.50,1],[-1,15,0,0],[5,40,0.55,0],[4,45,0.50,1],[-1,15,0,0],
+         [3,45,0.60,0],[4,40,0.50,1],[-1,15,0,0],[0,50,0.65,0],[3,45,0.50,1],[-1,15,0,0],
+         [4,55,0.70,0],[7,50,0.55,1],[-1,50,0,0]],
       ];
     } else {
-      // Peaceful: warm Mediterranean, varied melodic phrases
+      // Peaceful: warm Mediterranean lyre — beautiful flowing melodies
       scale = dorian;
       phrases = [
-        [[4,50,0.7,0],[7,50,0.5,1],[-1,20,0,0],[5,45,0.6,0],[3,55,0.7,0],[4,60,0.5,1],[-1,35,0,0],
-         [2,40,0.6,0],[3,45,0.5,1],[4,70,0.8,0],[-1,80,0,0]],
-        [[0,55,0.6,0],[0,120,0.3,2],[2,45,0.5,0],[4,50,0.7,0],[5,60,0.6,1],[7,70,0.8,0],[-1,25,0,0],
-         [5,45,0.5,0],[4,50,0.6,0],[2,55,0.5,1],[0,80,0.7,0],[-1,90,0,0]],
-        [[7,65,0.7,0],[4,55,0.5,1],[-1,30,0,0],[3,50,0.6,0],[7,60,0.7,0],[8,70,0.8,0],[-1,20,0,0],
-         [5,50,0.5,1],[3,60,0.6,0],[0,80,0.7,0],[-1,100,0,0]],
-        [[4,30,0.6,0],[5,30,0.5,1],[7,35,0.7,0],[5,30,0.5,0],[4,35,0.6,1],[2,30,0.5,0],[-1,15,0,0],
-         [4,30,0.7,0],[7,40,0.8,0],[9,35,0.6,1],[7,45,0.7,0],[4,55,0.6,0],[-1,70,0,0]],
-        [[0,70,0.5,0],[4,65,0.4,1],[0,130,0.2,2],[-1,30,0,0],[2,60,0.5,0],[4,70,0.6,0],
-         [7,80,0.7,0],[4,90,0.5,1],[0,100,0.6,0],[-1,120,0,0]],
-        // Ascending run — scale walk up with pauses
-        [[0,40,0.6,0],[1,35,0.5,1],[2,35,0.6,0],[3,40,0.7,1],[4,45,0.8,0],[-1,25,0,0],
-         [5,40,0.6,1],[7,50,0.8,0],[-1,20,0,0],[4,45,0.6,0],[2,50,0.5,1],[0,70,0.7,0],[-1,90,0,0]],
-        // Call-and-response: voice 0 plays, voice 1 echoes lower
-        [[4,50,0.7,0],[7,45,0.6,0],[-1,25,0,0],[2,50,0.5,1],[4,45,0.5,1],[-1,30,0,0],
-         [5,55,0.7,0],[7,50,0.7,0],[-1,20,0,0],[3,50,0.5,1],[0,60,0.6,1],[-1,100,0,0]],
-        // Two voices in harmony (thirds)
-        [[0,55,0.6,0],[2,55,0.5,1],[-1,20,0,0],[2,50,0.6,0],[4,50,0.5,1],[-1,20,0,0],
-         [4,55,0.7,0],[5,55,0.5,1],[-1,15,0,0],[7,60,0.8,0],[9,60,0.5,1],[-1,25,0,0],
-         [4,50,0.6,0],[5,50,0.5,1],[0,80,0.7,0],[-1,100,0,0]],
+        // Morning theme: gentle ascending melody with thirds harmony
+        [[4,50,0.70,0],[2,50,0.45,1],[-1,15,0,0],[5,45,0.65,0],[3,45,0.42,1],[-1,12,0,0],
+         [7,50,0.75,0],[4,50,0.48,1],[-1,20,0,0],[5,45,0.60,0],[3,50,0.42,1],[-1,15,0,0],
+         [4,55,0.70,0],[2,55,0.45,1],[0,70,0.75,0],[-1,80,0,0]],
+        // Pastoral arc: rise and gentle fall over bass drone
+        [[0,60,0.60,0],[0,120,0.22,2],[2,50,0.50,0],[4,50,0.65,0],[5,55,0.60,1],[7,65,0.75,0],[-1,20,0,0],
+         [5,45,0.55,0],[4,50,0.60,1],[2,55,0.50,0],[0,70,0.65,0],[-1,80,0,0]],
+        // Mediterranean dance: lilting rhythm, sixths and thirds
+        [[7,40,0.70,0],[4,40,0.50,1],[-1,15,0,0],[5,35,0.60,0],[2,35,0.42,1],[-1,12,0,0],
+         [7,40,0.70,0],[5,40,0.50,1],[-1,15,0,0],[4,35,0.60,0],[2,35,0.42,1],[-1,12,0,0],
+         [3,45,0.65,0],[0,45,0.45,1],[0,80,0.70,0],[-1,90,0,0]],
+        // Flowing water: stepwise motion, gentle and continuous
+        [[4,30,0.60,0],[5,30,0.50,1],[7,35,0.70,0],[5,30,0.50,0],[4,35,0.60,1],[2,30,0.50,0],[-1,12,0,0],
+         [4,30,0.65,0],[7,35,0.75,0],[9,35,0.60,1],[7,40,0.70,0],[4,50,0.60,0],[-1,65,0,0]],
+        // Sunlit rest: open voicing, warmth
+        [[0,65,0.55,0],[4,60,0.42,1],[0,130,0.18,2],[-1,25,0,0],[2,55,0.50,0],[4,60,0.60,0],
+         [7,70,0.70,0],[4,80,0.50,1],[0,90,0.60,0],[-1,100,0,0]],
+        // Scale walk: ascending with pauses for breath
+        [[0,40,0.60,0],[1,35,0.48,1],[2,35,0.60,0],[3,40,0.65,1],[4,45,0.75,0],[-1,20,0,0],
+         [5,40,0.55,1],[7,50,0.75,0],[-1,15,0,0],[4,45,0.60,0],[2,50,0.50,1],[0,65,0.70,0],[-1,80,0,0]],
+        // Echo dialogue: voice 0 calls, voice 1 answers lower
+        [[4,45,0.70,0],[7,40,0.60,0],[-1,20,0,0],[2,45,0.50,1],[4,40,0.48,1],[-1,25,0,0],
+         [5,50,0.70,0],[7,45,0.65,0],[-1,18,0,0],[3,45,0.50,1],[0,55,0.55,1],[-1,90,0,0]],
+        // Parallel thirds: voices moving together
+        [[0,50,0.60,0],[2,50,0.45,1],[-1,15,0,0],[2,45,0.60,0],[4,45,0.45,1],[-1,15,0,0],
+         [4,50,0.65,0],[5,50,0.48,1],[-1,12,0,0],[7,55,0.75,0],[9,55,0.48,1],[-1,20,0,0],
+         [4,50,0.60,0],[5,50,0.45,1],[0,70,0.70,0],[-1,90,0,0]],
+        // Harvest song: warm, resolved, satisfying
+        [[0,45,0.65,0],[4,45,0.48,1],[7,45,0.35,2],[-1,15,0,0],
+         [7,40,0.70,0],[5,40,0.50,1],[-1,12,0,0],[4,40,0.65,0],[2,40,0.48,1],[-1,12,0,0],
+         [3,45,0.65,0],[4,45,0.48,1],[-1,15,0,0],[5,40,0.60,0],[7,45,0.70,0],[-1,12,0,0],
+         [4,55,0.75,0],[0,55,0.50,1],[-1,80,0,0]],
+        // Lyre cadence: classic ancient ending formula (IV-I)
+        [[3,50,0.65,0],[5,50,0.50,1],[7,50,0.38,2],[-1,20,0,0],
+         [4,45,0.60,0],[3,45,0.48,1],[-1,15,0,0],
+         [2,50,0.60,0],[4,50,0.48,1],[-1,15,0,0],
+         [0,65,0.70,0],[4,65,0.50,1],[7,65,0.38,2],[-1,25,0,0],
+         [0,80,0.75,0],[4,80,0.50,1],[-1,100,0,0]],
+        // Contemplation: slow, wide intervals, philosophical mood
+        [[0,70,0.55,0],[-1,30,0,0],[7,60,0.50,1],[-1,25,0,0],[4,55,0.60,0],[-1,30,0,0],
+         [3,65,0.55,1],[-1,25,0,0],[0,80,0.65,0],[4,80,0.45,1],[-1,30,0,0],
+         [2,55,0.50,0],[0,70,0.60,0],[-1,100,0,0]],
+        // Birdsong imitation: quick ornamental notes then held tone
+        [[4,20,0.50,0],[5,18,0.45,0],[4,20,0.50,0],[-1,8,0,0],
+         [7,55,0.70,0],[4,55,0.48,1],[-1,25,0,0],
+         [5,20,0.50,0],[7,18,0.45,0],[5,20,0.50,0],[-1,8,0,0],
+         [4,55,0.65,0],[2,55,0.48,1],[0,70,0.70,0],[-1,90,0,0]],
       ];
     }
 
@@ -565,10 +799,17 @@ class SoundManager {
     let note = phrase[this._lyreNoteIdx % phrase.length];
     let [ni, dur, vel, voice] = note;
 
+    let volMult = this._lyreVolMult;
+    // Context-based dynamic adjustments
+    if (this._lyreContext === 'rain') volMult *= 0.7;
+    if (this._lyreContext === 'farming') volMult *= 0.9;
+
     if (ni >= 0 && ni < scale.length) {
       let freq = scale[ni];
-      let amp = vel * musicVol * (this._lyreMode === 'menu' ? 0.06 : 0.14);
+      let amp = vel * musicVol * volMult * (this._lyreMode === 'menu' ? 0.06 : 0.14);
       if (this._lyreMode === 'eerie' && freq > 500) freq *= 0.5;
+      // Rain dampens high frequencies
+      if (this._lyreContext === 'rain' && freq > 600) amp *= 0.6;
       this._pluckLyre(voice, freq, amp, dur * 16);
     }
 
@@ -578,13 +819,56 @@ class SoundManager {
       this._lyreNoteIdx = 0;
       this._lyrePhrase++;
       if (this._lyreMode === 'menu') this._lyreTimer += floor(random(180, 360));
-      else if (this._lyreMode === 'tense') this._lyreTimer += floor(random(20, 50));
+      else if (this._lyreMode === 'tense') this._lyreTimer += floor(random(15, 40));
       else if (this._lyreMode === 'eerie') this._lyreTimer += floor(random(100, 200));
-      else if (this._lyreMode === 'celebration') this._lyreTimer += floor(random(15, 35));
-      else if (this._lyreMode === 'night') this._lyreTimer += floor(random(160, 300));
-      else if (this._lyreMode === 'sailing') this._lyreTimer += floor(random(40, 80));
-      else this._lyreTimer += floor(random(60, 140));
+      else if (this._lyreMode === 'celebration') this._lyreTimer += floor(random(12, 30));
+      else if (this._lyreMode === 'night') this._lyreTimer += floor(random(140, 280));
+      else if (this._lyreMode === 'sailing') this._lyreTimer += floor(random(35, 70));
+      else this._lyreTimer += floor(random(50, 120));
     }
+  }
+
+  // Update bass drone — provides harmonic foundation under melodies
+  _updateDrone(musicVol) {
+    if (!this._droneGain) return;
+    let mode = this._lyreMode;
+    let droneFreq = 146.8; // D3
+    let droneVol = 0;
+    if (mode === 'peaceful') { droneVol = 0.04; droneFreq = 146.8; }
+    else if (mode === 'night') { droneVol = 0.035; droneFreq = 146.8; }
+    else if (mode === 'tense') { droneVol = 0.05; droneFreq = 146.8; }
+    else if (mode === 'eerie') { droneVol = 0.03; droneFreq = 110.0; } // A2 for darker color
+    else if (mode === 'celebration') { droneVol = 0.04; droneFreq = 146.8; }
+    else if (mode === 'sailing') { droneVol = 0.045; droneFreq = 146.8; }
+    else if (mode === 'menu') { droneVol = 0.02; droneFreq = 146.8; }
+    // Slow amplitude modulation for organic breathing
+    let breathe = 1.0 + Math.sin((typeof frameCount !== 'undefined' ? frameCount : 0) * 0.008) * 0.15;
+    let targetAmp = droneVol * musicVol * this._lyreVolMult * breathe;
+    this._droneGain.amp(Math.max(0, targetAmp), 0.3);
+    this._droneOsc.freq(droneFreq);
+  }
+
+  // Update rhythmic pulse — subtle heartbeat underneath music
+  _updatePulse(musicVol) {
+    if (!this._pulseGain) return;
+    let mode = this._lyreMode;
+    let fc = typeof frameCount !== 'undefined' ? frameCount : 0;
+    let pulseVol = 0;
+    let pulseRate = 0.06; // frames-based sine rate
+    if (mode === 'peaceful') { pulseVol = 0.02; pulseRate = 0.05; }
+    else if (mode === 'night') { pulseVol = 0.015; pulseRate = 0.03; } // slower at night
+    else if (mode === 'tense') { pulseVol = 0.035; pulseRate = 0.09; } // faster in combat
+    else if (mode === 'celebration') { pulseVol = 0.03; pulseRate = 0.10; }
+    else if (mode === 'sailing') { pulseVol = 0.025; pulseRate = 0.07; }
+    // Create pulse envelope: on for part of cycle, off for rest
+    let phase = Math.sin(fc * pulseRate);
+    let gate = phase > 0.3 ? Math.pow((phase - 0.3) / 0.7, 0.5) : 0;
+    let targetAmp = pulseVol * musicVol * this._lyreVolMult * gate;
+    this._pulseGain.amp(Math.max(0, targetAmp), 0.03);
+    // Pulse frequency follows root of current mode
+    let pFreq = mode === 'eerie' ? 110.0 : 146.8;
+    if (this._lyreContext === 'ocean') pFreq = 130.8; // wave-like lower pitch
+    this._pulseOsc.freq(pFreq);
   }
 
   // Pluck a lyre string — quick attack, long exponential decay (like a real string)
@@ -661,9 +945,23 @@ class SoundManager {
 
     switch (id) {
       // Farming — warm, soft pops and plucks
-      case 'harvest':   playTwo('sine', 523, 659, 0.22, 300, 100); break;  // C5->E5 major third
+      case 'harvest':
+        playTwo('sine', 523, 659, 0.22, 300, 100);  // C5->E5 major third
+        setTimeout(() => {
+          let sh = this._getSfxSlot();
+          if (sh) { sh.osc.setType('sine'); sh.osc.freq(784); sh._vol = 0.18 * vol; sh._peak = sh._vol;
+            sh.gain.amp(0,0); sh.gain.amp(sh._vol, 0.01); this._sfxEnvSmooth(sh, 784, 784, 350, { attack: 10 }); }
+        }, 200);
+        break;  // C5->E5->G5 satisfying ascending triad
       case 'chop':      play('triangle', 160, 0.25, 90, 120, { attack: 5 }); break;  // short thunk
-      case 'build':     play('triangle', 330, 0.20, 220, 180, { attack: 10 }); break;  // woody tap
+      case 'build':
+        play('triangle', 330, 0.20, 220, 180, { attack: 10 });  // woody tap
+        setTimeout(() => {
+          let sb2 = this._getSfxSlot();
+          if (sb2) { sb2.osc.setType('sine'); sb2.osc.freq(165); sb2._vol = 0.12 * vol; sb2._peak = sb2._vol;
+            sb2.gain.amp(0,0); sb2.gain.amp(sb2._vol, 0.01); this._sfxEnvSmooth(sb2, 165, 110, 200, { attack: 8 }); }
+        }, 30);
+        break;  // woody tap + resonant thunk
       // UI — gentle clicks and chimes
       case 'equip':     playTwo('sine', 784, 1047, 0.18, 200, 80); break;  // G5->C6 perfect fourth
       case 'click':     play('sine', 660, 0.12, 440, 60, { attack: 3 }); break;  // tiny pip
@@ -699,7 +997,14 @@ class SoundManager {
       case 'repair':    play('triangle', 380, 0.18, 260, 140, { attack: 5 }); break;  // tap
       case 'scavenge':  playTwo('sine', 349, 440, 0.16, 250, 90); break;  // F4->A4 find
       // Combat
-      case 'hit':       play('triangle', 280, 0.22, 120, 100, { attack: 3 }); break;  // impact thud
+      case 'hit':
+        play('triangle', 280, 0.24, 120, 100, { attack: 3 });  // impact thud
+        setTimeout(() => {
+          let si = this._getSfxSlot();
+          if (si) { si.osc.setType('sine'); si.osc.freq(70); si._vol = 0.16 * vol; si._peak = si._vol;
+            si.gain.amp(0,0); si.gain.amp(si._vol, 0.008); this._sfxEnvSmooth(si, 70, 40, 120, { attack: 3 }); }
+        }, 8);
+        break;  // thud + sub-bass punch
       case 'whirlwind':
         play('triangle', 600, 0.20, 150, 180, { attack: 5 });  // fast descending sweep
         // Sub-bass rumble layer for punch
@@ -812,6 +1117,110 @@ class SoundManager {
         break;
       case 'quest_progress':
         play('sine', 600, 0.14, 800, 200, { attack: 10 });  // rising pip
+        break;
+      case 'upgrade':
+        playTwo('sine', 660, 880, 0.18, 350, 120);  // E5->A5 ascending confirmation
+        setTimeout(() => {
+          let su = this._getSfxSlot();
+          if (su) { su.osc.setType('sine'); su.osc.freq(1047); su._vol = 0.16 * vol; su._peak = su._vol;
+            su.gain.amp(0,0); su.gain.amp(su._vol, 0.01); this._sfxEnvSmooth(su, 1047, 1047, 300, { attack: 8 }); }
+        }, 240);
+        break;  // E5->A5->C6 ascending triad
+      case 'hover':
+        play('sine', 880, 0.06, 660, 40, { attack: 3 }); break;  // subtle high pip
+      case 'step_grass':
+        play('triangle', 180, 0.05, 100, 65, { attack: 5 }); break;  // soft rustle
+      case 'step_water':
+        play('sine', 200, 0.08, 120, 90, { attack: 8 }); break;  // light splash
+      // New SFX: level up fanfare — triumphant 4-note ascending D major arpeggio
+      case 'level_up':
+        play('sine', 293.7, 0.22, 293.7, 200, { attack: 15 });  // D4
+        setTimeout(() => {
+          let s2 = this._getSfxSlot();
+          if (s2) { s2.osc.setType('sine'); s2.osc.freq(440); s2._vol = 0.22 * vol; s2._peak = s2._vol;
+            s2.gain.amp(0,0); s2.gain.amp(s2._vol, 0.015); this._sfxEnvSmooth(s2, 440, 440, 200, {}); }
+        }, 150);
+        setTimeout(() => {
+          let s3 = this._getSfxSlot();
+          if (s3) { s3.osc.setType('sine'); s3.osc.freq(587.3); s3._vol = 0.24 * vol; s3._peak = s3._vol;
+            s3.gain.amp(0,0); s3.gain.amp(s3._vol, 0.015); this._sfxEnvSmooth(s3, 587.3, 587.3, 200, {}); }
+        }, 300);
+        setTimeout(() => {
+          let s4 = this._getSfxSlot();
+          if (s4) { s4.osc.setType('sine'); s4.osc.freq(880); s4._vol = 0.26 * vol; s4._peak = s4._vol;
+            s4.gain.amp(0,0); s4.gain.amp(s4._vol, 0.015); this._sfxEnvSmooth(s4, 880, 880, 400, {}); }
+        }, 450);
+        break;
+      // Achievement unlock: bright sparkle arpeggio (fast ascending + shimmer)
+      case 'achievement':
+        play('sine', 880, 0.16, 880, 60, { attack: 3 });
+        setTimeout(() => {
+          let s2 = this._getSfxSlot();
+          if (s2) { s2.osc.setType('sine'); s2.osc.freq(1047); s2._vol = 0.16 * vol; s2._peak = s2._vol;
+            s2.gain.amp(0,0); s2.gain.amp(s2._vol, 0.008); this._sfxEnvSmooth(s2, 1047, 1047, 60, { attack: 3 }); }
+        }, 50);
+        setTimeout(() => {
+          let s3 = this._getSfxSlot();
+          if (s3) { s3.osc.setType('sine'); s3.osc.freq(1319); s3._vol = 0.18 * vol; s3._peak = s3._vol;
+            s3.gain.amp(0,0); s3.gain.amp(s3._vol, 0.008); this._sfxEnvSmooth(s3, 1319, 1319, 80, { attack: 3 }); }
+        }, 100);
+        setTimeout(() => {
+          let s4 = this._getSfxSlot();
+          if (s4) { s4.osc.setType('sine'); s4.osc.freq(1760); s4._vol = 0.14 * vol; s4._peak = s4._vol;
+            s4.gain.amp(0,0); s4.gain.amp(s4._vol, 0.005); this._sfxEnvSmooth(s4, 1760, 1760, 350, { attack: 3 }); }
+        }, 150);
+        break;
+      // Era transition: dramatic swell — low rumble rising to bright chord
+      case 'era_transition':
+        play('triangle', 110, 0.20, 220, 600, { attack: 200 });  // rising bass
+        setTimeout(() => {
+          let s2 = this._getSfxSlot();
+          if (s2) { s2.osc.setType('sine'); s2.osc.freq(440); s2._vol = 0.22 * vol; s2._peak = s2._vol;
+            s2.gain.amp(0,0); s2.gain.amp(s2._vol, 0.15); this._sfxEnvSmooth(s2, 440, 440, 500, { attack: 150 }); }
+        }, 200);
+        setTimeout(() => {
+          let s3 = this._getSfxSlot();
+          if (s3) { s3.osc.setType('sine'); s3.osc.freq(587.3); s3._vol = 0.20 * vol; s3._peak = s3._vol;
+            s3.gain.amp(0,0); s3.gain.amp(s3._vol, 0.12); this._sfxEnvSmooth(s3, 587.3, 587.3, 450, { attack: 120 }); }
+        }, 350);
+        setTimeout(() => {
+          let s4 = this._getSfxSlot();
+          if (s4) { s4.osc.setType('sine'); s4.osc.freq(880); s4._vol = 0.18 * vol; s4._peak = s4._vol;
+            s4.gain.amp(0,0); s4.gain.amp(s4._vol, 0.10); this._sfxEnvSmooth(s4, 880, 880, 500, { attack: 100 }); }
+        }, 500);
+        break;
+      // Crystal resonance: ethereal shimmer — two detuned high sines beating
+      case 'crystal_resonance':
+        play('sine', 1047, 0.14, 1047, 600, { attack: 30 });
+        setTimeout(() => {
+          let s2 = this._getSfxSlot();
+          if (s2) { s2.osc.setType('sine'); s2.osc.freq(1052); s2._vol = 0.12 * vol; s2._peak = s2._vol;
+            s2.gain.amp(0,0); s2.gain.amp(s2._vol, 0.03); this._sfxEnvSmooth(s2, 1052, 1048, 600, { attack: 30 }); }
+        }, 5);
+        setTimeout(() => {
+          let s3 = this._getSfxSlot();
+          if (s3) { s3.osc.setType('sine'); s3.osc.freq(1568); s3._vol = 0.08 * vol; s3._peak = s3._vol;
+            s3.gain.amp(0,0); s3.gain.amp(s3._vol, 0.05); this._sfxEnvSmooth(s3, 1568, 1575, 500, { attack: 50 }); }
+        }, 100);
+        break;
+      // Legion march: rhythmic stomping — low thumps in march tempo
+      case 'legion_march':
+        play('triangle', 80, 0.22, 50, 100, { attack: 5 });  // STOMP
+        setTimeout(() => {
+          let s2 = this._getSfxSlot();
+          if (s2) { s2.osc.setType('triangle'); s2.osc.freq(75); s2._vol = 0.18 * vol; s2._peak = s2._vol;
+            s2.gain.amp(0,0); s2.gain.amp(s2._vol, 0.005); this._sfxEnvSmooth(s2, 75, 45, 90, { attack: 5 }); }
+        }, 200);
+        setTimeout(() => {
+          let s3 = this._getSfxSlot();
+          if (s3) { s3.osc.setType('triangle'); s3.osc.freq(80); s3._vol = 0.22 * vol; s3._peak = s3._vol;
+            s3.gain.amp(0,0); s3.gain.amp(s3._vol, 0.005); this._sfxEnvSmooth(s3, 80, 50, 100, { attack: 5 }); }
+        }, 400);
+        setTimeout(() => {
+          let s4 = this._getSfxSlot();
+          if (s4) { s4.osc.setType('triangle'); s4.osc.freq(75); s4._vol = 0.18 * vol; s4._peak = s4._vol;
+            s4.gain.amp(0,0); s4.gain.amp(s4._vol, 0.005); this._sfxEnvSmooth(s4, 75, 45, 90, { attack: 5 }); }
+        }, 600);
         break;
     }
   }

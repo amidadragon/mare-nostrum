@@ -31,5 +31,14 @@ type: project
 
 **Twitter thread format:** Multi-tweet launch thread confirmed as a format (in addition to single punchy post). Thread structure: setup → story beat → NPCs → audio USP → bridge payoff → CTA.
 
-**Why:** Confirmed during itch.io store page production, March 2026.
+**Visual redesign decisions (March 2026):**
+- Game now has two-skin character progression: castaway (Chapter I) → citizen → governor → senator → Imperator. Not a cosmetic unlock — tied to island level milestones. Works as a "mirror" — player sees their arc reflected in their appearance.
+- Art direction reframed as "solarpunk Roman" — the Rome of warm light, hand-laid stone, solar energy, harmony with the land. Not conquest Rome. This language is now used in the itch.io long description and devlog.
+- "Hand-crafted pixel art" is now a named USP (not just "pixel art") — every tile described as deliberately crafted, including the golden hour sky color, bioluminescent teal, and material differentiation (stone vs wood).
+- Screenshot set expanded to 7: added an Imperator skin + colony overview shot as the payoff screenshot. The castaway (Screenshot 2) and Imperator (Screenshot 7) shots together tell the transformation story visually.
+- Devlog format confirmed: TikTok script + 3 Twitter option posts + written itch.io devlog blog post. All three in one file (DEVLOG_VISUAL_REDESIGN.md).
+- "solarpunk" added to itch.io tag list.
+- Section headers updated: added "You Change With the World" (character skins) and "A Solarpunk Roman World" and "Hand-Crafted Pixel Art" sections to the long description.
+
+**Why:** Visual redesign completed March 2026. New sections and character skin system are now safe-to-market confirmed features.
 **How to apply:** Maintain these decisions across all future copy unless explicitly changed.

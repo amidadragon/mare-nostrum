@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "comfyui": {
+      "command": "comfyui-mcp",
+      "args": ["--comfyui-path", "/Users/ioio/Documents/ComfyUI"]
+    }
+  }
+}

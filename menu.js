@@ -478,9 +478,10 @@ function drawMenuScreen() {
 
     let iy = menuStartY + i * itemGap;
     let iw = textWidth(items[i]);
-    let hitPad = 16;
+    let hitPad = 20;
+    let textTop = iy - itemSize * 0.8;
     let hovered = mouseX > w / 2 - iw / 2 - hitPad && mouseX < w / 2 + iw / 2 + hitPad &&
-                  mouseY > iy - hitPad && mouseY < iy + hitPad;
+                  mouseY > textTop - 8 && mouseY < textTop + itemSize + 8;
     if (hovered) { menuHover = i; menuKeyIdx = -1; isCursorPointer = true; }
     let selected = hovered || menuKeyIdx === i;
 
@@ -528,8 +529,11 @@ function drawMenuScreen() {
   let botAlpha = constrain((menuFadeIn - 200) / 55, 0, 1);
   textStyle(NORMAL);
   textSize(8);
-  fill(120, 110, 90, floor(120 * botAlpha));
-  text('v0.9  -  Shipwrecked. Sunlit. Reborn.', w / 2, h - 18);
+  // Parchment strip behind version
+  fill(20, 15, 10, floor(100 * botAlpha));
+  rect(w / 2 - 100, h - 26, 200, 16, 2);
+  fill(130, 115, 85, floor(100 * botAlpha));
+  text('v1.0  -  Shipwrecked. Sunlit. Reborn.', w / 2, h - 18);
 
   // ─── FADES ───
   if (aF < 1) { fill(0, 0, 0, floor(255 * (1 - aF))); rect(0, 0, w, h); }
@@ -537,54 +541,141 @@ function drawMenuScreen() {
 }
 
 // ─── SETTINGS PANEL (overlay) ────────────────────────────────────────────
+function _drawPanelFrame(px, py, panW, panH) {
+  // Outer shadow
+  fill(0, 0, 0, 80);
+  rect(px + 4, py + 4, panW, panH);
+  // Outer border — dark wood
+  fill(18, 14, 10, 250);
+  rect(px - 3, py - 3, panW + 6, panH + 6);
+  // Aged parchment body
+  fill(42, 36, 28, 252);
+  rect(px, py, panW, panH);
+  // Parchment texture noise — subtle horizontal grain
+  for (let ty = py + 6; ty < py + panH - 6; ty += 6) {
+    let tA = 4 + ((ty * 7 + 13) % 5);
+    fill(120, 100, 70, tA);
+    rect(px + 4, ty, panW - 8, 1);
+  }
+  // Gold border — double inset
+  stroke(180, 150, 55, 140);
+  strokeWeight(1);
+  noFill();
+  rect(px + 1, py + 1, panW - 2, panH - 2);
+  rect(px + 4, py + 4, panW - 8, panH - 8);
+  noStroke();
+  // Corner ornaments — small diamond at each corner
+  let corners = [[px + 4, py + 4], [px + panW - 5, py + 4], [px + 4, py + panH - 5], [px + panW - 5, py + panH - 5]];
+  fill(200, 170, 70, 160);
+  for (let c of corners) {
+    beginShape();
+    vertex(c[0], c[1] - 3); vertex(c[0] + 3, c[1]);
+    vertex(c[0], c[1] + 3); vertex(c[0] - 3, c[1]);
+    endShape(CLOSE);
+  }
+}
+
+function _drawSectionDivider(cx, y, divW) {
+  stroke(140, 120, 60, 60);
+  strokeWeight(1);
+  line(cx - divW / 2, y, cx - 8, y);
+  line(cx + 8, y, cx + divW / 2, y);
+  noStroke();
+  fill(180, 150, 70, 80);
+  rect(cx - 2, y - 2, 4, 4);
+}
+
 function drawSettingsPanel(fadeA) {
   let w = width, h = height;
   let panW = 280, panH = 340;
   let px = floor(w / 2 - panW / 2), py = floor(h * 0.26);
 
-  fill(0, 0, 0, 160); rect(0, 0, w, h);
+  fill(0, 0, 0, 170); rect(0, 0, w, h);
 
-  fill(25, 20, 15, 245); rect(px - 2, py - 2, panW + 4, panH + 4);
-  fill(40, 34, 26, 252); rect(px, py, panW, panH);
-  fill(180, 150, 55, 130);
-  rect(px, py, panW, 2); rect(px, py + panH - 2, panW, 2);
-  rect(px, py, 2, panH); rect(px + panW - 2, py, 2, panH);
+  _drawPanelFrame(px, py, panW, panH);
 
   textAlign(CENTER, CENTER);
-  fill(220, 195, 60); textSize(14);
+  textFont('Cinzel, Georgia, serif');
+  // Title with gold glow
+  fill(255, 210, 80, 20);
+  textSize(15);
+  text('SETTINGS', w / 2, py + 20);
+  fill(244, 213, 141); textSize(14);
   text('SETTINGS', w / 2, py + 20);
 
-  let fsY = py + 50;
+  _drawSectionDivider(w / 2, py + 36, panW - 40);
+
+  let fsY = py + 54;
   let fsOn = document.fullscreenElement != null;
-  fill(180, 160, 120, 200); textSize(10);
-  text('Fullscreen', w / 2 - 30, fsY);
+  fill(190, 170, 130, 220); textSize(10);
+  textAlign(RIGHT, CENTER);
+  text('Fullscreen', w / 2 + 12, fsY);
+  textAlign(CENTER, CENTER);
   let tbx = floor(w / 2 + 40), tby = fsY - 7;
-  fill(fsOn ? 85 : 45, fsOn ? 130 : 55, fsOn ? 50 : 40, 230);
-  rect(tbx, tby, 28, 14);
-  fill(220, 210, 180); rect(tbx + (fsOn ? 16 : 2), tby + 2, 10, 10);
+  // Toggle track
+  fill(30, 25, 18); rect(tbx, tby, 28, 14, 2);
+  fill(fsOn ? 75 : 40, fsOn ? 120 : 50, fsOn ? 45 : 35, 230);
+  rect(tbx + 1, tby + 1, 26, 12, 2);
+  // Toggle knob with highlight
+  fill(220, 210, 180); rect(tbx + (fsOn ? 16 : 2), tby + 2, 10, 10, 1);
+  fill(240, 230, 200, 80); rect(tbx + (fsOn ? 17 : 3), tby + 3, 8, 2);
 
   if (snd) {
-    let sliderY = py + 80, sliderW = 120, slX = floor(w / 2 + 10);
+    _drawSectionDivider(w / 2, py + 72, panW - 50);
+
+    let sliderY = py + 88, sliderW = 120, slX = floor(w / 2 + 10);
     let keys = ['master', 'sfx', 'ambient', 'music'];
     let labels = ['Master', 'SFX', 'Ambient', 'Music'];
     for (let ki = 0; ki < keys.length; ki++) {
-      fill(180, 160, 120, 200); textSize(10);
-      text(labels[ki], w / 2 - 45, sliderY);
+      fill(190, 170, 130, 220); textSize(10);
+      textAlign(RIGHT, CENTER);
+      text(labels[ki], w / 2, sliderY);
+      textAlign(CENTER, CENTER);
       let vol = snd.vol ? snd.vol[keys[ki]] || 0.5 : 0.5;
-      fill(40, 35, 28); rect(slX, sliderY - 3, sliderW, 6);
-      fill(190, 165, 60); rect(slX, sliderY - 3, floor(vol * sliderW), 6);
-      fill(220, 200, 120); rect(slX + floor(vol * sliderW) - 3, sliderY - 5, 6, 10);
-      sliderY += 24;
+      // Track groove
+      fill(25, 22, 16); rect(slX, sliderY - 3, sliderW, 6, 1);
+      fill(35, 30, 22); rect(slX + 1, sliderY - 2, sliderW - 2, 4, 1);
+      // Filled portion — warm gold gradient feel
+      fill(180, 155, 50); rect(slX + 1, sliderY - 2, floor(vol * (sliderW - 2)), 4, 1);
+      fill(200, 175, 70, 60); rect(slX + 1, sliderY - 2, floor(vol * (sliderW - 2)), 2);
+      // Knob with glow
+      let knobX = slX + floor(vol * sliderW) - 4;
+      fill(255, 220, 100, 25); ellipse(knobX + 4, sliderY, 16, 16);
+      fill(40, 34, 26); rect(knobX, sliderY - 6, 8, 12, 1);
+      fill(220, 200, 120); rect(knobX + 1, sliderY - 5, 6, 10, 1);
+      fill(240, 225, 160, 100); rect(knobX + 2, sliderY - 4, 4, 3);
+      // Percentage
+      fill(130, 115, 85, 100); textSize(7);
+      text(floor(vol * 100) + '%', slX + sliderW + 18, sliderY);
+      sliderY += 28;
     }
   }
 
-  let delY = py + 250;
-  fill(140, 50, 40, 200); textSize(10);
-  text('Delete Save Data', w / 2, delY);
+  _drawSectionDivider(w / 2, py + 210, panW - 50);
+
+  // Delete save — red tinted with hover
+  let delY = py + 240;
+  let delHover = mouseX > w/2 - 60 && mouseX < w/2 + 60 && mouseY > delY - 10 && mouseY < delY + 12;
+  if (delHover) {
+    fill(100, 30, 20, 40); rect(w/2 - 65, delY - 10, 130, 22, 2);
+    fill(200, 70, 50, 240);
+  } else {
+    fill(140, 55, 42, 200);
+  }
+  textSize(10); text('Delete Save Data', w / 2, delY);
 
   let backY = py + panH - 25;
   let bkH = mouseX > w/2 - 40 && mouseX < w/2 + 40 && mouseY > backY - 8 && mouseY < backY + 10;
-  fill(bkH ? 220 : 180, bkH ? 195 : 165, bkH ? 100 : 70);
+  // Back button with underline highlight
+  if (bkH) {
+    fill(255, 220, 100, 15); rect(w/2 - 45, backY - 10, 90, 22, 2);
+    fill(244, 220, 140);
+    stroke(244, 213, 141, 80); strokeWeight(1);
+    line(w/2 - 25, backY + 8, w/2 + 25, backY + 8);
+    noStroke();
+  } else {
+    fill(180, 165, 120);
+  }
   textSize(11); text('[ BACK ]', w / 2, backY);
   textAlign(LEFT, TOP);
 }
@@ -593,25 +684,25 @@ function drawSettingsPanel(fadeA) {
 let _creditsScroll = 0;
 function drawCreditsPanel(fadeA) {
   let w = width, h = height;
+  let t0 = millis() / 1000;
   let panW = 320, panH = 380;
   let px = floor(w / 2 - panW / 2), py = floor(h / 2 - panH / 2);
 
-  fill(0, 0, 0, 180); rect(0, 0, w, h);
+  fill(0, 0, 0, 185); rect(0, 0, w, h);
 
-  fill(25, 20, 15, 250); rect(px - 2, py - 2, panW + 4, panH + 4);
-  fill(35, 28, 20, 252); rect(px, py, panW, panH);
-  fill(180, 150, 55, 130);
-  rect(px, py, panW, 2); rect(px, py + panH - 2, panW, 2);
-  rect(px, py, 2, panH); rect(px + panW - 2, py, 2, panH);
+  _drawPanelFrame(px, py, panW, panH);
 
-  // Scrolling credits content
   _creditsScroll += 0.3;
   let sections = [
     { type: 'title', text: 'MARE NOSTRUM' },
     { type: 'sub', text: 'Shipwrecked. Sunlit. Reborn.' },
     { type: 'gap' },
+    { type: 'divider' },
+    { type: 'gap' },
     { type: 'heading', text: 'DESIGN & DIRECTION' },
     { type: 'line', text: 'Aurelian Forge Studio' },
+    { type: 'gap' },
+    { type: 'divider' },
     { type: 'gap' },
     { type: 'heading', text: 'CODE' },
     { type: 'line', text: 'Game Engine & Systems' },
@@ -619,19 +710,27 @@ function drawCreditsPanel(fadeA) {
     { type: 'line', text: 'Combat & Economy' },
     { type: 'line', text: 'Procedural Audio' },
     { type: 'gap' },
+    { type: 'divider' },
+    { type: 'gap' },
     { type: 'heading', text: 'ART' },
     { type: 'line', text: 'Hand-placed pixel primitives' },
     { type: 'line', text: 'Every tree, tile and toga' },
     { type: 'line', text: 'drawn with rect() and ellipse()' },
+    { type: 'gap' },
+    { type: 'divider' },
     { type: 'gap' },
     { type: 'heading', text: 'AUDIO' },
     { type: 'line', text: 'Procedural lyre system' },
     { type: 'line', text: 'Ambient wind & waves' },
     { type: 'line', text: 'All synthesized — zero samples' },
     { type: 'gap' },
+    { type: 'divider' },
+    { type: 'gap' },
     { type: 'heading', text: 'ENGINE' },
     { type: 'line', text: 'p5.js — Processing for the web' },
     { type: 'line', text: 'p5.sound — Web Audio API' },
+    { type: 'gap' },
+    { type: 'divider' },
     { type: 'gap' },
     { type: 'heading', text: 'SPECIAL THANKS' },
     { type: 'line', text: 'The p5.js community' },
@@ -644,38 +743,98 @@ function drawCreditsPanel(fadeA) {
   ];
 
   textAlign(CENTER, CENTER);
-  let clipTop = py + 30, clipBot = py + panH - 40;
-  let lineY = clipTop + 30 - (_creditsScroll % (sections.length * 18 + panH));
-  if (lineY < clipTop - sections.length * 18) _creditsScroll = 0;
+  textFont('Cinzel, Georgia, serif');
+  let clipTop = py + 34, clipBot = py + panH - 42;
+  let totalH = 0;
+  for (let s of sections) {
+    if (s.type === 'gap' || s.type === 'divider') totalH += 12;
+    else totalH += s.type === 'title' ? 24 : s.type === 'thanks' ? 22 : 18;
+  }
+  let lineY = clipTop + 30 - (_creditsScroll % (totalH + panH));
+  if (lineY < clipTop - totalH) _creditsScroll = 0;
 
   for (let s of sections) {
     if (s.type === 'gap') { lineY += 12; continue; }
+    if (s.type === 'divider') {
+      if (lineY > clipTop - 10 && lineY < clipBot + 10) {
+        let dAlpha = 255;
+        if (lineY < clipTop + 20) dAlpha = map(lineY, clipTop - 10, clipTop + 20, 0, 255);
+        if (lineY > clipBot - 20) dAlpha = map(lineY, clipBot - 20, clipBot + 10, 255, 0);
+        dAlpha = constrain(dAlpha, 0, 255);
+        stroke(140, 120, 60, dAlpha * 0.25);
+        strokeWeight(1);
+        line(w / 2 - 60, lineY, w / 2 - 6, lineY);
+        line(w / 2 + 6, lineY, w / 2 + 60, lineY);
+        noStroke();
+        fill(200, 170, 70, dAlpha * 0.4);
+        rect(w / 2 - 2, lineY - 2, 4, 4);
+      }
+      lineY += 12; continue;
+    }
     if (lineY > clipTop - 20 && lineY < clipBot + 20) {
       let alpha = 255;
       if (lineY < clipTop + 20) alpha = map(lineY, clipTop - 20, clipTop + 20, 0, 255);
       if (lineY > clipBot - 20) alpha = map(lineY, clipBot - 20, clipBot + 20, 255, 0);
       alpha = constrain(alpha, 0, 255);
-      if (s.type === 'title') { fill(244, 213, 141, alpha); textSize(16); }
-      else if (s.type === 'thanks') { fill(255, 215, 0, alpha); textSize(14); }
-      else if (s.type === 'heading') { fill(220, 195, 60, alpha); textSize(11); }
-      else if (s.type === 'sub') { fill(200, 170, 100, alpha * 0.7); textSize(9); }
-      else { fill(190, 175, 145, alpha * 0.8); textSize(9); }
-      text(s.text, w / 2, lineY);
+      if (s.type === 'title') {
+        // Glow behind title
+        fill(255, 200, 80, alpha * 0.08);
+        ellipse(w / 2, lineY, 180, 30);
+        fill(10, 5, 0, alpha * 0.5); textSize(17);
+        text(s.text, w / 2 + 1, lineY + 1);
+        fill(244, 213, 141, alpha); textSize(17);
+        text(s.text, w / 2, lineY);
+      } else if (s.type === 'thanks') {
+        let pulse = 0.8 + sin(t0 * 0.8) * 0.2;
+        fill(255, 215, 80, alpha * pulse);
+        textSize(14);
+        text(s.text, w / 2, lineY);
+      } else if (s.type === 'heading') {
+        fill(220, 195, 60, alpha); textSize(11);
+        textStyle(BOLD);
+        text(s.text, w / 2, lineY);
+        textStyle(NORMAL);
+      } else if (s.type === 'sub') {
+        fill(200, 170, 100, alpha * 0.7); textSize(9);
+        textStyle(ITALIC);
+        text(s.text, w / 2, lineY);
+        textStyle(NORMAL);
+      } else {
+        fill(190, 175, 145, alpha * 0.85); textSize(9);
+        text(s.text, w / 2, lineY);
+      }
     }
-    lineY += s.type === 'title' ? 22 : s.type === 'thanks' ? 20 : 16;
+    lineY += s.type === 'title' ? 24 : s.type === 'thanks' ? 22 : 18;
   }
 
-  // Title bar
-  fill(35, 28, 20, 252); noStroke();
-  rect(px + 2, py + 2, panW - 4, 28);
-  fill(220, 195, 60); textSize(13); textAlign(CENTER, CENTER);
-  text('CREDITS', w / 2, py + 16);
+  // Title bar — solid cover with ornament
+  fill(42, 36, 28, 252); noStroke();
+  rect(px + 5, py + 5, panW - 10, 28);
+  fill(255, 210, 80, 18);
+  textSize(14);
+  text('CREDITS', w / 2, py + 18);
+  fill(244, 213, 141); textSize(13); textAlign(CENTER, CENTER);
+  text('CREDITS', w / 2, py + 18);
+  // Underline ornament
+  stroke(180, 150, 55, 80); strokeWeight(1);
+  line(w / 2 - 40, py + 30, w / 2 + 40, py + 30);
+  noStroke();
+
+  // Bottom bar — solid cover
+  fill(42, 36, 28, 252); noStroke();
+  rect(px + 5, py + panH - 40, panW - 10, 36);
 
   let backY = py + panH - 22;
   let bkH = mouseX > w/2 - 40 && mouseX < w/2 + 40 && mouseY > backY - 8 && mouseY < backY + 10;
-  fill(35, 28, 20, 252); noStroke();
-  rect(px + 2, py + panH - 38, panW - 4, 36);
-  fill(bkH ? 220 : 180, bkH ? 195 : 165, bkH ? 100 : 70);
+  if (bkH) {
+    fill(255, 220, 100, 15); rect(w/2 - 45, backY - 10, 90, 22, 2);
+    fill(244, 220, 140);
+    stroke(244, 213, 141, 80); strokeWeight(1);
+    line(w/2 - 25, backY + 8, w/2 + 25, backY + 8);
+    noStroke();
+  } else {
+    fill(180, 165, 120);
+  }
   textSize(11); text('[ BACK ]', w / 2, backY);
   textAlign(LEFT, TOP);
 }

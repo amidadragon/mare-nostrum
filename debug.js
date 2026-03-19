@@ -260,6 +260,113 @@ const Debug = {
           }
           break;
 
+        case '/devmode':
+        case '/dev': {
+          // Instant mid-game state — skip all early progression
+          // Resources
+          state.gold += 5000; state.wood += 500; state.stone += 500;
+          state.crystals += 500; state.seeds += 99; state.harvest += 200;
+          state.fish += 50; state.ironOre += 100; state.ancientRelic += 30;
+          state.titanBone += 20; state.grapeSeeds += 30; state.oliveSeeds += 30;
+          state.meals += 20; state.wine += 20; state.oil += 20;
+          state.solar = state.maxSolar || 100;
+          // Progression
+          state.progression.gameStarted = true;
+          state.progression.homeIslandReached = true;
+          state.progression.villaCleared = true;
+          state.progression.farmCleared = true;
+          state.progression.triremeRepaired = true;
+          if (state.progression.tutorialsSeen) {
+            state.progression.tutorialsSeen.empDash = true;
+            state.progression.tutorialsSeen.invScreen = true;
+          }
+          // Island level
+          while (state.islandLevel < 10) {
+            state.islandLevel++;
+            state.islandRX += 40;
+            state.islandRY += 25;
+          }
+          if (state.pyramid) state.pyramid.level = state.islandLevel;
+          // Player stats
+          state.player.hp = state.player.maxHp;
+          state.player.weapon = 1;
+          state.player.armor = 1;
+          state.player.attackDamage = 25;
+          // Tools
+          if (state.tools) {
+            state.tools.sickle = true;
+            state.tools.axe = true;
+            state.tools.net = true;
+            state.tools.copperRod = true;
+            state.tools.ironRod = true;
+            state.tools.steelPick = true;
+            state.tools.lantern = true;
+          }
+          // Quest to chapter 3 (mid-game)
+          if (state.mainQuest) {
+            state.mainQuest.chapter = Math.max(state.mainQuest.chapter, 3);
+          }
+          // NPC hearts
+          if (state.npc) state.npc.hearts = Math.max(state.npc.hearts || 0, 5);
+          if (state.marcus) state.marcus.hearts = Math.max(state.marcus.hearts || 0, 4);
+          if (state.vesta) state.vesta.hearts = Math.max(state.vesta.hearts || 0, 3);
+          if (state.felix) state.felix.hearts = Math.max(state.felix.hearts || 0, 3);
+          // Day/time
+          state.day = Math.max(state.day || 1, 10);
+          state.time = 9 * 60; // 9 AM
+          // Teleport home
+          state.player.x = WORLD.islandCX;
+          state.player.y = WORLD.islandCY;
+          cam.x = state.player.x; cam.y = state.player.y;
+          camSmooth.x = cam.x; camSmooth.y = cam.y;
+          if (state.conquest.active) state.conquest.active = false;
+          if (state.adventure.active) state.adventure.active = false;
+          state.rowing.active = false;
+
+          this.addLog('═══ DEV MODE ACTIVATED ═══', '#ffdd44');
+          this.addLog('Lv10, mid-game, all tools, 5k gold', '#ffdd44');
+          this.addLog('Quest Ch3, NPCs befriended, Roman skin ON', '#ffdd44');
+          this.addLog('Type /help for more commands', '#aaffaa');
+          break;
+        }
+
+        case '/quest': {
+          let ch = parseInt(args[0]);
+          if (!isNaN(ch) && state.mainQuest) {
+            state.mainQuest.chapter = constrain(ch, 0, 9);
+            this.addLog('Quest set to chapter ' + ch, '#ffaa00');
+          } else {
+            this.addLog('Current chapter: ' + (state.mainQuest ? state.mainQuest.chapter : '?') + ' | Usage: /quest <0-9>', '#aaddff');
+          }
+          break;
+        }
+
+        case '/skin': {
+          let skin = args[0] || '';
+          if (skin === 'roman') {
+            state.progression.homeIslandReached = true;
+            this.addLog('Roman skin enabled', '#ffaa00');
+          } else if (skin === 'castaway' || skin === 'wreck') {
+            state.progression.homeIslandReached = false;
+            this.addLog('Castaway skin enabled', '#88cc44');
+          } else {
+            this.addLog('Usage: /skin roman | /skin castaway', '#aaddff');
+            this.addLog('Currently: ' + (state.progression.homeIslandReached ? 'Roman' : 'Castaway'), '#aaddff');
+          }
+          break;
+        }
+
+        case '/tools': {
+          if (state.tools) {
+            state.tools.sickle = true; state.tools.axe = true;
+            state.tools.net = true; state.tools.copperRod = true;
+            state.tools.ironRod = true; state.tools.steelPick = true;
+            state.tools.lantern = true;
+          }
+          this.addLog('All tools unlocked', '#ffaa00');
+          break;
+        }
+
         case '/help':
           this.addLog('─── DEBUG COMMANDS ───', '#ffdd44');
           this.addLog('/god — invincible + max damage', '#aaffaa');
@@ -278,6 +385,11 @@ const Debug = {
           this.addLog('/hearts <npc> [n] — set hearts', '#aaffaa');
           this.addLog('/spawn <type> — spawn enemy', '#aaffaa');
           this.addLog('/pos /fps /save', '#aaffaa');
+          this.addLog('─── DEV MODE ───', '#ffdd44');
+          this.addLog('/dev — instant mid-game (Lv10, tools, gold, quest ch3)', '#aaffaa');
+          this.addLog('/quest [0-9] — jump to quest chapter', '#aaffaa');
+          this.addLog('/skin roman|castaway — toggle character skin', '#aaffaa');
+          this.addLog('/tools — unlock all tools', '#aaffaa');
           break;
 
         default:
@@ -346,7 +458,7 @@ const Debug = {
   },
 
   handleKey(key, keyCode) {
-    if (key === '`') {
+    if (key === '`' || key === '§' || keyCode === 112) { // backtick, §, or F1
       this.toggle();
       return true;
     }
@@ -369,7 +481,7 @@ const Debug = {
       return true;
     }
     // Printable characters
-    if (key.length === 1 && keyCode !== 192) { // not backtick
+    if (key.length === 1 && keyCode !== 192 && key !== '§') { // not backtick or §
       this.input += key;
       return true;
     }

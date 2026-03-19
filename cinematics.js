@@ -4,6 +4,46 @@
 // snd, width, height, frameCount, C, WORLD, etc.
 // ═══════════════════════════════════════════════════════════════════════
 
+function _drawCinematicText(cx, ty, line, sz, r, g, b, a) {
+  if (a < 5) return;
+  textAlign(CENTER, CENTER);
+  textFont('Cinzel, Georgia, serif');
+  textSize(sz);
+  let tw = textWidth(line);
+  // Parchment backing
+  let padX = 16, padY = 6;
+  fill(15, 10, 5, floor(a * 0.35));
+  rect(cx - tw / 2 - padX, ty - sz / 2 - padY, tw + padX * 2, sz + padY * 2, 2);
+  // Gold border on parchment
+  stroke(180, 150, 55, floor(a * 0.12));
+  strokeWeight(1);
+  rect(cx - tw / 2 - padX + 1, ty - sz / 2 - padY + 1, tw + padX * 2 - 2, sz + padY * 2 - 2, 2);
+  noStroke();
+  // Drop shadow
+  fill(10, 5, 0, floor(a * 0.6));
+  text(line, cx + 1, ty + 1);
+  // Main text
+  fill(r, g, b, a);
+  text(line, cx, ty);
+}
+
+function _drawCinematicStars(w, h, alpha) {
+  if (alpha < 0.05) return;
+  for (let i = 0; i < 30; i++) {
+    let sx = ((i * 137 + 53) % 100) / 100 * w;
+    let sy = ((i * 89 + 17) % 45) / 100 * h;
+    let twinkle = (sin(millis() * 0.002 * (1 + i % 3) + i * 2.7) + 1) * 0.5;
+    let sa = floor((40 + twinkle * 80) * alpha);
+    fill(255, 250, 230, sa);
+    rect(floor(sx), floor(sy), 2, 2);
+    if (i % 5 === 0 && twinkle > 0.7) {
+      fill(255, 250, 230, floor(sa * 0.3));
+      rect(floor(sx) - 1, floor(sy), 4, 2);
+      rect(floor(sx), floor(sy) - 1, 2, 4);
+    }
+  }
+}
+
 // ─── INTRO CINEMATIC — SHIPWRECK SCENE ────────────────────────────────────
 function drawIntroCinematic(dt) {
   state.introTimer += dt;
@@ -61,6 +101,10 @@ function drawIntroCinematic(dt) {
     fill(lerpColor(skyTop, skyBot, amt));
     rect(0, y, w, 4);
   }
+
+  // Stars visible during storm/early phase, fading as dawn breaks
+  let starFade = max(0, 1 - (t - FADE_IN) / 180);
+  _drawCinematicStars(w, h, skyAlpha * starFade);
 
   // Thunder screen shake near lightning (frame 178-184)
   let thunderShakeX = 0, thunderShakeY = 0;
@@ -260,32 +304,32 @@ function drawIntroCinematic(dt) {
   // Title text — fades in during wreckage phase (character-by-character reveal)
   if (t > TEXT_START && t < DONE) {
     let textAlpha = min(255, (t - TEXT_START) * 3);
-    if (t > WAKE) textAlpha = max(0, textAlpha - (t - WAKE) * 5); // fade out
+    if (t > WAKE) textAlpha = max(0, textAlpha - (t - WAKE) * 5);
 
-    fill(220, 195, 140, textAlpha);
-    textSize(14);
-    // Character-by-character reveal (1 char per 2 frames)
     let line1 = 'Shipwrecked by cursed storm...';
     let charsShown1 = min(line1.length, floor((t - TEXT_START) / 2));
-    text(line1.substring(0, charsShown1), w / 2, h * 0.2);
+    let shown1 = line1.substring(0, charsShown1);
+    _drawCinematicText(w / 2, h * 0.2, shown1, 14, 220, 195, 140, textAlpha);
 
     if (t > TEXT_START + 60) {
       let subAlpha = min(255, (t - TEXT_START - 60) * 3);
       if (t > WAKE) subAlpha = max(0, subAlpha - (t - WAKE) * 5);
-      fill(180, 160, 120, subAlpha);
-      textSize(10);
       let line2 = 'Rebuild under Sol Invictus.';
       let charsShown2 = min(line2.length, floor((t - TEXT_START - 60) / 2));
-      text(line2.substring(0, charsShown2), w / 2, h * 0.2 + 22);
+      let shown2 = line2.substring(0, charsShown2);
+      _drawCinematicText(w / 2, h * 0.2 + 24, shown2, 10, 180, 160, 120, subAlpha);
     }
   }
 
   // Skip hint
   if (t > 30 && t < DONE) {
-    fill(120, 110, 90, 80 + sin(frameCount * 0.05) * 30);
+    let skipA = 80 + sin(frameCount * 0.05) * 30;
+    fill(15, 10, 5, floor(skipA * 0.3));
+    rect(w / 2 - 80, h - 26, 160, 14, 2);
+    fill(120, 110, 90, skipA);
     textSize(8);
     textAlign(CENTER, BOTTOM);
-    text('[ click or press any key to skip ]', w / 2, h - 16);
+    text('[ click or press any key to skip ]', w / 2, h - 14);
   }
 
   // Black fade-in from nothing
@@ -392,6 +436,23 @@ function drawPreRepairCutscene(dt) {
   ellipse(sunX, sunY, 40, 40);
   fill(255, 240, 190, 200 * skyAlpha);
   ellipse(sunX, sunY, 20, 20);
+
+  // Golden hour haze — warm atmospheric glow across the scene
+  let hazeA = floor(skyAlpha * 18);
+  fill(255, 200, 100, hazeA);
+  rect(0, floor(h * 0.3), w, floor(h * 0.25));
+  // Sun rays fanning down from setting sun
+  let rsX = floor(w * 0.7), rsY = floor(h * 0.42);
+  for (let ri = 0; ri < 5; ri++) {
+    let angle = -0.8 + ri * 0.35 + sin(t * 0.008 + ri) * 0.03;
+    let rayLen = h * 0.4;
+    fill(255, 210, 100, floor(6 * skyAlpha));
+    beginShape();
+    vertex(rsX, rsY);
+    vertex(rsX + cos(angle) * rayLen - 6, rsY + sin(angle) * rayLen);
+    vertex(rsX + cos(angle) * rayLen + 6, rsY + sin(angle) * rayLen);
+    endShape(CLOSE);
+  }
 
   // ─── THE WRECK — large, detailed, center-right ───
   let wrX = floor(w * 0.55), wrY = beachY - 4;
@@ -526,39 +587,35 @@ function drawPreRepairCutscene(dt) {
   }
 
   // ─── TEXT OVERLAYS ───
-  textAlign(CENTER, CENTER);
   noStroke();
 
   // "She's still in one piece..." — examining phase
   if (t > EXAMINE + 30 && t < DONE) {
     let tA = min(255, (t - EXAMINE - 30) * 4);
     if (t > PLAN + 40) tA = max(0, tA - (t - PLAN - 40) * 5);
-    fill(220, 195, 140, tA);
-    textSize(13);
-    text('"She is beyond repair... but the wood can be salvaged."', w / 2, h * 0.18);
+    _drawCinematicText(w / 2, h * 0.18, '"She is beyond repair... but the wood can be salvaged."', 13, 220, 195, 140, tA);
   }
 
   // "I will need wood and stone..." — planning phase
   if (t > PLAN && t < DONE) {
     let tA = min(255, (t - PLAN) * 3);
     if (t > DONE - 40) tA = max(0, tA - (t - DONE + 40) * 6);
-    fill(180, 160, 120, tA);
-    textSize(10);
-    text('Planks for a raft. Rope and cloth for a sail.', w / 2, h * 0.18 + 24);
+    _drawCinematicText(w / 2, h * 0.18 + 26, 'Planks for a raft. Rope and cloth for a sail.', 10, 180, 160, 120, tA);
     if (t > PLAN + 40) {
       let tA2 = min(255, (t - PLAN - 40) * 3);
       if (t > DONE - 40) tA2 = max(0, tA2 - (t - DONE + 40) * 6);
-      fill(160, 140, 100, tA2);
-      textSize(9);
-      text('I must build a raft... and find my way home.', w / 2, h * 0.18 + 44);
+      _drawCinematicText(w / 2, h * 0.18 + 48, 'I must build a raft... and find my way home.', 9, 160, 140, 100, tA2);
     }
   }
 
   // Skip hint
   if (t > 20 && t < DONE) {
-    fill(120, 110, 90, 60 + sin(t * 0.05) * 20);
+    let skipA = 60 + sin(t * 0.05) * 20;
+    fill(15, 10, 5, floor(skipA * 0.3));
+    rect(w / 2 - 80, h - 26, 160, 14, 2);
+    fill(120, 110, 90, skipA);
     textSize(8); textAlign(CENTER, BOTTOM);
-    text('[ click or press any key to skip ]', w / 2, h - 16);
+    text('[ click or press any key to skip ]', w / 2, h - 14);
   }
 
   // Black fade-in
@@ -865,6 +922,31 @@ function drawSailingCutscene(dt) {
     rect(ox - 1, 8 + oarDip, 4, 2);
   }
 
+  // ─── BOW SPRAY — foam kicked up by prow ───
+  if (t > PUSH_OFF) {
+    let sprayInt = min(1, (t - PUSH_OFF) / 60);
+    for (let si = 0; si < 6; si++) {
+      let spPhase = t * 0.08 + si * 1.3;
+      let spX = 36 + si * 2 + sin(spPhase) * 3;
+      let spY = 2 - si * 2 + sin(spPhase + 1) * 2;
+      let spA = floor((80 - si * 12) * sprayInt * skyAlpha);
+      if (spA > 0) {
+        fill(200, 220, 240, spA);
+        rect(floor(spX), floor(spY), 2, 2);
+      }
+    }
+    // Dripping water drops from bow
+    for (let di = 0; di < 3; di++) {
+      let dropPhase = (t * 0.1 + di * 2.1) % 3.0;
+      if (dropPhase < 1.5) {
+        let dropX = 34 + di * 3;
+        let dropY = 4 + dropPhase * 6;
+        fill(170, 200, 220, floor((60 - dropPhase * 40) * sprayInt));
+        rect(floor(dropX), floor(dropY), 1, 2);
+      }
+    }
+  }
+
   // ─── FIGURE on deck — standing at prow ───
   // Body
   fill(165, 52, 40, shipA);
@@ -930,49 +1012,55 @@ function drawSailingCutscene(dt) {
     }
   }
 
+  // ─── ATMOSPHERIC FOG LAYER — drifting sea mist ───
+  if (t > PUSH_OFF) {
+    let fogAlpha = min(1, (t - PUSH_OFF) / 100) * skyAlpha;
+    for (let fi = 0; fi < 5; fi++) {
+      let fogX = ((fi * 197 + floor(t * 0.3)) % (floor(w * 1.3))) - floor(w * 0.15);
+      let fogY = seaY - 8 + fi * 6;
+      let fogW = 60 + fi * 20;
+      fill(180, 195, 210, floor(8 * fogAlpha));
+      ellipse(fogX, fogY, fogW, 8);
+    }
+  }
+
   // ─── TEXT OVERLAYS ───
-  textAlign(CENTER, CENTER);
   noStroke();
 
   // Departure text
   if (t > PUSH_OFF - 30 && t < SAILING) {
     let tA = min(255, (t - PUSH_OFF + 30) * 3);
     if (t > SAILING - 40) tA = max(0, tA - (t - SAILING + 40) * 5);
-    fill(220, 200, 155, tA);
-    textSize(14);
-    text('The sea opens before me...', w / 2, h * 0.15);
+    _drawCinematicText(w / 2, h * 0.15, 'The sea opens before me...', 14, 220, 200, 155, tA);
   }
 
   // Mid-voyage text
   if (t > SAILING + 20 && t < ISLAND_APPEAR + 30) {
     let tA = min(255, (t - SAILING - 20) * 3);
     if (t > ISLAND_APPEAR) tA = max(0, tA - (t - ISLAND_APPEAR) * 4);
-    fill(190, 170, 130, tA);
-    textSize(11);
-    text('The wind catches the sail. Sol guides the way.', w / 2, h * 0.15);
+    _drawCinematicText(w / 2, h * 0.15, 'The wind catches the sail. Sol guides the way.', 11, 190, 170, 130, tA);
   }
 
   // Island sighted
   if (t > ISLAND_APPEAR + 40 && t < DONE) {
     let tA = min(255, (t - ISLAND_APPEAR - 40) * 3);
     if (t > DONE - 50) tA = max(0, tA - (t - DONE + 50) * 5);
-    fill(240, 215, 150, tA);
-    textSize(14);
-    text('Land! A new beginning...', w / 2, h * 0.15);
+    _drawCinematicText(w / 2, h * 0.15, 'Land! A new beginning...', 14, 240, 215, 150, tA);
     if (t > ISLAND_APPEAR + 90) {
       let tA2 = min(255, (t - ISLAND_APPEAR - 90) * 3);
       if (t > DONE - 50) tA2 = max(0, tA2 - (t - DONE + 50) * 5);
-      fill(200, 180, 140, tA2);
-      textSize(10);
-      text('Home.', w / 2, h * 0.15 + 22);
+      _drawCinematicText(w / 2, h * 0.15 + 24, 'Home.', 10, 200, 180, 140, tA2);
     }
   }
 
   // Skip hint
   if (t > 20 && t < DONE) {
-    fill(120, 110, 90, 60 + sin(t * 0.05) * 20);
+    let skipA = 60 + sin(t * 0.05) * 20;
+    fill(15, 10, 5, floor(skipA * 0.3));
+    rect(w / 2 - 80, h - 26, 160, 14, 2);
+    fill(120, 110, 90, skipA);
     textSize(8); textAlign(CENTER, BOTTOM);
-    text('[ click or press any key to skip ]', w / 2, h - 16);
+    text('[ click or press any key to skip ]', w / 2, h - 14);
   }
 
   // Black fade-in

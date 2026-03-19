@@ -1,20 +1,16 @@
 ---
 name: known_bugs
-description: Confirmed bugs and their status — updated 2026-03-18 (post-overhaul sprint audit pass 4)
+description: Confirmed bugs and their status — updated 2026-03-19 (final QA audit)
 type: project
 ---
 
-# Known Bugs — Updated 2026-03-18 (Audit Pass 4)
+# Known Bugs — Updated 2026-03-19 (Final QA Audit)
 
 ## CRITICAL
 
 ### BUG-017: `cx`/`cy` used before `let` declaration in `expandIsland()` — CRASH at levels 5, 10, 15, 20
-`let cx = WORLD.islandCX, cy = WORLD.islandCY;` is declared at sketch.js:23182, but `cx` and `cy` are used at lines 23128, 23136, 23140, 23145-23146, 23149, 23156, 23159 — all inside the milestone landmark building blocks that execute BEFORE the declaration.
-JavaScript `let` has a temporal dead zone. When a player reaches island level 5, 10, 15, or 20, `expandIsland()` throws `ReferenceError: Cannot access 'cx' before initialization`. Resources are already deducted (line 23107-23111) and `islandLevel++` already fired (23112) before the crash, so the player loses resources and gets a level-up but no landmark buildings spawn.
-Level 25 milestone block does NOT use `cx`/`cy` so it survives.
-- **Location:** sketch.js:23182 (declaration), 23128/23136/23140/23145/23146/23149/23156/23159 (uses)
-- **Fix:** Move `let cx = WORLD.islandCX, cy = WORLD.islandCY;` to immediately after `let rx = getSurfaceRX(), ry = getSurfaceRY();` at line 23123.
-- **Status:** Open — BLOCKS progression past level 4
+**FIXED** — `let cx = WORLD.islandCX, cy = WORLD.islandCY` now declared at line 21340, before all milestone building blocks. Verified in 2026-03-19 audit: declaration is at line 21340, first use at 21344.
+- **Status:** Fixed
 
 ### BUG-001: colonySpec never saved
 **FIXED** — `colonySpec: state.colonySpec` is now in saveData at sketch.js:21303. Verified in loadGame at line 21351: `if (d.colonySpec) state.colonySpec = d.colonySpec;`
@@ -33,17 +29,13 @@ Level 25 milestone block does NOT use `cx`/`cy` so it survives.
 
 ## CRITICAL (NEW — Audit Pass 4)
 
-### BUG-024: `drawArenaIsleDistant()` is dead code — arena renders without horizon clamping
-`drawArenaIsleDistant()` (sketch.js:12566) was created to pin the arena to the horizon when viewed from the home island, but it is never called. The render loop at sketch.js:1662 still calls `drawArena()` which uses raw `w2sY(a.isleY)` with no horizon clamping. The arena island can float above the water line when camera is panned. The new function is correctly implemented but never wired into the draw loop.
-- **Location:** sketch.js:1662 (calls `drawArena()`), sketch.js:12566 (`drawArenaIsleDistant()` — dead)
-- **Fix:** Replace `drawArena()` at line 1662 with `drawArenaIsleDistant()`. `drawArena()` at line 1577 (inside active arena mode) should remain.
-- **Status:** Open — High severity, visual regression, intended fix not applied
+### BUG-024: `drawArenaIsleDistant()` — FIXED
+Wired into draw loop at line 1716. Confirmed in 2026-03-19 audit.
+- **Status:** Fixed
 
-### BUG-025: `drawConquestIsleDistant()` is dead code — Terra Nova renders without horizon clamping
-Same pattern as BUG-024. `drawConquestIsleDistant()` (sketch.js:15330) correctly clamps Terra Nova to the horizon, but is never called. The render loop at sketch.js:1665 still calls `drawConquestIsland()` which uses raw `w2sY(c.isleY)`. Terra Nova can float above the water line.
-- **Location:** sketch.js:1665 (calls `drawConquestIsland()`), sketch.js:15330 (`drawConquestIsleDistant()` — dead)
-- **Fix:** Replace `drawConquestIsland()` at line 1665 with `drawConquestIsleDistant()`. The call at line 1540 (inside active conquest mode) should remain as `drawConquestIsland()`.
-- **Status:** Open — High severity, visual regression, intended fix not applied
+### BUG-025: `drawConquestIsleDistant()` — FIXED
+Wired into draw loop at line 1719. Confirmed in 2026-03-19 audit.
+- **Status:** Fixed
 
 ## CRITICAL (from Pass 3, still open)
 
@@ -56,11 +48,22 @@ Note: The effect is the player experiences the rite dialogue but the Chapter X c
 
 ## HIGH
 
-### BUG-026: Hyperborea frost node save/load uses wrong field name — collection state lost on reload
-`saveGame()` at sketch.js:20058 saves `iceNodes: (state.hyperborea.iceNodes || []).map(...)` but the actual field is `state.hyperborea.frostNodes` (initialized at sketch.js:714, used in islands.js:116, reset daily at sketch.js:2003). `state.hyperborea.iceNodes` is never defined — the `|| []` guard makes the save write an empty array. `loadGame()` at sketch.js:20229 restores into `state.hyperborea.iceNodes` — a phantom field that does nothing. After any reload, ALL Hyperborea frost node collection states are lost.
-- **Location:** sketch.js:20058 (save), sketch.js:20229 (load), sketch.js:714 (correct field: `frostNodes`)
-- **Fix:** Change `state.hyperborea.iceNodes` to `state.hyperborea.frostNodes` at both lines 20058 and 20229.
-- **Status:** Open — introduced in audit pass 4 island loot save work
+### BUG-030: ESC closes game instead of Empire Dashboard / Inventory / Skill Tree (NEW — 2026-03-19)
+The first ESC block in keyPressed() (sketch.js:18169-18180) handles a subset of overlays and always returns, reaching `saveGame(); gameScreen='menu'` if no handled overlay is open. A second ESC block at line 18707 that handles `empireDashOpen`, `inventoryOpen`, and `skillTreeOpen` is UNREACHABLE. Additionally, `state.buildMode` and `state.demolishMode` are not in either ESC chain.
+Result: ESC while Empire Dashboard, Inventory, Skill Tree, or Build Mode is open saves the game and goes to menu.
+- **Location:** sketch.js:18169-18180 (first block, incomplete), sketch.js:18707-18712 (dead second block)
+- **Fix:** Add to first ESC block (after line 18175, before saveGame()):
+  `if (empireDashOpen) { empireDashOpen = false; return; }`
+  `if (inventoryOpen) { inventoryOpen = false; return; }`
+  `if (typeof skillTreeOpen !== 'undefined' && skillTreeOpen) { skillTreeOpen = false; return; }`
+  `if (state.buildMode) { state.buildMode = false; state.demolishMode = false; return; }`
+  Then remove the dead block at 18707.
+- **Status:** Open — High severity, affects core game loop
+
+### BUG-026: Hyperborea frost node save key naming mismatch
+Save key is `iceNodes` (line 19426), state field is `frostNodes`. Round-trip is self-consistent (save writes iceNodes, load reads iceNodes to populate frostNodes). This is no longer data-loss but is a confusing naming inconsistency. Verified 2026-03-19: frost node collection IS saved and restored correctly.
+- **Location:** sketch.js:19426 (save), sketch.js:19600 (load)
+- **Status:** Cosmetic naming issue only — not a data loss bug
 
 ### BUG-019: Island states (vulcan/hyperborea/plenty/necropolis) not saved
 None of the four explorable island states are included in `saveData`. Specifically:
@@ -94,11 +97,9 @@ None of the four explorable island states are included in `saveData`. Specifical
 - **Fix:** Add `if (snd) snd.playSFX('skeleton_death');` in the necropolis skeleton update loop when `sk.hp <= 0` is first detected (before the filter at line 315).
 - **Status:** Open — Low severity, missing audio feedback
 
-### BUG-029: `player.xpBoost` and `player.xpBoostTimer` not saved — Honeyed Figs effect lost on reload
-`useHoneyedFigs()` (sketch.js:13515) sets `state.player.xpBoost` and `state.player.xpBoostTimer` as dynamic properties. Neither is included in `saveGame()` playerXp/playerSkills block nor loaded in `loadGame()`. If a player uses Honeyed Figs and saves/reloads before the timer expires, the XP boost is silently lost.
-- **Location:** sketch.js:13518-13519 (sets fields), sketch.js:19972-19989 (save — fields absent)
-- **Fix:** Add `playerXpBoost: state.player.xpBoost || 0, playerXpBoostTimer: state.player.xpBoostTimer || 0` to saveData, and restore them in loadGame after the playerSkills block.
-- **Status:** Open — Low severity (1 game day duration, survives most sessions)
+### BUG-029: `player.xpBoost` and `player.xpBoostTimer` not saved — FIXED
+Both fields now saved at line 19355 and loaded at lines 19666-19667. Verified 2026-03-19.
+- **Status:** Fixed
 
 ### BUG-008: `mq_standard_found` counter never incremented — STILL OPEN
 - **Status:** Open
@@ -158,3 +159,18 @@ State fields `steel`, `marble`, `perfume`, `scrolls` are initialized at sketch.j
 
 ### BUG-014: dt cap behavior at low framerates — by design
 - **Status:** By design
+
+---
+
+## Monitoring Session 2026-03-19 (Multi-Agent Edit Session)
+
+### Shell escape \! artifact pattern
+During 2-hour multi-agent editing, agents repeatedly introduced `\!` instead of `!` in sketch.js code. This is a heredoc bash escape artifact. The `\!` was found at multiple points: `\!==`, `\!state.x`, and `'\!'` in string literals. Node's syntax checker reports these as "Unexpected token". Agents fixed them progressively, but new ones appeared as different agents wrote code. Final state: all resolved, all files pass syntax check.
+
+**Key locations affected**: Lines in `drawExpeditionSummaryOverlay`, `drawArenaHUD`, `updateArenaEnemy`, pyramid drawing code.
+
+### Orphaned switch case body
+Arena enemy state machine had `case 'stagger':` body (stateTimer/vx/vy code + break) with its `case` label deleted. Downstream `case 'dying':` appeared at switch-level, causing Node to report "Unexpected token 'case'". Fixed by restoring the label.
+
+### All 12 files pass syntax check at end of session
+Final `npm run check` = ALL PASS at ~T+30min of monitoring window.

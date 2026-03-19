@@ -548,10 +548,17 @@ function initState() {
       festivalsAttended: 0,
       visitorsTraded: 0,
       bestCombo: 0,
+      fish: {},    // Naturalist: { sardine: { caught: true, count: N, firstDay: N } }
+      crops: {},   // Naturalist: { grain: { harvested: true, count: N, firstDay: N } }
+      enemies: {}, // Naturalist: { wolf: { defeated: true, count: N, firstDay: N } }
+      relics: {},  // Naturalist: { bronze_eagle: { found: true, firstDay: N } }
+      lore: {},    // Naturalist: { '1': { read: true, firstDay: N } }
     },
     journal: [], // unlocked journal entry IDs: ['shipwreck', 'first_harvest', ...]
     journalOpen: false, // true when viewing journal tab in codex
     codexOpen: false,
+    naturalistOpen: false,
+    naturalistTab: 0,
 
     // Screen flash effect
     screenFlash: null,
@@ -1949,6 +1956,7 @@ function drawInner() {
     drawUpgradeShopUI();
     drawMarketUI();
     drawCodexUI();
+    drawNaturalistCodex();
     if (typeof drawLoreTabletPopup === 'function') drawLoreTabletPopup();
     if (typeof drawNarrativeDialogue === 'function') drawNarrativeDialogue();
     drawDiscoveryEvent();
@@ -3258,6 +3266,10 @@ function digTreasure() {
     t.found = true;
     state[t.type] = (state[t.type] || 0) + t.qty;
     state.codex.treasuresFound++;
+    let _relicMap = { ancientRelic: 'bronze_eagle', crystals: 'crystal_shard', gold: 'ancient_coin', ironOre: 'roman_helm' };
+    let _rid = _relicMap[t.type] || 'sea_amphora';
+    if (!state.codex.relics) state.codex.relics = {};
+    if (!state.codex.relics[_rid]) state.codex.relics[_rid] = { found: true, firstDay: state.day };
     unlockJournal('relic_found');
     addFloatingText(w2sX(t.x), w2sY(t.y) - 30, 'TREASURE! +' + t.qty + ' ' + t.type, '#ffcc00');
     spawnParticles(state.player.x, state.player.y, 'harvest', 20);
@@ -3579,6 +3591,240 @@ function drawCodexUI() {
   textAlign(LEFT, TOP);
 }
 
+// ─── NATURALIST'S CODEX UI ────────────────────────────────────────────────
+const NAT_TAB_NAMES = ['Fish', 'Crops', 'Bestiary', 'Relics', 'Buildings', 'Lore'];
+const NAT_RARITY_COLORS = { Common: '#aabbcc', Uncommon: '#88cc88', Rare: '#ddaa33', Legendary: '#ff8844' };
+
+function getNatCodexCompletion() {
+  let total = 0, done = 0;
+  let fishKeys = Object.keys(NAT_FISH_DATA);
+  total += fishKeys.length;
+  fishKeys.forEach(k => { if (state.codex.fish && state.codex.fish[k]) done++; });
+  let cropKeys = Object.keys(NAT_CROP_DATA);
+  total += cropKeys.length;
+  cropKeys.forEach(k => { if (state.codex.crops && state.codex.crops[k]) done++; });
+  let enemyKeys = Object.keys(NAT_ENEMY_DATA);
+  total += enemyKeys.length;
+  enemyKeys.forEach(k => { if (state.codex.enemies && state.codex.enemies[k]) done++; });
+  let relicKeys = Object.keys(NAT_RELIC_DATA);
+  total += relicKeys.length;
+  relicKeys.forEach(k => { if (state.codex.relics && state.codex.relics[k]) done++; });
+  total += 20; // lore tablets
+  if (state.codex.lore) done += Object.keys(state.codex.lore).length;
+  return { total, done };
+}
+
+function getNatTabCompletion(tab) {
+  if (tab === 0) {
+    let k = Object.keys(NAT_FISH_DATA); let d = k.filter(x => state.codex.fish && state.codex.fish[x]).length;
+    return { done: d, total: k.length, complete: d >= k.length };
+  }
+  if (tab === 1) {
+    let k = Object.keys(NAT_CROP_DATA); let d = k.filter(x => state.codex.crops && state.codex.crops[x]).length;
+    return { done: d, total: k.length, complete: d >= k.length };
+  }
+  if (tab === 2) {
+    let k = Object.keys(NAT_ENEMY_DATA); let d = k.filter(x => state.codex.enemies && state.codex.enemies[x]).length;
+    return { done: d, total: k.length, complete: d >= k.length };
+  }
+  if (tab === 3) {
+    let k = Object.keys(NAT_RELIC_DATA); let d = k.filter(x => state.codex.relics && state.codex.relics[x]).length;
+    return { done: d, total: k.length, complete: d >= k.length };
+  }
+  if (tab === 4) {
+    let k = Object.keys(state.codex.buildingsBuilt || {}); let t = 20;
+    return { done: min(k.length, t), total: t, complete: k.length >= t };
+  }
+  if (tab === 5) {
+    let d = Object.keys(state.codex.lore || {}).length;
+    return { done: d, total: 20, complete: d >= 20 };
+  }
+  return { done: 0, total: 1, complete: false };
+}
+
+function drawNaturalistCodex() {
+  if (!state.naturalistOpen) return;
+  push();
+  let pw = min(width - 40, 560), ph = min(height - 60, 480);
+  let px = (width - pw) / 2, py = (height - ph) / 2;
+  // Parchment background
+  fill(245, 235, 210, 250); stroke(160, 130, 80); strokeWeight(2);
+  rect(px, py, pw, ph, 8);
+  noStroke();
+  // Title
+  fill(80, 55, 30); textSize(16); textAlign(CENTER, TOP); textStyle(BOLD);
+  text("Naturalist's Codex", px + pw / 2, py + 10);
+  textStyle(NORMAL);
+  // Overall progress bar
+  let comp = getNatCodexCompletion();
+  let barW = pw - 80, barX = px + 40, barY = py + 33;
+  fill(200, 185, 150); rect(barX, barY, barW, 8, 4);
+  fill(120, 170, 100); rect(barX, barY, barW * (comp.done / max(comp.total, 1)), 8, 4);
+  fill(100, 80, 50); textSize(7); textAlign(RIGHT, TOP);
+  text(comp.done + '/' + comp.total, px + pw - 35, barY);
+  // Tab strip
+  let tabW = pw / 6, tabY = py + 48;
+  for (let i = 0; i < 6; i++) {
+    let tx = px + i * tabW;
+    let tc = getNatTabCompletion(i);
+    let active = state.naturalistTab === i;
+    fill(active ? [220, 200, 160] : [190, 175, 145]);
+    stroke(160, 130, 80); strokeWeight(1);
+    rect(tx, tabY, tabW, 20, active ? [4, 4, 0, 0] : 0);
+    noStroke();
+    fill(tc.complete ? [80, 140, 70] : (active ? [60, 40, 20] : [100, 80, 55]));
+    textSize(8); textAlign(CENTER, CENTER);
+    text(NAT_TAB_NAMES[i] + ' ' + tc.done + '/' + tc.total, tx + tabW / 2, tabY + 10);
+  }
+  // Content area
+  let cx = px + 10, cy = tabY + 24, cw = pw - 20, ch = ph - (cy - py) - 30;
+  fill(235, 225, 200, 180); noStroke(); rect(cx, cy - 2, cw, ch + 4, 4);
+  // Dispatch
+  if (state.naturalistTab === 0) drawNatFishTab(cx, cy, cw, ch);
+  else if (state.naturalistTab === 1) drawNatCropsTab(cx, cy, cw, ch);
+  else if (state.naturalistTab === 2) drawNatBestiaryTab(cx, cy, cw, ch);
+  else if (state.naturalistTab === 3) drawNatRelicsTab(cx, cy, cw, ch);
+  else if (state.naturalistTab === 4) drawNatBuildingsTab(cx, cy, cw, ch);
+  else if (state.naturalistTab === 5) drawNatLoreTab(cx, cy, cw, ch);
+  // Close hint
+  fill(120, 100, 70); textSize(7); textAlign(CENTER, BOTTOM);
+  text('[N] Close  |  [1-6] Switch Tab', px + pw / 2, py + ph - 5);
+  pop();
+}
+
+function _drawNatEntry(x, y, w, label, rarity, desc, countStr, discovered) {
+  let bg = discovered ? color(250, 245, 230, 220) : color(200, 195, 185, 140);
+  fill(bg); noStroke(); rect(x, y, w, 42, 4);
+  if (discovered) {
+    fill(color(NAT_RARITY_COLORS[rarity] || '#aabbcc')); textSize(7); textAlign(LEFT, TOP);
+    text(rarity, x + 6, y + 3);
+    fill(60, 40, 20); textSize(9); textStyle(BOLD);
+    text(label, x + 6, y + 12);
+    textStyle(NORMAL); fill(90, 70, 45); textSize(7);
+    text(desc, x + 6, y + 24, w - 60);
+    if (countStr) { fill(100, 140, 80); textSize(7); textAlign(RIGHT, TOP); text(countStr, x + w - 6, y + 12); }
+  } else {
+    fill(140, 130, 110); textSize(9); textAlign(LEFT, TOP); textStyle(ITALIC);
+    text('???', x + 6, y + 14);
+    textStyle(NORMAL); textSize(7); fill(150, 140, 120);
+    text('Not yet discovered', x + 6, y + 26);
+  }
+  textAlign(LEFT, TOP); textStyle(NORMAL);
+}
+
+function drawNatFishTab(cx, cy, cw, ch) {
+  let cols = 2, entH = 46, gap = 4;
+  let keys = Object.keys(NAT_FISH_DATA);
+  let colW = (cw - gap * (cols + 1)) / cols;
+  for (let i = 0; i < keys.length; i++) {
+    let k = keys[i], d = NAT_FISH_DATA[k];
+    let col = i % cols, row = floor(i / cols);
+    let ex = cx + gap + col * (colW + gap), ey = cy + gap + row * (entH + gap);
+    if (ey + entH > cy + ch) continue;
+    let rec = state.codex.fish && state.codex.fish[k];
+    let countStr = rec ? 'Caught: ' + rec.count : null;
+    let extra = rec ? ' | Day ' + rec.firstDay : '';
+    _drawNatEntry(ex, ey, colW, d.label, d.rarity, d.desc + '  [' + d.season + ', ' + d.time + ']' + extra, countStr, !!rec);
+  }
+  // Completion reward note
+  let tc = getNatTabCompletion(0);
+  fill(tc.complete ? [80, 140, 70] : [130, 110, 75]); textSize(7); textAlign(LEFT, BOTTOM);
+  text(tc.complete ? 'REWARD ACTIVE: +50% fishing speed' : 'Complete all ' + tc.total + ' fish for +50% fishing speed', cx + 4, cy + ch - 2);
+}
+
+function drawNatCropsTab(cx, cy, cw, ch) {
+  let keys = Object.keys(NAT_CROP_DATA);
+  let entH = 46, gap = 4, colW = (cw - gap * 3) / 2;
+  for (let i = 0; i < keys.length; i++) {
+    let k = keys[i], d = NAT_CROP_DATA[k];
+    let col = i % 2, row = floor(i / 2);
+    let ex = cx + gap + col * (colW + gap), ey = cy + gap + row * (entH + gap);
+    if (ey + entH > cy + ch) continue;
+    let rec = state.codex.crops && state.codex.crops[k];
+    let countStr = rec ? 'Harvested: ' + rec.count : null;
+    _drawNatEntry(ex, ey, colW, d.label, d.rarity, d.desc, countStr, !!rec);
+  }
+  let tc = getNatTabCompletion(1);
+  fill(tc.complete ? [80, 140, 70] : [130, 110, 75]); textSize(7); textAlign(LEFT, BOTTOM);
+  text(tc.complete ? 'REWARD ACTIVE: +1 seed per harvest' : 'Grow all ' + tc.total + ' crops for +1 bonus seed per harvest', cx + 4, cy + ch - 2);
+}
+
+function drawNatBestiaryTab(cx, cy, cw, ch) {
+  let keys = Object.keys(NAT_ENEMY_DATA);
+  let entH = 46, gap = 4, colW = (cw - gap * 3) / 2;
+  for (let i = 0; i < keys.length; i++) {
+    let k = keys[i], d = NAT_ENEMY_DATA[k];
+    let col = i % 2, row = floor(i / 2);
+    let ex = cx + gap + col * (colW + gap), ey = cy + gap + row * (entH + gap);
+    if (ey + entH > cy + ch) continue;
+    let rec = state.codex.enemies && state.codex.enemies[k];
+    let countStr = rec ? 'Defeated: ' + rec.count : null;
+    _drawNatEntry(ex, ey, colW, d.label, d.rarity, d.desc, countStr, !!rec);
+  }
+  let tc = getNatTabCompletion(2);
+  fill(tc.complete ? [80, 140, 70] : [130, 110, 75]); textSize(7); textAlign(LEFT, BOTTOM);
+  text(tc.complete ? 'REWARD ACTIVE: +10% damage' : 'Defeat all ' + tc.total + ' enemy types for +10% damage', cx + 4, cy + ch - 2);
+}
+
+function drawNatRelicsTab(cx, cy, cw, ch) {
+  let keys = Object.keys(NAT_RELIC_DATA);
+  let entH = 46, gap = 4, colW = (cw - gap * 3) / 2;
+  for (let i = 0; i < keys.length; i++) {
+    let k = keys[i], d = NAT_RELIC_DATA[k];
+    let col = i % 2, row = floor(i / 2);
+    let ex = cx + gap + col * (colW + gap), ey = cy + gap + row * (entH + gap);
+    if (ey + entH > cy + ch) continue;
+    let rec = state.codex.relics && state.codex.relics[k];
+    let countStr = rec ? 'Found day ' + rec.firstDay : null;
+    _drawNatEntry(ex, ey, colW, d.label, d.rarity, d.desc, countStr, !!rec);
+  }
+  let tc = getNatTabCompletion(3);
+  fill(130, 110, 75); textSize(7); textAlign(LEFT, BOTTOM);
+  text('Dig treasures around the island to find relics. ' + tc.done + '/' + tc.total + ' found.', cx + 4, cy + ch - 2);
+}
+
+function drawNatBuildingsTab(cx, cy, cw, ch) {
+  let built = Object.keys(state.codex.buildingsBuilt || {});
+  let entH = 20, gap = 3, cols = 3, colW = (cw - gap * (cols + 1)) / cols;
+  let all = Object.keys(BLUEPRINTS || {});
+  for (let i = 0; i < all.length; i++) {
+    let k = all[i];
+    let col = i % cols, row = floor(i / cols);
+    let ex = cx + gap + col * (colW + gap), ey = cy + gap + row * (entH + gap);
+    if (ey + entH > cy + ch) continue;
+    let isBuilt = state.codex.buildingsBuilt && state.codex.buildingsBuilt[k];
+    fill(isBuilt ? color(230, 225, 205, 220) : color(195, 190, 180, 130));
+    noStroke(); rect(ex, ey, colW, entH, 3);
+    fill(isBuilt ? [50, 35, 20] : [140, 130, 115]); textSize(8); textAlign(LEFT, CENTER);
+    let bp = BLUEPRINTS && BLUEPRINTS[k];
+    let label = bp ? bp.name : k;
+    text((isBuilt ? '' : '? ') + label, ex + 5, ey + entH / 2);
+  }
+  let tc = getNatTabCompletion(4);
+  fill(tc.complete ? [80, 140, 70] : [130, 110, 75]); textSize(7); textAlign(LEFT, BOTTOM);
+  text(tc.complete ? 'REWARD ACTIVE: -20% build cost' : 'Build all types for -20% build cost. ' + tc.done + '/20 built.', cx + 4, cy + ch - 2);
+}
+
+function drawNatLoreTab(cx, cy, cw, ch) {
+  let found = state.codex.lore || {};
+  let entH = 20, gap = 3, cols = 4, colW = (cw - gap * (cols + 1)) / cols;
+  for (let i = 0; i < 20; i++) {
+    let k = String(i + 1);
+    let col = i % cols, row = floor(i / cols);
+    let ex = cx + gap + col * (colW + gap), ey = cy + gap + row * (entH + gap);
+    if (ey + entH > cy + ch) continue;
+    let rec = found[k];
+    fill(rec ? color(230, 225, 205, 220) : color(195, 190, 180, 130));
+    noStroke(); rect(ex, ey, colW, entH, 3);
+    fill(rec ? [50, 35, 20] : [140, 130, 115]); textSize(8); textAlign(LEFT, CENTER);
+    text(rec ? 'Tablet #' + k : '? Tablet #' + k, ex + 5, ey + entH / 2);
+    if (rec) { fill(100, 130, 80); textSize(6); text('Day ' + rec.firstDay, ex + colW - 28, ey + entH / 2); }
+  }
+  let tc = getNatTabCompletion(5);
+  fill(tc.complete ? [80, 140, 70] : [130, 110, 75]); textSize(7); textAlign(LEFT, BOTTOM);
+  text(tc.complete ? 'REWARD ACTIVE: All lore unlocked — speak to Felix.' : 'Find all 20 lore tablets. ' + tc.done + '/20 found.', cx + 4, cy + ch - 2);
+}
+
 // ─── ISLAND VISITORS ─────────────────────────────────────────────────────
 const VISITORS = [
   { type: 'pilgrim', name: 'Pilgrim', color: '#ddccaa',
@@ -3786,17 +4032,27 @@ function updateCooking(dt) {
 
 // ─── FISH TYPES ───────────────────────────────────────────────────────────
 const FISH_TYPES = [
-  { name: 'Sardine',  weight: 1, color: '#88aacc', minH: 0, maxH: 24, season: -1 },
-  { name: 'Tuna',     weight: 2, color: '#4477aa', minH: 6, maxH: 18, season: -1 },
-  { name: 'Octopus',  weight: 3, color: '#9955aa', minH: 18, maxH: 6, season: 1 },  // night, summer
-  { name: 'Eel',      weight: 2, color: '#556633', minH: 20, maxH: 5, season: -1 },  // night only
-  { name: 'Goldfish', weight: 5, color: '#ffaa33', minH: 10, maxH: 14, season: 0 },  // spring noon — rare
+  { name: 'Sardine',         weight: 1, color: '#88aacc', minH: 0,  maxH: 24, season: -1 },
+  { name: 'Tuna',            weight: 2, color: '#4477aa', minH: 6,  maxH: 18, season: -1 },
+  { name: 'Octopus',         weight: 3, color: '#9955aa', minH: 18, maxH: 6,  season: 1  },  // night, summer
+  { name: 'Eel',             weight: 2, color: '#556633', minH: 20, maxH: 5,  season: -1 },  // night only
+  { name: 'Goldfish',        weight: 5, color: '#ffaa33', minH: 10, maxH: 14, season: 0  },  // spring noon — rare
+  { name: 'Mackerel',        weight: 1, color: '#6699bb', minH: 5,  maxH: 20, season: -1 },
+  { name: 'Sea Bass',        weight: 1, color: '#5588aa', minH: 6,  maxH: 22, season: -1 },
+  { name: 'Anchovy',         weight: 1, color: '#99aabb', minH: 0,  maxH: 24, season: -1 },
+  { name: 'Swordfish',       weight: 3, color: '#3366aa', minH: 8,  maxH: 16, season: 1  },  // summer
+  { name: 'Golden Bream',    weight: 4, color: '#ddaa22', minH: 10, maxH: 16, season: -1 },
+  { name: 'Electric Ray',    weight: 5, color: '#88ddff', minH: 19, maxH: 4,  season: 2  },  // autumn night
+  { name: 'Cuttlefish',      weight: 2, color: '#bb88cc', minH: 17, maxH: 7,  season: -1 },
+  { name: 'Red Mullet',      weight: 2, color: '#cc6644', minH: 6,  maxH: 20, season: 0  },  // spring
+  { name: "Poseidon's Catch",weight: 8, color: '#55aaff', minH: 0,  maxH: 24, season: -1, stormOnly: true },
 ];
 
 function rollFishType() {
   let h = state.time / 60;
   let season = getSeason();
   let eligible = FISH_TYPES.filter(f => {
+    if (f.stormOnly && !stormActive) return false;
     // Time check — wraps around midnight
     if (f.minH < f.maxH) {
       if (h < f.minH || h > f.maxH) return false;
@@ -3820,6 +4076,50 @@ function rollFishType() {
   }
   return eligible[0];
 }
+
+// ─── NATURALIST CODEX DATA ────────────────────────────────────────────────
+const NAT_FISH_DATA = {
+  'sardine':          { label: 'Sardine',          rarity: 'Common',   desc: 'A humble staple of the Mediterranean catch.',         season: 'All Year', time: 'Any' },
+  'tuna':             { label: 'Tuna',              rarity: 'Common',   desc: 'Prized by fishermen for its size and flavor.',         season: 'All Year', time: 'Dawn-Dusk' },
+  'octopus':          { label: 'Octopus',           rarity: 'Uncommon', desc: 'Emerges at night under the summer moon.',              season: 'Summer',   time: 'Night' },
+  'eel':              { label: 'Eel',               rarity: 'Uncommon', desc: 'Slippery and elusive, it hunts only after dark.',       season: 'All Year', time: 'Night' },
+  'goldfish':         { label: 'Goldfish',          rarity: 'Rare',     desc: 'A glittering rarity born in the noontime spring.',     season: 'Spring',   time: 'Midday' },
+  'mackerel':         { label: 'Mackerel',          rarity: 'Common',   desc: 'Schools in abundance near the shallows at dawn.',      season: 'All Year', time: 'Morning' },
+  'sea bass':         { label: 'Sea Bass',          rarity: 'Common',   desc: 'A reliable catch for any patient angler.',             season: 'All Year', time: 'Morning' },
+  'anchovy':          { label: 'Anchovy',           rarity: 'Common',   desc: 'Tiny but plentiful -- the salt of Roman cuisine.',     season: 'All Year', time: 'Any' },
+  'swordfish':        { label: 'Swordfish',         rarity: 'Uncommon', desc: 'A fierce fighter requiring strength to reel in.',      season: 'Summer',   time: 'Day' },
+  'golden bream':     { label: 'Golden Bream',      rarity: 'Rare',     desc: 'Its golden scales shimmer like scattered coins.',      season: 'All Year', time: 'Midday' },
+  'electric ray':     { label: 'Electric Ray',      rarity: 'Rare',     desc: 'Crackles with strange energy on autumn nights.',       season: 'Autumn',   time: 'Night' },
+  'cuttlefish':       { label: 'Cuttlefish',        rarity: 'Uncommon', desc: 'Its ink stains the water like a dark prophecy.',       season: 'All Year', time: 'Dusk' },
+  'red mullet':       { label: 'Red Mullet',        rarity: 'Uncommon', desc: 'A sacred fish offered at spring festivals.',           season: 'Spring',   time: 'Morning' },
+  "poseidon's catch": { label: "Poseidon's Catch",  rarity: 'Legendary',desc: 'Only the storm-tossed sea yields this ancient beast.', season: 'Storm',    time: 'Any' },
+};
+const NAT_CROP_DATA = {
+  grain:      { label: 'Grain',      rarity: 'Common',   desc: 'The backbone of Roman civilization. Plant early, harvest often.' },
+  grape:      { label: 'Grapes',     rarity: 'Common',   desc: 'For wine and trade. Romans consider a vineyard a sign of permanence.' },
+  olive:      { label: 'Olive',      rarity: 'Common',   desc: 'Oil, light, and life. The sacred tree of Athena grows slowly but yields much.' },
+  herb:       { label: 'Herb',       rarity: 'Common',   desc: 'Rosemary and thyme. Useful in cooking, medicine, and ritual.' },
+  sunfruit:   { label: 'Sunfruit',   rarity: 'Uncommon', desc: 'A mysterious crop that stores the sun\'s energy in radiant flesh.' },
+  frostherb:  { label: 'Frostherb',  rarity: 'Uncommon', desc: 'A northern rarity. Its crystalline leaves shimmer in winter light.' },
+  wildflower: { label: 'Wildflower', rarity: 'Uncommon', desc: 'Not eaten, but loved. Brightens the island and lifts morale.' },
+};
+const NAT_ENEMY_DATA = {
+  wolf:          { label: 'Wolf',          rarity: 'Common',   desc: 'Hungry and bold. The wolf was sacred to Mars -- a complicated omen.' },
+  bandit:        { label: 'Bandit',        rarity: 'Common',   desc: 'Desperate men driven to desperation. They covet what you\'ve built.' },
+  harpy:         { label: 'Harpy',         rarity: 'Uncommon', desc: 'Winged spirits of the storm. Neither fully mortal nor divine.' },
+  secutor:       { label: 'Secutor',       rarity: 'Uncommon', desc: 'A trained gladiator -- shield-bearer who knows every feint.' },
+  minotaur:      { label: 'Minotaur',      rarity: 'Rare',     desc: 'The bull-man of legend. Defeating one is the stuff of heroes.' },
+  shield_bearer: { label: 'Shield Bearer', rarity: 'Uncommon', desc: 'A disciplined soldier who fights from behind an iron wall.' },
+  archer:        { label: 'Archer',        rarity: 'Uncommon', desc: 'Keeps distance and fires without mercy. Close the gap fast.' },
+  centurion:     { label: 'Centurion',     rarity: 'Rare',     desc: 'Commands respect even in death. A true officer of Rome gone rogue.' },
+};
+const NAT_RELIC_DATA = {
+  bronze_eagle:  { label: 'Bronze Eagle',  rarity: 'Uncommon', desc: 'A legionary\'s standard, lost long ago. Rome\'s symbol endures.' },
+  crystal_shard: { label: 'Crystal Shard', rarity: 'Common',   desc: 'A fragment humming with ancient energy, origin unknown.' },
+  ancient_coin:  { label: 'Ancient Coin',  rarity: 'Common',   desc: 'A coin from a forgotten era. The face has been worn smooth by time.' },
+  roman_helm:    { label: 'Roman Helm',    rarity: 'Rare',     desc: 'A ceremonial helmet, perhaps from a fallen consul. Heavy with history.' },
+  sea_amphora:   { label: 'Sea Amphora',   rarity: 'Common',   desc: 'A clay vessel sealed with wax. Whatever it contained is long since gone.' },
+};
 
 // ─── WEATHER SYSTEM ──────────────────────────────────────────────────────
 function updateWeather(dt) {
@@ -7631,7 +7931,9 @@ function drawBuildGhost() {
 }
 
 function getBuildDiscount() {
-  return (state.prophecy && state.prophecy.type === 'build') ? 0.7 : 1;
+  let d = (state.prophecy && state.prophecy.type === 'build') ? 0.7 : 1;
+  let natMult = typeof getNatBuildCostMult === 'function' ? getNatBuildCostMult() : 1.0;
+  return d * natMult;
 }
 
 function isBuildingUnlocked(buildType) {
@@ -8611,7 +8913,8 @@ function startFishing() {
     state.fishing.active = true;
     state.fishing.timer = 0;
     let rodBonus = state.tools.ironRod ? 0.7 : state.tools.copperRod ? 0.85 : 1.0;
-    state.fishing.biteTime = random(60, 180) * rodBonus;
+    let _natFishBonus = typeof getNatFishingSpeedBonus === 'function' ? getNatFishingSpeedBonus() : 1.0;
+    state.fishing.biteTime = random(60, 180) * rodBonus / _natFishBonus;
     state.fishing.bite = false;
     state.fishing.caught = false;
     state.player.vx = 0;
@@ -8644,6 +8947,10 @@ function reelFish() {
     state.dailyActivities.fished += amt;
     checkQuestProgress('fish', amt);
     state.codex.fishCaught[fishType.name.toLowerCase()] = true;
+    let _fk = fishType.name.toLowerCase();
+    if (!state.codex.fish[_fk]) state.codex.fish[_fk] = { caught: true, count: 0, firstDay: state.day };
+    state.codex.fish[_fk].count += amt;
+    state.codex.fish[_fk].caught = true;
     unlockJournal('first_fish');
     addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 40, '+' + amt + ' ' + fishType.name + '!', fishType.color);
     if (f.streak >= 3) {
@@ -12753,7 +13060,7 @@ function playerAttack() {
     if (abs(diff) > arcHalf) continue;
 
     // Hit! — weapon damage
-    let dmg = [15, 20, 25][p.weapon] || 15;
+    let dmg = floor(([15, 20, 25][p.weapon] || 15) * (typeof getNatBestiaryBonus === 'function' ? getNatBestiaryBonus() : 1));
     // Secutor blocks frontal 50%
     if (e.type === 'secutor' && random() < 0.5) {
       addFloatingText(w2sX(e.x), w2sY(e.y) - 20, 'BLOCKED', '#aaaaaa');
@@ -12918,6 +13225,11 @@ function updateEnemyAI(e, dt, p, a) {
 
 function enemyDeath(e, a) {
   a.killCount++;
+  if (e.type && state && state.codex) {
+    if (!state.codex.enemies[e.type]) state.codex.enemies[e.type] = { defeated: true, count: 0, firstDay: state.day };
+    state.codex.enemies[e.type].count++;
+    state.codex.enemies[e.type].defeated = true;
+  }
   spawnParticles(e.x, e.y, 'combat', 8);
   // Drop loot
   let drops = [];
@@ -15771,7 +16083,7 @@ function conquestPlayerAttack() {
   let fAngle = getFacingAngle();
   let arcHalf = PI * 0.3;
   let range = p.attackRange + (p.weapon === 1 ? 12 : 0);
-  let dmg = [15, 20, 25][p.weapon] || 15;
+  let dmg = floor(([15, 20, 25][p.weapon] || 15) * (typeof getNatBestiaryBonus === 'function' ? getNatBestiaryBonus() : 1));
 
   // Check campfire morale bonus
   if (c.buildings.some(b => b.type === 'campfire')) dmg += 3;
@@ -17138,7 +17450,7 @@ function drawHUD() {
   } else if (state.wreck && state.wreck.active) {
     controlLines = ['WASD move  |  E gather  |  TAB raft'];
   } else {
-    controlLines = ['WASD move  |  1-5 tools  |  6-0 items  |  E interact', 'SPACE attack  |  B build  |  K skills  |  ESC menu'];
+    controlLines = ['WASD move  |  1-5 tools  |  6-0 items  |  E interact', 'SPACE attack  |  B build  |  K skills  |  N codex  |  ESC menu'];
   }
   let controlH = 10 + controlLines.length * 12;
   drawHUDPanel(cr - 200, cb - controlH, 200, controlH);
@@ -17973,11 +18285,16 @@ function mousePressed() {
         triggerPlayerJoy();
         unlockJournal('first_harvest');
         state.codex.cropsGrown[p.cropType || 'grain'] = true;
+        let _ck = p.cropType || 'grain';
+        if (!state.codex.crops[_ck]) state.codex.crops[_ck] = { harvested: true, count: 0, firstDay: state.day };
+        state.codex.crops[_ck].count += harvestAmt;
+        state.codex.crops[_ck].harvested = true;
         checkQuestProgress('harvest', harvestAmt);
         if (typeof advanceMainQuestCounter === 'function') advanceMainQuestCounter('mq_harvested', harvestAmt);
         trackMilestone('first_harvest');
         // Auto-seeds: each harvest gives 1-2 seeds back
         let seedBack = 1 + (random() < 0.5 ? 1 : 0);
+        if (Object.keys(state.codex.crops).length >= 7) seedBack += 1;
         state.seeds += seedBack;
         addFloatingText(px, py - 25, '+' + seedBack + ' Seed', '#8fbc8f');
         // Seasonal crop bonuses
@@ -18715,6 +19032,7 @@ function keyPressed() {
 
   // Close overlays with ESC
   if (keyCode === 27) {
+    if (state.naturalistOpen) { state.naturalistOpen = false; return; }
     if (empireDashOpen) { empireDashOpen = false; return; }
     if (inventoryOpen) { inventoryOpen = false; return; }
     if (typeof skillTreeOpen !== 'undefined' && skillTreeOpen) { skillTreeOpen = false; return; }
@@ -18745,8 +19063,23 @@ function keyPressed() {
     return;
   }
 
+  // Naturalist's Codex toggle (N key)
+  if (key === 'n' || key === 'N') {
+    state.naturalistOpen = !state.naturalistOpen;
+    if (state.naturalistOpen) { state.codexOpen = false; state.journalOpen = false; }
+    return;
+  }
+  if (state.naturalistOpen) {
+    if (key === '1') { state.naturalistTab = 0; return; }
+    if (key === '2') { state.naturalistTab = 1; return; }
+    if (key === '3') { state.naturalistTab = 2; return; }
+    if (key === '4') { state.naturalistTab = 3; return; }
+    if (key === '5') { state.naturalistTab = 4; return; }
+    if (key === '6') { state.naturalistTab = 5; return; }
+  }
+
   // Block input when overlays are open
-  if (empireDashOpen || inventoryOpen) return;
+  if (empireDashOpen || inventoryOpen || state.naturalistOpen) return;
 
   // Villa Codex toggle
   if (key === 'v' || key === 'V') {
@@ -19515,7 +19848,14 @@ function loadGame() {
     }
     if (state.felix) state.felix.hearts = d.felixHearts || 0;
     state.harvestCombo.bestEver = d.harvestComboBestEver || 0;
-    if (d.codex) state.codex = d.codex;
+    if (d.codex) {
+      state.codex = d.codex;
+      if (!state.codex.fish)    state.codex.fish    = {};
+      if (!state.codex.crops)   state.codex.crops   = {};
+      if (!state.codex.enemies) state.codex.enemies = {};
+      if (!state.codex.relics)  state.codex.relics  = {};
+      if (!state.codex.lore)    state.codex.lore    = {};
+    }
     if (d.journal) state.journal = d.journal;
     // Expedition resources
     state.ironOre = d.ironOre || 0;
