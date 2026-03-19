@@ -1534,12 +1534,105 @@ function drawRomanRoad(ix, iy) {
     }
   }
 
-  // One straight Via Romana: Shrine → Farm → Temple → Grove → Emporium
+  // Helper: draw a paved road between two world-space points (Era 2+ style)
+  function drawRoadSegment(wx1, wy1, wx2, wy2, roadWidth) {
+    let sx1 = w2sX(wx1), sy1 = w2sY(wy1);
+    let sx2 = w2sX(wx2), sy2 = w2sY(wy2);
+    let dx = sx2 - sx1, dy = sy2 - sy1;
+    let len = sqrt(dx * dx + dy * dy);
+    if (len < 1) return;
+    let nx = -dy / len, ny = dx / len; // unit normal
+
+    // Road surface
+    stroke(ep.roadBase[0], ep.roadBase[1], ep.roadBase[2], 200);
+    strokeWeight(roadWidth);
+    strokeCap(SQUARE);
+    line(sx1, sy1, sx2, sy2);
+
+    // Gravel border (slightly wider, drawn behind)
+    stroke(ep.roadLine[0], ep.roadLine[1], ep.roadLine[2], 90);
+    strokeWeight(roadWidth + 4);
+    line(sx1, sy1, sx2, sy2);
+
+    // Re-draw surface on top
+    stroke(ep.roadBase[0], ep.roadBase[1], ep.roadBase[2], 200);
+    strokeWeight(roadWidth);
+    line(sx1, sy1, sx2, sy2);
+
+    // Curb lines
+    stroke(ep.roadLine[0], ep.roadLine[1], ep.roadLine[2], 70);
+    strokeWeight(1);
+    let hw = roadWidth / 2;
+    line(sx1 + nx * hw, sy1 + ny * hw, sx2 + nx * hw, sy2 + ny * hw);
+    line(sx1 - nx * hw, sy1 - ny * hw, sx2 - nx * hw, sy2 - ny * hw);
+    noStroke();
+
+    // Stepping stones at intervals (Era 2+)
+    if (ep.era >= 2) {
+      let steps = floor(len / 40);
+      for (let i = 1; i < steps; i++) {
+        let t = i / steps;
+        let stx = lerp(sx1, sx2, t);
+        let sty = lerp(sy1, sy2, t);
+        fill(ep.roadBase[0] + 15, ep.roadBase[1] + 15, ep.roadBase[2] + 15, 160);
+        rect(stx - 3, sty - 2, 6, 4, 1);
+      }
+    }
+
+    // Era 3: teal crystal inlay along curbs at night
+    if (ep.era >= 3 && getSkyBrightness() < 0.4) {
+      let glowA = map(getSkyBrightness(), 0, 0.4, 40, 0);
+      stroke(80, 200, 180, glowA);
+      strokeWeight(2);
+      line(sx1 + nx * hw * 0.8, sy1 + ny * hw * 0.8, sx2 + nx * hw * 0.8, sy2 + ny * hw * 0.8);
+      line(sx1 - nx * hw * 0.8, sy1 - ny * hw * 0.8, sx2 - nx * hw * 0.8, sy2 - ny * hw * 0.8);
+      noStroke();
+    }
+  }
+
+  let cx = WORLD.islandCX, cy = WORLD.islandCY;
+  let rx = getSurfaceRX(), ry = getSurfaceRY();
+  let avenueY = cy - 8;
+  let cardoX = cx + rx * 0.05;
+
+  // DECUMANUS — main E-W road (all eras, existing pixel-art renderer)
   let mp = getMerchantPortPosition();
   let empSX = w2sX(mp.x - 55); // left edge of storage building
-  let totalLen = dist(shrineSX + 50, roadSY, empSX, roadSY);
+  let decWestX = cx - rx * 0.85;
+  let decEastX = cx + rx * 0.80;
+  // Widen Decumanus in Era 2/3
+  if (ep.era >= 2) {
+    // Draw wider surface first via segment helper, then overlay pixel detail
+    drawRoadSegment(decWestX, avenueY, decEastX, avenueY, ep.era === 2 ? 22 : 26);
+  }
+  let decStartSX = w2sX(decWestX);
+  let totalLen = dist(decStartSX, roadSY, empSX, roadSY);
   let segs = max(20, floor(totalLen / 11));
-  drawRoadSeg(shrineSX + 50, roadSY, empSX, roadSY, segs);
+  drawRoadSeg(decStartSX, roadSY, empSX, roadSY, segs);
+
+  if (ep.era >= 2) {
+    // CARDO — N-S cross road
+    let cardoW = ep.era === 2 ? 16 : 20;
+    drawRoadSegment(cardoX, cy - ry * 0.70, cardoX, cy + ry * 0.60, cardoW);
+
+    // INTERSECTION PLAZA — forum plaza where Decumanus meets Cardo
+    let plazaX = w2sX(cardoX);
+    let plazaY = w2sY(avenueY);
+    noStroke();
+    fill(ep.roadBase[0] + 10, ep.roadBase[1] + 10, ep.roadBase[2] + 10, 220);
+    rect(plazaX - 35, plazaY - 22, 70, 44, 2);
+    noFill();
+    stroke(ep.roadLine[0], ep.roadLine[1], ep.roadLine[2], 60);
+    strokeWeight(1.5);
+    rect(plazaX - 35, plazaY - 22, 70, 44, 2);
+    noStroke();
+
+    // VIA SACRA — NE diagonal toward temple
+    drawRoadSegment(cardoX, avenueY, cx + rx * 0.5, cy - ry * 0.35, 14);
+
+    // VIA MILITARIS — SE diagonal toward castrum
+    drawRoadSegment(cardoX, avenueY, cx + rx * 0.45, cy + ry * 0.5, 12);
+  }
 
   // Stone milestones at junctions — era-aware
   noStroke();
