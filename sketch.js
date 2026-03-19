@@ -77,6 +77,8 @@ let inventoryOpen = false;    // I key
 let screenTransition = { active: false, alpha: 0, dir: 1, callback: null };
 let achievementPopup = null;  // { text, timer, slideX }
 let photoMode = false;
+let screenshotMode = false;
+let screenshotFilter = 0; // 0=none, 1=warm, 2=cool, 3=sepia
 
 // ─── DIALOG SYSTEM ─────────────────────────────────────────────────────
 let dialogState = {
@@ -1591,7 +1593,10 @@ function drawInner() {
     updateTime(dt);
     drawTempleInterior(dt);
     drawHUD();
-    drawCursor();
+    if (!screenshotMode) drawCursor();
+    drawVignette();
+    drawScreenshotFilter();
+    drawScreenshotIndicator();
     return;
   }
 
@@ -2090,47 +2095,53 @@ function drawInner() {
     // Golden hour color grading — atmospheric tint over the world
     if (!state.conquest.active && !state.adventure.active) drawColorGrading();
 
-    drawHUD();
-    if (!photoMode && typeof drawQuestTracker === 'function') drawQuestTracker();
-    drawHotbar();
-    drawFestivalBanner();
-    drawEventBanner();
-    drawWanderingMerchantUI();
-    drawBuildUI();
-    drawShopUI();
-    drawUpgradeShopUI();
-    drawMarketUI();
-    drawCodexUI();
-    drawNaturalistCodex();
-    if (typeof drawLoreTabletPopup === 'function') drawLoreTabletPopup();
-    if (typeof drawNarrativeDialogue === 'function') drawNarrativeDialogue();
-    drawDiscoveryEvent();
-    if (!photoMode) drawTutorialHintUI();
-    drawScreenFlash();
-    drawImperatorBanner();
-    drawDailySummary();
-    drawModifierSelectUI();
-    drawNotifications();
-    drawDialogSystem();
-    drawEmpireDashboard();
-    drawInventoryScreen();
-    if (typeof drawSkillTree === 'function') drawSkillTree();
-    drawLegiaUI();
-    drawExpeditionSummaryOverlay();
-    if (typeof drawArenaSummaryOverlay === 'function') drawArenaSummaryOverlay();
-    drawAchievementPopup();
-    if (typeof drawEconomyUIOverlay === 'function') drawEconomyUIOverlay();
-    drawScreenTransition();
-    drawImperatorCeremony();
-    // Photo mode hint — always visible at low alpha
-    if (!photoMode) {
-      push(); noStroke();
-      fill(160, 140, 100, 102);
-      textSize(7); textAlign(RIGHT, BOTTOM);
-      text('[ P ] PHOTO', width - 18, height - 6);
-      pop();
+    if (!screenshotMode) {
+      drawHUD();
+      if (!photoMode && typeof drawQuestTracker === 'function') drawQuestTracker();
+      drawHotbar();
+      drawFestivalBanner();
+      drawEventBanner();
+      drawWanderingMerchantUI();
+      drawBuildUI();
+      drawShopUI();
+      drawUpgradeShopUI();
+      drawMarketUI();
+      drawCodexUI();
+      drawNaturalistCodex();
+      if (typeof drawLoreTabletPopup === 'function') drawLoreTabletPopup();
+      if (typeof drawNarrativeDialogue === 'function') drawNarrativeDialogue();
+      drawDiscoveryEvent();
+      if (!photoMode) drawTutorialHintUI();
+      drawScreenFlash();
+      drawImperatorBanner();
+      drawDailySummary();
+      drawModifierSelectUI();
+      drawNotifications();
+      drawDialogSystem();
+      drawEmpireDashboard();
+      drawInventoryScreen();
+      if (typeof drawSkillTree === 'function') drawSkillTree();
+      drawLegiaUI();
+      drawExpeditionSummaryOverlay();
+      if (typeof drawArenaSummaryOverlay === 'function') drawArenaSummaryOverlay();
+      drawAchievementPopup();
+      if (typeof drawEconomyUIOverlay === 'function') drawEconomyUIOverlay();
+      drawScreenTransition();
+      drawImperatorCeremony();
+      // Photo mode hint — always visible at low alpha
+      if (!photoMode) {
+        push(); noStroke();
+        fill(160, 140, 100, 102);
+        textSize(7); textAlign(RIGHT, BOTTOM);
+        text('[ P ] PHOTO  [ F9 ] SCREENSHOT', width - 18, height - 6);
+        pop();
+      }
+      if (!photoMode) drawCursor();
     }
-    if (!photoMode) drawCursor();
+    // Screenshot mode overlays — always on top of world
+    drawVignette();
+    drawScreenshotFilter();
+    drawScreenshotIndicator();
   }
 
   // Debug perf overlay
@@ -19735,6 +19746,7 @@ function drawInventoryScreen() {
 }
 
 function drawHotbar() {
+  if (screenshotMode) return;
   let p = state.player;
   let slot = p.hotbarSlot;
   let slotW = 36, slotH = 36, gap = 3;
@@ -19854,8 +19866,66 @@ function drawHotbar() {
   textAlign(LEFT, TOP);
 }
 
+// ─── SCREENSHOT MODE OVERLAYS ─────────────────────────────────────────────
+function drawVignette() {
+  if (!screenshotMode) return;
+  push();
+  noStroke();
+  let maxA = 100;
+  for (let i = 0; i < 8; i++) {
+    let t = i / 8;
+    let a = maxA * (1 - t) * (1 - t);
+    fill(0, 0, 0, a);
+    let m = t * 0.5;
+    rect(0, 0, width, height * (0.2 - m * 0.18));
+    rect(0, height * (0.8 + m * 0.18), width, height * (0.2 - m * 0.18));
+    rect(0, 0, width * (0.15 - m * 0.12), height);
+    rect(width * (0.85 + m * 0.12), 0, width * (0.15 - m * 0.12), height);
+  }
+  pop();
+}
+
+function drawScreenshotFilter() {
+  if (!screenshotMode || screenshotFilter === 0) return;
+  push();
+  noStroke();
+  if (screenshotFilter === 1) {
+    fill(255, 180, 60, 25);
+    rect(0, 0, width, height);
+    fill(255, 140, 40, 12);
+    rect(0, height * 0.5, width, height * 0.5);
+  } else if (screenshotFilter === 2) {
+    fill(40, 80, 180, 25);
+    rect(0, 0, width, height);
+    fill(60, 140, 200, 10);
+    rect(0, 0, width, height * 0.4);
+  } else if (screenshotFilter === 3) {
+    fill(160, 120, 60, 35);
+    rect(0, 0, width, height);
+    fill(200, 180, 140, 15);
+    rect(0, 0, width, height);
+  }
+  pop();
+}
+
+function drawScreenshotIndicator() {
+  if (!screenshotMode) return;
+  push();
+  noStroke();
+  fill(255, 60, 40);
+  ellipse(width - 15, 15, 8, 8);
+  if (screenshotFilter > 0) {
+    fill(255, 255, 255, 150);
+    textSize(10);
+    textAlign(RIGHT);
+    let sNames = ['', 'WARM', 'COOL', 'SEPIA'];
+    text(sNames[screenshotFilter], width - 25, 18);
+  }
+  pop();
+}
+
 function drawHUD() {
-  if (photoMode) return;
+  if (photoMode || screenshotMode) return;
   if (dialogState.active) return;
   let h = state.time / 60;
   let mins = floor(state.time % 60);
@@ -21144,6 +21214,25 @@ function keyPressed() {
   }
   if (state.introPhase !== 'done') { skipIntro(); return; }
   if (state.cutscene) { skipCutscene(); return; }
+
+  // F9 = toggle screenshot mode
+  if (keyCode === 120) {
+    screenshotMode = !screenshotMode;
+    screenshotFilter = 0;
+    if (screenshotMode) {
+      addFloatingText(width / 2, height * 0.1, 'SCREENSHOT MODE - F to cycle filters, F9 to exit', '#ffffff');
+    } else {
+      addFloatingText(width / 2, height * 0.1, 'HUD RESTORED', '#ffdc50');
+    }
+    return;
+  }
+  // F key in screenshot mode = cycle filter
+  if (screenshotMode && (key === 'f' || key === 'F')) {
+    screenshotFilter = (screenshotFilter + 1) % 4;
+    let fNames = ['No Filter', 'Warm (Golden Hour)', 'Cool (Moonlit)', 'Sepia (Ancient)'];
+    addFloatingText(width / 2, height * 0.1, fNames[screenshotFilter], '#ffffff');
+    return;
+  }
 
   // ESC — close overlays first, then menu as last resort
   if (keyCode === 27) {
