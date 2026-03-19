@@ -878,6 +878,9 @@ function buildIsland() {
   state.plots = [];
   rebuildFarmGrid(1);
 
+  // Ambient citizens
+  state.citizens = [];
+
   // Chickens near farm
   state.chickens = [];
   let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
