@@ -300,6 +300,145 @@ function getGiftResponse(npcName, giftType) {
   return prefs.likeResp;
 }
 
+// ─── NPC DAILY WANTS — seeded per real-world day ───
+const DAILY_WANTS = {
+  livia: [
+    { type: 'gift', resource: 'flower', label: 'Livia wants flowers today' },
+    { type: 'gift', resource: 'fish', label: 'Livia craves fresh fish' },
+    { type: 'gift', resource: 'harvest', label: 'Livia needs grain for bread' },
+    { type: 'favor', zone: 'temple', label: 'Livia asks you to pray at the temple' },
+    { type: 'favor', zone: 'ruins', label: 'Livia wants you to explore the ruins' },
+    { type: 'activity', action: 'lyre', label: 'Livia wants to hear the lyre' },
+    { type: 'gift', resource: 'crystals', label: 'Livia seeks a crystal shard' },
+    { type: 'activity', action: 'sunset', label: 'Livia wants to watch the sunset together' },
+  ],
+  marcus: [
+    { type: 'gift', resource: 'fish', label: 'Marcus wants fish for the troops' },
+    { type: 'gift', resource: 'wood', label: 'Marcus needs timber for repairs' },
+    { type: 'gift', resource: 'stone', label: 'Marcus wants stone for the walls' },
+    { type: 'favor', zone: 'castrum', label: 'Marcus asks you to inspect the castrum' },
+    { type: 'favor', zone: 'arena', label: 'Marcus wants you to train in the arena' },
+    { type: 'activity', action: 'spar', label: 'Marcus challenges you to spar' },
+    { type: 'gift', resource: 'ironOre', label: 'Marcus needs iron for weapons' },
+    { type: 'activity', action: 'patrol', label: 'Marcus wants you to patrol the shore' },
+  ],
+  vesta: [
+    { type: 'gift', resource: 'harvest', label: 'Vesta wants fresh vegetables' },
+    { type: 'gift', resource: 'seeds', label: 'Vesta needs seeds for the garden' },
+    { type: 'gift', resource: 'flower', label: 'Vesta seeks wildflowers for offerings' },
+    { type: 'favor', zone: 'farm', label: 'Vesta asks you to tend the crops' },
+    { type: 'favor', zone: 'shrine', label: 'Vesta wants you to visit the crystal shrine' },
+    { type: 'activity', action: 'cook', label: 'Vesta wants to cook together' },
+    { type: 'gift', resource: 'fish', label: 'Vesta wants fish for Garum sauce' },
+    { type: 'activity', action: 'stargaze', label: 'Vesta invites you to stargaze tonight' },
+  ],
+  felix: [
+    { type: 'gift', resource: 'gold', label: 'Felix wants gold for his maps' },
+    { type: 'gift', resource: 'wood', label: 'Felix needs planks for the dock' },
+    { type: 'gift', resource: 'fish', label: 'Felix craves a fresh catch' },
+    { type: 'favor', zone: 'port', label: 'Felix asks you to check the harbor' },
+    { type: 'favor', zone: 'diving', label: 'Felix wants you to dive for relics' },
+    { type: 'activity', action: 'lyre', label: 'Felix wants sea shanties on the lyre' },
+    { type: 'gift', resource: 'stone', label: 'Felix needs ballast stones' },
+    { type: 'activity', action: 'sail', label: 'Felix wants to sail together' },
+  ],
+};
+
+// Get today's want for an NPC — deterministic seed from real-world day
+function getDailyWant(npcName) {
+  let pool = DAILY_WANTS[npcName];
+  if (!pool || pool.length === 0) return null;
+  let daySeed = Math.floor(Date.now() / 86400000);
+  // Each NPC gets a different offset so they don't all want the same type
+  let npcOffset = { livia: 0, marcus: 3, vesta: 5, felix: 7 }[npcName] || 0;
+  let idx = (daySeed + npcOffset) % pool.length;
+  return pool[idx];
+}
+
+// ─── FELIX + LIVIA RELATIONSHIP SCENE ───
+// Triggers: Chapter 6+, hearts >= 8 with both Felix AND Livia
+// One-time: state.narrativeFlags.felixLiviaSceneShown
+const FELIX_LIVIA_SCENE = {
+  trigger: {
+    minChapter: 6,
+    minHeartsFelix: 8,
+    minHeartsLivia: 8,
+    flag: 'felixLiviaSceneShown',
+  },
+  lines: [
+    { speaker: 'livia', text: "You're still carrying that wax tablet." },
+    { speaker: 'felix', text: "Force of habit. A man records what he can't afford to forget." },
+    { speaker: 'livia', text: "In Rome... you could have just walked away." },
+    { speaker: 'felix', text: "And let them take you? Not while I still had legs." },
+    { speaker: 'livia', text: "I never said —" },
+    { speaker: 'felix', text: "I know. Neither did I. Now we're even." },
+  ],
+  rewards: {
+    heartBonus: 1,        // +1 heart to both Felix and Livia (if below max)
+    loreEntry: {
+      id: 'unspoken_debt',
+      title: 'The Unspoken Debt',
+      text: 'Before the exile, Felix was a court scribe. When the Praetorians came for Livia — a senator\'s daughter who spoke too freely — Felix forged documents that bought her one night to escape. He never told her. She always knew.',
+    },
+  },
+};
+
+// Check if Felix+Livia scene should trigger
+function shouldTriggerFelixLiviaScene(state) {
+  if (!state || !state.narrativeFlags) return false;
+  if (state.narrativeFlags[FELIX_LIVIA_SCENE.trigger.flag]) return false;
+  let ch = state.chapter || 0;
+  if (ch < FELIX_LIVIA_SCENE.trigger.minChapter) return false;
+  // Check hearts — need to find how hearts are stored
+  // Hearts might be state.npc.hearts for Livia, state.marcusHearts, etc.
+  // This will be called from sketch.js which knows the exact state shape
+  return true; // sketch.js will do the final hearts check
+}
+
+// Get the scene lines
+function getFelixLiviaLines() {
+  return FELIX_LIVIA_SCENE.lines;
+}
+
+function getFelixLiviaRewards() {
+  return FELIX_LIVIA_SCENE.rewards;
+}
+
+// ─── FAVOR LEGACY DIALOGUE — unlocked at favor milestones ───
+const FAVOR_DIALOGUE = {
+  livia: {
+    10: "You know... I stopped counting the sunsets. They all belong to us now.",
+    20: "My father would have liked you. He valued constancy above all things.",
+    30: "If Rome could see what we built here, they would weep. Not from envy. From recognition.",
+  },
+  marcus: {
+    10: "I trained a thousand soldiers. You're the only one I'd follow into the dark.",
+    20: "The walls I build now aren't to keep enemies out. They're to keep this feeling in.",
+    30: "When I close my eyes, I don't see Rome anymore. I see this. That's enough.",
+  },
+  vesta: {
+    10: "The gods speak in harvest rhythms. You've learned to listen. That is rare.",
+    20: "I dreamed of the old temple last night. It was smaller than I remembered. Ours is better.",
+    30: "There is a prayer I saved for the one who would rebuild the world. I think it's time I said it.",
+  },
+  felix: {
+    10: "I've mapped every coastline I could see. None of them lead back to what we were. Good.",
+    20: "You know what the sea taught me? That the only shore worth reaching is the one you chose.",
+    30: "I'll tell you a secret. I stopped looking for a way home the day you built the dock.",
+  },
+};
+
+function getFavorDialogue(npcName, favorLevel) {
+  let lines = FAVOR_DIALOGUE[npcName];
+  if (!lines) return null;
+  // Return the highest unlocked line
+  let thresholds = [30, 20, 10];
+  for (let t of thresholds) {
+    if (favorLevel >= t && lines[t]) return { threshold: t, text: lines[t] };
+  }
+  return null;
+}
+
 // ─── RELATIONSHIP MILESTONES ────────────────────────────────────────────
 const RELATIONSHIP_TIERS = [
   { hearts: 0, title: 'Stranger', color: '#888888' },
