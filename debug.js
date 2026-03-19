@@ -86,13 +86,21 @@ const Debug = {
 
         case '/level':
           let lvl = parseInt(args[0]) || 20;
+          // Give resources so expandIsland doesn't fail on cost check
+          state.crystals = 9999; state.stone = 9999; state.ironOre = 9999;
+          state.gold = 9999; state.ancientRelic = 999; state.titanBone = 999;
+          state.wood = 9999;
           while (state.islandLevel < lvl && state.islandLevel < 25) {
-            state.islandLevel++;
-            state.islandRX += 40;
-            state.islandRY += 25;
-            state.pyramid.level = state.islandLevel;
+            if (typeof expandIsland === 'function') {
+              expandIsland();
+            } else {
+              state.islandLevel++;
+              state.islandRX += 40;
+              state.islandRY += 25;
+              state.pyramid.level = state.islandLevel;
+            }
           }
-          this.addLog('Island level set to ' + state.islandLevel, '#ffaa00');
+          this.addLog('Island level set to ' + state.islandLevel + ' (with buildings)', '#ffaa00');
           break;
 
         case '/tp':
