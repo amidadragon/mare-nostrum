@@ -342,7 +342,9 @@ function initState() {
     fish: 0,
 
     // Fishing
-    fishing: { active: false, timer: 0, biteTime: 0, bite: false, caught: false, streak: 0 },
+    fishing: { active: false, timer: 0, biteTime: 0, bite: false, caught: false, streak: 0,
+      phase: null, phaseTimer: 0, waitDuration: 0, nibbleTimer: 0,
+      bobberX: 0, bobberY: 0, bobberDip: 0, strikeWindowEnd: 0, missLine: '' },
 
     // Diving — underwater exploration
     diving: {
@@ -10807,7 +10809,7 @@ function updatePlayer(dt) {
   if (keyIsDown(83) || keyIsDown(DOWN_ARROW))  dy += 1;
 
   if (dx !== 0 || dy !== 0) {
-    if (state.fishing.active) { state.fishing.active = false; state.fishing.bite = false; }
+    if (state.fishing.active) { state.fishing.active = false; state.fishing.bite = false; state.fishing.phase = null; }
     let len = sqrt(dx * dx + dy * dy);
     p.vx = (dx / len) * spd;
     p.vy = (dy / len) * spd;
@@ -10926,42 +10928,96 @@ function updatePlayer(dt) {
 function updateFishing(dt) {
   let f = state.fishing;
   if (!f.active) return;
-  f.timer += dt;
-  if (!f.bite && f.timer >= f.biteTime) {
-    f.bite = true;
-    f.biteFlash = 12; // visual bobber dip
-    f.timer = 0;
-    if (state.tools.net) {
-      reelFish();
-      return;
+
+  if (f.phase === 'cast') {
+    f.phaseTimer -= dt;
+    if (f.phaseTimer <= 0) {
+      f.phase = 'wait';
+      let rodBonus = state.tools.ironRod ? 0.7 : state.tools.copperRod ? 0.85 : 1.0;
+      let _natFishBonus = typeof getNatFishingSpeedBonus === 'function' ? getNatFishingSpeedBonus() : 1.0;
+      f.waitDuration = floor(random(90, 300) * rodBonus / _natFishBonus);
+      f.phaseTimer = f.waitDuration;
+      f.nibbleTimer = floor(random(25, 45));
+      spawnParticles(f.bobberX, f.bobberY, 'build', 6);
+      if (snd) snd.playSFX('water');
     }
-    addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 40, '!! BITE !!', '#ffdd00');
-    spawnParticles(state.player.x + (state.player.facing === 'left' ? -20 : 20), state.player.y, 'build', 4);
-    if (snd) snd.playSFX('fish_cast');
-    triggerScreenShake(2, 4);
-  }
-  if (f.bite && f.timer > 50) {
-    // Missed the catch
-    f.active = false;
-    f.bite = false;
-    f.streak = 0;
-    addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 30, 'Got away...', C.textDim);
-    if (snd) snd.playSFX('water');
-    triggerScreenShake(1, 3);
+  } else if (f.phase === 'wait') {
+    f.phaseTimer -= dt;
+    f.nibbleTimer -= dt;
+    // Gentle bobbing
+    f.bobberDip = sin(frameCount * 0.08) * 3;
+    // Nibble dips
+    if (f.nibbleTimer <= 0 && f.phaseTimer > 72) {
+      f.bobberDip = -3;
+      f.nibbleTimer = floor(random(25, 45));
+    }
+    // Net auto-catches at strike
+    if (f.phaseTimer <= 0) {
+      f.phase = 'strike';
+      f.phaseTimer = 72; // 1.2 second window
+      f.bobberDip = -12;
+      f.bite = true;
+      f.strikeWindowEnd = frameCount + 72;
+      if (snd) snd.playSFX('fish_cast');
+      triggerScreenShake(2, 4);
+      spawnParticles(f.bobberX, f.bobberY, 'build', 4);
+      if (state.tools.net) {
+        reelFish();
+        return;
+      }
+    }
+  } else if (f.phase === 'strike') {
+    f.phaseTimer -= dt;
+    f.bobberDip = -12 + sin(frameCount * 0.15) * 2;
+    if (f.phaseTimer <= 0) {
+      // Player missed
+      let missLines = ['Too slow!', 'It got away!', 'Nearly had it!',
+        'The line went slack.', 'A cunning fish.',
+        'Should have struck!', 'Next time.', 'The sea is patient.'];
+      f.missLine = missLines[floor(random(missLines.length))];
+      addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 30, f.missLine, '#ff8866');
+      f.phase = 'cooldown';
+      f.phaseTimer = 180;
+      f.bobberDip = 0;
+      f.bite = false;
+      f.streak = 0;
+      if (snd) snd.playSFX('water');
+      triggerScreenShake(1, 3);
+    }
+  } else if (f.phase === 'reel') {
+    f.phaseTimer -= dt;
+    if (f.phaseTimer <= 0) {
+      f.active = false;
+      f.phase = null;
+      f.bite = false;
+    }
+  } else if (f.phase === 'cooldown') {
+    f.phaseTimer -= dt;
+    if (f.phaseTimer <= 0) {
+      f.active = false;
+      f.phase = null;
+      f.bite = false;
+    }
   }
 }
 
 function startFishing() {
   let edgeDist = islandEdgeDist(state.player.x, state.player.y);
   if (edgeDist > -0.08) {
-    // Near island edge
-    state.fishing.active = true;
-    state.fishing.timer = 0;
-    let rodBonus = state.tools.ironRod ? 0.7 : state.tools.copperRod ? 0.85 : 1.0;
-    let _natFishBonus = typeof getNatFishingSpeedBonus === 'function' ? getNatFishingSpeedBonus() : 1.0;
-    state.fishing.biteTime = random(60, 180) * rodBonus / _natFishBonus;
-    state.fishing.bite = false;
-    state.fishing.caught = false;
+    let f = state.fishing;
+    f.active = true;
+    f.phase = 'cast';
+    f.phaseTimer = 30; // 0.5 second cast
+    f.timer = 0;
+    f.bite = false;
+    f.caught = false;
+    f.bobberDip = 0;
+    f.missLine = '';
+    f.streak = f.streak || 0;
+    // Bobber lands ahead of player toward water
+    let facingRight = state.player.facing === 'right' || state.player.facing === 'down';
+    f.bobberX = state.player.x + (facingRight ? 40 : -40);
+    f.bobberY = state.player.y + 20;
     state.player.vx = 0;
     state.player.vy = 0;
     state.player.moving = false;
@@ -10975,9 +11031,7 @@ function startFishing() {
 
 function reelFish() {
   let f = state.fishing;
-  if (f.active && f.bite) {
-    f.active = false;
-    f.bite = false;
+  if (f.active && (f.bite || f.phase === 'strike')) {
     f.streak = (f.streak || 0) + 1;
     let fishType = rollFishType();
     let amt = fishType.weight >= 3 ? 2 : 1;
@@ -11004,42 +11058,97 @@ function reelFish() {
       addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 58, '+' + f.streak + ' streak!', '#ffdd55');
     }
     spawnParticles(state.player.x, state.player.y, 'build', 6);
+    triggerScreenShake(3, 5);
+    // Transition to reel phase (brief celebration)
+    f.phase = 'reel';
+    f.phaseTimer = 40;
+    f.bite = false;
+    f.bobberDip = 0;
   }
 }
 
 function drawFishing() {
   let f = state.fishing;
-  if (!f.active) return;
+  if (!f.active || !f.phase) return;
   let px = w2sX(state.player.x);
   let py = w2sY(state.player.y);
-  // Fishing rod
+  // Fishing rod from player
   stroke(140, 100, 40);
   strokeWeight(2);
   let rodEndX = px + (state.player.facing === 'left' ? -30 : 30);
   let rodEndY = py - 20;
   line(px, py - 10, rodEndX, rodEndY);
-  // Line dropping down
+
+  if (f.phase === 'cooldown') { noStroke(); return; }
+
+  // Bobber position in screen coords
+  let bx = w2sX(f.bobberX);
+  let by = w2sY(f.bobberY) + f.bobberDip;
+
+  // Cast animation: bobber flies from rod to target
+  if (f.phase === 'cast') {
+    let t = 1 - (f.phaseTimer / 30);
+    bx = lerp(rodEndX, w2sX(f.bobberX), t);
+    by = lerp(rodEndY, w2sY(f.bobberY), t) - sin(t * PI) * 20;
+  }
+
+  // Fishing line from rod tip to bobber
   stroke(200, 200, 200, 150);
   strokeWeight(0.8);
-  let lineEndY = rodEndY + 25 + sin(frameCount * 0.1) * 3;
-  line(rodEndX, rodEndY, rodEndX, lineEndY);
-  // Bobber — pixel
+  // Slight sag in the line
+  let midX = (rodEndX + bx) / 2;
+  let midY = (rodEndY + by) / 2 + 8;
+  noFill();
+  beginShape();
+  vertex(rodEndX, rodEndY);
+  quadraticVertex(midX, midY, bx, by);
+  endShape();
   noStroke();
-  fill(255, 60, 60);
-  rect(floor(rodEndX) - 2, floor(lineEndY) - 2, 4, 4);
+
+  // Bobber
+  if (f.phase === 'strike') {
+    fill(220, 60, 40); // agitated red
+  } else {
+    fill(255, 60, 60);
+  }
+  rect(floor(bx) - 2, floor(by) - 2, 4, 4);
   fill(255, 255, 255);
-  rect(floor(rodEndX) - 1, floor(lineEndY) - 2, 2, 2);
-  // Bite indicator
-  if (f.bite) {
+  rect(floor(bx) - 1, floor(by) - 2, 2, 2);
+
+  // Water ripples around bobber
+  if (f.phase !== 'cast') {
+    noFill();
+    stroke(255, 255, 255, 30 + sin(frameCount * 0.1) * 15);
+    strokeWeight(0.5);
+    ellipse(bx, by + 3, 14 + sin(frameCount * 0.08) * 3, 5);
+    noStroke();
+  }
+
+  // Strike indicator
+  if (f.phase === 'strike') {
+    let flash = sin(frameCount * 0.3) > 0;
+    if (flash) {
+      fill(255, 220, 40);
+      textSize(14);
+      textAlign(CENTER, BOTTOM);
+      text('!', floor(bx), floor(by) - 12);
+    }
     fill(255, 200, 40, 150 + floor(sin(frameCount * 0.3) * 100));
     textSize(10);
     textAlign(CENTER, BOTTOM);
-    text('!! PRESS F !!', floor(px), floor(py) - 50);
-    // Splash — pixel rects
+    text('PRESS F', floor(px), floor(py) - 50);
+    // Splash pixels
     fill(100, 180, 255, 120);
     for (let s = 0; s < 3; s++) {
-      rect(floor(rodEndX) + floor(random(-6, 6)), floor(lineEndY) + floor(random(-4, 2)), 2, 2);
+      rect(floor(bx) + floor(random(-6, 6)), floor(by) + floor(random(-4, 2)), 2, 2);
     }
+  }
+
+  // Reel phase: taut line + fish sprite pop
+  if (f.phase === 'reel') {
+    stroke(200, 200, 200, 200);
+    strokeWeight(1.2);
+    line(rodEndX, rodEndY, bx, by);
   }
   noStroke();
 }
@@ -22059,8 +22168,20 @@ function keyPressed() {
 
   // Fishing / Trade with ship
   if (key === 'f' || key === 'F') {
-    if (state.fishing.active && state.fishing.bite) {
+    if (state.fishing.active && state.fishing.phase === 'strike') {
+      // Successful strike!
       reelFish();
+    } else if (state.fishing.active && state.fishing.phase === 'wait') {
+      // Too early!
+      addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 30, 'Too early!', '#ff8866');
+      state.fishing.phase = 'cooldown';
+      state.fishing.phaseTimer = 120; // 2 second cooldown
+      state.fishing.bobberDip = 0;
+      state.fishing.bite = false;
+      state.fishing.streak = 0;
+      if (snd) snd.playSFX('water');
+    } else if (state.fishing.active && (state.fishing.phase === 'reel' || state.fishing.phase === 'cooldown' || state.fishing.phase === 'cast')) {
+      // Ignore during these phases
     } else if (state.ship.shopOpen && state.ship.state === 'docked') {
       // Trade handled by number keys below
     } else if (!state.fishing.active && !state.buildMode) {
