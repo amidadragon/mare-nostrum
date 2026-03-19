@@ -993,15 +993,13 @@ function buildIsland() {
   let avenueY = cy - 8; // road centerline
   // Seed RNG for consistent placement
   randomSeed(42);
-  // Two loose rows flanking road, plus scattered extras behind
+  // Grove on far right edge only — keep city center clear
   let treeSlots = [];
-  for (let tx = cx + 100; tx <= cx + 360; tx += 64 + random(-8, 8)) {
+  for (let tx = cx + 240; tx <= cx + 360; tx += 64 + random(-8, 8)) {
     // Upper row — offset varies naturally
     treeSlots.push({ x: tx + random(-6, 6), y: avenueY - 26 - random(0, 12) });
     // Lower row
     treeSlots.push({ x: tx + random(-6, 6), y: avenueY + 26 + random(0, 12) });
-    // Occasional extra tree set back further (grove depth)
-    if (random() > 0.7) treeSlots.push({ x: tx + random(-10, 10), y: avenueY - 48 - random(0, 15) });
   }
   randomSeed(millis()); // restore random
   for (let slot of treeSlots) {
@@ -16369,6 +16367,16 @@ function addClampedTree(x, y, cx, cy) {
   if (pdx * pdx + pdy * pdy < 60 * 60) {
     p.x = portX - 65;
   }
+  // Skip if too close to any existing building
+  let tooNearBuilding = state.buildings.some(b => {
+    let bdx = p.x - b.x, bdy = p.y - b.y;
+    return bdx * bdx + bdy * bdy < 60 * 60;
+  });
+  if (tooNearBuilding) return;
+  // Skip if in center zone (forum/plaza area)
+  let _srx = getSurfaceRX(), _sry = getSurfaceRY();
+  let cnx = (p.x - cx) / (_srx * 0.3), cny = (p.y - cy) / (_sry * 0.3);
+  if (cnx * cnx + cny * cny < 1) return;
   state.trees.push({
     x: p.x, y: p.y,
     health: 3, maxHealth: 3, alive: true, regrowTimer: 0,
@@ -16968,6 +16976,13 @@ function expandIsland() {
     // Two torches flanking temple entrance
     state.buildings.push({ x: cx + rx * 0.55 - 32, y: cy - ry * 0.35 + 16, w: 8, h: 16, type: 'torch', rot: 0 });
     state.buildings.push({ x: cx + rx * 0.55 + 32, y: cy - ry * 0.35 + 16, w: 8, h: 16, type: 'torch', rot: 0 });
+    // Temple plaza — 3x2 grid of floor tiles in front of temple
+    state.buildings.push({ x: cx + rx * 0.55 - 24, y: cy - ry * 0.35 + 28, w: 24, h: 20, type: 'floor', rot: 0 });
+    state.buildings.push({ x: cx + rx * 0.55,      y: cy - ry * 0.35 + 28, w: 24, h: 20, type: 'floor', rot: 0 });
+    state.buildings.push({ x: cx + rx * 0.55 + 24, y: cy - ry * 0.35 + 28, w: 24, h: 20, type: 'floor', rot: 0 });
+    state.buildings.push({ x: cx + rx * 0.55 - 24, y: cy - ry * 0.35 + 48, w: 24, h: 20, type: 'floor', rot: 0 });
+    state.buildings.push({ x: cx + rx * 0.55,      y: cy - ry * 0.35 + 48, w: 24, h: 20, type: 'floor', rot: 0 });
+    state.buildings.push({ x: cx + rx * 0.55 + 24, y: cy - ry * 0.35 + 48, w: 24, h: 20, type: 'floor', rot: 0 });
     // Floor tiles for town center plaza
     state.buildings.push({ x: cx - 20, y: cy + 10, w: 24, h: 20, type: 'floor', rot: 0 });
     state.buildings.push({ x: cx,      y: cy + 10, w: 24, h: 20, type: 'floor', rot: 0 });
@@ -16991,10 +17006,15 @@ function expandIsland() {
     placeBuildingChecked({ x: cx + rx * 0.8, y: cy - ry * 0.1, w: 20, h: 44, type: 'watchtower', rot: 0 });
     // Triumphal arch along east road
     state.buildings.push({ x: cx + rx * 0.65, y: cy, w: 48, h: 52, type: 'arch', rot: 0 });
-    // Mosaic floor for forum area
+    // Mosaic floor for forum area — expanded civic plaza
     state.buildings.push({ x: cx + rx * 0.05 - 30, y: cy + ry * 0.15 + 30, w: 28, h: 20, type: 'mosaic', rot: 0 });
     state.buildings.push({ x: cx + rx * 0.05,      y: cy + ry * 0.15 + 30, w: 28, h: 20, type: 'mosaic', rot: 0 });
     state.buildings.push({ x: cx + rx * 0.05 + 30, y: cy + ry * 0.15 + 30, w: 28, h: 20, type: 'mosaic', rot: 0 });
+    state.buildings.push({ x: cx + rx * 0.05 - 30, y: cy + ry * 0.15 - 20, w: 24, h: 20, type: 'floor', rot: 0 });
+    state.buildings.push({ x: cx + rx * 0.05,      y: cy + ry * 0.15 - 20, w: 24, h: 20, type: 'floor', rot: 0 });
+    state.buildings.push({ x: cx + rx * 0.05 + 30, y: cy + ry * 0.15 - 20, w: 24, h: 20, type: 'floor', rot: 0 });
+    state.buildings.push({ x: cx + rx * 0.05 + 60, y: cy + ry * 0.15,      w: 24, h: 20, type: 'floor', rot: 0 });
+    state.buildings.push({ x: cx + rx * 0.05 - 60, y: cy + ry * 0.15,      w: 24, h: 20, type: 'floor', rot: 0 });
     addFloatingText(width / 2, height * 0.25, 'SENATOR — Forum & Watchtower raised!', '#ff9944');
     triggerScreenShake(8, 20);
     spawnParticles(cx, cy + ry * 0.5, 'build', 15);
@@ -17010,6 +17030,11 @@ function expandIsland() {
     state.buildings.push({ x: cx - rx * 0.3 + 40, y: cy - ry * 0.55 + 10, w: 20, h: 16, type: 'flower', rot: 0 });
     state.buildings.push({ x: cx - rx * 0.3 - 20, y: cy - ry * 0.55 + 30, w: 20, h: 16, type: 'flower', rot: 0 });
     state.buildings.push({ x: cx - rx * 0.3 + 20, y: cy - ry * 0.55 + 30, w: 20, h: 16, type: 'flower', rot: 0 });
+    // Mosaic processional near the arch
+    state.buildings.push({ x: port.x + 90,  y: port.y - 50, w: 28, h: 20, type: 'mosaic', rot: 0 });
+    state.buildings.push({ x: port.x + 120, y: port.y - 50, w: 28, h: 20, type: 'mosaic', rot: 0 });
+    state.buildings.push({ x: port.x + 150, y: port.y - 50, w: 28, h: 20, type: 'mosaic', rot: 0 });
+    state.buildings.push({ x: port.x + 120, y: port.y - 30, w: 28, h: 20, type: 'mosaic', rot: 0 });
     addFloatingText(width / 2, height * 0.25, 'CONSUL — Triumphal Arch & Villa built! Imperial Bridge Unlocked!', '#ffaa00');
     triggerScreenShake(12, 30);
     spawnParticles(port.x + 120, port.y - 15, 'build', 20);
@@ -17073,6 +17098,20 @@ function expandIsland() {
     if (dx * dx + dy * dy < 70 * 70) {
       t.x = port.x - 75;
     }
+  });
+
+  // Remove trees within 50px of ANY building
+  state.buildings.forEach(b => {
+    state.trees = state.trees.filter(t => {
+      let dx = t.x - b.x, dy = t.y - b.y;
+      return dx * dx + dy * dy > 50 * 50;
+    });
+  });
+  // Remove trees from center zone entirely (forum/plaza area)
+  state.trees = state.trees.filter(t => {
+    let dx = t.x - cx, dy = t.y - cy;
+    let distFromCenter = dx * dx / (rx * 0.3 * rx * 0.3) + dy * dy / (ry * 0.3 * ry * 0.3);
+    return distFromCenter > 1;
   });
 
   // ─── ZONE-BASED EXPANSION — each level adds elements at fixed positions ───
@@ -17208,7 +17247,7 @@ function expandIsland() {
       let cSize = 14 + floor(lvl / 5) * 2;
       state.crystalNodes.push({ x: crx, y: cry, size: min(cSize, 24), phase: random(TWO_PI), charge: 50 + lvl * 5, respawnTimer: 0 });
     }
-    let numTrees = 2 + floor(lvl / 4);
+    let numTrees = 1 + floor(lvl / 6);
     for (let i = 0; i < numTrees; i++) {
       let ta = random(TWO_PI);
       let tr = random(0.4, 0.85);
@@ -17266,6 +17305,13 @@ function expandIsland() {
       state.buildings.push({ x: cx + rx * 0.35, y: cy + ry * 0.3, w: 24, h: 20, type: 'floor', rot: 0 });
       state.buildings.push({ x: cx + rx * 0.35, y: cy + ry * 0.4, w: 24, h: 20, type: 'floor', rot: 0 });
       state.buildings.push({ x: cx + rx * 0.4, y: cy + ry * 0.5, w: 32, h: 8, type: 'wall', rot: 0 });
+      // South road — port toward center (5 tiles)
+      { let _port = getPortPosition();
+        for (let i = 0; i < 5; i++) {
+          let t = (i + 1) / 6;
+          state.buildings.push({ x: lerp(_port.x, cx, t), y: lerp(_port.y, cy + 10, t), w: 24, h: 20, type: 'floor', rot: 0 });
+        }
+      }
     }
     if (lvl === 9) {
       // Three aqueduct segments spanning north
@@ -17294,6 +17340,11 @@ function expandIsland() {
       state.buildings.push({ x: cx + rx * 0.3,  y: cy,            w: 10, h: 20, type: 'lantern', rot: 0 });
       state.buildings.push({ x: cx + rx * 0.45, y: cy,            w: 10, h: 20, type: 'lantern', rot: 0 });
       state.buildings.push({ x: cx - rx * 0.2,  y: cy + ry * 0.4, w: 24, h: 24, type: 'well',    rot: 0 });
+      // East road — forum toward temple (4 tiles)
+      for (let i = 0; i < 4; i++) {
+        let t = (i + 1) / 5;
+        state.buildings.push({ x: lerp(cx + rx * 0.05, cx + rx * 0.55, t), y: lerp(cy + ry * 0.15, cy - ry * 0.35, t), w: 24, h: 20, type: 'floor', rot: 0 });
+      }
       addFloatingText(width / 2, height * 0.3, 'Lanterns light the via — a second well dug!', '#ffee88');
       spawnParticles(cx + rx * 0.3, cy, 'build', 10);
     }
@@ -17328,6 +17379,11 @@ function expandIsland() {
       state.buildings.push({ x: cx - rx * 0.25 - 10,  y: cy - ry * 0.35 + 16, w: 8, h: 16, type: 'torch', rot: 0 });
       state.buildings.push({ x: cx - rx * 0.25 + 66,  y: cy - ry * 0.35 + 16, w: 8, h: 16, type: 'torch', rot: 0 });
       state.buildings.push({ x: cx - rx * 0.25 + 142, y: cy - ry * 0.35 + 16, w: 8, h: 16, type: 'torch', rot: 0 });
+      // Southeast road — forum toward castrum (3 tiles)
+      for (let i = 0; i < 3; i++) {
+        let t = (i + 1) / 4;
+        state.buildings.push({ x: lerp(cx + rx * 0.05, cx + rx * 0.45, t), y: lerp(cy + ry * 0.15, cy + ry * 0.5, t), w: 24, h: 20, type: 'floor', rot: 0 });
+      }
       addFloatingText(width / 2, height * 0.3, 'Housing district expands!', '#aaddff');
       spawnParticles(cx - rx * 0.25 + 66, cy - ry * 0.35, 'build', 12);
     }
