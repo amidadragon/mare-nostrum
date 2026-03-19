@@ -483,6 +483,12 @@ function initState() {
       ],
     },
 
+    // NPC daily wants + favor system
+    npcFavor: { livia: 0, marcus: 0, vesta: 0, felix: 0 },
+    lastWantDate: '',
+    todayWantsSatisfied: [],
+    zonesVisitedToday: [],
+
     // Crystal shrine — far left side of island, well clear of farm grid
     crystalShrine: {
       x: WORLD.islandCX - 440, y: WORLD.islandCY - 15,
@@ -1795,6 +1801,8 @@ function drawInner() {
     }
     updatePlayer(dt);
     updatePlayerAnim(dt);
+    resetDailyWantsIfNeeded();
+    updateZoneVisits();
     { let _pg = state.progression;
       let _full = !_pg.gameStarted || _pg.villaCleared;
       if (_full || _pg.companionsAwakened.lares) updateCompanion(dt);
@@ -12709,6 +12717,162 @@ function drawCenturion() {
   pop();
 }
 
+// ─── NPC DAILY WANTS + FAVOR ─────────────────────────────────────────────
+function getTodayDateString() {
+  return new Date().toISOString().split('T')[0];
+}
+
+function resetDailyWantsIfNeeded() {
+  let today = getTodayDateString();
+  if (state.lastWantDate !== today) {
+    state.lastWantDate = today;
+    state.todayWantsSatisfied = [];
+    state.zonesVisitedToday = [];
+  }
+}
+
+function getNPCDailyWant(npcName) {
+  if (typeof getDailyWant === 'function') return getDailyWant(npcName);
+  let daySeed = Math.floor(Date.now() / 86400000);
+  let offsets = { livia: 0, marcus: 3, vesta: 5, felix: 7 };
+  let gifts = { livia: 'flower', marcus: 'fish', vesta: 'harvest', felix: 'gold' };
+  let offset = offsets[npcName] || 0;
+  return { type: 'gift', resource: gifts[npcName], label: npcName + ' wants a gift' };
+}
+
+function checkNPCWantSatisfied(npcName) {
+  resetDailyWantsIfNeeded();
+  if (state.todayWantsSatisfied.includes(npcName)) return false;
+
+  let want = getNPCDailyWant(npcName);
+  if (!want) return false;
+
+  let satisfied = false;
+  if (want.type === 'gift') {
+    let res = want.resource;
+    if (state[res] && state[res] >= 1) {
+      state[res]--;
+      satisfied = true;
+    }
+  } else if (want.type === 'favor') {
+    satisfied = state.zonesVisitedToday && state.zonesVisitedToday.includes(want.zone);
+  } else if (want.type === 'activity') {
+    satisfied = true;
+  }
+
+  if (satisfied) {
+    state.todayWantsSatisfied.push(npcName);
+    state.npcFavor[npcName] = Math.min(30, (state.npcFavor[npcName] || 0) + 1);
+    addFloatingText(width / 2, height * 0.3, npcName.charAt(0).toUpperCase() + npcName.slice(1) + ' is pleased! +1 Favor', '#ffdd44');
+    spawnParticles(state.player.x, state.player.y - 10, 'harvest', 8);
+
+    let favor = state.npcFavor[npcName];
+    if (favor === 10 || favor === 20 || favor === 30) {
+      addNotification('New dialogue unlocked with ' + npcName.charAt(0).toUpperCase() + npcName.slice(1) + '!', '#ffaaff');
+    }
+    return true;
+  }
+  return false;
+}
+
+function drawNPCWantBubble(npcScreenX, npcScreenY, npcName) {
+  resetDailyWantsIfNeeded();
+  if (state.todayWantsSatisfied.includes(npcName)) return;
+  if ((state.npcFavor[npcName] || 0) >= 30) return;
+
+  let want = getNPCDailyWant(npcName);
+  if (!want) return;
+
+  let bx = npcScreenX, by = npcScreenY - 28;
+  let bob = sin(frameCount * 0.06 + npcScreenX * 0.01) * 2;
+
+  noStroke();
+  fill(255, 250, 235);
+  rect(bx - 8, by - 8 + bob, 16, 14, 3);
+  fill(255, 250, 235);
+  beginShape();
+  vertex(bx - 2, by + 6 + bob);
+  vertex(bx + 2, by + 6 + bob);
+  vertex(bx, by + 10 + bob);
+  endShape(CLOSE);
+
+  if (want.type === 'gift') {
+    fill(200, 160, 80);
+    rect(bx - 4, by - 4 + bob, 8, 6);
+    fill(220, 180, 100);
+    rect(bx - 5, by - 5 + bob, 10, 2);
+    fill(180, 50, 40);
+    rect(bx - 1, by - 4 + bob, 2, 6);
+  } else if (want.type === 'favor') {
+    fill(140, 120, 90);
+    ellipse(bx - 2, by - 1 + bob, 4, 6);
+    ellipse(bx + 2, by + 1 + bob, 3, 5);
+  } else if (want.type === 'activity') {
+    fill(240, 200, 60);
+    ellipse(bx, by - 1 + bob, 7, 7);
+    fill(255, 220, 80);
+    ellipse(bx, by - 1 + bob, 4, 4);
+  }
+}
+
+function drawFavorStars(x, y, npcName) {
+  let favor = state.npcFavor[npcName] || 0;
+  let fullStars = Math.floor(favor / 6);
+  let partialFill = (favor % 6) / 6;
+
+  for (let i = 0; i < 5; i++) {
+    let sx = x + i * 14;
+    if (i < fullStars) {
+      fill(240, 200, 60);
+    } else if (i === fullStars && partialFill > 0) {
+      fill(lerp(120, 240, partialFill), lerp(110, 200, partialFill), lerp(90, 60, partialFill));
+    } else {
+      fill(120, 110, 90);
+    }
+    noStroke();
+    beginShape();
+    vertex(sx, y - 4);
+    vertex(sx + 3, y);
+    vertex(sx, y + 4);
+    vertex(sx - 3, y);
+    endShape(CLOSE);
+  }
+}
+
+function updateZoneVisits() {
+  if (!state.zonesVisitedToday) state.zonesVisitedToday = [];
+  let px = state.player.x, py = state.player.y;
+
+  if (state.pyramid && dist(px, py, state.pyramid.x, state.pyramid.y) < 80) {
+    if (!state.zonesVisitedToday.includes('temple')) state.zonesVisitedToday.push('temple');
+  }
+  let farmX = getFarmCenterX(), farmY = getFarmCenterY();
+  if (dist(px, py, farmX, farmY) < 100) {
+    if (!state.zonesVisitedToday.includes('farm')) state.zonesVisitedToday.push('farm');
+  }
+  let port = getPortPosition();
+  if (dist(px, py, port.x, port.y) < 60) {
+    if (!state.zonesVisitedToday.includes('port')) state.zonesVisitedToday.push('port');
+  }
+  if (state.legia && state.legia.castrumX) {
+    if (dist(px, py, state.legia.castrumX, state.legia.castrumY) < 70) {
+      if (!state.zonesVisitedToday.includes('castrum')) state.zonesVisitedToday.push('castrum');
+    }
+  }
+  if (state.ruins && state.ruins.length > 0) {
+    state.ruins.forEach(r => {
+      if (dist(px, py, r.x, r.y) < 50) {
+        if (!state.zonesVisitedToday.includes('ruins')) state.zonesVisitedToday.push('ruins');
+      }
+    });
+  }
+  if (state.crystalShrine) {
+    if (dist(px, py, state.crystalShrine.x, state.crystalShrine.y) < 50) {
+      if (!state.zonesVisitedToday.includes('shrine')) state.zonesVisitedToday.push('shrine');
+    }
+  }
+}
+
 // ─── NPC ──────────────────────────────────────────────────────────────────
 function drawNPC() {
   let n = state.npc;
@@ -12989,8 +13153,14 @@ function drawNPC() {
     text(tier.title, 0, -34 - (n.currentLine !== -1 && n.currentLine !== null ? 28 : 0));
     textAlign(LEFT, TOP);
   }
+  // Favor stars below hearts
+  drawFavorStars(-(5 * 14) / 2, -38 - (n.currentLine !== -1 && n.currentLine !== null ? 28 : 0), 'livia');
 
   pop(); // counter-scale
+
+  // Want bubble (drawn outside counter-scale, in screen coords)
+  drawNPCWantBubble(0, -20, 'livia');
+
   pop(); // main translate
 }
 
@@ -21655,6 +21825,7 @@ function keyPressed() {
     let n = state.npc;
     let d = dist2(p.x, p.y, n.x, n.y);
     if (d < 80) {
+      checkNPCWantSatisfied('livia');
       // Gift priority: wine/oil (3 hearts), meals (2 hearts), harvest (1 heart)
       let giftHearts = 0;
       let giftName = '';
@@ -21709,6 +21880,7 @@ function keyPressed() {
       if (name === 'Marcus' && !nn.present) return;
       let dd = dist2(p.x, p.y, nn.x, nn.y);
       if (dd < 80) {
+        checkNPCWantSatisfied(name.toLowerCase());
         // Gift check
         let giftH = 0, giftN = '';
         let wineBonus = (state.prophecy && state.prophecy.type === 'wine') ? 2 : 1;
@@ -22591,6 +22763,10 @@ function saveGame() {
     progression: state.progression,
     // Narrative engine
     mainQuest: state.mainQuest || null,
+    npcFavor: state.npcFavor || { livia: 0, marcus: 0, vesta: 0, felix: 0 },
+    lastWantDate: state.lastWantDate || '',
+    todayWantsSatisfied: state.todayWantsSatisfied || [],
+    zonesVisitedToday: state.zonesVisitedToday || [],
     npcQuests: state.npcQuests || null,
     loreTablets: state.loreTablets || null,
     narrativeFlags: state.narrativeFlags || null,
@@ -22798,6 +22974,10 @@ function loadGame() {
     }
     // Load narrative engine state
     if (d.mainQuest) state.mainQuest = d.mainQuest;
+    if (d.npcFavor) state.npcFavor = d.npcFavor;
+    state.lastWantDate = d.lastWantDate || '';
+    state.todayWantsSatisfied = d.todayWantsSatisfied || [];
+    state.zonesVisitedToday = d.zonesVisitedToday || [];
     if (d.npcQuests) state.npcQuests = d.npcQuests;
     if (d.loreTablets) state.loreTablets = d.loreTablets;
     if (d.narrativeFlags) state.narrativeFlags = d.narrativeFlags;
@@ -24340,6 +24520,10 @@ function drawNewNPC(npc, type) {
     text(_tier.title, 0, -28);
     textAlign(LEFT, TOP);
   }
+  // Favor stars below hearts
+  drawFavorStars(-(5 * 14) / 2, -32, type);
+  // Want bubble above NPC
+  drawNPCWantBubble(0, -20, type);
 
   // Dialog bubble
   if (npc.dialogTimer > 0) {
