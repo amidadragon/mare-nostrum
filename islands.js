@@ -41,6 +41,12 @@ function updateVulcanIsland(dt) {
 }
 function drawVulcanIsland() {
   let v = state.vulcan, ix = w2sX(v.isleX), iy = w2sY(v.isleY);
+  let isActive = v.active;
+  // Clamp to horizon when viewed from boat
+  if (!isActive) {
+    let horizMinY = max(height * 0.06, height * 0.25 - (typeof horizonOffset !== 'undefined' ? horizonOffset : 0)) + 10;
+    iy = max(iy, horizMinY);
+  }
   if (ix < -500 || ix > width + 500 || iy < -500 || iy > height + 500) return;
   push(); noStroke();
   let vt = frameCount * 0.01;
@@ -145,6 +151,14 @@ function drawVulcanIsland() {
   fill(255, forged ? 170 : 50, 0, floor(35 * crackGlow));
   ellipse(ix, iy - 38, 42, 26);
   if (forged) { fill(255, 200, 80, floor(15 * crackGlow)); ellipse(ix, iy - 38, 60, 36); }
+  // Distant dock indicator
+  if (!isActive) {
+    noStroke();
+    fill(140, 120, 90);
+    rect(ix - 3, iy + v.isleRY * 0.4, 6, 12); // pier
+    fill(160, 140, 105);
+    rect(ix - 5, iy + v.isleRY * 0.4, 10, 3); // pier top
+  }
   pop();
 }
 function drawVulcanEntities() {
@@ -217,6 +231,12 @@ function updateHyperboreIsland(dt) {
 }
 function drawHyperboreIsland() {
   let h = state.hyperborea, ix = w2sX(h.isleX), iy = w2sY(h.isleY);
+  let isActive = h.active;
+  // Clamp to horizon when viewed from boat
+  if (!isActive) {
+    let horizMinY = max(height * 0.06, height * 0.25 - (typeof horizonOffset !== 'undefined' ? horizonOffset : 0)) + 10;
+    iy = max(iy, horizMinY);
+  }
   if (ix < -500 || ix > width + 500 || iy < -500 || iy > height + 500) return;
   push(); noStroke();
   let ht = frameCount * 0.01;
@@ -299,6 +319,14 @@ function drawHyperboreIsland() {
       rect(floor(ax - 40), floor(ay + 4), 80, 2);
       rect(floor(ax - 30), floor(ay - 4), 60, 2);
     }
+  }
+  // Distant dock indicator
+  if (!isActive) {
+    noStroke();
+    fill(140, 120, 90);
+    rect(ix - 3, iy + h.isleRY * 0.4, 6, 12); // pier
+    fill(160, 140, 105);
+    rect(ix - 5, iy + h.isleRY * 0.4, 10, 3); // pier top
   }
   pop();
 }
@@ -394,6 +422,12 @@ function updatePlentyIsland(dt) {
 }
 function drawPlentyIsland() {
   let pl = state.plenty, ix = w2sX(pl.isleX), iy = w2sY(pl.isleY);
+  let isActive = pl.active;
+  // Clamp to horizon when viewed from boat
+  if (!isActive) {
+    let horizMinY = max(height * 0.06, height * 0.25 - (typeof horizonOffset !== 'undefined' ? horizonOffset : 0)) + 10;
+    iy = max(iy, horizMinY);
+  }
   if (ix < -500 || ix > width + 500 || iy < -500 || iy > height + 500) return;
   push(); noStroke();
   let pt = frameCount * 0.01;
@@ -470,6 +504,14 @@ function drawPlentyIsland() {
     let mAlpha = 20 + sin(pt * 6) * 8;
     fill(200, 225, 240, mAlpha); ellipse(wx, wy + wf.h - 2, 22, 10);
   }
+  // Distant dock indicator
+  if (!isActive) {
+    noStroke();
+    fill(140, 120, 90);
+    rect(ix - 3, iy + pl.isleRY * 0.4, 6, 12); // pier
+    fill(160, 140, 105);
+    rect(ix - 5, iy + pl.isleRY * 0.4, 10, 3); // pier top
+  }
   pop();
 }
 function drawPlentyEntities() {
@@ -536,6 +578,12 @@ function updateNecropolisIsland(dt) {
 }
 function drawNecropolisIsland() {
   let n = state.necropolis, ix = w2sX(n.isleX), iy = w2sY(n.isleY);
+  let isActive = n.active;
+  // Clamp to horizon when viewed from boat
+  if (!isActive) {
+    let horizMinY = max(height * 0.06, height * 0.25 - (typeof horizonOffset !== 'undefined' ? horizonOffset : 0)) + 10;
+    iy = max(iy, horizMinY);
+  }
   if (ix < -500 || ix > width + 500 || iy < -500 || iy > height + 500) return;
   push(); noStroke();
   let nt = frameCount * 0.01;
@@ -612,6 +660,14 @@ function drawNecropolisIsland() {
   fill(110, 55, 170, 12 * glow); ellipse(ix, iy, n.isleRX * 2.2, n.isleRY * 2.2);
   // Active dark overlay
   if (n.active) { fill(0, 0, 10, 25 * (n.darkAura || 0.3)); ellipse(ix, iy, n.isleRX * 2.5, n.isleRY * 2.5); }
+  // Distant dock indicator
+  if (!isActive) {
+    noStroke();
+    fill(140, 120, 90);
+    rect(ix - 3, iy + n.isleRY * 0.4, 6, 12); // pier
+    fill(160, 140, 105);
+    rect(ix - 5, iy + n.isleRY * 0.4, 10, 3); // pier top
+  }
   pop();
 }
 function drawNecropolisEntities() {
