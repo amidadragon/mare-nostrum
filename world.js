@@ -629,40 +629,138 @@ function drawIsland() {
   fill(160, 185, 200, 18 * wetShimmer * dayMix);
   drawCoastlineShape(ix, iy, iw * 0.4625, ih * 0.1925, -15);
 
+  // ─── COASTAL VARIETY ───
+  // North rocky headland (angle PI+0.3 to TWO_PI-0.3)
+  {
+    let hRX = iw * 0.462;
+    let hRY = ih * 0.193;
+    for (let ha = PI + 0.3; ha < TWO_PI - 0.3; ha += 0.18) {
+      let hx = floor(ix + cos(ha) * hRX + sin(ha * 3.1) * 4);
+      let hy = floor((iy - 14) + sin(ha) * hRY + cos(ha * 2.7) * 2);
+      fill(88, 78, 62);
+      rect(hx - 3, hy - 2, 5 + floor(sin(ha * 5.3) * 2), 3);
+      rect(hx, hy - 4, 3, 2);
+    }
+  }
+  // East tide pools (angle -0.3 to PI/4)
+  {
+    let tRX = iw * 0.455;
+    let tRY = ih * 0.190;
+    for (let ta = -0.3; ta < PI / 4; ta += 0.22) {
+      let tx = ix + cos(ta) * tRX + sin(ta * 4.1) * 3;
+      let ty = (iy - 14) + sin(ta) * tRY + cos(ta * 3.3) * 2;
+      fill(45, 100, 110, 80);
+      ellipse(tx, ty, 7 + sin(ta * 7) * 2, 3);
+    }
+  }
+
   // Grass top — seasonal colors with terrain variation
   let sg = getSeasonGrass();
   // Base grass (organic coastline)
   fill(sg.r, sg.g, sg.b);
   drawCoastlineShape(ix, iy, iw * 0.45, ih * 0.18, -18);
 
-  // ─── HILLS — 4 elevation mounds ───
+  // ─── HILLS — 4 elevation mounds (3-layer with sun direction) ───
   let bright2 = getSkyBrightness();
   if (bright2 > 0.1) {
     let hillAlpha = 60 * bright2;
-    // H1: Central sacred hill (where pyramid sits)
+
+    // H1: Central sacred hill — cast shadow below
+    fill(sg.r - 25, sg.g - 20, sg.b - 12, 45 * bright2);
+    ellipse(ix + iw * 0.04, iy - 10, iw * 0.18, ih * 0.07);
+    // H1 north shadow face
+    fill(sg.r - 20, sg.g - 16, sg.b - 10, hillAlpha * 0.9);
+    drawCoastlineShape(ix + iw * 0.03, iy + 6, iw * 0.14, ih * 0.065, -16);
+    // H1 body
     fill(sg.r + 22, sg.g + 28, sg.b + 10, hillAlpha);
     drawCoastlineShape(ix + iw * 0.03, iy, iw * 0.14, ih * 0.065, -22);
-    // Highlight rim
+    // H1 south highlight face
     fill(sg.r + 35, sg.g + 40, sg.b + 15, hillAlpha * 0.5);
-    drawCoastlineShape(ix + iw * 0.03, iy, iw * 0.12, ih * 0.05, -24);
+    drawCoastlineShape(ix + iw * 0.03, iy - 3, iw * 0.12, ih * 0.05, -24);
+    // H1 rocky outcrops on shadow side
+    fill(88, 78, 62, 110);
+    rect(floor(ix + iw * 0.00), floor(iy - 14), 4, 3);
+    rect(floor(ix + iw * 0.02), floor(iy - 11), 3, 2);
+    rect(floor(ix - iw * 0.02), floor(iy - 12), 5, 3);
+    rect(floor(ix + iw * 0.04), floor(iy - 10), 3, 2);
+    rect(floor(ix - iw * 0.01), floor(iy - 9), 4, 3);
 
     // H2: Northwest hill
+    // Shadow face
+    fill(sg.r - 18, sg.g - 14, sg.b - 9, hillAlpha * 0.7);
+    drawCoastlineShape(ix - iw * 0.22, iy + 6, iw * 0.09, ih * 0.05, -14);
+    // Body
     fill(sg.r + 16, sg.g + 20, sg.b + 6, hillAlpha * 0.8);
     drawCoastlineShape(ix - iw * 0.22, iy, iw * 0.09, ih * 0.05, -20);
+    // Highlight
+    fill(sg.r + 28, sg.g + 32, sg.b + 10, hillAlpha * 0.4);
+    drawCoastlineShape(ix - iw * 0.22, iy - 3, iw * 0.077, ih * 0.038, -22);
+    // Rocky outcrops
+    fill(88, 78, 62, 100);
+    rect(floor(ix - iw * 0.25), floor(iy - 12), 4, 2);
+    rect(floor(ix - iw * 0.23), floor(iy - 10), 3, 2);
+    rect(floor(ix - iw * 0.20), floor(iy - 11), 4, 3);
 
     // H3: East hill (near grove)
+    // Shadow face
+    fill(sg.r - 16, sg.g - 12, sg.b - 8, hillAlpha * 0.65);
+    drawCoastlineShape(ix + iw * 0.24, iy + 6, iw * 0.08, ih * 0.04, -15);
+    // Body
     fill(sg.r + 18, sg.g + 22, sg.b + 8, hillAlpha * 0.7);
     drawCoastlineShape(ix + iw * 0.24, iy, iw * 0.08, ih * 0.04, -21);
+    // Highlight
+    fill(sg.r + 30, sg.g + 34, sg.b + 12, hillAlpha * 0.35);
+    drawCoastlineShape(ix + iw * 0.24, iy - 3, iw * 0.068, ih * 0.032, -23);
+    // Rocky outcrops
+    fill(88, 78, 62, 95);
+    rect(floor(ix + iw * 0.21), floor(iy - 10), 3, 2);
+    rect(floor(ix + iw * 0.23), floor(iy - 12), 4, 2);
+    rect(floor(ix + iw * 0.26), floor(iy - 9), 3, 2);
 
     // H4: South gentle slope
+    // Shadow face
+    fill(sg.r - 12, sg.g - 10, sg.b - 6, hillAlpha * 0.45);
+    drawCoastlineShape(ix + iw * 0.05, iy + 5, iw * 0.12, ih * 0.04, -7);
+    // Body
     fill(sg.r + 10, sg.g + 14, sg.b + 4, hillAlpha * 0.5);
     drawCoastlineShape(ix + iw * 0.05, iy, iw * 0.12, ih * 0.04, -12);
+    // Highlight
+    fill(sg.r + 22, sg.g + 26, sg.b + 8, hillAlpha * 0.25);
+    drawCoastlineShape(ix + iw * 0.05, iy - 2, iw * 0.10, ih * 0.032, -14);
 
     // Valley shadows between hills
     fill(sg.r - 18, sg.g - 14, sg.b - 10, 35 * bright2);
     ellipse(ix - iw * 0.08, iy - 16, iw * 0.16, ih * 0.06);
     fill(sg.r - 14, sg.g - 12, sg.b - 8, 28 * bright2);
     ellipse(ix + iw * 0.14, iy - 14, iw * 0.13, ih * 0.05);
+  }
+
+  // ─── VEGETATION ZONES ───
+  if (bright2 > 0.1) {
+    // Olive grove — NE quadrant
+    fill(55, 80, 38, 55 * bright2);
+    ellipse(ix + iw * 0.22, iy - 22, iw * 0.18, ih * 0.10);
+    // Olive grove dappled shadow dots
+    fill(30, 50, 20, 40 * bright2);
+    for (let od = 0; od < 8; od++) {
+      let odx = ix + iw * 0.22 + sin(od * 1.9) * iw * 0.07;
+      let ody = iy - 22 + cos(od * 2.3) * ih * 0.04;
+      ellipse(odx, ody, 8 + sin(od * 3.1) * 3, 4);
+    }
+
+    // Scrubland — south shore
+    fill(95, 88, 48, 45 * bright2);
+    ellipse(ix + iw * 0.06, iy - 6, iw * 0.22, ih * 0.07);
+
+    // Cultivated field — west near farm
+    fill(75, 118, 42, 50 * bright2);
+    ellipse(ix - iw * 0.28, iy - 18, iw * 0.16, ih * 0.08);
+    // Horizontal row lines across field
+    fill(55, 95, 30, 35 * bright2);
+    for (let fr = -2; fr <= 2; fr++) {
+      let frY = floor(iy - 18 + fr * 5);
+      rect(floor(ix - iw * 0.36), frY, floor(iw * 0.16), 2);
+    }
   }
 
   // Wildflower patches — scattered colored clusters
