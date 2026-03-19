@@ -1793,7 +1793,6 @@ function drawInner() {
       let _full = !_pg.gameStarted || _pg.villaCleared;
       if (_full || _pg.companionsAwakened.harvester) updateHarvester(dt);
     }
-    updateVestaCrystals(dt);
     updateBlessing(dt);
     updateCats(dt);
     updateCitizens(dt);
