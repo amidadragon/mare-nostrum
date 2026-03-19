@@ -167,6 +167,23 @@ const WORLD = {
   tileSize: 32,     // grid snap for building
 };
 
+const TUNIC_COLORS = [
+  { name: 'Natural',  rgb: [220, 200, 170] },
+  { name: 'Saffron',  rgb: [240, 180, 60] },
+  { name: 'Indigo',   rgb: [80, 100, 200] },
+  { name: 'Scarlet',  rgb: [200, 60, 60] },
+  { name: 'Forest',   rgb: [80, 140, 80] },
+  { name: 'Bone',     rgb: [240, 235, 220] },
+];
+
+const HEADWEAR = [
+  { name: 'None',         unlocked: function() { return true; } },
+  { name: 'Laurel Crown', unlocked: function() { return (state.islandLevel || 0) >= 10; } },
+  { name: 'Bronze Helm',  unlocked: function() { return (state.player.totalXp || 0) >= 500 || (state.codex && state.codex.enemies && Object.values(state.codex.enemies).reduce(function(s,e) { return s + (e.count || 0); }, 0) >= 50); } },
+];
+
+let wardrobeOpen = false;
+
 // Organic coastline — cached noise vertices (regenerated on island resize)
 let _coastlineVerts = null;
 let _coastlineLastRX = 0;
@@ -416,6 +433,8 @@ function initState() {
       fortifyTimer: 0,    // damage reduction active timer
       battleCryTimer: 0,  // soldier buff active timer
     },
+
+    wardrobe: { tunicColor: 0, headwear: 0 },
 
     rowing: {
       active: false,
@@ -2148,6 +2167,7 @@ function drawInner() {
       drawLegiaUI();
       drawExpeditionSummaryOverlay();
       if (typeof drawArenaSummaryOverlay === 'function') drawArenaSummaryOverlay();
+      drawWardrobe();
       drawAchievementPopup();
       if (typeof drawEconomyUIOverlay === 'function') drawEconomyUIOverlay();
       drawScreenTransition();
@@ -11236,6 +11256,181 @@ function triggerPlayerAlert() {
 }
 
 // ─── PLAYER DRAW — MODULAR LAYERS ────────────────────────────────────────
+function drawWardrobe() {
+  if (!wardrobeOpen) return;
+
+  let pw = 220, ph = 280;
+  let px = width / 2 - pw / 2;
+  let py = height / 2 - ph / 2;
+
+  noStroke();
+  fill(0, 0, 0, 120);
+  rect(0, 0, width, height);
+
+  fill(45, 35, 25);
+  rect(px, py, pw, ph, 6);
+  fill(65, 52, 38);
+  rect(px + 4, py + 4, pw - 8, ph - 8, 4);
+
+  fill(220, 200, 160);
+  textSize(14);
+  textAlign(CENTER);
+  text('WARDROBE', px + pw / 2, py + 24);
+
+  fill(180, 165, 135);
+  textSize(10);
+  text('Tunic', px + pw / 2, py + 46);
+
+  let swatchSize = 24;
+  let swatchGap = 8;
+  let swatchStartX = px + (pw - (TUNIC_COLORS.length * (swatchSize + swatchGap) - swatchGap)) / 2;
+
+  for (let i = 0; i < TUNIC_COLORS.length; i++) {
+    let sx = swatchStartX + i * (swatchSize + swatchGap);
+    let sy = py + 54;
+    let tc = TUNIC_COLORS[i];
+
+    fill(tc.rgb[0], tc.rgb[1], tc.rgb[2]);
+    ellipse(sx + swatchSize / 2, sy + swatchSize / 2, swatchSize, swatchSize);
+
+    if (state.wardrobe.tunicColor === i) {
+      noFill();
+      stroke(220, 190, 80);
+      strokeWeight(2);
+      ellipse(sx + swatchSize / 2, sy + swatchSize / 2, swatchSize + 4, swatchSize + 4);
+      noStroke();
+    }
+
+    fill(160, 145, 120);
+    textSize(7);
+    text(tc.name, sx + swatchSize / 2, sy + swatchSize + 10);
+  }
+
+  fill(180, 165, 135);
+  textSize(10);
+  text('Headwear', px + pw / 2, py + 110);
+
+  let hwSize = 40;
+  let hwGap = 16;
+  let hwStartX = px + (pw - (HEADWEAR.length * (hwSize + hwGap) - hwGap)) / 2;
+
+  for (let i = 0; i < HEADWEAR.length; i++) {
+    let hx = hwStartX + i * (hwSize + hwGap);
+    let hy = py + 120;
+    let hw = HEADWEAR[i];
+    let isUnlocked = hw.unlocked();
+
+    fill(isUnlocked ? 55 : 40, isUnlocked ? 45 : 35, isUnlocked ? 35 : 30);
+    rect(hx, hy, hwSize, hwSize, 4);
+
+    if (state.wardrobe.headwear === i && isUnlocked) {
+      noFill();
+      stroke(220, 190, 80);
+      strokeWeight(2);
+      rect(hx - 2, hy - 2, hwSize + 4, hwSize + 4, 5);
+      noStroke();
+    }
+
+    if (!isUnlocked) {
+      fill(100, 90, 70);
+      rect(hx + hwSize/2 - 5, hy + hwSize/2 - 4, 10, 8, 2);
+      noFill();
+      stroke(100, 90, 70);
+      strokeWeight(1.5);
+      arc(hx + hwSize/2, hy + hwSize/2 - 4, 8, 8, PI, TWO_PI);
+      noStroke();
+    } else {
+      push();
+      translate(hx + hwSize / 2, hy + hwSize / 2);
+      noStroke();
+      if (i === 0) {
+        fill(195, 165, 130);
+        ellipse(0, -2, 14, 16);
+      } else if (i === 1) {
+        fill(80, 160, 60);
+        for (let l = -3; l <= 3; l++) {
+          let la = l * 0.4;
+          let lx = cos(la - HALF_PI) * 8;
+          let ly = sin(la - HALF_PI) * 8;
+          ellipse(lx, ly - 2, 5, 3);
+        }
+      } else if (i === 2) {
+        fill(180, 150, 100);
+        arc(0, 2, 18, 16, PI, TWO_PI);
+        rect(-9, 2, 18, 4);
+        fill(160, 130, 80);
+        rect(-2, 2, 4, 8);
+        fill(200, 50, 40);
+        rect(-8, -8, 16, 3, 1);
+      }
+      pop();
+    }
+
+    fill(isUnlocked ? 160 : 100, isUnlocked ? 145 : 90, isUnlocked ? 120 : 70);
+    textSize(7);
+    textAlign(CENTER);
+    text(hw.name, hx + hwSize / 2, hy + hwSize + 12);
+  }
+
+  fill(180, 165, 135);
+  textSize(10);
+  text('Preview', px + pw / 2, py + 195);
+
+  push();
+  translate(px + pw / 2, py + 235);
+  scale(2);
+  drawPlayerPreview();
+  pop();
+
+  fill(140, 125, 100);
+  textSize(9);
+  text('[W] Close', px + pw / 2, py + ph - 10);
+
+  textAlign(LEFT);
+}
+
+function drawPlayerPreview() {
+  let tc = TUNIC_COLORS[state.wardrobe ? state.wardrobe.tunicColor || 0 : 0].rgb;
+  noStroke();
+
+  fill(0, 0, 0, 30);
+  ellipse(0, 8, 12, 4);
+
+  fill(tc[0] - 30, tc[1] - 30, tc[2] - 30);
+  rect(-3, 3, 2, 5);
+  rect(1, 3, 2, 5);
+
+  fill(tc[0], tc[1], tc[2]);
+  rect(-4, -5, 8, 9);
+
+  fill(120, 90, 50);
+  rect(-4, 1, 8, 2);
+
+  fill(195, 165, 130);
+  rect(-3, -10, 6, 5);
+
+  fill(50);
+  rect(-2, -8, 1, 1);
+  rect(1, -8, 1, 1);
+
+  let hw = state.wardrobe ? state.wardrobe.headwear || 0 : 0;
+  if (hw === 0) {
+    fill(80, 60, 40);
+    rect(-3, -11, 6, 2);
+  } else if (hw === 1) {
+    fill(80, 160, 60);
+    rect(-4, -12, 8, 2);
+    rect(-5, -11, 2, 2);
+    rect(3, -11, 2, 2);
+  } else if (hw === 2) {
+    fill(180, 150, 100);
+    rect(-4, -12, 8, 4);
+    rect(-3, -8, 6, 1);
+    fill(200, 50, 40);
+    rect(-3, -13, 6, 2);
+  }
+}
+
 function drawPlayer() {
   if (state.rowing.active) return;
   let p = state.player;
@@ -11317,10 +11512,12 @@ function drawPlayer() {
     rect(1, 17 + kickR * 0.5, 4, 2);
 
     // Tunic body
-    fill(180, 50, 40);
+    let _dtc = TUNIC_COLORS[state.wardrobe ? state.wardrobe.tunicColor || 0 : 0].rgb;
+    let _dHas = state.wardrobe && state.wardrobe.tunicColor > 0;
+    fill(_dHas ? _dtc[0] : 180, _dHas ? _dtc[1] : 50, _dHas ? _dtc[2] : 40);
     rect(-7, -4, 14, 14, 2);
     // Tunic ripple in water
-    fill(160, 40, 35, 150);
+    fill(_dHas ? _dtc[0] - 20 : 160, _dHas ? _dtc[1] - 10 : 40, _dHas ? _dtc[2] - 5 : 35, 150);
     let ripple = sin(t * 0.06) * 1.5;
     rect(-8 + ripple, 2, 16, 3);
     // Belt
@@ -11512,17 +11709,19 @@ function drawPlayerCape(fDir, moving, isRoman) {
 function drawPlayerBody(isRoman) {
   let breathe = sin(frameCount * 0.04) * 0.4;
   let chestW = 14 + floor(breathe);
+  let _tc = TUNIC_COLORS[state.wardrobe ? state.wardrobe.tunicColor || 0 : 0].rgb;
+  let _hasCostume = state.wardrobe && state.wardrobe.tunicColor > 0;
 
   if (isRoman) {
-  // Crimson tunic with bronze lorica
-  fill(175, 58, 44);
+  // Tunic with bronze lorica
+  fill(_hasCostume ? _tc[0] : 175, _hasCostume ? _tc[1] : 58, _hasCostume ? _tc[2] : 44);
   rect(-floor(chestW / 2), -5, chestW, 18);
   // Tunica shadow fold
-  fill(122, 40, 30, 60);
+  fill(_hasCostume ? _tc[0] - 50 : 122, _hasCostume ? _tc[1] - 18 : 40, _hasCostume ? _tc[2] - 14 : 30, 60);
   rect(-6, 4, 2, 8);
   rect(4, 5, 2, 7);
   // Torn tunic edge — tattered hem
-  fill(155, 50, 38, 80);
+  fill(_hasCostume ? _tc[0] - 20 : 155, _hasCostume ? _tc[1] - 8 : 50, _hasCostume ? _tc[2] - 6 : 38, 80);
   rect(-5, 12, 2, 1);
   rect(2, 13, 3, 1);
 
@@ -11556,13 +11755,13 @@ function drawPlayerBody(isRoman) {
   rect(-8, -6, 2, 1);
   rect(6, -6, 2, 1);
   } else {
-  // Castaway terracotta tunic
-  fill(196, 101, 74);
+  // Castaway tunic
+  fill(_hasCostume ? _tc[0] : 196, _hasCostume ? _tc[1] : 101, _hasCostume ? _tc[2] : 74);
   rect(-floor(chestW / 2), -5, chestW, 18);
-  fill(160, 80, 55, 60);
+  fill(_hasCostume ? _tc[0] - 36 : 160, _hasCostume ? _tc[1] - 21 : 80, _hasCostume ? _tc[2] - 19 : 55, 60);
   rect(-6, 4, 2, 8);
   rect(4, 5, 2, 7);
-  fill(170, 88, 60, 80);
+  fill(_hasCostume ? _tc[0] - 26 : 170, _hasCostume ? _tc[1] - 13 : 88, _hasCostume ? _tc[2] - 14 : 60, 80);
   rect(-5, 12, 2, 1);
   rect(2, 13, 3, 1);
   rect(-2, 13, 1, 1);
@@ -11730,6 +11929,27 @@ function drawPlayerHead(fDir, facingUp, anim, isRoman) {
     // Plume wear/tear — gap pixels
     fill(196, 162, 70);
     rect(3, -19, 1, 1); // torn spot
+  }
+
+  // Wardrobe headwear override
+  let _wHw = state.wardrobe ? state.wardrobe.headwear || 0 : 0;
+  if (_wHw === 1 && HEADWEAR[1].unlocked()) {
+    fill(80, 160, 60);
+    rect(-5, -15, 2, 1); rect(3, -15, 2, 1);
+    fill(90, 170, 65);
+    rect(-4, -16, 2, 1); rect(2, -16, 2, 1);
+    rect(-1, -17, 2, 1);
+    fill(60, 140, 40, 120);
+    rect(-6, -14, 1, 2); rect(5, -14, 1, 2);
+  } else if (_wHw === 2 && HEADWEAR[2].unlocked()) {
+    fill(196, 162, 70);
+    rect(-6, -16, 12, 5);
+    fill(170, 140, 60);
+    rect(-6, -13, 2, 3); rect(4, -13, 2, 3);
+    fill(180, 30, 20);
+    rect(-4, -20, 8, 4); rect(-2, -22, 4, 2);
+    let _cf = floor(sin(frameCount * 0.08) * 1);
+    rect(-3, -21 + _cf, 2, 3); rect(2, -21 - _cf, 2, 3);
   }
 
   if (facingUp) {
@@ -21205,6 +21425,36 @@ function mousePressed() {
   if (gameScreen !== 'game') { handleMenuClick(); return; }
   if (state.introPhase !== 'done') { skipIntro(); return; }
   if (state.cutscene) { skipCutscene(); return; }
+  // Wardrobe click handling
+  if (wardrobeOpen) {
+    let pw = 220, ph = 280;
+    let px = width / 2 - pw / 2;
+    let py = height / 2 - ph / 2;
+    let swatchSize = 24, swatchGap = 8;
+    let swatchStartX = px + (pw - (TUNIC_COLORS.length * (swatchSize + swatchGap) - swatchGap)) / 2;
+    for (let i = 0; i < TUNIC_COLORS.length; i++) {
+      let sx = swatchStartX + i * (swatchSize + swatchGap) + swatchSize / 2;
+      let sy = py + 54 + swatchSize / 2;
+      if (dist(mouseX, mouseY, sx, sy) < swatchSize / 2 + 2) {
+        state.wardrobe.tunicColor = i;
+        return;
+      }
+    }
+    let hwSize = 40, hwGap = 16;
+    let hwStartX = px + (pw - (HEADWEAR.length * (hwSize + hwGap) - hwGap)) / 2;
+    for (let i = 0; i < HEADWEAR.length; i++) {
+      let hx = hwStartX + i * (hwSize + hwGap);
+      let hy = py + 120;
+      if (mouseX > hx && mouseX < hx + hwSize && mouseY > hy && mouseY < hy + hwSize) {
+        if (HEADWEAR[i].unlocked()) state.wardrobe.headwear = i;
+        return;
+      }
+    }
+    if (mouseX < px || mouseX > px + pw || mouseY < py || mouseY > py + ph) {
+      wardrobeOpen = false;
+    }
+    return;
+  }
   // Dismiss lore tablet popup / narrative dialogue on click
   if (typeof loreTabletPopup !== 'undefined' && loreTabletPopup) { loreTabletPopup = null; return; }
   if (typeof narrativeDialogue !== 'undefined' && narrativeDialogue) { narrativeDialogue = null; return; }
@@ -21644,6 +21894,7 @@ function keyPressed() {
   // ESC — close overlays first, then menu as last resort
   if (keyCode === 27) {
     if (state.insideTemple) { state.insideTemple = false; return; }
+    if (wardrobeOpen) { wardrobeOpen = false; return; }
     if (dialogState.active) { dialogState.active = false; return; }
     if (state.expeditionModifierSelect) { state.expeditionModifierSelect = false; return; }
     if (state.upgradeShopOpen) { state.upgradeShopOpen = false; return; }
@@ -22266,6 +22517,14 @@ function keyPressed() {
     return false; // prevent browser tab switching
   }
 
+  // Wardrobe toggle (W key)
+  if (key === 'w' || key === 'W') {
+    if (gameScreen === 'game' && !state.diving.active && !state.rowing.active) {
+      wardrobeOpen = !wardrobeOpen;
+      return;
+    }
+  }
+
   // Inventory toggle (I key)
   if (key === 'i' || key === 'I') {
     inventoryOpen = !inventoryOpen;
@@ -22295,7 +22554,7 @@ function keyPressed() {
   }
 
   // Block input when overlays are open
-  if (empireDashOpen || inventoryOpen || state.naturalistOpen) return;
+  if (empireDashOpen || inventoryOpen || state.naturalistOpen || wardrobeOpen) return;
 
   // Villa Codex toggle
   if (key === 'v' || key === 'V') {
@@ -23006,6 +23265,8 @@ function saveGame() {
     activeEvent: state.activeEvent || null,
     eventCooldown: state.eventCooldown || {},
     eventHistory: state.eventHistory || [],
+    // Wardrobe cosmetics
+    wardrobe: state.wardrobe || { tunicColor: 0, headwear: 0 },
     // Victory
     won: state.won || false,
     // Progression system
@@ -23208,6 +23469,8 @@ function loadGame() {
     if (d.activeEvent) state.activeEvent = d.activeEvent;
     if (d.eventCooldown) state.eventCooldown = d.eventCooldown;
     if (d.eventHistory) state.eventHistory = d.eventHistory;
+    // Wardrobe cosmetics
+    state.wardrobe = d.wardrobe || { tunicColor: 0, headwear: 0 };
     // Victory state
     state.won = d.won || false;
     // Ensure prophecy exists
