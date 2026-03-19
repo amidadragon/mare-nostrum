@@ -995,14 +995,13 @@ function buildIsland() {
   randomSeed(42);
   // Two loose rows flanking road, plus scattered extras behind
   let treeSlots = [];
-  for (let tx = cx + 100; tx <= cx + 360; tx += 48 + random(-8, 8)) {
+  for (let tx = cx + 100; tx <= cx + 360; tx += 64 + random(-8, 8)) {
     // Upper row — offset varies naturally
     treeSlots.push({ x: tx + random(-6, 6), y: avenueY - 26 - random(0, 12) });
     // Lower row
     treeSlots.push({ x: tx + random(-6, 6), y: avenueY + 26 + random(0, 12) });
     // Occasional extra tree set back further (grove depth)
-    if (random() > 0.5) treeSlots.push({ x: tx + random(-10, 10), y: avenueY - 48 - random(0, 15) });
-    if (random() > 0.6) treeSlots.push({ x: tx + random(-10, 10), y: avenueY + 48 + random(0, 10) });
+    if (random() > 0.7) treeSlots.push({ x: tx + random(-10, 10), y: avenueY - 48 - random(0, 15) });
   }
   randomSeed(millis()); // restore random
   for (let slot of treeSlots) {
@@ -16893,6 +16892,32 @@ function getExpandCostString() {
   return parts.join(', ');
 }
 
+function canPlaceBuilding(x, y, w, h) {
+  return !state.buildings.some(b => {
+    return Math.abs(b.x - x) < (b.w + w) / 2 + 4 &&
+           Math.abs(b.y - y) < (b.h + h) / 2 + 4;
+  });
+}
+
+function placeBuildingChecked(bld) {
+  if (canPlaceBuilding(bld.x, bld.y, bld.w, bld.h)) {
+    state.buildings.push(bld);
+    return true;
+  }
+  // Try offset positions
+  let offsets = [[20, 0], [-20, 0], [0, 20], [0, -20], [25, 15], [-25, -15]];
+  for (let off of offsets) {
+    let nx = bld.x + off[0], ny = bld.y + off[1];
+    if (canPlaceBuilding(nx, ny, bld.w, bld.h)) {
+      bld.x = nx; bld.y = ny;
+      state.buildings.push(bld);
+      return true;
+    }
+  }
+  state.buildings.push(bld); // fallback: place anyway
+  return false;
+}
+
 function expandIsland() {
   let cost = getExpandCost(state.islandLevel);
   if (!canAffordExpand()) {
@@ -16938,8 +16963,8 @@ function expandIsland() {
     unlockJournal('imperial_governor');
     // Temple on the east side, Market near port
     let port = getPortPosition();
-    state.buildings.push({ x: cx + rx * 0.55, y: cy - ry * 0.35, w: 56, h: 40, type: 'temple', rot: 0 });
-    state.buildings.push({ x: port.x + 80, y: port.y - 30, w: 36, h: 28, type: 'market', rot: 0 });
+    placeBuildingChecked({ x: cx + rx * 0.55, y: cy - ry * 0.35, w: 56, h: 40, type: 'temple', rot: 0 });
+    placeBuildingChecked({ x: port.x + 80, y: port.y - 30, w: 36, h: 28, type: 'market', rot: 0 });
     // Two torches flanking temple entrance
     state.buildings.push({ x: cx + rx * 0.55 - 32, y: cy - ry * 0.35 + 16, w: 8, h: 16, type: 'torch', rot: 0 });
     state.buildings.push({ x: cx + rx * 0.55 + 32, y: cy - ry * 0.35 + 16, w: 8, h: 16, type: 'torch', rot: 0 });
@@ -16961,15 +16986,15 @@ function expandIsland() {
   }
   if (state.islandLevel === 15) {
     unlockJournal('imperial_senator');
-    // Forum in the south, Watchtower on the far east edge
-    state.buildings.push({ x: cx, y: cy + ry * 0.5, w: 64, h: 48, type: 'forum', rot: 0 });
-    state.buildings.push({ x: cx + rx * 0.8, y: cy - ry * 0.1, w: 20, h: 44, type: 'watchtower', rot: 0 });
+    // Forum near island center (by pyramid plaza), Watchtower on the far east edge
+    placeBuildingChecked({ x: cx + rx * 0.05, y: cy + ry * 0.15, w: 64, h: 48, type: 'forum', rot: 0 });
+    placeBuildingChecked({ x: cx + rx * 0.8, y: cy - ry * 0.1, w: 20, h: 44, type: 'watchtower', rot: 0 });
     // Triumphal arch along east road
     state.buildings.push({ x: cx + rx * 0.65, y: cy, w: 48, h: 52, type: 'arch', rot: 0 });
     // Mosaic floor for forum area
-    state.buildings.push({ x: cx - 30, y: cy + ry * 0.5 + 30, w: 28, h: 20, type: 'mosaic', rot: 0 });
-    state.buildings.push({ x: cx,      y: cy + ry * 0.5 + 30, w: 28, h: 20, type: 'mosaic', rot: 0 });
-    state.buildings.push({ x: cx + 30, y: cy + ry * 0.5 + 30, w: 28, h: 20, type: 'mosaic', rot: 0 });
+    state.buildings.push({ x: cx + rx * 0.05 - 30, y: cy + ry * 0.15 + 30, w: 28, h: 20, type: 'mosaic', rot: 0 });
+    state.buildings.push({ x: cx + rx * 0.05,      y: cy + ry * 0.15 + 30, w: 28, h: 20, type: 'mosaic', rot: 0 });
+    state.buildings.push({ x: cx + rx * 0.05 + 30, y: cy + ry * 0.15 + 30, w: 28, h: 20, type: 'mosaic', rot: 0 });
     addFloatingText(width / 2, height * 0.25, 'SENATOR — Forum & Watchtower raised!', '#ff9944');
     triggerScreenShake(8, 20);
     spawnParticles(cx, cy + ry * 0.5, 'build', 15);
@@ -16978,8 +17003,8 @@ function expandIsland() {
     unlockJournal('imperial_consul');
     // Triumphal Arch near port entrance, Villa on the north
     let port = getPortPosition();
-    state.buildings.push({ x: port.x + 120, y: port.y - 15, w: 48, h: 52, type: 'arch', rot: 0 });
-    state.buildings.push({ x: cx - rx * 0.3, y: cy - ry * 0.55, w: 60, h: 44, type: 'villa', rot: 0 });
+    placeBuildingChecked({ x: port.x + 120, y: port.y - 15, w: 48, h: 52, type: 'arch', rot: 0 });
+    placeBuildingChecked({ x: cx - rx * 0.3, y: cy - ry * 0.55, w: 60, h: 44, type: 'villa', rot: 0 });
     // Flower gardens around villa (Residential NW)
     state.buildings.push({ x: cx - rx * 0.3 - 40, y: cy - ry * 0.55 + 10, w: 20, h: 16, type: 'flower', rot: 0 });
     state.buildings.push({ x: cx - rx * 0.3 + 40, y: cy - ry * 0.55 + 10, w: 20, h: 16, type: 'flower', rot: 0 });
@@ -17183,7 +17208,7 @@ function expandIsland() {
       let cSize = 14 + floor(lvl / 5) * 2;
       state.crystalNodes.push({ x: crx, y: cry, size: min(cSize, 24), phase: random(TWO_PI), charge: 50 + lvl * 5, respawnTimer: 0 });
     }
-    let numTrees = 4 + lvl + floor(random(0, 3));
+    let numTrees = 2 + floor(lvl / 4);
     for (let i = 0; i < numTrees; i++) {
       let ta = random(TWO_PI);
       let tr = random(0.4, 0.85);
@@ -17219,10 +17244,10 @@ function expandIsland() {
     }
     if (lvl === 8) {
       // Bath house southwest + Castrum
-      state.buildings.push({ x: cx - rx * 0.3, y: cy + ry * 0.35, w: 44, h: 32, type: 'bath', rot: 0 });
+      placeBuildingChecked({ x: cx - rx * 0.3, y: cy + ry * 0.35, w: 44, h: 32, type: 'bath', rot: 0 });
       if (state.legia && state.legia.castrumLevel < 1) {
         let _castrumX = cx + rx * 0.45, _castrumY = cy + ry * 0.5;
-        state.buildings.push({ x: _castrumX, y: _castrumY, w: 52, h: 40, type: 'castrum', rot: 0 });
+        placeBuildingChecked({ x: _castrumX, y: _castrumY, w: 52, h: 40, type: 'castrum', rot: 0 });
         state.legia.castrumLevel = 1;
         state.legia.castrumX = _castrumX;
         state.legia.castrumY = _castrumY;
@@ -17308,7 +17333,7 @@ function expandIsland() {
     }
     if (lvl === 17) {
       // Library — large building north (Civic NE)
-      state.buildings.push({ x: cx + rx * 0.3, y: cy - ry * 0.35, w: 48, h: 36, type: 'library', rot: 0 });
+      placeBuildingChecked({ x: cx + rx * 0.3, y: cy - ry * 0.35, w: 48, h: 36, type: 'library', rot: 0 });
       // Floor tiles in front of library
       state.buildings.push({ x: cx + rx * 0.3 - 20, y: cy - ry * 0.35 + 24, w: 24, h: 20, type: 'floor', rot: 0 });
       state.buildings.push({ x: cx + rx * 0.3,      y: cy - ry * 0.35 + 24, w: 24, h: 20, type: 'floor', rot: 0 });
@@ -17320,27 +17345,27 @@ function expandIsland() {
       spawnParticles(cx + rx * 0.3, cy - ry * 0.35, 'build', 14);
     }
     if (lvl === 18) {
-      // Arena rises — single structure south of center
-      state.buildings.push({ x: cx + rx * 0.15, y: cy + ry * 0.4, w: 56, h: 44, type: 'arena', rot: 0 });
+      // Arena rises — southeast military district
+      placeBuildingChecked({ x: cx + rx * 0.35, y: cy + ry * 0.35, w: 56, h: 44, type: 'arena', rot: 0 });
       // Torches flanking arena entrance
-      state.buildings.push({ x: cx + rx * 0.15 - 36, y: cy + ry * 0.4 + 18, w: 8, h: 16, type: 'torch', rot: 0 });
-      state.buildings.push({ x: cx + rx * 0.15 + 36, y: cy + ry * 0.4 + 18, w: 8, h: 16, type: 'torch', rot: 0 });
+      state.buildings.push({ x: cx + rx * 0.35 - 36, y: cy + ry * 0.35 + 18, w: 8, h: 16, type: 'torch', rot: 0 });
+      state.buildings.push({ x: cx + rx * 0.35 + 36, y: cy + ry * 0.35 + 18, w: 8, h: 16, type: 'torch', rot: 0 });
       addFloatingText(width / 2, height * 0.3, 'Arena rises — glory awaits!', '#ff8844');
-      spawnParticles(cx + rx * 0.15, cy + ry * 0.4, 'build', 14);
+      spawnParticles(cx + rx * 0.35, cy + ry * 0.35, 'build', 14);
     }
     if (lvl === 19) {
-      // Arena grounds — mosaics and decoration around arena
-      state.buildings.push({ x: cx + rx * 0.15 - 20, y: cy + ry * 0.4 + 52, w: 28, h: 20, type: 'mosaic', rot: 0 });
-      state.buildings.push({ x: cx + rx * 0.15 + 20, y: cy + ry * 0.4 + 52, w: 28, h: 20, type: 'mosaic', rot: 0 });
+      // Arena grounds — mosaics and decoration around arena (SE)
+      state.buildings.push({ x: cx + rx * 0.35 - 20, y: cy + ry * 0.35 + 52, w: 28, h: 20, type: 'mosaic', rot: 0 });
+      state.buildings.push({ x: cx + rx * 0.35 + 20, y: cy + ry * 0.35 + 52, w: 28, h: 20, type: 'mosaic', rot: 0 });
       // Lanterns flanking arena approach
-      state.buildings.push({ x: cx + rx * 0.15 - 50, y: cy + ry * 0.4 + 30, w: 10, h: 20, type: 'lantern', rot: 0 });
-      state.buildings.push({ x: cx + rx * 0.15 + 50, y: cy + ry * 0.4 + 30, w: 10, h: 20, type: 'lantern', rot: 0 });
+      state.buildings.push({ x: cx + rx * 0.35 - 50, y: cy + ry * 0.35 + 30, w: 10, h: 20, type: 'lantern', rot: 0 });
+      state.buildings.push({ x: cx + rx * 0.35 + 50, y: cy + ry * 0.35 + 30, w: 10, h: 20, type: 'lantern', rot: 0 });
       addFloatingText(width / 2, height * 0.3, 'Arena complete — let the games begin!', '#ff6622');
-      spawnParticles(cx + rx * 0.15, cy + ry * 0.4 + 30, 'build', 16);
+      spawnParticles(cx + rx * 0.35, cy + ry * 0.35 + 30, 'build', 16);
     }
     if (lvl === 21) {
       // Senate forum + flanking torches
-      state.buildings.push({ x: cx - rx * 0.15,      y: cy + ry * 0.15, w: 64, h: 48, type: 'forum', rot: 0 });
+      placeBuildingChecked({ x: cx - rx * 0.15,      y: cy + ry * 0.15, w: 64, h: 48, type: 'forum', rot: 0 });
       state.buildings.push({ x: cx - rx * 0.15 - 40, y: cy + ry * 0.15 + 20, w: 8, h: 16, type: 'torch', rot: 0 });
       state.buildings.push({ x: cx - rx * 0.15 + 72, y: cy + ry * 0.15 + 20, w: 8, h: 16, type: 'torch', rot: 0 });
       // Floor tiles in front of senate forum (Town Center)
@@ -17376,7 +17401,7 @@ function expandIsland() {
     }
     if (lvl === 24) {
       // Imperial palace villa + mosaics
-      state.buildings.push({ x: cx,      y: cy - ry * 0.5,      w: 60, h: 44, type: 'villa',   rot: 0 });
+      placeBuildingChecked({ x: cx,      y: cy - ry * 0.5,      w: 60, h: 44, type: 'villa',   rot: 0 });
       state.buildings.push({ x: cx - 38, y: cy - ry * 0.5 + 52, w: 28, h: 20, type: 'mosaic',  rot: 0 });
       state.buildings.push({ x: cx + 18, y: cy - ry * 0.5 + 52, w: 28, h: 20, type: 'mosaic',  rot: 0 });
       // Flower gardens flanking palace
