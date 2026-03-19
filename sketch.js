@@ -622,6 +622,8 @@ function initState() {
 
     // Weather
     weather: { type: 'clear', timer: 0, intensity: 0 }, // clear, rain, heatwave, fog
+    daysSinceRain: 0,
+    stormMessageShown: false, // session only, not saved
 
     // Heart milestones already given
     heartRewards: [],
@@ -1830,6 +1832,11 @@ function drawInner() {
     updateCitizens(dt);
     updateCooking(dt);
     updateWeather(dt);
+    // Storm fishing message (first storm per session)
+    if (!state.stormMessageShown && (stormActive || state.weather.type === 'storm' || state.weather.type === 'rain')) {
+      addFloatingText(width / 2, height * 0.25, 'Storm fishing! Double yield!', '#ffaa44');
+      state.stormMessageShown = true;
+    }
     updateHarvestCombo(dt);
     updateCatAdoption();
     updateFestival(dt);
@@ -1881,6 +1888,13 @@ function drawInner() {
     drawConquestIsleDistant();
     drawConquestDistantEntities();
     drawConquestDistantLabel();
+    // Fog dims distant islands
+    if (state.weather.type === 'fog') {
+      let _fogHorizonY = max(height * 0.06, height * 0.25 - horizonOffset) + 30;
+      noStroke();
+      fill(200, 200, 210, 180);
+      rect(0, 0, width, _fogHorizonY);
+    }
     drawColonyOverlay(); // Colony buildings/farms on settled Terra Nova
     if (typeof drawEconomyWorldOverlay === 'function') drawEconomyWorldOverlay();
     // Wreck beach visible when sailing
@@ -2218,6 +2232,12 @@ function updateTime(dt) {
     let prevSeason = getSeason();
     state.time = 0;
     state.day++;
+    // Track days since rain for drought
+    if (state.weather.type === 'rain' || state.weather.type === 'storm' || stormActive) {
+      state.daysSinceRain = 0;
+    } else {
+      state.daysSinceRain = (state.daysSinceRain || 0) + 1;
+    }
     let newSeason = getSeason();
     if (newSeason !== prevSeason) {
       // Season transition fanfare (non-festival days)
@@ -2351,10 +2371,16 @@ function updateTime(dt) {
 
   state.plots.forEach(p => {
     if (p.planted && !p.ripe) {
+      // Storm pauses crop growth
+      if (state.weather.type === 'storm') return;
       let growRate = (hour >= 6 && hour <= 18) ? 0.18 : 0.05;
       if (stormActive) growRate *= 1.8;
       if (state.weather.type === 'rain') growRate *= (1.5 + state.weather.intensity * 0.5);
       if (state.weather.type === 'heatwave') growRate *= 0.5;
+      // Drought slows crop growth
+      let _dsr = state.daysSinceRain || 0;
+      if (_dsr >= 7) growRate *= 0.3;
+      else if (_dsr >= 3) growRate *= 0.5;
       if (state.prophecy && state.prophecy.type === 'crops') growRate *= 1.3;
       let fest = getFestival();
       if (fest && fest.effect.crops) growRate *= fest.effect.crops;
@@ -5089,13 +5115,16 @@ const FISH_TYPES = [
   { name: 'Cuttlefish',      weight: 2, color: '#bb88cc', minH: 17, maxH: 7,  season: -1 },
   { name: 'Red Mullet',      weight: 2, color: '#cc6644', minH: 6,  maxH: 20, season: 0  },  // spring
   { name: "Poseidon's Catch",weight: 8, color: '#55aaff', minH: 0,  maxH: 24, season: -1, stormOnly: true },
+  { name: 'Silver Eel',     weight: 5, color: '#c0d0e0', minH: 0,  maxH: 24, season: -1, stormOnly: true },
+  { name: 'Fog Crab',       weight: 5, color: '#8899aa', minH: 0,  maxH: 24, season: -1, fogOnly: true },
 ];
 
 function rollFishType() {
   let h = state.time / 60;
   let season = getSeason();
   let eligible = FISH_TYPES.filter(f => {
-    if (f.stormOnly && !stormActive) return false;
+    if (f.stormOnly && !stormActive && !(state.weather.type === 'storm' || state.weather.type === 'rain')) return false;
+    if (f.fogOnly && state.weather.type !== 'fog') return false;
     // Time check — wraps around midnight
     if (f.minH < f.maxH) {
       if (h < f.minH || h > f.maxH) return false;
@@ -5136,6 +5165,8 @@ const NAT_FISH_DATA = {
   'cuttlefish':       { label: 'Cuttlefish',        rarity: 'Uncommon', desc: 'Its ink stains the water like a dark prophecy.',       season: 'All Year', time: 'Dusk' },
   'red mullet':       { label: 'Red Mullet',        rarity: 'Uncommon', desc: 'A sacred fish offered at spring festivals.',           season: 'Spring',   time: 'Morning' },
   "poseidon's catch": { label: "Poseidon's Catch",  rarity: 'Legendary',desc: 'Only the storm-tossed sea yields this ancient beast.', season: 'Storm',    time: 'Any' },
+  'silver eel':       { label: 'Silver Eel',        rarity: 'Rare',     desc: 'A shimmering eel drawn to the surface by storm currents.', season: 'Storm', time: 'Any' },
+  'fog crab':         { label: 'Fog Crab',           rarity: 'Rare',     desc: 'Emerges only when the sea mist is thickest.',            season: 'Fog',   time: 'Any' },
 };
 const NAT_CROP_DATA = {
   grain:      { label: 'Grain',      rarity: 'Common',   desc: 'The backbone of Roman civilization. Plant early, harvest often.' },
@@ -10072,6 +10103,19 @@ function drawCrystalShape(x, y, size) {
 // ─── FARM PLOTS ───────────────────────────────────────────────────────────
 function drawFarmPlots() {
   state.plots.forEach(p => drawOnePlot(p));
+  // Drought wilt particles
+  if ((state.daysSinceRain || 0) >= 3 && frameCount % 30 === 0) {
+    let activePlots = state.plots.filter(p => p.planted && !p.ripe && p.stage > 0);
+    if (activePlots.length > 0) {
+      let wp = activePlots[floor(random(activePlots.length))];
+      particles.push({
+        x: wp.x + random(-4, 4), y: wp.y + random(-4, 4),
+        vx: random(-0.2, 0.2), vy: -0.5,
+        life: 30, maxLife: 30, type: 'burst', size: 2,
+        r: 160, g: 130, b: 80, gravity: 0, world: true,
+      });
+    }
+  }
 }
 function drawOnePlot(p) {
     let px = w2sX(p.x);
@@ -10691,6 +10735,8 @@ function updatePlayer(dt) {
   // Heart bonuses: 2+ hearts = +15% speed, 4+ hearts = +30% speed
   let heartSpeedBonus = state.npc.hearts >= 4 ? 1.3 : (state.npc.hearts >= 2 ? 1.15 : 1);
   let spd = p.speed * heartSpeedBonus;
+  // Storm slows movement
+  if (stormActive || state.weather.type === 'storm') spd *= 0.7;
   if (state.prophecy && state.prophecy.type === 'speed') spd *= 1.25;
 
   if (p.dashTimer > 0) {
@@ -10887,6 +10933,8 @@ function reelFish() {
     f.streak = (f.streak || 0) + 1;
     let fishType = rollFishType();
     let amt = fishType.weight >= 3 ? 2 : 1;
+    // Storm fishing bonus: double yield
+    if (stormActive || state.weather.type === 'storm' || state.weather.type === 'rain') amt *= 2;
     if (state.heartRewards.includes('golden')) amt *= 2;
     if (state.prophecy && state.prophecy.type === 'fish') amt += 1;
     let fest = getFestival();
@@ -20142,6 +20190,7 @@ function drawHUD() {
   if (state.blessing.type) hudH += 12;
   if (state.quest) hudH += 12;
   if (state.weather.type !== 'clear') hudH += 12;
+  if ((state.daysSinceRain || 0) >= 3) hudH += 12;
   hudH += 12; // crop select line
   if (state.quarrier && state.quarrier.unlocked) hudH += 14;
   drawHUDPanel(12, 12, 195, hudH - 14);
@@ -20251,6 +20300,15 @@ function drawHUD() {
     textSize(7);
     let wSec = floor(state.weather.timer / 60);
     text('WEATHER: ' + state.weather.type.toUpperCase() + ' (' + wSec + 's)', 22, hudY);
+    hudY += 12;
+  }
+
+  // Drought indicator
+  if ((state.daysSinceRain || 0) >= 3) {
+    fill(200, 140, 60);
+    textSize(7);
+    let dLabel = (state.daysSinceRain || 0) >= 7 ? 'SEVERE DROUGHT' : 'DROUGHT';
+    text(dLabel + ' (day ' + (state.daysSinceRain || 0) + ')', 22, hudY);
     hudY += 12;
   }
 
@@ -22672,7 +22730,7 @@ function saveGame() {
     grapeSeeds: state.grapeSeeds, oliveSeeds: state.oliveSeeds,
     meals: state.meals, wine: state.wine, oil: state.oil,
     stew: state.stew, garum: state.garum, honeyedFigs: state.honeyedFigs, ambrosia: state.ambrosia,
-    weather: state.weather, heartRewards: state.heartRewards,
+    weather: state.weather, daysSinceRain: state.daysSinceRain || 0, heartRewards: state.heartRewards,
     marcusHearts: state.marcus ? state.marcus.hearts : 0,
     vestaHearts: state.vesta ? state.vesta.hearts : 0,
     felixHearts: state.felix ? state.felix.hearts : 0,
@@ -22841,6 +22899,8 @@ function loadGame() {
     state.stew = d.stew || 0; state.garum = d.garum || 0; state.honeyedFigs = d.honeyedFigs || 0; state.ambrosia = d.ambrosia || 0;
     state.heartRewards = d.heartRewards || [];
     if (d.weather) state.weather = d.weather;
+    state.daysSinceRain = d.daysSinceRain || 0;
+    state.stormMessageShown = false; // session only
     if (state.marcus) state.marcus.hearts = d.marcusHearts || 0;
     if (state.vesta) {
       state.vesta.hearts = d.vestaHearts || 0;
