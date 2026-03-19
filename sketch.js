@@ -535,6 +535,11 @@ function initState() {
     showSummary: false,
     lastSummary: null,
 
+    // Random events
+    activeEvent: null,   // null | { id, timer, data }
+    eventCooldown: {},   // { eventId: daysRemaining }
+    eventHistory: [],    // [ eventId, ... ] — one-shot tracking
+
     // Roman festival
     festival: null,
 
@@ -1705,6 +1710,7 @@ function drawInner() {
     updateHarvestCombo(dt);
     updateCatAdoption();
     updateFestival(dt);
+    updateActiveEvent(dt);
     updateVisitor(dt);
     updateDiscoveryEvents(dt);
     updateBridgeConstruction(dt);
@@ -1978,6 +1984,8 @@ function drawInner() {
     if (!photoMode && typeof drawQuestTracker === 'function') drawQuestTracker();
     drawHotbar();
     drawFestivalBanner();
+    drawEventBanner();
+    drawWanderingMerchantUI();
     drawBuildUI();
     drawShopUI();
     drawUpgradeShopUI();
@@ -2102,6 +2110,8 @@ function updateTime(dt) {
     // Colony income (daily)
     updateColonyIncome();
     if (typeof onDayTransitionEconomy === 'function') onDayTransitionEconomy();
+    // Random event roll — 20% chance per day
+    checkRandomEvent();
     // Daily island resource refresh — nodes respawn each day for revisit incentive
     if (state.vulcan.phase !== 'unexplored') {
       state.vulcan.obsidianNodes.forEach(n => n.collected = false);
@@ -2189,6 +2199,7 @@ function updateTime(dt) {
     if (c.charge <= 0) {
       if (!c.respawnTimer) c.respawnTimer = 800;
       let crystalSpeed = (state.prophecy && state.prophecy.type === 'crystal') ? 3 : 1;
+      crystalSpeed *= getEventCrystalMult();
       c.respawnTimer -= dt * crystalSpeed;
       if (c.respawnTimer <= 0) {
         c.charge = 30 + floor(random(30));
@@ -2219,6 +2230,8 @@ function updateTime(dt) {
       });
       if (hasAqueduct) growRate *= 2;
       if (state.blessing.type === 'crops') growRate *= 2;
+      // Event multiplier: harvest_moon = 2x growth speed
+      if (state.activeEvent && state.activeEvent.id === 'harvest_moon') growRate *= 2;
       p.timer += growRate * dt;
       let oldStage = p.stage;
       p.stage = min(3, floor(p.timer / 40));
@@ -3046,6 +3059,377 @@ function updateFestival(dt) {
     spawnParticles(rx, ry, 'harvest', 3);
     addFloatingText(w2sX(rx), w2sY(ry) - 20, '+1 Gold', '#ffcc44');
   }
+}
+
+// ─── RANDOM EVENTS ───────────────────────────────────────────────────────
+// 1 day = ~8000 frames (~133s). Duration values below are in frames.
+const EVENT_DEFS = [
+  {
+    id: 'festival_day',
+    name: 'FESTIVAL DAY',
+    desc: 'All NPCs rejoice! +50% harvest yield.',
+    duration: 8000,    // 1 full day
+    cooldown: 7,       // days before it can fire again
+    oneShot: false,
+    onStart() {
+      addFloatingText(width / 2, height * 0.22, 'Festival Day! All rejoice!', '#ffdd66');
+      spawnParticles(state.player.x, state.player.y, 'harvest', 20);
+      if (snd) snd.playSFX('festival_start');
+    },
+    onEnd() {},
+  },
+  {
+    id: 'storm_surge',
+    name: 'STORM SURGE',
+    desc: 'Heavy weather — crystal nodes charge 2x faster.',
+    duration: 4000,    // half a day
+    cooldown: 5,
+    oneShot: false,
+    onStart() {
+      state.weather = { type: 'rain', timer: 4000, intensity: 0.9 };
+      addFloatingText(width / 2, height * 0.22, 'Storm Surge! Crystal nodes pulse!', '#88ccff');
+      spawnParticles(state.player.x, state.player.y, 'divine', 8);
+    },
+    onEnd() {},
+  },
+  {
+    id: 'wandering_merchant',
+    name: 'WANDERING MERCHANT',
+    desc: 'A rare merchant has anchored at the dock.',
+    duration: 8000,    // 1 day
+    cooldown: 10,
+    oneShot: false,
+    onStart() {
+      // Pick 3 random items from the wandering merchant pool
+      let pool = [
+        { name: 'Exotic Spice', resource: 'exoticSpices', qty: 2, cost: 40 },
+        { name: 'Ancient Relic', resource: 'ancientRelic', qty: 1, cost: 70 },
+        { name: 'Titan Bone', resource: 'titanBone', qty: 1, cost: 55 },
+        { name: 'Soul Essence', resource: 'soulEssence', qty: 2, cost: 80 },
+        { name: 'Rare Hide', resource: 'rareHide', qty: 2, cost: 35 },
+        { name: 'Crystal Shard', resource: 'crystals', qty: 5, cost: 30 },
+        { name: 'Iron Ore', resource: 'ironOre', qty: 3, cost: 25 },
+        { name: 'Rare Seeds', resource: 'seeds', qty: 8, cost: 20 },
+      ];
+      let shuffled = [...pool].sort(() => random() - 0.5);
+      state.activeEvent.data.stock = shuffled.slice(0, 3).map(i => ({ ...i, sold: false }));
+      // Place merchant near dock
+      state.activeEvent.data.x = WORLD.islandCX + WORLD.islandRX - 80;
+      state.activeEvent.data.y = WORLD.islandCY + 60;
+      addFloatingText(width / 2, height * 0.22, 'A rare merchant anchors at the dock!', '#ffcc44');
+      if (snd) snd.playSFX('visitor_arrive');
+    },
+    onEnd() {
+      if (state.activeEvent && state.activeEvent.data.shopOpen) {
+        state.activeEvent.data.shopOpen = false;
+      }
+    },
+  },
+  {
+    id: 'harvest_moon',
+    name: 'HARVEST MOON',
+    desc: 'Night crops glow — all farms grow 2x tonight.',
+    duration: 4000,    // one night
+    cooldown: 8,
+    oneShot: false,
+    onStart() {
+      addFloatingText(width / 2, height * 0.22, 'Harvest Moon rises! Crops grow twice as fast!', '#ffeeaa');
+      spawnParticles(state.player.x, state.player.y, 'harvest', 15);
+    },
+    onEnd() {},
+  },
+  {
+    id: 'solar_eclipse',
+    name: 'SOLAR ECLIPSE',
+    desc: 'The sky darkens. Crystal power doubles.',
+    duration: 200,     // brief — ~3 seconds
+    cooldown: 14,
+    oneShot: false,
+    onStart() {
+      addFloatingText(width / 2, height * 0.22, 'Solar Eclipse! Crystal power surges!', '#cc88ff');
+      spawnParticles(state.player.x, state.player.y, 'divine', 20);
+      if (snd) snd.playSFX('crystal_charge');
+    },
+    onEnd() {},
+  },
+  {
+    id: 'ancient_spirit',
+    name: 'ANCIENT SPIRIT',
+    desc: 'A ghost stirs at the ruins. Approach for a prophecy.',
+    duration: 8000,    // 1 day window to interact
+    cooldown: 0,       // irrelevant — oneShot
+    oneShot: true,
+    onStart() {
+      // Find a ruin position; fall back to centre of island
+      let ruinPos = state.ruins && state.ruins.length > 0
+        ? state.ruins[0]
+        : { x: WORLD.islandCX - 200, y: WORLD.islandCY - 80 };
+      state.activeEvent.data.x = ruinPos.x;
+      state.activeEvent.data.y = ruinPos.y;
+      state.activeEvent.data.interacted = false;
+      addFloatingText(width / 2, height * 0.22, 'An Ancient Spirit lingers at the ruins...', '#aaddff');
+      spawnParticles(ruinPos.x, ruinPos.y, 'divine', 12);
+    },
+    onEnd() {},
+  },
+];
+
+function isEventEligible(def) {
+  if (def.oneShot && state.eventHistory.includes(def.id)) return false;
+  let cd = state.eventCooldown[def.id] || 0;
+  if (cd > 0) return false;
+  return true;
+}
+
+function checkRandomEvent() {
+  if (state.activeEvent) return;
+  if (random() > 0.20) return; // 20% chance per day
+  let eligible = EVENT_DEFS.filter(isEventEligible);
+  if (!eligible.length) return;
+  let def = eligible[floor(random(eligible.length))];
+  state.activeEvent = { id: def.id, timer: def.duration, data: {} };
+  // Tick down other cooldowns by 1 day
+  EVENT_DEFS.forEach(d => {
+    if (state.eventCooldown[d.id] > 0) state.eventCooldown[d.id]--;
+  });
+  // Set cooldown for this event
+  if (!def.oneShot) state.eventCooldown[def.id] = def.cooldown;
+  if (def.oneShot) state.eventHistory.push(def.id);
+  def.onStart();
+}
+
+function updateActiveEvent(dt) {
+  if (!state.activeEvent) {
+    // Tick cooldowns even when no event is active (catch-all in case checkRandomEvent skips)
+    return;
+  }
+  let def = EVENT_DEFS.find(d => d.id === state.activeEvent.id);
+  if (!def) { state.activeEvent = null; return; }
+
+  state.activeEvent.timer -= dt;
+
+  // Per-frame effects
+  if (def.id === 'festival_day') {
+    // Spawn golden particles occasionally
+    if (frameCount % 90 === 0) {
+      let rx = state.player.x + random(-120, 120);
+      let ry = state.player.y + random(-80, 80);
+      spawnParticles(rx, ry, 'harvest', 2);
+    }
+  }
+
+  if (state.activeEvent.timer <= 0) {
+    def.onEnd();
+    state.activeEvent = null;
+  }
+}
+
+// Returns the harvest multiplier contributed by active events (applied on crop harvest)
+function getEventHarvestMult() {
+  if (!state.activeEvent) return 1;
+  let id = state.activeEvent.id;
+  if (id === 'festival_day') return 1.5;
+  if (id === 'harvest_moon') return 2.0;
+  return 1;
+}
+
+// Returns the crystal charge rate multiplier from active events
+function getEventCrystalMult() {
+  if (!state.activeEvent) return 1;
+  let id = state.activeEvent.id;
+  if (id === 'storm_surge') return 2;
+  if (id === 'solar_eclipse') return 2;
+  return 1;
+}
+
+// Returns the crop growth timer multiplier (lower = faster growth) from active events
+function getEventCropGrowthMult() {
+  if (!state.activeEvent) return 1;
+  let id = state.activeEvent.id;
+  if (id === 'harvest_moon') return 0.5; // 2x speed = half the timer
+  return 1;
+}
+
+function drawEventBanner() {
+  if (!state.activeEvent) return;
+  let def = EVENT_DEFS.find(d => d.id === state.activeEvent.id);
+  if (!def) return;
+
+  push();
+  noStroke();
+  // Dark strip across top
+  fill(0, 0, 0, 160);
+  rectMode(CORNER);
+  rect(0, 0, width, 30);
+  // Gold event name left, description centre-right
+  textAlign(LEFT, CENTER);
+  textSize(9);
+  fill(80, 60, 20, 200);
+  rect(0, 0, width, 30);
+  // Gold shimmer strip
+  fill(200, 160, 40, 40);
+  rect(0, 0, width, 2);
+  fill(200, 160, 40, 40);
+  rect(0, 28, width, 2);
+
+  let pulse = sin(frameCount * 0.06) * 0.3 + 0.7;
+  fill(255, 220, 80, floor(pulse * 255));
+  textSize(10);
+  textAlign(LEFT, CENTER);
+  text(def.name, 10, 15);
+
+  fill(220, 200, 140, 220);
+  textSize(9);
+  textAlign(CENTER, CENTER);
+  text(def.desc, width / 2 + 50, 15);
+
+  // Timer bar — thin gold progress across bottom of strip
+  let progress = state.activeEvent.timer / def.duration;
+  fill(180, 140, 30, 140);
+  rect(0, 27, width * progress, 3);
+  pop();
+
+  // Wandering merchant: draw NPC dot and interaction prompt if near
+  if (def.id === 'wandering_merchant' && state.activeEvent.data.x !== undefined) {
+    let mx = state.activeEvent.data.mx !== undefined ? state.activeEvent.data.mx : state.activeEvent.data.x;
+    let my = state.activeEvent.data.my !== undefined ? state.activeEvent.data.my : state.activeEvent.data.y;
+    let sx = w2sX(mx), sy = w2sY(my) + floatOffset;
+    push();
+    // Merchant sprite — simple coloured figure
+    noStroke();
+    fill(180, 120, 60);
+    ellipse(sx, sy - 18, 12, 12);
+    fill(120, 70, 30);
+    rect(sx - 5, sy - 12, 10, 14, 2);
+    fill(200, 160, 60);
+    ellipse(sx, sy - 24, 14, 8);
+    // Interaction prompt
+    let playerDist = dist(state.player.x, state.player.y, mx, my);
+    if (playerDist < 80) {
+      fill(0, 0, 0, 160);
+      rect(sx - 52, sy - 40, 104, 16, 4);
+      fill(255, 220, 100);
+      textSize(9); textAlign(CENTER, CENTER);
+      text('[E] Trade — Wandering Merchant', sx, sy - 32);
+    }
+    pop();
+  }
+
+  // Ancient spirit: draw ghost figure at ruin
+  if (def.id === 'ancient_spirit' && !state.activeEvent.data.interacted) {
+    let gx = state.activeEvent.data.x, gy = state.activeEvent.data.y;
+    let sx = w2sX(gx), sy = w2sY(gy) + floatOffset;
+    let ghostAlpha = sin(frameCount * 0.04) * 60 + 140;
+    push();
+    noStroke();
+    fill(180, 220, 255, ghostAlpha);
+    ellipse(sx, sy - 20, 10, 10);
+    fill(180, 220, 255, ghostAlpha - 40);
+    ellipse(sx, sy - 8, 8, 18);
+    let playerDist = dist(state.player.x, state.player.y, gx, gy);
+    if (playerDist < 80) {
+      fill(0, 0, 0, 160);
+      rect(sx - 48, sy - 38, 96, 16, 4);
+      fill(180, 220, 255);
+      textSize(9); textAlign(CENTER, CENTER);
+      text('[E] Speak with the Spirit', sx, sy - 30);
+    }
+    pop();
+  }
+}
+
+// Interaction: called from the E-key handler when near wandering merchant
+function interactWanderingMerchant() {
+  if (!state.activeEvent || state.activeEvent.id !== 'wandering_merchant') return false;
+  let mx = state.activeEvent.data.x, my = state.activeEvent.data.y;
+  if (dist(state.player.x, state.player.y, mx, my) > 80) return false;
+  state.activeEvent.data.shopOpen = !state.activeEvent.data.shopOpen;
+  return true;
+}
+
+// Interaction: called from E-key handler when near ancient spirit
+function interactAncientSpirit() {
+  if (!state.activeEvent || state.activeEvent.id !== 'ancient_spirit') return false;
+  if (state.activeEvent.data.interacted) return false;
+  let gx = state.activeEvent.data.x, gy = state.activeEvent.data.y;
+  if (dist(state.player.x, state.player.y, gx, gy) > 80) return false;
+  state.activeEvent.data.interacted = true;
+  let prophecies = [
+    'The tide that retreats leaves behind its gifts.',
+    'Stone endures. So shall you.',
+    'When the sun hides its face, the crystal sings.',
+    'That which you plant in faith shall yield tenfold.',
+    'The sea remembers all who crossed it.',
+    'Listen — even silence carries news from Rome.',
+  ];
+  let msg = prophecies[floor(random(prophecies.length))];
+  addFloatingText(width / 2, height * 0.3, '"' + msg + '"', '#aaddff');
+  spawnParticles(gx, gy, 'divine', 14);
+  // End the event
+  state.activeEvent.timer = 0;
+  return true;
+}
+
+// Draw the wandering merchant shop UI (rendered in main HUD pass)
+function drawWanderingMerchantUI() {
+  if (!state.activeEvent || state.activeEvent.id !== 'wandering_merchant') return;
+  if (!state.activeEvent.data.shopOpen) return;
+  let stock = state.activeEvent.data.stock || [];
+  let panelW = 260, panelH = 40 + stock.length * 50;
+  let px = width / 2 - panelW / 2, py = height / 2 - panelH / 2;
+  push();
+  noStroke();
+  fill(30, 22, 12, 220);
+  rect(px, py, panelW, panelH, 8);
+  stroke(180, 140, 50); strokeWeight(1); noFill();
+  rect(px, py, panelW, panelH, 8);
+  noStroke();
+  fill(220, 180, 80);
+  textSize(11); textAlign(CENTER, TOP);
+  text('WANDERING MERCHANT', px + panelW / 2, py + 10);
+  fill(160, 140, 100);
+  textSize(8); textAlign(CENTER, TOP);
+  text('Gold: ' + state.gold, px + panelW / 2, py + 24);
+  stock.forEach((item, i) => {
+    let iy = py + 40 + i * 50;
+    fill(item.sold ? 50 : 45, item.sold ? 40 : 35, 25, 200);
+    rect(px + 8, iy, panelW - 16, 44, 4);
+    if (!item.sold) {
+      fill(200, 180, 120);
+      textSize(9); textAlign(LEFT, TOP);
+      text(item.name + ' (x' + item.qty + ')', px + 16, iy + 6);
+      fill(200, 180, 60);
+      text(item.cost + 'g', px + panelW - 50, iy + 6);
+      fill(140, 160, 120);
+      textSize(8);
+      text('Press ' + (i + 1) + ' to buy', px + 16, iy + 22);
+    } else {
+      fill(100, 140, 80);
+      textSize(9); textAlign(CENTER, CENTER);
+      text('SOLD', px + panelW / 2, iy + 22);
+    }
+  });
+  fill(160, 120, 60);
+  textSize(8); textAlign(CENTER, BOTTOM);
+  text('[E] Close', px + panelW / 2, py + panelH - 6);
+  pop();
+}
+
+function buyWanderingMerchantItem(idx) {
+  if (!state.activeEvent || state.activeEvent.id !== 'wandering_merchant') return;
+  let stock = state.activeEvent.data.stock;
+  if (!stock || idx < 0 || idx >= stock.length) return;
+  let item = stock[idx];
+  if (item.sold) { addFloatingText(width / 2, height * 0.35, 'Already sold!', '#ff8888'); return; }
+  if (state.gold < item.cost) {
+    addFloatingText(width / 2, height * 0.35, 'Need ' + item.cost + ' gold!', '#ff6644');
+    return;
+  }
+  state.gold -= item.cost;
+  state[item.resource] = (state[item.resource] || 0) + item.qty;
+  item.sold = true;
+  addFloatingText(width / 2, height * 0.3, 'Bought ' + item.name + '!', '#ffcc44');
+  if (snd) snd.playSFX('harvest');
 }
 
 // ─── NIGHT MARKET ────────────────────────────────────────────────────────
@@ -18929,6 +19313,8 @@ function mousePressed() {
         if (state.colonySpec && state.colonySpec['conquest'] === 'agricultural') harvestAmt = floor(harvestAmt * 1.3);
         // Fertile Hands passive skill bonus
         if (typeof getHarvestSkillBonus === 'function') harvestAmt = floor(harvestAmt * getHarvestSkillBonus());
+        // Random event bonus (festival_day +50%, harvest_moon +100%)
+        harvestAmt = floor(harvestAmt * getEventHarvestMult());
         // Harvest combo
         harvestAmt = onHarvestCombo(p, harvestAmt);
         state.harvest += harvestAmt;
@@ -19154,6 +19540,7 @@ function keyPressed() {
     if (state.ship && state.ship.shopOpen) { state.ship.shopOpen = false; return; }
     if (state.tradeRouteUI) { state.tradeRouteUI = false; return; }
     if (state.legia && state.legia.legiaUIOpen) { state.legia.legiaUIOpen = false; return; }
+    if (state.activeEvent && state.activeEvent.data && state.activeEvent.data.shopOpen) { state.activeEvent.data.shopOpen = false; return; }
     saveGame();
     gameScreen = 'menu';
     menuFadeIn = 0;
@@ -19337,6 +19724,12 @@ function keyPressed() {
     if (keyCode === 27 || key === 'e' || key === 'E') { state.nightMarket.shopOpen = false; return; }
     return; // Block other input while market open
   }
+  // Wandering merchant purchases (1-3 keys while shop open)
+  if (state.activeEvent && state.activeEvent.id === 'wandering_merchant' && state.activeEvent.data.shopOpen) {
+    if (key >= '1' && key <= '3') { buyWanderingMerchantItem(parseInt(key) - 1); return; }
+    if (keyCode === 27 || key === 'e' || key === 'E') { state.activeEvent.data.shopOpen = false; return; }
+    return;
+  }
   // Dash
   if (keyCode === SHIFT && state.player.dashCooldown <= 0 && state.solar >= 10) {
     state.player.dashTimer = 10;
@@ -19377,6 +19770,10 @@ function keyPressed() {
         if (inWater) { startDive(); return; }
       }
     }
+
+    // Random event E-key interactions
+    if (interactWanderingMerchant()) return;
+    if (interactAncientSpirit()) return;
 
     // Discovery event interaction (NPC rescue, etc.)
     if (handleDiscoveryInteract()) return;
@@ -20475,6 +20872,10 @@ function saveGame() {
     },
     // Legia military system
     legia: state.legia || null,
+    // Random events
+    activeEvent: state.activeEvent || null,
+    eventCooldown: state.eventCooldown || {},
+    eventHistory: state.eventHistory || [],
     // Victory
     won: state.won || false,
     // Progression system
@@ -20666,6 +21067,10 @@ function loadGame() {
       state.legia.deployed = d.legia.deployed || 0;
       state.legia.legiaUIOpen = false; // never restore open
     }
+    // Random events
+    if (d.activeEvent) state.activeEvent = d.activeEvent;
+    if (d.eventCooldown) state.eventCooldown = d.eventCooldown;
+    if (d.eventHistory) state.eventHistory = d.eventHistory;
     // Victory state
     state.won = d.won || false;
     // Ensure prophecy exists
