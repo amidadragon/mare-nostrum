@@ -8749,9 +8749,222 @@ function drawOneBuilding(b) {
         rect(-bw / 2 + 2, -bh / 2 + 2, bw - 4, 2);
         rect(-bw / 2 + 2, bh / 2 - 4, bw - 4, 2);
         break;
+
+      case 'shrine': {
+        // Small sacred shrine — raised platform, columns, flame bowl
+        noStroke();
+        fill(178, 170, 155);
+        rect(-bw / 2, -bh / 2 + 10, bw, bh - 10, 1);
+        for (let sry = -bh / 2 + 12; sry < bh / 2; sry += 4) {
+          for (let srx = -bw / 2 + 2; srx < bw / 2 - 2; srx += 4) {
+            if ((floor(srx / 4) + floor(sry / 4)) % 2 === 0) {
+              fill(168, 160, 145);
+              rect(srx, sry, 4, 4);
+            }
+          }
+        }
+        fill(200, 193, 178);
+        rect(-bw / 4 - 2, -bh / 2 + 2, 4, bh - 12, 1);
+        rect(bw / 4 - 2, -bh / 2 + 2, 4, bh - 12, 1);
+        fill(210, 202, 186);
+        rect(-bw / 4 - 3, -bh / 2 + 1, 6, 3, 1);
+        rect(bw / 4 - 3, -bh / 2 + 1, 6, 3, 1);
+        fill(190, 182, 166);
+        rect(-bw / 4 - 3, bh / 2 - 4, 6, 2, 1);
+        rect(bw / 4 - 3, bh / 2 - 4, 6, 2, 1);
+        fill(120, 100, 65);
+        rect(-4, -bh / 2 + 10, 8, 4, 1);
+        rect(-3, -bh / 2 + 8, 6, 3);
+        let shrineFlicker = sin(frameCount * 0.22 + b.x * 0.5) * 1.5;
+        fill(255, 140, 30, 200);
+        beginShape();
+        vertex(shrineFlicker * 0.3, -bh / 2 + 2 + shrineFlicker);
+        vertex(-3, -bh / 2 + 8);
+        vertex(3, -bh / 2 + 8);
+        endShape(CLOSE);
+        fill(255, 210, 60, 180);
+        beginShape();
+        vertex(0, -bh / 2 + 4 + shrineFlicker * 0.5);
+        vertex(-2, -bh / 2 + 8);
+        vertex(2, -bh / 2 + 8);
+        endShape(CLOSE);
+        let shrinePulse = 25 + sin(frameCount * 0.04 + b.x * 0.07) * 15;
+        fill(205, 165, 55, shrinePulse);
+        ellipse(0, -bh / 2 + 6, 14, 10);
+        break;
+      }
+
+      case 'house': {
+        noStroke();
+        fill(0, 0, 0, 25);
+        rect(-bw / 2 + 2, bh / 2 - 3, bw, 5);
+        fill(218, 198, 168);
+        rect(-bw / 2, -bh / 2 + 8, bw, bh - 8, 1);
+        stroke(198, 178, 148, 60);
+        strokeWeight(0.5);
+        for (let hby = -bh / 2 + 10; hby < bh / 2; hby += 4) {
+          line(-bw / 2 + 1, hby, bw / 2 - 1, hby);
+          let hboff = (floor((hby + 10) / 4) % 2) * 5;
+          for (let hbx = -bw / 2 + hboff + 4; hbx < bw / 2 - 2; hbx += 8) {
+            line(hbx, hby, hbx, hby + 4);
+          }
+        }
+        noStroke();
+        fill(95, 58, 24);
+        rect(-5, -bh / 2 + 14, 10, bh - 22, 1);
+        fill(75, 45, 18);
+        rect(-4, -bh / 2 + 15, 3.5, bh - 24);
+        rect(0.5, -bh / 2 + 15, 3.5, bh - 24);
+        fill(180, 150, 70);
+        rect(3, -bh / 2 + 20, 2, 2, 1);
+        fill(40, 35, 25, 180);
+        rect(-bw / 2 + 4, -bh / 2 + 12, 8, 6);
+        rect(bw / 2 - 12, -bh / 2 + 12, 8, 6);
+        fill(175, 95, 55);
+        rect(-bw / 2 + 3, -bh / 2 + 11, 3, 8);
+        rect(-bw / 2 + 10, -bh / 2 + 11, 3, 8);
+        rect(bw / 2 - 13, -bh / 2 + 11, 3, 8);
+        rect(bw / 2 - 6, -bh / 2 + 11, 3, 8);
+        fill(185, 100, 58);
+        beginShape();
+        vertex(-bw / 2 - 2, -bh / 2 + 8);
+        vertex(0, -bh / 2 - 4);
+        vertex(bw / 2 + 2, -bh / 2 + 8);
+        endShape(CLOSE);
+        fill(195, 115, 68);
+        beginShape();
+        vertex(-bw / 2 + 2, -bh / 2 + 7);
+        vertex(0, -bh / 2 - 2);
+        vertex(bw / 2 - 2, -bh / 2 + 7);
+        endShape(CLOSE);
+        fill(0, 0, 0, 30);
+        rect(-bw / 2 - 2, -bh / 2 + 7, bw + 4, 3);
+        if (getSkyBrightness() < 0.5) {
+          let houseNight = map(getSkyBrightness(), 0, 0.5, 1, 0);
+          fill(255, 200, 80, 60 * houseNight);
+          rect(-bw / 2 + 4, -bh / 2 + 12, 8, 6);
+          rect(bw / 2 - 12, -bh / 2 + 12, 8, 6);
+          fill(255, 190, 70, 20 * houseNight);
+          ellipse(0, -bh / 2 + 18, 16, 10);
+        }
+        break;
+      }
+
+      case 'library': {
+        noStroke();
+        fill(0, 0, 0, 25);
+        rect(-bw / 2 + 2, bh / 2 - 3, bw, 5);
+        fill(195, 185, 168);
+        rect(-bw / 2, -bh / 2 + 6, bw, bh - 6, 1);
+        for (let lni = 0; lni < 6; lni++) {
+          let lnx = -bw / 2 + 8 + lni * ((bw - 16) / 5);
+          fill(55, 42, 28, 180);
+          rect(lnx, -bh / 2 + 12, 5, 8, 1);
+          fill(195, 175, 140);
+          rect(lnx + 1, -bh / 2 + 14, 3, 5, 1);
+        }
+        fill(205, 198, 183);
+        rect(-8, -bh / 2 + 4, 5, bh - 10, 1);
+        rect(3, -bh / 2 + 4, 5, bh - 10, 1);
+        fill(215, 208, 192);
+        rect(-9, -bh / 2 + 3, 7, 3, 1);
+        rect(2, -bh / 2 + 3, 7, 3, 1);
+        fill(180, 172, 158);
+        rect(-bw / 2, -bh / 2, bw, 8, 1);
+        fill(185, 177, 162);
+        for (let lpi = 0; lpi < 6; lpi++) {
+          let lpx = -bw / 2 + 2 + lpi * ((bw - 4) / 5);
+          rect(lpx, -bh / 2 - 3, 4, 4, 1);
+        }
+        fill(195, 160, 55, 150);
+        rect(-bw / 2 + 1, -bh / 2 + 7, bw - 2, 2);
+        break;
+      }
+
+      case 'arena': {
+        noStroke();
+        fill(210, 190, 150);
+        ellipse(0, 0, bw - 8, bh - 8);
+        for (let ati = 0; ati < 12; ati++) {
+          let atx = (sin(ati * 2.3 + b.x) * (bw / 2 - 10));
+          let aty = (cos(ati * 1.7 + b.y) * (bh / 2 - 10));
+          fill(195, 175, 135, 80);
+          rect(atx - 1, aty - 1, 2, 2);
+        }
+        for (let aai = 0; aai < 20; aai++) {
+          let aAngle = aai * TWO_PI / 20;
+          let asx = cos(aAngle) * (bw / 2 - 2);
+          let asy = sin(aAngle) * (bh / 2 - 2);
+          let seatCol = aai % 2 === 0 ? [170, 162, 148] : [160, 152, 138];
+          fill(seatCol[0], seatCol[1], seatCol[2]);
+          rect(asx - 3, asy - 3, 6, 6);
+        }
+        fill(155, 148, 132);
+        rect(-8, bh / 2 - 10, 16, 10, 1);
+        fill(45, 35, 20, 200);
+        rect(-5, bh / 2 - 8, 10, 8);
+        arc(0, bh / 2 - 8, 10, 6, PI, TWO_PI);
+        fill(110, 85, 45);
+        rect(-bw / 2 + 4, -bh / 2 - 6, 2, 16);
+        rect(bw / 2 - 6, -bh / 2 - 6, 2, 16);
+        fill(180, 35, 35);
+        rect(-bw / 2 + 5, -bh / 2 - 4, 7, 10);
+        rect(bw / 2 - 12, -bh / 2 - 4, 7, 10);
+        fill(155, 25, 25);
+        rect(-bw / 2 + 5, -bh / 2 + 5, 7, 2);
+        rect(bw / 2 - 12, -bh / 2 + 5, 7, 2);
+        break;
+      }
+
+      case 'campfire': {
+        noStroke();
+        let cfGlowPulse = 20 + sin(frameCount * 0.06 + b.x * 0.1) * 12;
+        fill(255, 150, 40, cfGlowPulse);
+        ellipse(0, 0, 20, 16);
+        fill(65, 58, 48);
+        ellipse(0, 0, 10, 8);
+        for (let csi = 0; csi < 8; csi++) {
+          let csAngle = csi * TWO_PI / 8;
+          let csx = cos(csAngle) * 5;
+          let csy = sin(csAngle) * 4;
+          let csCol = csi % 2 === 0 ? [130, 120, 105] : [120, 110, 95];
+          fill(csCol[0], csCol[1], csCol[2]);
+          rect(csx - 1.5, csy - 1.5, 3, 3, 1);
+        }
+        let cfFrame = floor(frameCount / 6) % 4;
+        let cfFlicker = sin(frameCount * 0.3 + b.x) * 0.8;
+        fill(255, 240, 160, 220);
+        rect(-1.5 + cfFlicker * 0.2, -2, 3, 3);
+        fill(255, 150, 30, 200);
+        if (cfFrame === 0) { rect(-2.5 + cfFlicker, -5, 5, 5); }
+        else if (cfFrame === 1) { rect(-3 + cfFlicker, -4, 5, 4); rect(0, -6, 2, 2); }
+        else if (cfFrame === 2) { rect(-2 + cfFlicker, -5, 4, 5); rect(-1, -7, 3, 2); }
+        else { rect(-3 + cfFlicker, -5, 6, 5); }
+        fill(220, 80, 20, 180);
+        if (cfFrame === 0) { rect(-1, -7 + cfFlicker, 2, 3); }
+        else if (cfFrame === 1) { rect(0, -8 + cfFlicker, 2, 3); }
+        else if (cfFrame === 2) { rect(-1.5, -9 + cfFlicker, 3, 3); }
+        else { rect(-0.5, -7 + cfFlicker * 0.5, 2, 2); }
+        fill(255, 220, 80, 150);
+        let sparkSeed = floor(frameCount / 8) % 3;
+        rect(-3 + sparkSeed * 2 + cfFlicker, -9 - sparkSeed, 1, 1);
+        rect(1 - sparkSeed + cfFlicker, -10 + sparkSeed, 1, 1);
+        for (let smi = 0; smi < 3; smi++) {
+          let smY = -10 - smi * 4 - (frameCount * 0.3 + smi * 5) % 12;
+          let smX = sin(frameCount * 0.02 + smi * 2) * 2;
+          let smA = max(0, 40 - smi * 12 - ((frameCount * 0.3 + smi * 5) % 12) * 2);
+          fill(140, 135, 125, smA);
+          rect(smX - 1, smY, 2, 2);
+        }
+        break;
+      }
+
       case 'castrum':
         // Roman military fort — stone walls, tower corners, red standard
         noStroke();
+        // Stone perimeter
+        fill(140, 128, 110);
+        rect(-bw / 2, -bh / 2, bw, bh, 2);
         // Stone perimeter
         fill(140, 128, 110);
         rect(-bw / 2, -bh / 2, bw, bh, 2);
@@ -19015,6 +19228,81 @@ function drawBuildIcon(type, selected) {
       // Roof edge
       fill(selected ? color(165, 88, 50, 180) : color(110, 60, 35, 120));
       rect(-10, -10, 20, 3, 1);
+      break;
+    case 'shrine':
+      // Shrine icon — columns and flame
+      fill(c1);
+      rect(-8, -2, 16, 10, 1);
+      fill(c2);
+      rect(-6, -8, 3, 8, 1);
+      rect(3, -8, 3, 8, 1);
+      fill(c1);
+      rect(-7, -10, 5, 3, 1);
+      rect(2, -10, 5, 3, 1);
+      fill(selected ? color(255, 160, 40, 220) : color(200, 120, 30, 120));
+      rect(-1, -6, 2, 3);
+      fill(selected ? color(255, 220, 80, 200) : color(200, 170, 50, 100));
+      rect(-0.5, -8, 1, 2);
+      break;
+    case 'house':
+      // House icon — peaked roof with door/windows
+      fill(c1);
+      rect(-9, -2, 18, 12, 1);
+      fill(0, 0, 0, selected ? 120 : 70);
+      rect(-2, 2, 4, 8);
+      fill(accent);
+      rect(1, 5, 1, 1);
+      fill(0, 0, 0, selected ? 100 : 60);
+      rect(-7, 0, 3, 3);
+      rect(4, 0, 3, 3);
+      fill(selected ? color(185, 100, 58) : color(130, 70, 40));
+      beginShape();
+      vertex(-10, -2); vertex(0, -10); vertex(10, -2);
+      endShape(CLOSE);
+      break;
+    case 'library':
+      // Library icon — scroll niches and columns
+      fill(c1);
+      rect(-10, -6, 20, 16, 1);
+      fill(0, 0, 0, selected ? 100 : 60);
+      for (let li = 0; li < 3; li++) {
+        rect(-7 + li * 5, -3, 3, 5, 1);
+      }
+      fill(selected ? color(195, 175, 140) : color(140, 125, 100));
+      for (let li = 0; li < 3; li++) {
+        rect(-6 + li * 5, -1, 1, 3, 1);
+      }
+      fill(c1);
+      rect(-10, -10, 20, 5, 1);
+      fill(accent);
+      rect(-9, -5, 18, 1.5);
+      break;
+    case 'arena':
+      // Arena icon — oval with seating and banners
+      fill(selected ? color(210, 190, 150) : color(150, 135, 108));
+      ellipse(0, 0, 18, 14);
+      fill(c1);
+      for (let ai = 0; ai < 8; ai++) {
+        let aa = ai * TWO_PI / 8;
+        rect(cos(aa) * 8 - 1, sin(aa) * 6 - 1, 3, 3);
+      }
+      fill(selected ? color(180, 35, 35) : color(130, 30, 30));
+      rect(-9, -10, 4, 6);
+      rect(5, -10, 4, 6);
+      break;
+    case 'campfire':
+      // Campfire icon — stone ring with flame
+      fill(c2);
+      for (let ci = 0; ci < 6; ci++) {
+        let ca = ci * TWO_PI / 6;
+        rect(cos(ca) * 5 - 1, sin(ca) * 4 - 1, 2, 2, 1);
+      }
+      fill(selected ? color(255, 150, 30, 220) : color(200, 110, 20, 120));
+      rect(-2, -3, 4, 4);
+      fill(selected ? color(255, 220, 60, 200) : color(200, 170, 40, 100));
+      rect(-1, -5, 2, 3);
+      fill(selected ? color(255, 255, 180, 160) : color(200, 200, 140, 60));
+      rect(0, -6, 1, 2);
       break;
   }
 }
