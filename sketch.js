@@ -6545,14 +6545,39 @@ function drawRomanRoad(ix, iy) {
         rect(rx - 1, ry - 1, 3, 2);
       }
     }
-    // Kerbstones — pixel
+    // Kerbstones — pixel (era 2+ only)
     noStroke();
-    fill(165, 155, 135, 70);
-    for (let i = 0; i <= segs; i += 2) {
-      let t = i / segs;
-      let rx = floor(lerp(x1, x2, t)), ry = floor(lerp(y1, y2, t) + sin(t * PI) * 3);
-      rect(rx - 2, ry - rw * 0.14 - 1, 4, 2);
-      rect(rx - 2, ry + rw * 0.14 - 1, 4, 2);
+    if (ep.era >= 2) {
+      fill(ep.roadBase[0] + 20, ep.roadBase[1] + 20, ep.roadBase[2] + 10, 70);
+      for (let i = 0; i <= segs; i += 2) {
+        let t = i / segs;
+        let rx = floor(lerp(x1, x2, t)), ry = floor(lerp(y1, y2, t) + sin(t * PI) * 3);
+        rect(rx - 2, ry - rw * 0.14 - 1, 4, 2);
+        rect(rx - 2, ry + rw * 0.14 - 1, 4, 2);
+      }
+    }
+    // Era 2: stepping stones at intervals
+    if (ep.era === 2) {
+      fill(ep.stoneBase[0], ep.stoneBase[1], ep.stoneBase[2], 100);
+      for (let i = 4; i <= segs; i += 8) {
+        let t = i / segs;
+        let rx = floor(lerp(x1, x2, t)), ry = floor(lerp(y1, y2, t) + sin(t * PI) * 3);
+        rect(rx - 3, ry - 1, 6, 3, 1);
+      }
+    }
+    // Era 3: teal crystal inlay strips along curbs at night
+    if (ep.era === 3) {
+      let bright = getSkyBrightness();
+      if (bright < 0.5) {
+        let glowA = map(bright, 0, 0.5, 35, 0);
+        fill(ep.roadLine[0], ep.roadLine[1], ep.roadLine[2], glowA);
+        for (let i = 0; i <= segs; i++) {
+          let t = i / segs;
+          let rx = floor(lerp(x1, x2, t)), ry = floor(lerp(y1, y2, t) + sin(t * PI) * 3);
+          rect(rx - 1, ry - rw * 0.14 - 2, 2, 2);
+          rect(rx - 1, ry + rw * 0.14, 2, 2);
+        }
+      }
     }
   }
 
@@ -6563,14 +6588,14 @@ function drawRomanRoad(ix, iy) {
   let segs = max(20, floor(totalLen / 11));
   drawRoadSeg(shrineSX + 50, roadSY, empSX, roadSY, segs);
 
-  // Stone milestones at junctions
+  // Stone milestones at junctions — era-aware
   noStroke();
   [{ x: farmSX, y: roadSY + 8 }, { x: templeSX, y: roadSY + 8 }, { x: groveSX, y: roadSY + 8 }].forEach(j => {
-    fill(155, 145, 130);
+    fill(ep.stoneBase[0], ep.stoneBase[1], ep.stoneBase[2]);
     rect(j.x - 3, j.y - 6, 6, 8, 2);
-    fill(170, 160, 145);
+    fill(ep.stoneBase[0] + 15, ep.stoneBase[1] + 15, ep.stoneBase[2] + 15);
     rect(j.x - 2, j.y - 7, 4, 3, 1);
-    fill(120, 110, 95);
+    fill(ep.roadLine[0], ep.roadLine[1], ep.roadLine[2]);
     rect(j.x - 1, j.y - 3, 2, 2);
   });
 }
@@ -6600,26 +6625,27 @@ function drawNightLighting() {
     });
   }
 
-  // Torch and lantern light pools — warm radial glow
+  // Torch and lantern light pools — era-aware radial glow
+  let ep = getEraPalette();
   state.buildings.forEach(b => {
     let bx = w2sX(b.x);
     let by = w2sY(b.y);
     if (b.type === 'torch' || b.type === 'lantern') {
-      let radius = b.type === 'lantern' ? 70 : 50;
+      let radius = b.type === 'lantern' ? 70 : ep.nightRadius;
       let flicker = sin(frameCount * 0.08 + b.x) * 0.15 + 0.85;
       let flicker2 = sin(frameCount * 0.13 + b.x * 0.7) * 0.08;
       let r = radius * (flicker + flicker2);
-      // Outer warm glow
+      // Outer glow — era-colored
       for (let gr = r; gr > 0; gr -= 3) {
         let ga = 6 * nightStr * flicker * (gr / r);
-        fill(255, 180, 60, ga);
+        fill(ep.nightGlow[0], ep.nightGlow[1], ep.nightGlow[2], ga);
         circle(bx, by - 5, gr * 2);
       }
-      // Inner hot core
-      fill(255, 220, 120, 15 * nightStr * flicker);
+      // Inner hot core — era-colored
+      fill(ep.nightGlow[0], min(255, ep.nightGlow[1] + 40), min(255, ep.nightGlow[2] + 40), 15 * nightStr * flicker);
       circle(bx, by - 8, 16);
-      // Ground light pool (warm ellipse beneath)
-      fill(255, 180, 60, 8 * nightStr * flicker);
+      // Ground light pool — era-colored
+      fill(ep.nightGlow[0], ep.nightGlow[1], ep.nightGlow[2], 8 * nightStr * flicker);
       ellipse(bx, by + 5, r * 1.2, r * 0.4);
 
       // Ember particles from torches
@@ -6634,15 +6660,15 @@ function drawNightLighting() {
         });
       }
     }
-    // Window glow for doors/houses
+    // Window glow for doors/houses — era-colored
     if (b.type === 'door') {
       let flicker2 = sin(frameCount * 0.05 + b.x * 0.3) * 0.1 + 0.9;
-      fill(255, 200, 100, 25 * nightStr * flicker2);
+      fill(ep.nightGlow[0], ep.nightGlow[1], ep.nightGlow[2], 25 * nightStr * flicker2);
       ellipse(bx, by + 3, 45, 18);
-      fill(255, 180, 80, 55 * nightStr * flicker2);
+      fill(ep.nightGlow[0], ep.nightGlow[1], ep.nightGlow[2], 55 * nightStr * flicker2);
       rect(bx - 5, by - 18, 10, 14, 1);
       // Light spill from doorway onto ground
-      fill(255, 190, 90, 8 * nightStr * flicker2);
+      fill(ep.nightGlow[0], ep.nightGlow[1], ep.nightGlow[2], 8 * nightStr * flicker2);
       beginShape();
       vertex(bx - 5, by);
       vertex(bx + 5, by);
@@ -6652,16 +6678,16 @@ function drawNightLighting() {
     }
   });
 
-  // Temple warm glow
+  // Temple glow — era-colored
   let tx = w2sX(WORLD.islandCX);
   let ty = w2sY(WORLD.islandCY - 15);
   let templeFlicker = sin(frameCount * 0.04) * 0.1 + 0.9;
   for (let gr = 75; gr > 0; gr -= 3) {
-    fill(255, 200, 100, 4.5 * nightStr * templeFlicker * (gr / 75));
+    fill(ep.nightGlow[0], ep.nightGlow[1], ep.nightGlow[2], 4.5 * nightStr * templeFlicker * (gr / 75));
     circle(tx, ty - 20, gr * 2);
   }
   // Temple ground pool
-  fill(255, 190, 90, 6 * nightStr * templeFlicker);
+  fill(ep.nightGlow[0], ep.nightGlow[1], ep.nightGlow[2], 6 * nightStr * templeFlicker);
   ellipse(tx, ty, 100, 25);
 
   // Crystal shrine teal glow — pulsing
