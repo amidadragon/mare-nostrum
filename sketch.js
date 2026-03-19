@@ -466,6 +466,9 @@ function initState() {
       chargeTimer: 0,
     },
 
+    // Temple interior
+    insideTemple: false,
+
     // Build mode
     buildMode: false,
     demolishMode: false,
@@ -1453,6 +1456,15 @@ function drawInner() {
   }
   if (state.cutscene === 'sailing') {
     drawSailingCutscene(dt);
+    return;
+  }
+
+  // === TEMPLE INTERIOR ===
+  if (state.insideTemple) {
+    updateTime(dt);
+    drawTempleInterior(dt);
+    drawHUD();
+    drawCursor();
     return;
   }
 
@@ -6353,6 +6365,220 @@ function drawExpansionZone(ix, iy, iw, ih) {
 }
 
 // ─── PYRAMID ──────────────────────────────────────────────────────────────
+// ─── TEMPLE INTERIOR ──────────────────────────────────────────────────────
+function drawTempleInterior(dt) {
+  let tp = state.templePlayerX || width / 2;
+  let tpy = state.templePlayerY || height * 0.75;
+  let spd = 2.5;
+  if (keyIsDown(LEFT_ARROW) || keyIsDown(65)) tp -= spd;
+  if (keyIsDown(RIGHT_ARROW) || keyIsDown(68)) tp += spd;
+  if (keyIsDown(UP_ARROW) || keyIsDown(87)) tpy -= spd;
+  if (keyIsDown(DOWN_ARROW) || keyIsDown(83)) tpy += spd;
+  tp = constrain(tp, 60, width - 60);
+  tpy = constrain(tpy, height * 0.2, height * 0.92);
+  state.templePlayerX = tp;
+  state.templePlayerY = tpy;
+
+  // Exit if player walks to bottom
+  if (tpy > height * 0.9) {
+    state.insideTemple = false;
+    return;
+  }
+
+  push();
+  // Dark interior background
+  background(20, 15, 10);
+
+  // Checkerboard marble floor
+  noStroke();
+  let tileS = 32;
+  for (let tx = 0; tx < width; tx += tileS) {
+    for (let ty = floor(height * 0.3); ty < height; ty += tileS) {
+      let light = (floor(tx / tileS) + floor(ty / tileS)) % 2 === 0;
+      fill(light ? color(210, 205, 195) : color(140, 135, 125));
+      rect(tx, ty, tileS, tileS);
+    }
+  }
+
+  // Back wall
+  fill(45, 35, 28);
+  rect(0, 0, width, height * 0.32);
+  // Wall base molding
+  fill(60, 48, 35);
+  rect(0, height * 0.30, width, height * 0.02);
+  // Wall top molding
+  fill(55, 42, 30);
+  rect(0, 0, width, 8);
+
+  // Sol Invictus mosaic on back wall
+  let mosaicX = width / 2;
+  let mosaicY = height * 0.16;
+  let mosaicR = 36;
+  // Outer glow
+  let gPulse = sin(frameCount * 0.03) * 0.2 + 0.8;
+  for (let gr = mosaicR + 20; gr > mosaicR; gr -= 4) {
+    fill(255, 200, 60, 8 * gPulse);
+    circle(mosaicX, mosaicY, gr * 2);
+  }
+  // Sun disk
+  fill(212, 170, 50);
+  circle(mosaicX, mosaicY, mosaicR * 2);
+  fill(240, 200, 70);
+  circle(mosaicX, mosaicY, mosaicR * 1.4);
+  fill(255, 230, 120);
+  circle(mosaicX, mosaicY, mosaicR * 0.7);
+  // Rays
+  stroke(212, 170, 50, 180);
+  strokeWeight(2.5);
+  for (let r = 0; r < 12; r++) {
+    let a = r * TWO_PI / 12 + frameCount * 0.005;
+    let inner = mosaicR + 4;
+    let outer = mosaicR + 22;
+    line(mosaicX + cos(a) * inner, mosaicY + sin(a) * inner,
+         mosaicX + cos(a) * outer, mosaicY + sin(a) * outer);
+  }
+  noStroke();
+  // Face features
+  fill(180, 140, 40);
+  circle(mosaicX - 8, mosaicY - 4, 5);
+  circle(mosaicX + 8, mosaicY - 4, 5);
+  arc(mosaicX, mosaicY + 8, 16, 8, 0, PI);
+
+  // 4 Columns (2 per side)
+  let colPositions = [width * 0.18, width * 0.32, width * 0.68, width * 0.82];
+  for (let ci = 0; ci < colPositions.length; ci++) {
+    let cx = colPositions[ci];
+    let colTop2 = height * 0.08;
+    let colBot = height * 0.82;
+    // Base
+    fill(180, 174, 164);
+    rect(cx - 14, colBot, 28, 10, 2);
+    // Shaft
+    fill(195, 188, 178);
+    rect(cx - 10, colTop2, 20, colBot - colTop2);
+    // Fluting
+    stroke(175, 168, 158, 50);
+    strokeWeight(0.8);
+    for (let f = -8; f <= 8; f += 4) {
+      line(cx + f, colBot, cx + f, colTop2 + 4);
+    }
+    noStroke();
+    // Capital
+    fill(200, 194, 184);
+    rect(cx - 14, colTop2 - 4, 28, 8, 2);
+    fill(212, 170, 64);
+    circle(cx - 12, colTop2, 4);
+    circle(cx + 12, colTop2, 4);
+  }
+
+  // Sacred flame altar (center)
+  let altarX = width / 2;
+  let altarY = height * 0.45;
+  // Altar base
+  fill(100, 80, 55);
+  rect(altarX - 20, altarY, 40, 16, 2);
+  fill(120, 95, 65);
+  rect(altarX - 18, altarY + 2, 36, 4);
+  // Altar top
+  fill(140, 110, 75);
+  rect(altarX - 22, altarY - 4, 44, 6, 2);
+  // Fire bowl
+  fill(80, 60, 40);
+  ellipse(altarX, altarY - 2, 24, 8);
+  // Animated fire
+  let ft = frameCount;
+  for (let f = 0; f < 4; f++) {
+    let fw = (4 - f) * 4;
+    let fh = 18 * (1 - f * 0.2);
+    let flicker = sin(ft * 0.15 + f * 1.5) * 3;
+    let fc = lerpColor(color(255, 100, 20, 220), color(255, 230, 60, 160), f / 4);
+    fill(fc);
+    beginShape();
+    vertex(altarX - fw + flicker, altarY - 4);
+    quadraticVertex(altarX - fw * 0.5, altarY - 4 - fh * 0.5, altarX + flicker * 0.3, altarY - 4 - fh);
+    quadraticVertex(altarX + fw * 0.5, altarY - 4 - fh * 0.5, altarX + fw + flicker, altarY - 4);
+    endShape(CLOSE);
+  }
+  // Fire glow
+  fill(255, 180, 60, 25 * gPulse);
+  circle(altarX, altarY - 10, 100);
+
+  // Torch sconces on walls (2)
+  let torchPositions = [{ x: width * 0.1, y: height * 0.18 }, { x: width * 0.9, y: height * 0.18 }];
+  for (let ti = 0; ti < torchPositions.length; ti++) {
+    let tx = torchPositions[ti].x;
+    let ty = torchPositions[ti].y;
+    // Bracket
+    fill(100, 80, 50);
+    rect(tx - 3, ty, 6, 12);
+    rect(tx - 5, ty + 10, 10, 4);
+    // Torch flame
+    let tFlicker = sin(ft * 0.12 + ti * 3) * 2;
+    fill(255, 140, 30, 200);
+    ellipse(tx + tFlicker, ty - 4, 10, 14);
+    fill(255, 220, 70, 160);
+    ellipse(tx + tFlicker * 0.6, ty - 7, 6, 8);
+    fill(255, 255, 180, 100);
+    ellipse(tx + tFlicker * 0.3, ty - 9, 3, 4);
+    // Torch glow
+    fill(255, 160, 50, 12);
+    circle(tx, ty, 120);
+  }
+
+  // Warm ambient glow overlay
+  noStroke();
+  fill(255, 180, 80, 8);
+  rect(0, 0, width, height);
+
+  // Crystal / Solar display
+  fill(200, 180, 120);
+  textAlign(CENTER, TOP);
+  textSize(10);
+  text('Temple of Sol Invictus', width / 2, 14);
+  fill(160, 150, 120);
+  textSize(8);
+  text('Island Level ' + (state.islandLevel || 1) + '  |  Day ' + state.day, width / 2, 28);
+
+  // Crystal and solar counts
+  fill(100, 220, 180);
+  textSize(9);
+  text('Crystals: ' + state.crystals, width / 2 - 60, 42);
+  fill(255, 200, 60);
+  text('Solar: ' + state.solar + '/' + state.maxSolar, width / 2 + 60, 42);
+
+  // Altar interaction prompt
+  let nearAltar = dist(tp, tpy, altarX, altarY) < 60;
+  if (nearAltar) {
+    fill(255, 220, 120, 200 + sin(ft * 0.08) * 40);
+    textSize(9);
+    textAlign(CENTER, CENTER);
+    if (state.crystals >= 5) {
+      text('[E] Offer 5 Crystals  →  +25 Solar', altarX, altarY + 30);
+    } else {
+      fill(180, 120, 100);
+      text('[E] Offer Crystals (need 5)', altarX, altarY + 30);
+    }
+  }
+
+  // Player in temple (simple Roman sprite)
+  fill(196, 160, 110);
+  ellipse(tp, tpy - 18, 12, 12);
+  fill(200, 60, 40);
+  rect(tp - 6, tpy - 12, 12, 16, 2);
+  fill(196, 160, 110);
+  rect(tp - 2, tpy + 4, 4, 8);
+
+  // Exit hints
+  fill(160, 150, 130, 160);
+  textAlign(CENTER, CENTER);
+  textSize(8);
+  text('[ESC] Exit Temple', width / 2, height * 0.95);
+  text('↓ Walk south to exit', width / 2, height * 0.88);
+
+  textAlign(LEFT, TOP);
+  pop();
+}
+
 function drawPyramid() {
   let pyr = state.pyramid;
   let sx = w2sX(pyr.x);
@@ -6440,10 +6666,25 @@ function drawPyramid() {
     // Door arch
     fill(160, 152, 142);
     arc(0, cellaTop - cellaH * 0.7, doorW + 4, 10, -PI, 0, PIE);
-    // Amber doorway glow
-    let glowCol = (tier === 5 && lvl >= 23) ? color(80, 240, 200, 45) : color(255, 190, 80, 35);
+    // Amber doorway glow — enhanced when player is near
+    let _nearDoor = dist(state.player.x, state.player.y, pyr.x, pyr.y + 5) < 40;
+    let doorGlowAlpha = _nearDoor ? (55 + sin(frameCount * 0.06) * 20) : 35;
+    let glowCol = (tier === 5 && lvl >= 23) ? color(80, 240, 200, doorGlowAlpha) : color(255, 190, 80, doorGlowAlpha);
     fill(glowCol);
     rect(-doorW / 2 + 2, cellaTop - cellaH * 0.5, doorW - 4, cellaH * 0.5);
+    // Warm spill when near
+    if (_nearDoor) {
+      fill(255, 180, 60, 15 + sin(frameCount * 0.05) * 8);
+      ellipse(0, cellaTop + 4, doorW * 2.5, 12);
+    }
+  }
+
+  // [E] Enter prompt near door
+  if (tier >= 2 && dist(state.player.x, state.player.y, pyr.x, pyr.y + 5) < 40 && !state.buildMode) {
+    fill(255, 220, 120, 200 + sin(frameCount * 0.08) * 40);
+    textAlign(CENTER, CENTER); textSize(8);
+    text('[E] Enter Temple', 0, cellaTop + 16);
+    textAlign(LEFT, TOP);
   }
 
   // ─── COLUMNS ───
@@ -18745,6 +18986,7 @@ function keyPressed() {
 
   // ESC — close overlays first, then menu as last resort
   if (keyCode === 27) {
+    if (state.insideTemple) { state.insideTemple = false; return; }
     if (dialogState.active) { dialogState.active = false; return; }
     if (state.expeditionModifierSelect) { state.expeditionModifierSelect = false; return; }
     if (state.upgradeShopOpen) { state.upgradeShopOpen = false; return; }
@@ -18945,6 +19187,22 @@ function keyPressed() {
 
   // Interact
   if (key === 'e' || key === 'E') {
+    // Temple altar conversion — 5 crystals → 25 solar
+    if (state.insideTemple) {
+      let altarX = width / 2, altarY = height * 0.45;
+      if (dist(state.templePlayerX || width / 2, state.templePlayerY || height * 0.6, altarX, altarY) < 60) {
+        if (state.crystals >= 5) {
+          state.crystals -= 5;
+          state.solar = min(state.solar + 25, state.maxSolar);
+          if (snd) snd.playSFX('crystal');
+          addFloatingText(width / 2, height * 0.25, '+25 Solar Energy', C.solarBright);
+          spawnParticles(state.player.x, state.player.y, 'divine', 8);
+        } else {
+          addFloatingText(width / 2, height * 0.25, 'Need 5 Crystals', '#ff8888');
+        }
+      }
+      return;
+    }
     // Dive — E near water, but NOT if near the rowboat
     if (typeof startDive === 'function' && !state.rowing.active && !state.buildMode &&
         !state.conquest.active && !state.adventure.active &&
@@ -19107,6 +19365,15 @@ function keyPressed() {
         addFloatingText(w2sX(state.crystalShrine.x), w2sY(state.crystalShrine.y) - 30, 'The rite is complete. Mare Nostrum endures.', '#ffd700');
         return;
       }
+    }
+    // Temple interior entry — near door (front of pyramid)
+    if (!state.insideTemple && dist(state.player.x, state.player.y, state.pyramid.x, state.pyramid.y + 5) < 40) {
+      state.insideTemple = true;
+      state.templePlayerX = width / 2;
+      state.templePlayerY = height * 0.75;
+      if (snd) snd.playSFX('build');
+      addFloatingText(width / 2, height * 0.3, 'Entering the Temple of Sol Invictus', '#ffd080');
+      return;
     }
     // Upgrade Forge at pyramid
     if (dist(state.player.x, state.player.y, state.pyramid.x, state.pyramid.y) < 60) {
@@ -19942,6 +20209,7 @@ function saveGame() {
     solar: state.solar, maxSolar: state.maxSolar,
     islandLevel: state.islandLevel, islandRX: state.islandRX, islandRY: state.islandRY,
     pyramidLevel: state.pyramid.level,
+    insideTemple: false,
     playerX: state.player.x, playerY: state.player.y, playerFacing: state.player.facing,
     playerXp: state.player.xp, playerTotalXp: state.player.totalXp,
     playerLevel: state.player.level, playerSkillPoints: state.player.skillPoints,
