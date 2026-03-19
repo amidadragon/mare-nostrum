@@ -1683,3 +1683,52 @@ function drawExpansionZone(ix, iy, iw, ih) {
   }
   noStroke();
 }
+
+// ─── NIGHT LIGHTING — torch/lantern/crystal glow at night ─────────────────
+function drawNightLighting() {
+  let bright = getSkyBrightness();
+  if (bright > 0.45) return;
+  let nightAlpha = map(bright, 0, 0.45, 1, 0);
+  let ep = getEraPalette();
+  let ng = ep.nightGlow;
+  let nr = ep.nightRadius;
+
+  noStroke();
+  if (state.buildings) {
+    state.buildings.forEach(b => {
+      if (b.type !== 'torch' && b.type !== 'lantern' && b.type !== 'campfire') return;
+      let sx = w2sX(b.x);
+      let sy = w2sY(b.y);
+      fill(ng[0], ng[1], ng[2], 12 * nightAlpha);
+      ellipse(sx, sy, nr * 2.5, nr * 1.5);
+      fill(ng[0], ng[1], ng[2], 25 * nightAlpha);
+      ellipse(sx, sy, nr * 1.2, nr * 0.8);
+      fill(ng[0], ng[1], ng[2], 40 * nightAlpha);
+      ellipse(sx, sy, nr * 0.5, nr * 0.35);
+    });
+  }
+  if (state.crystalNodes) {
+    state.crystalNodes.forEach(cn => {
+      if (cn.respawnTimer > 0) return;
+      let sx = w2sX(cn.x);
+      let sy = w2sY(cn.y);
+      fill(80, 220, 200, 15 * nightAlpha);
+      ellipse(sx, sy, 50, 30);
+      fill(80, 240, 210, 8 * nightAlpha);
+      ellipse(sx, sy, 80, 45);
+    });
+  }
+  if (state.pyramid) {
+    let sx = w2sX(state.pyramid.x);
+    let sy = w2sY(state.pyramid.y);
+    let tier = state.islandLevel <= 4 ? 1 : state.islandLevel <= 8 ? 2 : state.islandLevel <= 14 ? 3 : state.islandLevel <= 19 ? 4 : 5;
+    let glowR = 40 + tier * 20;
+    if (tier >= 5) {
+      fill(80, 220, 200, 18 * nightAlpha);
+      ellipse(sx, sy - 20, glowR * 2, glowR);
+    } else {
+      fill(ng[0], ng[1], ng[2], 15 * nightAlpha);
+      ellipse(sx, sy - 10, glowR * 1.8, glowR * 0.9);
+    }
+  }
+}
