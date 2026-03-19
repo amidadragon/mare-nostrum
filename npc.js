@@ -495,9 +495,10 @@ function drawNPC() {
   rect(-1, -6, 1, 1);
 
   // Counter-scale for UI elements (dialog, prompt, hearts)
-  let invS = 1 / 0.72;
+  // Undo both size AND facing flip so text reads left-to-right
+  let invS = 1 / (0.72 * faceDir);
   push();
-  scale(invS);
+  scale(invS, 1 / 0.72);
 
   if (n.currentLine !== -1 && n.currentLine !== null) {
     let ln = (typeof n.currentLine === 'string') ? n.currentLine : n.lines[n.currentLine];
@@ -1070,6 +1071,9 @@ function drawNewNPC(npc, type) {
     fill(145, 105, 80, 100);
     rect(-1, -7, 2, 1);
   }
+
+  // Undo facing flip for UI text (so text always reads left-to-right)
+  if (npcFace < 0) scale(-1, 1);
 
   // Hearts above head
   for (let h = 0; h < min(npc.hearts, 10); h++) {
