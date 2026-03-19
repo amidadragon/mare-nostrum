@@ -111,6 +111,26 @@ function drawFloatingText() {
   textAlign(LEFT, TOP);
 }
 
+function updateScreenTransition(dt) {
+  if (!screenTransition.active) return;
+  screenTransition.alpha += screenTransition.dir * 8 * dt;
+  if (screenTransition.dir > 0 && screenTransition.alpha >= 255) {
+    screenTransition.alpha = 255;
+    if (screenTransition.callback) screenTransition.callback();
+    screenTransition.dir = -1;
+  } else if (screenTransition.dir < 0 && screenTransition.alpha <= 0) {
+    screenTransition.alpha = 0;
+    screenTransition.active = false;
+  }
+}
+
+function startScreenTransition(callback) {
+  screenTransition.active = true;
+  screenTransition.alpha = 0;
+  screenTransition.dir = 1;
+  screenTransition.callback = callback;
+}
+
 function drawScreenTransition() {
   if (!screenTransition.active) return;
   noStroke();
