@@ -78,7 +78,16 @@ class SoundManager {
     this._lyreFadeDir = 0; // -1 fading out, 1 fading in, 0 steady
     this._lyrePendingMode = null;
     // Dynamic context
-    this._lyreContext = 'default'; // farming, combat, night, rain, ocean
+    this._lyreContext = 'default'; // farming, combat, night, rain, ocean, dawn
+    // Harmony layer: 4th oscillator doubles melody note at interval
+    this._harmOsc = null;
+    this._harmGain = null;
+    // Rain ambient (filtered white noise)
+    this._rainNoise = null;
+    this._rainFilter = null;
+    this._rainGain = null;
+    // Context tempo multiplier
+    this._tempoMult = 1.0;
   }
 
   init() {
@@ -251,8 +260,32 @@ class SoundManager {
       this._whaleOsc.start();
       this._whaleOsc.amp(1.0);
 
+      // Harmony layer: sine oscillator that doubles melody at an interval
+      this._harmOsc = new p5.Oscillator('sine');
+      this._harmGain = new p5.Gain();
+      this._harmOsc.disconnect();
+      this._harmOsc.connect(this._harmGain);
+      this._harmGain.connect();
+      this._harmGain.amp(0);
+      this._harmOsc.start();
+      this._harmOsc.amp(1.0);
+
+      // Rain ambient: filtered white noise for rainfall
+      this._rainNoise = new p5.Noise('white');
+      this._rainFilter = new p5.BandPass();
+      this._rainFilter.freq(2000);
+      this._rainFilter.res(2);
+      this._rainNoise.disconnect();
+      this._rainNoise.connect(this._rainFilter);
+      this._rainGain = new p5.Gain();
+      this._rainFilter.connect(this._rainGain);
+      this._rainGain.connect();
+      this._rainGain.amp(0);
+      this._rainNoise.start();
+      this._rainNoise.amp(0.12);
+
       this.ready = true;
-      console.log('[SoundManager] init OK — 3 lyre voices, 4 sfx slots, ambient layers ready');
+      console.log('[SoundManager] init OK — 3 lyre voices + harmony, 4 sfx slots, ambient layers ready');
     } catch (e) {
       console.warn('SoundManager init failed:', e.message);
     }
@@ -318,6 +351,23 @@ class SoundManager {
       }
     } else {
       this._thunderTimer = 0; // reset when storm ends
+    }
+
+    // ─── Rain ambient (filtered noise) ───
+    if (this._rainGain) {
+      let isRaining = (typeof stormActive !== 'undefined' && stormActive) ||
+        (typeof state !== 'undefined' && state.weather && state.weather.type === 'rain');
+      let rainVol = isRaining ? 0.05 * masterVol : 0;
+      if (typeof state !== 'undefined' && state.weather && state.weather.intensity) {
+        rainVol *= (0.6 + state.weather.intensity * 0.4);
+      }
+      if (typeof stormActive !== 'undefined' && stormActive) rainVol = 0.07 * masterVol;
+      if (diving) rainVol *= 0.2;
+      this._rainGain.amp(max(0, rainVol), 0.5);
+      // Modulate filter frequency for variation
+      if (isRaining && this._rainFilter) {
+        this._rainFilter.freq(1800 + sin(frameCount * 0.006) * 400);
+      }
     }
 
     // ─── Bird chirps ───
@@ -480,13 +530,24 @@ class SoundManager {
     // Detect gameplay context for dynamic ornaments
     if (typeof state !== 'undefined') {
       let ctx = 'default';
-      if (typeof stormActive !== 'undefined' && stormActive) ctx = 'rain';
+      if (state.conquest && state.conquest.active) ctx = 'combat';
+      else if (typeof stormActive !== 'undefined' && stormActive) ctx = 'rain';
+      else if (state.weather && state.weather.type === 'rain') ctx = 'rain';
       else if (state.rowing && state.rowing.active) ctx = 'ocean';
-      else if (state.conquest && state.conquest.active) ctx = 'combat';
       else if (state.time >= 1200 || state.time < 300) ctx = 'night';
+      else if (state.time >= 300 && state.time < 480) ctx = 'dawn';
       else if (state.farming && state.farming.growing > 0) ctx = 'farming';
       this._lyreContext = ctx;
     }
+
+    // Context-based tempo multiplier (smooth transition)
+    let targetTempo = 1.0;
+    if (this._lyreContext === 'combat') targetTempo = 0.7;
+    else if (this._lyreContext === 'rain') targetTempo = 1.3;
+    else if (this._lyreContext === 'night') targetTempo = 1.2;
+    else if (this._lyreContext === 'dawn') targetTempo = 1.1;
+    else if (this._lyreContext === 'farming') targetTempo = 0.95;
+    this._tempoMult += (targetTempo - this._tempoMult) * 0.02;
 
     // Handle crossfade
     if (this._lyreFadeDir === -1) {
@@ -664,6 +725,16 @@ class SoundManager {
         // Ending flourish: fast ascending arpeggio
         [[0,10,0.60,0],[2,10,0.50,1],[4,10,0.65,0],[5,10,0.50,1],[7,10,0.70,0],[9,10,0.55,1],
          [11,14,0.85,0],[9,14,0.65,1],[7,14,0.70,0],[4,18,0.80,1],[0,22,0.85,0],[-1,25,0,0]],
+        // Rhythmic clap: short-long pattern with accents
+        [[4,8,0.70,0],[-1,4,0,0],[4,16,0.80,0],[7,16,0.60,1],[-1,8,0,0],
+         [5,8,0.65,0],[-1,4,0,0],[5,16,0.75,0],[9,16,0.55,1],[-1,8,0,0],
+         [7,8,0.70,0],[-1,4,0,0],[7,16,0.80,0],[11,16,0.60,1],[-1,6,0,0],
+         [9,12,0.65,0],[7,12,0.55,1],[4,18,0.80,0],[-1,20,0,0]],
+        // Wine toast: ascending major with held chord at top
+        [[0,14,0.65,0],[2,14,0.50,1],[-1,6,0,0],[4,14,0.70,0],[5,14,0.55,1],[-1,6,0,0],
+         [7,14,0.75,0],[9,14,0.55,1],[-1,6,0,0],
+         [11,22,0.85,0],[9,22,0.65,1],[7,22,0.50,2],[-1,10,0,0],
+         [9,12,0.60,0],[7,12,0.50,1],[4,18,0.70,0],[0,22,0.75,1],[-1,22,0,0]],
       ];
     } else if (this._lyreMode === 'night') {
       scale = dorian;
@@ -705,6 +776,19 @@ class SoundManager {
         [[5,110,0.22,0],[-1,50,0,0],[4,100,0.20,1],[-1,50,0,0],
          [3,110,0.22,0],[-1,50,0,0],[2,100,0.18,1],[-1,50,0,0],
          [0,160,0.26,0],[0,160,0.14,2],[-1,220,0,0]],
+        // Descending minor: Aeolian descent, melancholy and warm
+        [[5,130,0.24,0],[-1,60,0,0],[4,120,0.22,1],[-1,50,0,0],
+         [3,130,0.24,0],[-1,60,0,0],[2,120,0.20,1],[-1,50,0,0],
+         [1,140,0.22,0],[-1,70,0,0],[0,180,0.26,0],[0,180,0.12,2],[-1,200,0,0]],
+        // Embers: very low register, sparse warmth
+        [[0,200,0.14,2],[-1,120,0,0],[1,150,0.20,0],[-1,80,0,0],
+         [0,160,0.18,1],[-1,100,0,0],[3,140,0.20,0],[-1,70,0,0],
+         [2,150,0.18,1],[-1,80,0,0],[0,200,0.22,0],[-1,200,0,0]],
+        // Owl call: two-note motif repeated with variation
+        [[4,80,0.22,0],[2,120,0.18,1],[-1,100,0,0],
+         [4,80,0.20,0],[3,120,0.16,1],[-1,120,0,0],
+         [4,80,0.22,0],[0,140,0.20,1],[-1,80,0,0],
+         [0,180,0.15,2],[-1,180,0,0]],
       ];
     } else if (this._lyreMode === 'sailing') {
       scale = dorian;
@@ -792,6 +876,27 @@ class SoundManager {
          [7,55,0.70,0],[4,55,0.48,1],[-1,25,0,0],
          [5,20,0.50,0],[7,18,0.45,0],[5,20,0.50,0],[-1,8,0,0],
          [4,55,0.65,0],[2,55,0.48,1],[0,70,0.70,0],[-1,90,0,0]],
+        // Golden hour: long warm phrase, two-chord voicings with stepwise melody
+        [[0,55,0.60,0],[4,55,0.42,1],[7,55,0.30,2],[-1,18,0,0],
+         [2,45,0.55,0],[5,45,0.38,1],[-1,15,0,0],
+         [4,50,0.65,0],[7,50,0.45,1],[-1,15,0,0],
+         [5,50,0.60,0],[9,50,0.42,1],[-1,18,0,0],
+         [7,55,0.70,0],[4,55,0.48,1],[-1,20,0,0],
+         [5,45,0.55,0],[2,45,0.38,1],[-1,15,0,0],
+         [4,50,0.60,0],[0,50,0.42,1],[-1,15,0,0],
+         [0,70,0.65,0],[4,70,0.45,2],[-1,100,0,0]],
+        // Cypress shade: gentle descending thirds over drone
+        [[0,100,0.18,2],[7,40,0.60,0],[5,40,0.42,1],[-1,12,0,0],
+         [5,40,0.55,0],[3,40,0.38,1],[-1,12,0,0],
+         [4,40,0.60,0],[2,40,0.42,1],[-1,12,0,0],
+         [3,40,0.55,0],[0,40,0.38,1],[-1,15,0,0],
+         [2,45,0.50,0],[4,45,0.38,1],[-1,12,0,0],
+         [0,60,0.65,0],[4,60,0.45,1],[-1,80,0,0]],
+        // Forum gossip: playful rhythmic alternation
+        [[4,25,0.60,0],[-1,8,0,0],[5,25,0.55,0],[-1,8,0,0],[4,25,0.60,0],[7,30,0.70,1],[-1,12,0,0],
+         [5,25,0.55,0],[-1,8,0,0],[4,25,0.55,0],[-1,8,0,0],[2,25,0.50,0],[4,30,0.60,1],[-1,15,0,0],
+         [3,35,0.60,0],[5,35,0.42,1],[-1,12,0,0],
+         [0,50,0.65,0],[4,50,0.45,1],[-1,70,0,0]],
       ];
     }
 
@@ -802,29 +907,86 @@ class SoundManager {
     let volMult = this._lyreVolMult;
     // Context-based dynamic adjustments
     if (this._lyreContext === 'rain') volMult *= 0.7;
-    if (this._lyreContext === 'farming') volMult *= 0.9;
+    else if (this._lyreContext === 'farming') volMult *= 0.9;
+    else if (this._lyreContext === 'combat') volMult *= 1.1;
+    else if (this._lyreContext === 'dawn') volMult *= 0.8;
 
     if (ni >= 0 && ni < scale.length) {
       let freq = scale[ni];
       let amp = vel * musicVol * volMult * (this._lyreMode === 'menu' ? 0.06 : 0.14);
       if (this._lyreMode === 'eerie' && freq > 500) freq *= 0.5;
-      // Rain dampens high frequencies
-      if (this._lyreContext === 'rain' && freq > 600) amp *= 0.6;
-      this._pluckLyre(voice, freq, amp, dur * 16);
+      // Rain: dampen highs, slight detune for washed-out feel
+      if (this._lyreContext === 'rain') {
+        if (freq > 600) amp *= 0.6;
+        freq *= (1 - 0.003); // slight flat detune
+      }
+      // Combat: boost bass, sharper attack feel
+      if (this._lyreContext === 'combat' && freq < 400) amp *= 1.15;
+      // Dawn: ascending phrases brighter
+      if (this._lyreContext === 'dawn' && ni > 4) amp *= 1.1;
+      // Farming: slightly brighter tone
+      if (this._lyreContext === 'farming' && freq > 350) amp *= 1.05;
+
+      let pluckDur = dur * 16;
+      this._pluckLyre(voice, freq, amp, pluckDur);
+
+      // Harmony layer: play a 5th above (or 3rd) at reduced volume
+      if (this._harmOsc && this._harmGain && amp > 0.005) {
+        let harmInterval = (this._lyreMode === 'night' || this._lyreMode === 'eerie') ? 1.2 : 1.5; // minor 3rd vs perfect 5th
+        if (this._lyreContext === 'farming') harmInterval = 1.25; // major 3rd for warmth
+        let harmFreq = freq * harmInterval;
+        // Only harmonize if result is in comfortable range
+        if (harmFreq < 1200) {
+          let harmAmp = amp * 0.35;
+          this._harmOsc.freq(harmFreq * (1 + (random() - 0.5) * 0.004));
+          this._harmGain.amp(harmAmp, 0.015);
+          // Slower decay than main note
+          setTimeout(() => {
+            if (this._harmGain) this._harmGain.amp(harmAmp * 0.3, 0.1);
+          }, pluckDur * 0.3);
+          setTimeout(() => {
+            if (this._harmGain) this._harmGain.amp(0, 0.08);
+          }, pluckDur * 0.7);
+        }
+      }
+
+      // Grace note: quick ornamental note before main note (10% chance, not in eerie/menu)
+      if (this._lyreMode !== 'eerie' && this._lyreMode !== 'menu' && random() < 0.10) {
+        let graceIdx = ni > 0 ? ni - 1 : ni + 1;
+        if (graceIdx >= 0 && graceIdx < scale.length) {
+          let graceFreq = scale[graceIdx];
+          let graceAmp = amp * 0.4;
+          // Grace note on a different voice if available
+          let graceVoice = (voice + 1) % this._lyreVoices.length;
+          this._pluckLyre(graceVoice, graceFreq, graceAmp, 40);
+        }
+      }
+
+      // Rain echo: delayed quiet repeat for reverb-like depth
+      if (this._lyreContext === 'rain' && random() < 0.4) {
+        let echoDelay = floor(random(8, 16));
+        let echoAmp = amp * 0.25;
+        let echoVoice = (voice + 2) % this._lyreVoices.length;
+        setTimeout(() => {
+          this._pluckLyre(echoVoice, freq * 0.998, echoAmp, pluckDur * 0.6);
+        }, echoDelay * 16);
+      }
     }
 
-    this._lyreTimer = dur;
+    // Apply tempo multiplier to timer
+    this._lyreTimer = floor(dur * this._tempoMult);
     this._lyreNoteIdx++;
     if (this._lyreNoteIdx >= phrase.length) {
       this._lyreNoteIdx = 0;
       this._lyrePhrase++;
-      if (this._lyreMode === 'menu') this._lyreTimer += floor(random(180, 360));
-      else if (this._lyreMode === 'tense') this._lyreTimer += floor(random(15, 40));
-      else if (this._lyreMode === 'eerie') this._lyreTimer += floor(random(100, 200));
-      else if (this._lyreMode === 'celebration') this._lyreTimer += floor(random(12, 30));
-      else if (this._lyreMode === 'night') this._lyreTimer += floor(random(140, 280));
-      else if (this._lyreMode === 'sailing') this._lyreTimer += floor(random(35, 70));
-      else this._lyreTimer += floor(random(50, 120));
+      let pauseMult = this._lyreContext === 'rain' ? 1.4 : (this._lyreContext === 'combat' ? 0.6 : 1.0);
+      if (this._lyreMode === 'menu') this._lyreTimer += floor(random(180, 360) * pauseMult);
+      else if (this._lyreMode === 'tense') this._lyreTimer += floor(random(15, 40) * pauseMult);
+      else if (this._lyreMode === 'eerie') this._lyreTimer += floor(random(100, 200) * pauseMult);
+      else if (this._lyreMode === 'celebration') this._lyreTimer += floor(random(12, 30) * pauseMult);
+      else if (this._lyreMode === 'night') this._lyreTimer += floor(random(140, 280) * pauseMult);
+      else if (this._lyreMode === 'sailing') this._lyreTimer += floor(random(35, 70) * pauseMult);
+      else this._lyreTimer += floor(random(50, 120) * pauseMult);
     }
   }
 
@@ -841,6 +1003,11 @@ class SoundManager {
     else if (mode === 'celebration') { droneVol = 0.04; droneFreq = 146.8; }
     else if (mode === 'sailing') { droneVol = 0.045; droneFreq = 146.8; }
     else if (mode === 'menu') { droneVol = 0.02; droneFreq = 146.8; }
+    // Context modifiers on drone
+    if (this._lyreContext === 'combat') { droneVol *= 1.4; }
+    else if (this._lyreContext === 'rain') { droneFreq *= 0.97; droneVol *= 0.8; }
+    else if (this._lyreContext === 'dawn') { droneVol *= 0.6; }
+    else if (this._lyreContext === 'farming') { droneVol *= 1.1; }
     // Slow amplitude modulation for organic breathing
     let breathe = 1.0 + Math.sin((typeof frameCount !== 'undefined' ? frameCount : 0) * 0.008) * 0.15;
     let targetAmp = droneVol * musicVol * this._lyreVolMult * breathe;
@@ -860,6 +1027,11 @@ class SoundManager {
     else if (mode === 'tense') { pulseVol = 0.035; pulseRate = 0.09; } // faster in combat
     else if (mode === 'celebration') { pulseVol = 0.03; pulseRate = 0.10; }
     else if (mode === 'sailing') { pulseVol = 0.025; pulseRate = 0.07; }
+    // Context modifiers on pulse
+    if (this._lyreContext === 'combat') { pulseVol *= 1.3; pulseRate *= 1.2; }
+    else if (this._lyreContext === 'rain') { pulseVol *= 0.5; pulseRate *= 0.7; }
+    else if (this._lyreContext === 'farming') { pulseVol *= 1.1; pulseRate *= 1.05; }
+    else if (this._lyreContext === 'dawn') { pulseVol *= 0.7; }
     // Create pulse envelope: on for part of cycle, off for rest
     let phase = Math.sin(fc * pulseRate);
     let gate = phase > 0.3 ? Math.pow((phase - 0.3) / 0.7, 0.5) : 0;
@@ -868,6 +1040,8 @@ class SoundManager {
     // Pulse frequency follows root of current mode
     let pFreq = mode === 'eerie' ? 110.0 : 146.8;
     if (this._lyreContext === 'ocean') pFreq = 130.8; // wave-like lower pitch
+    if (this._lyreContext === 'combat') pFreq = 146.8; // lock to root for drive
+    if (this._lyreContext === 'rain') pFreq = 130.8; // slightly lower, subdued
     this._pulseOsc.freq(pFreq);
   }
 
