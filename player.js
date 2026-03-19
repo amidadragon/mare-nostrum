@@ -376,7 +376,7 @@ function drawWardrobe() {
 
   fill(140, 125, 100);
   textSize(9);
-  text('[W] Close', px + pw / 2, py + ph - 10);
+  text('[V] Close', px + pw / 2, py + ph - 10);
 
   textAlign(LEFT);
 }

@@ -15108,8 +15108,8 @@ function keyPressed() {
     return false; // prevent browser tab switching
   }
 
-  // Wardrobe toggle (W key)
-  if (key === 'w' || key === 'W') {
+  // Wardrobe toggle (V key — vestments)
+  if (key === 'v' || key === 'V') {
     if (gameScreen === 'game' && !state.diving.active && !state.rowing.active) {
       wardrobeOpen = !wardrobeOpen;
       return;
