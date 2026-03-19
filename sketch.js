@@ -5472,27 +5472,39 @@ function drawIsland() {
 
   // Grass top — seasonal colors with terrain variation
   let sg = getSeasonGrass();
-  // Base grass
+  // Base grass (organic coastline)
   fill(sg.r, sg.g, sg.b);
-  ellipse(ix, iy - 18, iw * 0.90, ih * 0.36);
+  drawCoastlineShape(ix, iy, iw * 0.45, ih * 0.18, -18);
 
-  // Elevation hints — lighter hilltop zones
+  // ─── HILLS — 4 elevation mounds ───
   let bright2 = getSkyBrightness();
-  // Central hill (lighter grass = higher ground)
-  fill(sg.r + 18 * bright2, sg.g + 24 * bright2, sg.b + 8 * bright2, 50 * bright2);
-  ellipse(ix + iw * 0.05, iy - 24, iw * 0.30, ih * 0.14);
-  // Left hillock
-  fill(sg.r + 12 * bright2, sg.g + 16 * bright2, sg.b + 4 * bright2, 40 * bright2);
-  ellipse(ix - iw * 0.22, iy - 20, iw * 0.18, ih * 0.10);
-  // Right hillock
-  fill(sg.r + 14 * bright2, sg.g + 18 * bright2, sg.b + 6 * bright2, 35 * bright2);
-  ellipse(ix + iw * 0.25, iy - 22, iw * 0.16, ih * 0.08);
+  if (bright2 > 0.1) {
+    let hillAlpha = 60 * bright2;
+    // H1: Central sacred hill (where pyramid sits)
+    fill(sg.r + 22, sg.g + 28, sg.b + 10, hillAlpha);
+    drawCoastlineShape(ix + iw * 0.03, iy, iw * 0.14, ih * 0.065, -22);
+    // Highlight rim
+    fill(sg.r + 35, sg.g + 40, sg.b + 15, hillAlpha * 0.5);
+    drawCoastlineShape(ix + iw * 0.03, iy, iw * 0.12, ih * 0.05, -24);
 
-  // Valley shadows (darker depressions between hills)
-  fill(sg.r - 15, sg.g - 12, sg.b - 8, 30);
-  ellipse(ix - iw * 0.08, iy - 16, iw * 0.14, ih * 0.06);
-  fill(sg.r - 12, sg.g - 10, sg.b - 6, 25);
-  ellipse(ix + iw * 0.15, iy - 14, iw * 0.12, ih * 0.05);
+    // H2: Northwest hill
+    fill(sg.r + 16, sg.g + 20, sg.b + 6, hillAlpha * 0.8);
+    drawCoastlineShape(ix - iw * 0.22, iy, iw * 0.09, ih * 0.05, -20);
+
+    // H3: East hill (near grove)
+    fill(sg.r + 18, sg.g + 22, sg.b + 8, hillAlpha * 0.7);
+    drawCoastlineShape(ix + iw * 0.24, iy, iw * 0.08, ih * 0.04, -21);
+
+    // H4: South gentle slope
+    fill(sg.r + 10, sg.g + 14, sg.b + 4, hillAlpha * 0.5);
+    drawCoastlineShape(ix + iw * 0.05, iy, iw * 0.12, ih * 0.04, -12);
+
+    // Valley shadows between hills
+    fill(sg.r - 18, sg.g - 14, sg.b - 10, 35 * bright2);
+    ellipse(ix - iw * 0.08, iy - 16, iw * 0.16, ih * 0.06);
+    fill(sg.r - 14, sg.g - 12, sg.b - 8, 28 * bright2);
+    ellipse(ix + iw * 0.14, iy - 14, iw * 0.13, ih * 0.05);
+  }
 
   // Wildflower patches — scattered colored clusters
   if (bright2 > 0.2) {
@@ -5537,12 +5549,12 @@ function drawIsland() {
     ellipse(stx + 1, sty, st.s * 0.8, st.s * 0.5);
   });
 
-  // Rim highlight — seasonal, softer
+  // Rim highlight — seasonal, softer (organic coastline)
   let sr2 = getSeasonRim();
   noFill();
   stroke(sr2.r, sr2.g, sr2.b, 120);
   strokeWeight(1.2);
-  ellipse(ix, iy - 18, iw * 0.90, ih * 0.36);
+  drawCoastlineShape(ix, iy, iw * 0.45, ih * 0.18, -18);
   noStroke();
 
   // Cloud shadows — tied to actual drift clouds when available
