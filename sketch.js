@@ -1064,6 +1064,9 @@ function buildIsland() {
     });
   }
 
+  // Player's first structure — campfire near island center
+  state.buildings.push({ x: cx + 20, y: cy + 15, w: 16, h: 16, type: 'campfire', rot: 0 });
+
   state.isInitialized = true;
 }
 
@@ -23412,7 +23415,7 @@ function expandIsland() {
     state.buildings.push({ x: cx + rx * 0.35 - 20, y: cy - ry * 0.3,      w: 24, h: 20, type: 'floor',  rot: 0 });
     state.buildings.push({ x: cx + rx * 0.35,      y: cy - ry * 0.3,      w: 24, h: 20, type: 'floor',  rot: 0 });
     state.buildings.push({ x: cx + rx * 0.35 + 20, y: cy - ry * 0.3,      w: 24, h: 20, type: 'floor',  rot: 0 });
-    state.buildings.push({ x: cx + rx * 0.4,       y: cy - ry * 0.35,     w: 32, h: 28, type: 'temple', rot: 0 });
+    state.buildings.push({ x: cx + rx * 0.4,       y: cy - ry * 0.35,     w: 32, h: 28, type: 'shrine', rot: 0 });
     addFloatingText(width / 2, height * 0.3, 'Shrine consecrated — the gods watch!', '#ffaaff');
     spawnParticles(cx + rx * 0.4, cy - ry * 0.35, 'build', 10);
 
@@ -23506,8 +23509,8 @@ function expandIsland() {
     // ── Per-level landmark buildings ──
     if (lvl === 6) {
       // Housing district northwest — two domus side by side
-      state.buildings.push({ x: cx - rx * 0.2,      y: cy - ry * 0.2, w: 36, h: 28, type: 'market', rot: 0 });
-      state.buildings.push({ x: cx - rx * 0.2 + 44, y: cy - ry * 0.2, w: 36, h: 28, type: 'market', rot: 0 });
+      state.buildings.push({ x: cx - rx * 0.2,      y: cy - ry * 0.2, w: 36, h: 28, type: 'house', rot: 0 });
+      state.buildings.push({ x: cx - rx * 0.2 + 44, y: cy - ry * 0.2, w: 36, h: 28, type: 'house', rot: 0 });
       // Torch between domus (Residential NW)
       state.buildings.push({ x: cx - rx * 0.2 + 22, y: cy - ry * 0.2 + 16, w: 8, h: 16, type: 'torch', rot: 0 });
       addFloatingText(width / 2, height * 0.3, 'Citizens settle — domus built!', '#aaddff');
@@ -23588,10 +23591,10 @@ function expandIsland() {
     }
     if (lvl === 16) {
       // Housing district expansion — four more domus
-      state.buildings.push({ x: cx - rx * 0.25,      y: cy - ry * 0.35, w: 36, h: 28, type: 'market', rot: 0 });
-      state.buildings.push({ x: cx - rx * 0.25 + 44, y: cy - ry * 0.35, w: 36, h: 28, type: 'market', rot: 0 });
-      state.buildings.push({ x: cx - rx * 0.25 + 88, y: cy - ry * 0.35, w: 36, h: 28, type: 'market', rot: 0 });
-      state.buildings.push({ x: cx - rx * 0.25 + 132,y: cy - ry * 0.35, w: 36, h: 28, type: 'market', rot: 0 });
+      state.buildings.push({ x: cx - rx * 0.25,      y: cy - ry * 0.35, w: 36, h: 28, type: 'house', rot: 0 });
+      state.buildings.push({ x: cx - rx * 0.25 + 44, y: cy - ry * 0.35, w: 36, h: 28, type: 'house', rot: 0 });
+      state.buildings.push({ x: cx - rx * 0.25 + 88, y: cy - ry * 0.35, w: 36, h: 28, type: 'house', rot: 0 });
+      state.buildings.push({ x: cx - rx * 0.25 + 132,y: cy - ry * 0.35, w: 36, h: 28, type: 'house', rot: 0 });
       // Torches along housing street (Residential NW)
       state.buildings.push({ x: cx - rx * 0.25 - 10,  y: cy - ry * 0.35 + 16, w: 8, h: 16, type: 'torch', rot: 0 });
       state.buildings.push({ x: cx - rx * 0.25 + 66,  y: cy - ry * 0.35 + 16, w: 8, h: 16, type: 'torch', rot: 0 });
@@ -23600,8 +23603,8 @@ function expandIsland() {
       spawnParticles(cx - rx * 0.25 + 66, cy - ry * 0.35, 'build', 12);
     }
     if (lvl === 17) {
-      // Library — large temple-type building north (Civic NE)
-      state.buildings.push({ x: cx + rx * 0.3, y: cy - ry * 0.35, w: 48, h: 36, type: 'temple', rot: 0 });
+      // Library — large building north (Civic NE)
+      state.buildings.push({ x: cx + rx * 0.3, y: cy - ry * 0.35, w: 48, h: 36, type: 'library', rot: 0 });
       // Floor tiles in front of library
       state.buildings.push({ x: cx + rx * 0.3 - 20, y: cy - ry * 0.35 + 24, w: 24, h: 20, type: 'floor', rot: 0 });
       state.buildings.push({ x: cx + rx * 0.3,      y: cy - ry * 0.35 + 24, w: 24, h: 20, type: 'floor', rot: 0 });
@@ -23613,29 +23616,23 @@ function expandIsland() {
       spawnParticles(cx + rx * 0.3, cy - ry * 0.35, 'build', 14);
     }
     if (lvl === 18) {
-      // Arena foundation — four walls forming a rectangle
-      state.buildings.push({ x: cx + rx * 0.15,      y: cy + ry * 0.4,       w: 60, h: 16, type: 'wall', rot: 0 });
-      state.buildings.push({ x: cx + rx * 0.15,      y: cy + ry * 0.4 + 60,  w: 60, h: 16, type: 'wall', rot: 0 });
-      state.buildings.push({ x: cx + rx * 0.15 - 22, y: cy + ry * 0.4 + 30,  w: 16, h: 60, type: 'wall', rot: 0 });
-      state.buildings.push({ x: cx + rx * 0.15 + 62, y: cy + ry * 0.4 + 30,  w: 16, h: 60, type: 'wall', rot: 0 });
-      // Arena entrance door (south wall gap)
-      state.buildings.push({ x: cx + rx * 0.15 + 20, y: cy + ry * 0.4 + 60, w: 32, h: 8, type: 'door', rot: 0 });
-      addFloatingText(width / 2, height * 0.3, 'Arena foundation laid — glory awaits!', '#ff8844');
-      spawnParticles(cx + rx * 0.15, cy + ry * 0.4, 'build', 12);
+      // Arena rises — single structure south of center
+      state.buildings.push({ x: cx + rx * 0.15, y: cy + ry * 0.4, w: 56, h: 44, type: 'arena', rot: 0 });
+      // Torches flanking arena entrance
+      state.buildings.push({ x: cx + rx * 0.15 - 36, y: cy + ry * 0.4 + 18, w: 8, h: 16, type: 'torch', rot: 0 });
+      state.buildings.push({ x: cx + rx * 0.15 + 36, y: cy + ry * 0.4 + 18, w: 8, h: 16, type: 'torch', rot: 0 });
+      addFloatingText(width / 2, height * 0.3, 'Arena rises — glory awaits!', '#ff8844');
+      spawnParticles(cx + rx * 0.15, cy + ry * 0.4, 'build', 14);
     }
     if (lvl === 19) {
-      // Arena closed with two more walls + interior mosaics
-      state.buildings.push({ x: cx + rx * 0.15 + 22, y: cy + ry * 0.4,      w: 16, h: 16, type: 'wall',   rot: 0 });
-      state.buildings.push({ x: cx + rx * 0.15 + 22, y: cy + ry * 0.4 + 60, w: 16, h: 16, type: 'wall',   rot: 0 });
-      state.buildings.push({ x: cx + rx * 0.15 + 10, y: cy + ry * 0.4 + 25, w: 28, h: 20, type: 'mosaic', rot: 0 });
-      state.buildings.push({ x: cx + rx * 0.15 + 30, y: cy + ry * 0.4 + 48, w: 28, h: 20, type: 'mosaic', rot: 0 });
-      // Torches inside arena corners
-      state.buildings.push({ x: cx + rx * 0.15 - 14, y: cy + ry * 0.4 + 8,  w: 8, h: 16, type: 'torch', rot: 0 });
-      state.buildings.push({ x: cx + rx * 0.15 + 54, y: cy + ry * 0.4 + 8,  w: 8, h: 16, type: 'torch', rot: 0 });
-      state.buildings.push({ x: cx + rx * 0.15 - 14, y: cy + ry * 0.4 + 52, w: 8, h: 16, type: 'torch', rot: 0 });
-      state.buildings.push({ x: cx + rx * 0.15 + 54, y: cy + ry * 0.4 + 52, w: 8, h: 16, type: 'torch', rot: 0 });
+      // Arena grounds — mosaics and decoration around arena
+      state.buildings.push({ x: cx + rx * 0.15 - 20, y: cy + ry * 0.4 + 52, w: 28, h: 20, type: 'mosaic', rot: 0 });
+      state.buildings.push({ x: cx + rx * 0.15 + 20, y: cy + ry * 0.4 + 52, w: 28, h: 20, type: 'mosaic', rot: 0 });
+      // Lanterns flanking arena approach
+      state.buildings.push({ x: cx + rx * 0.15 - 50, y: cy + ry * 0.4 + 30, w: 10, h: 20, type: 'lantern', rot: 0 });
+      state.buildings.push({ x: cx + rx * 0.15 + 50, y: cy + ry * 0.4 + 30, w: 10, h: 20, type: 'lantern', rot: 0 });
       addFloatingText(width / 2, height * 0.3, 'Arena complete — let the games begin!', '#ff6622');
-      spawnParticles(cx + rx * 0.15 + 20, cy + ry * 0.4 + 30, 'build', 16);
+      spawnParticles(cx + rx * 0.15, cy + ry * 0.4 + 30, 'build', 16);
     }
     if (lvl === 21) {
       // Senate forum + flanking torches
