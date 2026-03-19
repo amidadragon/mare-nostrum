@@ -6509,7 +6509,8 @@ function drawFarmZoneBG() {
 }
 
 function drawRomanRoad(ix, iy) {
-  // Via Romana — one straight road across the island
+  // Via Romana — era-aware road across the island
+  let ep = getEraPalette();
   let roadY = WORLD.islandCY - 8; // consistent centerline
   let shrineSX = w2sX(WORLD.islandCX - 440);
   let farmSX = w2sX(WORLD.islandCX - 220);
@@ -6518,28 +6519,29 @@ function drawRomanRoad(ix, iy) {
   let roadSY = w2sY(roadY); // one Y for the whole road
 
   function drawRoadSeg(x1, y1, x2, y2, segs) {
-    let rw = 20;
+    let rw = ep.era === 1 ? 16 : 20;
     noStroke();
-    // Dark gravel base (wider) — pixel
+    // Dark gravel/earth base (wider) — pixel
     for (let i = 0; i <= segs; i++) {
       let t = i / segs;
       let rx = floor(lerp(x1, x2, t)), ry = floor(lerp(y1, y2, t) + sin(t * PI) * 3);
-      fill(95, 88, 75, 110);
-      rect(rx - (rw + 6) / 2, ry - 2, rw + 6, 4);
+      let edgeJitter = ep.era === 1 ? sin(i * 1.7) * 1.5 : 0;
+      fill(ep.roadLine[0], ep.roadLine[1], ep.roadLine[2], 110);
+      rect(rx - (rw + 6) / 2 + edgeJitter, ry - 2, rw + 6, 4);
     }
-    // Stone pavers — pixel
+    // Road surface — pixel
     for (let i = 0; i <= segs; i++) {
       let t = i / segs;
       let rx = floor(lerp(x1, x2, t)), ry = floor(lerp(y1, y2, t) + sin(t * PI) * 3);
-      fill(145, 138, 125, 155);
+      fill(ep.roadBase[0], ep.roadBase[1], ep.roadBase[2], 155);
       rect(rx - rw / 2, ry - 2, rw, 4);
       if (i % 2 === 0) {
-        fill(160, 152, 138, 120);
+        fill(ep.roadBase[0] + 15, ep.roadBase[1] + 14, ep.roadBase[2] + 13, 120);
         rect(rx - rw * 0.35, ry - 1, rw * 0.33, 2);
         rect(rx + 3, ry - 1, rw * 0.33, 2);
       }
       if (i % 3 === 0) {
-        fill(120, 112, 98, 50);
+        fill(ep.roadLine[0], ep.roadLine[1], ep.roadLine[2], 50);
         rect(rx - 1, ry - 1, 3, 2);
       }
     }
