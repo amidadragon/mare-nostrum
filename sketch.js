@@ -6358,13 +6358,21 @@ function drawPyramid() {
   let sx = w2sX(pyr.x);
   let sy = w2sY(pyr.y);
   let lvl = pyr.level;
+  let tier = lvl <= 4 ? 1 : lvl <= 8 ? 2 : lvl <= 14 ? 3 : lvl <= 19 ? 4 : 5;
 
-  // Proportional scaling — temple grows wider AND taller gracefully
-  let baseW = min(180, 55 + lvl * 12);
-  let colH = min(80, 35 + lvl * 6);
-  let colCount = 4 + (lvl >= 3 ? 2 : 0) + (lvl >= 5 ? 2 : 0); // 4, 4, 6, 6, 8
-  let colW = 4 + (lvl >= 3 ? 1 : 0);  // thicker columns at high level
-  let steps = 2 + Math.min(lvl, 3);
+  // Tier-based scaling — no caps
+  let baseW, colH, colCount, colW, steps;
+  if (tier === 1) {
+    baseW = 60; colH = 28; colCount = 2; colW = 3; steps = 1;
+  } else if (tier === 2) {
+    baseW = 100 + (lvl - 5) * 6; colH = 45 + (lvl - 5) * 4; colCount = 4; colW = 4; steps = 3;
+  } else if (tier === 3) {
+    baseW = 130 + (lvl - 9) * 4; colH = 57 + (lvl - 9) * 3; colCount = 7; colW = 5; steps = 5;
+  } else if (tier === 4) {
+    baseW = 175 + (lvl - 15) * 7; colH = 72 + (lvl - 15) * 3; colCount = 9; colW = 5; steps = 7;
+  } else {
+    baseW = 210 + (lvl - 20) * 6; colH = 84 + (lvl - 20) * 2; colCount = 9; colW = 5; steps = 7;
+  }
 
   pyr.chargePhase += 0.02;
 
@@ -6374,329 +6382,572 @@ function drawPyramid() {
 
   // Ground shadow
   fill(0, 0, 0, 40);
-  ellipse(0, 12, baseW * 1.3, 16);
+  ellipse(0, 12, baseW * 1.3, 16 + tier * 2);
 
   // ─── PLATFORM / STYLOBATE ───
-  // Wide marble platform with proper Roman stepped base
+  let cellaTop = 10 - steps * 4;
   for (let st = 0; st < steps; st++) {
     let stepW = baseW + (steps - st) * 10;
     let stepY = 10 - st * 4;
-    // Step shadow (depth)
-    fill(155 - st * 5, 148 - st * 5, 138 - st * 5, 60);
-    rect(-stepW / 2 + 1, stepY + 3, stepW, 2);
-    // Main step — warm marble
-    fill(192 - st * 5, 185 - st * 5, 175 - st * 5);
-    rect(-stepW / 2, stepY, stepW, 5, 1);
-    // Step front face — lighter (sunlit)
-    fill(205 - st * 4, 198 - st * 4, 188 - st * 4);
-    rect(-stepW / 2, stepY, stepW, 2);
-    // Step edge bevel highlight
-    fill(215 - st * 4, 208 - st * 4, 198 - st * 4, 100);
-    rect(-stepW / 2, stepY, stepW, 0.8);
+    if (tier === 1) {
+      // Rough-cut basalt
+      fill(74, 56, 40);
+      rect(-stepW / 2, stepY, stepW, 5, 1);
+      fill(84, 66, 50);
+      rect(-stepW / 2, stepY, stepW, 2);
+    } else {
+      fill(192 - st * 5, 185 - st * 5, 175 - st * 5);
+      rect(-stepW / 2, stepY, stepW, 5, 1);
+      fill(205 - st * 4, 198 - st * 4, 188 - st * 4);
+      rect(-stepW / 2, stepY, stepW, 2);
+      fill(155 - st * 5, 148 - st * 5, 138 - st * 5, 60);
+      rect(-stepW / 2 + 1, stepY + 3, stepW, 2);
+    }
+  }
+
+  // Crystal step veins (Tier 5, lv21+)
+  if (tier === 5 && lvl >= 21) {
+    let veinAlpha = 60 + sin(frameCount * 0.04) * 20;
+    stroke(80, 220, 190, veinAlpha);
+    strokeWeight(0.6);
+    for (let st = 0; st < steps; st++) {
+      let stepW = baseW + (steps - st) * 10;
+      let stepY = 10 - st * 4;
+      for (let v = 0; v < 2; v++) {
+        let vx = -stepW * 0.3 + v * stepW * 0.4 + sin(st + v) * 10;
+        line(vx, stepY + 1, vx + stepW * 0.2, stepY + 1);
+      }
+    }
+    noStroke();
   }
 
   // ─── CELLA (inner chamber wall) ───
   let cellaW = baseW * 0.7;
   let cellaH = colH - 4;
-  let cellaTop = 10 - steps * 4;
-  // Back wall
-  fill(175, 168, 158);
-  rect(-cellaW / 2, cellaTop - cellaH, cellaW, cellaH);
-  // Wall texture — subtle horizontal lines
-  stroke(165, 158, 148, 40);
-  strokeWeight(0.5);
-  for (let ly = cellaTop - cellaH + 6; ly < cellaTop; ly += 8) {
-    line(-cellaW / 2 + 2, ly, cellaW / 2 - 2, ly);
+  if (tier >= 2) {
+    fill(175, 168, 158);
+    rect(-cellaW / 2, cellaTop - cellaH, cellaW, cellaH);
+    stroke(165, 158, 148, 40);
+    strokeWeight(0.5);
+    for (let ly = cellaTop - cellaH + 6; ly < cellaTop; ly += 8) {
+      line(-cellaW / 2 + 2, ly, cellaW / 2 - 2, ly);
+    }
+    noStroke();
+    // Doorway
+    let doorW = tier >= 3 ? 18 : 14;
+    fill(40, 35, 30);
+    rect(-doorW / 2, cellaTop - cellaH * 0.7, doorW, cellaH * 0.7, 2, 2, 0, 0);
+    // Door arch
+    fill(160, 152, 142);
+    arc(0, cellaTop - cellaH * 0.7, doorW + 4, 10, -PI, 0, PIE);
+    // Amber doorway glow
+    let glowCol = (tier === 5 && lvl >= 23) ? color(80, 240, 200, 45) : color(255, 190, 80, 35);
+    fill(glowCol);
+    rect(-doorW / 2 + 2, cellaTop - cellaH * 0.5, doorW - 4, cellaH * 0.5);
   }
-  noStroke();
-  // Cella doorway (dark entrance)
-  fill(40, 35, 30);
-  rect(-8, cellaTop - cellaH * 0.7, 16, cellaH * 0.7, 2, 2, 0, 0);
-  // Door arch
-  fill(160, 152, 142);
-  arc(0, cellaTop - cellaH * 0.7, 18, 10, -PI, 0, PIE);
 
-  // ─── COLUMNS — proper Corinthian style ───
-  let colSpacing = baseW * 0.82 / (colCount - 1);
+  // ─── COLUMNS ───
+  let colSpacing = baseW * 0.82 / max(colCount - 1, 1);
   let colStartX = -baseW * 0.41;
   let colBase = cellaTop;
-  let colTop = cellaTop - cellaH;
+  let colTop = cellaTop - colH;
 
   for (let c = 0; c < colCount; c++) {
     let cx2 = colStartX + c * colSpacing;
 
-    // Column base — Attic style (torus + scotia + torus)
-    fill(180, 174, 164);
-    rect(cx2 - colW - 2, colBase - 5, colW * 2 + 4, 5, 1);
-    fill(190, 184, 174);
-    rect(cx2 - colW - 1, colBase - 6, colW * 2 + 2, 2, 1);
-
-    // Column shaft — slight entasis (wider at bottom)
-    fill(195, 188, 178);
-    beginShape();
-    vertex(cx2 - colW, colBase - 5);
-    vertex(cx2 - colW + 0.5, colTop + 6);
-    vertex(cx2 + colW - 0.5, colTop + 6);
-    vertex(cx2 + colW, colBase - 5);
-    endShape(CLOSE);
-
-    // Fluting — vertical grooves
-    stroke(175, 168, 158, 50);
-    strokeWeight(0.5);
-    for (let f = -colW + 1.5; f <= colW - 1.5; f += 2) {
-      line(cx2 + f, colBase - 5, cx2 + f * 0.9, colTop + 6);
-    }
-    noStroke();
-
-    // Capital — Corinthian (ornate with acanthus leaves)
-    fill(200, 194, 184);
-    rect(cx2 - colW - 2, colTop + 2, colW * 2 + 4, 4, 1); // abacus
-    // Acanthus leaf decorations
-    fill(185, 178, 168);
-    ellipse(cx2 - colW, colTop + 5, 5, 6);
-    ellipse(cx2 + colW, colTop + 5, 5, 6);
-    ellipse(cx2, colTop + 4, 4, 5);
-    // Volute scrolls
-    fill(195, 188, 178);
-    circle(cx2 - colW - 1, colTop + 3, 3);
-    circle(cx2 + colW + 1, colTop + 3, 3);
-  }
-
-  // ─── ENTABLATURE ───
-  let entW = colSpacing * (colCount - 1) + colW * 2 + 12;
-  let entY = colTop + 2;
-
-  // Architrave — three fasciae
-  fill(190, 184, 174);
-  rect(-entW / 2, entY - 2, entW, 2);
-  fill(185, 178, 168);
-  rect(-entW / 2, entY - 5, entW, 3);
-  fill(180, 174, 164);
-  rect(-entW / 2, entY - 7, entW, 2);
-
-  // Frieze — with triglyphs and metopes
-  fill(175, 168, 158);
-  rect(-entW / 2 - 2, entY - 13, entW + 4, 6);
-  // Triglyphs (vertical grooves)
-  fill(160, 154, 144);
-  for (let t = 0; t < colCount; t++) {
-    let tx = colStartX + t * colSpacing;
-    rect(tx - 3, entY - 12, 6, 5);
-    stroke(150, 144, 134);
-    strokeWeight(0.6);
-    line(tx - 1, entY - 12, tx - 1, entY - 7);
-    line(tx + 1, entY - 12, tx + 1, entY - 7);
-    noStroke();
-  }
-
-  // Cornice — projecting top molding
-  fill(195, 188, 178);
-  rect(-entW / 2 - 4, entY - 16, entW + 8, 3, 1);
-  // Dentils
-  fill(185, 178, 168);
-  for (let d = -entW / 2 - 2; d < entW / 2 + 2; d += 5) {
-    rect(d, entY - 15, 3, 2);
-  }
-
-  // ─── PEDIMENT ───
-  let pedY = entY - 16;
-  let pedW = entW / 2 + 5;
-  let pedH = 12 + lvl * 4;
-
-  // Outer triangle with raking cornice
-  fill(190, 184, 174);
-  triangle(-pedW, pedY, pedW, pedY, 0, pedY - pedH);
-  // Raking cornice edge
-  stroke(200, 194, 184);
-  strokeWeight(1.5);
-  line(-pedW, pedY, 0, pedY - pedH);
-  line(pedW, pedY, 0, pedY - pedH);
-  line(-pedW, pedY, pedW, pedY);
-  noStroke();
-
-  // Tympanum (inner panel)
-  fill(170, 164, 154);
-  triangle(-pedW + 5, pedY, pedW - 5, pedY, 0, pedY - pedH + 4);
-
-  // Tympanum relief sculpture — sun god / eagle motif
-  let tympCY = pedY - pedH * 0.35;
-  // Laurel wreath circle
-  stroke(200, 180, 60, 60 + sin(pyr.chargePhase) * 25);
-  strokeWeight(1.2);
-  noFill();
-  circle(0, tympCY, 14);
-  // Sun rays
-  for (let r = 0; r < 8; r++) {
-    let ra = r * PI / 4 + pyr.chargePhase * 0.1;
-    let r1 = 8, r2 = 12;
-    line(cos(ra) * r1, tympCY + sin(ra) * r1, cos(ra) * r2, tympCY + sin(ra) * r2);
-  }
-  noStroke();
-  // Center medallion
-  fill(210, 190, 70, 80 + sin(pyr.chargePhase) * 30);
-  circle(0, tympCY, 6);
-
-  // Acroterion (decorative finials at pediment corners)
-  fill(195, 188, 178);
-  // Center acroterion — palmette
-  ellipse(0, pedY - pedH - 2, 6, 8);
-  fill(210, 190, 70, 120);
-  ellipse(0, pedY - pedH - 3, 3, 5);
-  // Side acroteria
-  fill(195, 188, 178);
-  ellipse(-pedW + 2, pedY - 3, 5, 6);
-  ellipse(pedW - 2, pedY - 3, 5, 6);
-
-  // ─── SACRED FLAME / CRYSTAL (top) ───
-  let flameY = pedY - pedH - 8;
-  let capPulse = sin(pyr.chargePhase * 1.5) * 0.3 + 0.7;
-
-  // Glow aura
-  let glowSize = 15 + lvl * 5;
-  for (let gr = glowSize; gr > 0; gr -= 3) {
-    fill(0, 255, 136, 6 * capPulse * (gr / glowSize));
-    circle(0, flameY, gr * 2);
-  }
-  // Warm inner glow
-  for (let gr = glowSize * 0.5; gr > 0; gr -= 2) {
-    fill(255, 200, 60, 12 * capPulse * (gr / (glowSize * 0.5)));
-    circle(0, flameY, gr * 2);
-  }
-
-  // Sacred flame shape (animated)
-  let flameH = 8 + lvl * 3;
-  for (let f = 0; f < 3; f++) {
-    let fw = (3 - f) * 2.5 + lvl;
-    let fh = flameH * (1 - f * 0.25);
-    let flicker = sin(frameCount * 0.15 + f * 2) * 1.5;
-    fill(lerpColor(color(0, 200, 100, 180), color(255, 200, 40, 160), f / 3));
-    beginShape();
-    vertex(-fw + flicker, flameY + 3);
-    quadraticVertex(-fw * 0.6, flameY - fh * 0.4, flicker * 0.5, flameY - fh);
-    quadraticVertex(fw * 0.6, flameY - fh * 0.4, fw + flicker, flameY + 3);
-    endShape(CLOSE);
-  }
-
-  // ─── LEVEL DECORATIONS ───
-  // Level 2+: bronze torches flanking entrance
-  if (lvl >= 2) {
-    for (let side = -1; side <= 1; side += 2) {
-      let tx = side * (cellaW / 2 + 8);
-      // Torch pole
-      fill(140, 100, 50);
-      rect(tx - 1.5, cellaTop - colH * 0.6, 3, colH * 0.4);
-      // Torch fire
-      let fFlicker = sin(frameCount * 0.12 + side) * 1;
-      fill(255, 160, 40, 180);
-      ellipse(tx + fFlicker, cellaTop - colH * 0.6 - 3, 6, 8);
-      fill(255, 220, 80, 120);
-      ellipse(tx + fFlicker, cellaTop - colH * 0.6 - 5, 3, 5);
-    }
-  }
-
-  // Level 3+: golden eagles on pediment
-  if (lvl >= 3) {
-    for (let side = -1; side <= 1; side += 2) {
-      let eagleX = side * (pedW * 0.5);
-      let eagleY = pedY - pedH * 0.15;
-      fill(200, 170, 50);
-      // Eagle body
-      ellipse(eagleX, eagleY, 6, 4);
-      // Wings spread
+    if (tier === 1) {
+      // Rough upright stones
+      fill(74, 56, 40);
+      rect(cx2 - colW, colBase - 5, colW * 2, -(colH - 5));
+      fill(84, 66, 50);
+      rect(cx2 - colW + 0.5, colBase - 5, colW, -(colH - 8));
+    } else {
+      // Column base
+      fill(180, 174, 164);
+      rect(cx2 - colW - 2, colBase - 5, colW * 2 + 4, 5, 1);
+      fill(190, 184, 174);
+      rect(cx2 - colW - 1, colBase - 6, colW * 2 + 2, 2, 1);
+      // Shaft with entasis
+      fill(195, 188, 178);
       beginShape();
-      vertex(eagleX - 3 * side, eagleY);
-      vertex(eagleX - 8 * side, eagleY - 4);
-      vertex(eagleX - 6 * side, eagleY - 1);
+      vertex(cx2 - colW, colBase - 5);
+      vertex(cx2 - colW + 0.5, colTop + 6);
+      vertex(cx2 + colW - 0.5, colTop + 6);
+      vertex(cx2 + colW, colBase - 5);
+      endShape(CLOSE);
+      // Fluting
+      stroke(175, 168, 158, 50);
+      strokeWeight(0.5);
+      for (let f = -colW + 1.5; f <= colW - 1.5; f += 2) {
+        line(cx2 + f, colBase - 5, cx2 + f * 0.9, colTop + 6);
+      }
+      noStroke();
+      // Capital
+      if (tier === 2) {
+        // Simple Doric
+        fill(200, 194, 184);
+        rect(cx2 - colW - 1, colTop + 3, colW * 2 + 2, 3, 1);
+        fill(190, 184, 174);
+        ellipse(cx2, colTop + 5, colW * 2, 4);
+      } else {
+        // Corinthian
+        fill(200, 194, 184);
+        rect(cx2 - colW - 2, colTop + 2, colW * 2 + 4, 4, 1);
+        fill(185, 178, 168);
+        ellipse(cx2 - colW, colTop + 5, 5, 6);
+        ellipse(cx2 + colW, colTop + 5, 5, 6);
+        ellipse(cx2, colTop + 4, 4, 5);
+        // Gold-tipped volutes (Tier 4+)
+        let volCol = tier >= 4 ? color(212, 170, 64) : color(195, 188, 178);
+        fill(volCol);
+        circle(cx2 - colW - 1, colTop + 3, 3);
+        circle(cx2 + colW + 1, colTop + 3, 3);
+      }
+    }
+
+    // Crystal veins on columns (Tier 5, lv21+)
+    if (tier === 5 && lvl >= 21) {
+      let vAlpha = 60 + sin(frameCount * 0.04 + c * 0.8) * 30;
+      stroke(80, 240, 200, vAlpha);
+      strokeWeight(0.8);
+      line(cx2 - 1, colBase - 8, cx2 - 0.5, colTop + 8);
+      line(cx2 + 1.5, colBase - 12, cx2 + 1, colTop + 10);
+      noStroke();
+    }
+  }
+
+  // Tier 4+: inner row of columns (double colonnade)
+  if (tier >= 4) {
+    let innerCount = 4;
+    let innerSpacing = baseW * 0.6 / (innerCount - 1);
+    let innerStartX = -baseW * 0.3;
+    for (let c = 0; c < innerCount; c++) {
+      let cx2 = innerStartX + c * innerSpacing;
+      fill(180, 174, 164, 160);
+      beginShape();
+      vertex(cx2 - colW + 1, colBase - 5);
+      vertex(cx2 - colW + 1.5, colTop + 8);
+      vertex(cx2 + colW - 1.5, colTop + 8);
+      vertex(cx2 + colW - 1, colBase - 5);
+      endShape(CLOSE);
+      fill(190, 184, 174, 140);
+      rect(cx2 - colW, colTop + 4, colW * 2, 4, 1);
+    }
+  }
+
+  // ─── TIER 1 LINTEL ───
+  if (tier === 1) {
+    fill(74, 56, 40);
+    rect(-32, colTop, 64, 8);
+    fill(84, 66, 50);
+    rect(-30, colTop + 1, 60, 3);
+    // Altar block between columns
+    fill(61, 43, 31);
+    rect(-6, cellaTop - 10, 12, 10);
+    fill(74, 56, 40);
+    rect(-5, cellaTop - 9, 10, 3);
+  }
+
+  // ─── ENTABLATURE (Tier 2+) ───
+  let entW, entY, pedY, pedW, pedH;
+  if (tier >= 2) {
+    entW = colSpacing * (colCount - 1) + colW * 2 + 12;
+    entY = colTop + 2;
+    // Architrave
+    fill(190, 184, 174);
+    rect(-entW / 2, entY - 2, entW, 2);
+    fill(185, 178, 168);
+    rect(-entW / 2, entY - 5, entW, 3);
+    if (tier >= 3) {
+      fill(180, 174, 164);
+      rect(-entW / 2, entY - 7, entW, 2);
+      // Frieze with triglyphs
+      fill(175, 168, 158);
+      rect(-entW / 2 - 2, entY - 13, entW + 4, 6);
+      fill(160, 154, 144);
+      for (let t = 0; t < colCount; t++) {
+        let tx = colStartX + t * colSpacing;
+        rect(tx - 3, entY - 12, 6, 5);
+        stroke(150, 144, 134);
+        strokeWeight(0.6);
+        line(tx - 1, entY - 12, tx - 1, entY - 7);
+        line(tx + 1, entY - 12, tx + 1, entY - 7);
+        noStroke();
+      }
+      // Cornice
+      fill(195, 188, 178);
+      rect(-entW / 2 - 4, entY - 16, entW + 8, 3, 1);
+      fill(185, 178, 168);
+      for (let d = -entW / 2 - 2; d < entW / 2 + 2; d += 5) {
+        rect(d, entY - 15, 3, 2);
+      }
+      // Gold cornice strip (Tier 4+)
+      if (tier >= 4) {
+        fill(212, 170, 64, 140);
+        rect(-entW / 2 - 4, entY - 16, entW + 8, 2);
+      }
+    }
+
+    // ─── PEDIMENT ───
+    pedY = tier >= 3 ? entY - 16 : entY - 5;
+    pedW = (tier >= 3 ? entW : entW * 0.9) / 2 + 5;
+    pedH = tier === 2 ? 8 : (tier === 3 ? 18 : (tier === 4 ? 26 : 28));
+
+    fill(190, 184, 174);
+    triangle(-pedW, pedY, pedW, pedY, 0, pedY - pedH);
+    // Raking cornice
+    stroke(tier >= 4 ? color(212, 170, 64, 180) : color(200, 194, 184));
+    strokeWeight(1.5);
+    line(-pedW, pedY, 0, pedY - pedH);
+    line(pedW, pedY, 0, pedY - pedH);
+    line(-pedW, pedY, pedW, pedY);
+    noStroke();
+    // Tympanum
+    fill(170, 164, 154);
+    triangle(-pedW + 5, pedY, pedW - 5, pedY, 0, pedY - pedH + 4);
+
+    // Tympanum sculpture (Tier 3+: Sol Invictus)
+    if (tier >= 3) {
+      let tympCY = pedY - pedH * 0.35;
+      stroke(200, 180, 60, 60 + sin(pyr.chargePhase) * 25);
+      strokeWeight(1.2);
+      noFill();
+      circle(0, tympCY, 14);
+      for (let r = 0; r < 8; r++) {
+        let ra = r * PI / 4 + pyr.chargePhase * 0.1;
+        line(cos(ra) * 8, tympCY + sin(ra) * 8, cos(ra) * 12, tympCY + sin(ra) * 12);
+      }
+      noStroke();
+      fill(210, 190, 70, 80 + sin(pyr.chargePhase) * 30);
+      circle(0, tympCY, 6);
+    }
+
+    // Acroteria
+    let acroH = tier >= 4 ? 14 : (tier >= 3 ? 10 : 6);
+    let acroW = tier >= 4 ? 10 : (tier >= 3 ? 7 : 5);
+    let acroCol = tier >= 4 ? color(220, 195, 60) : color(195, 188, 178);
+    fill(acroCol);
+    ellipse(0, pedY - pedH - 2, acroW, acroH);
+    if (tier >= 3) {
+      fill(210, 190, 70, 120);
+      ellipse(0, pedY - pedH - 3, acroW * 0.5, acroH * 0.6);
+    }
+    fill(acroCol);
+    ellipse(-pedW + 2, pedY - 3, acroW - 1, acroH - 2);
+    ellipse(pedW - 2, pedY - 3, acroW - 1, acroH - 2);
+  } else {
+    // Tier 1 has no pediment — set variables for flame positioning
+    entW = 64; entY = colTop + 8; pedY = colTop; pedW = 32; pedH = 0;
+  }
+
+  // ─── SACRED FLAME ───
+  if (tier === 1) {
+    // Small votive flame on altar
+    let altarFlameY = cellaTop - 12;
+    let fFlicker = sin(frameCount * 0.15) * 1;
+    fill(232, 98, 26, 200);
+    ellipse(fFlicker * 0.5, altarFlameY - 2, 5, 7);
+    fill(255, 180, 60, 160);
+    ellipse(fFlicker * 0.3, altarFlameY - 4, 3, 4);
+    // Night glow for votive
+    let tBright = getSkyBrightness();
+    if (tBright < 0.5) {
+      let ng = map(tBright, 0, 0.5, 1, 0);
+      fill(255, 160, 60, 20 * ng);
+      circle(0, altarFlameY, 80);
+    }
+  } else if (tier <= 3) {
+    // Sacred flame at apex
+    let flameY = pedY - pedH - 8;
+    let capPulse = sin(pyr.chargePhase * 1.5) * 0.3 + 0.7;
+    let glowSize = 15 + tier * 8;
+    for (let gr = glowSize; gr > 0; gr -= 3) {
+      fill(255, 200, 60, 8 * capPulse * (gr / glowSize));
+      circle(0, flameY, gr * 2);
+    }
+    let flameH = 8 + tier * 4;
+    for (let f = 0; f < 3; f++) {
+      let fw = (3 - f) * 2 + tier;
+      let fh = flameH * (1 - f * 0.25);
+      let flicker = sin(frameCount * 0.15 + f * 2) * 1.5;
+      fill(lerpColor(color(255, 140, 30, 180), color(255, 220, 60, 160), f / 3));
+      beginShape();
+      vertex(-fw + flicker, flameY + 3);
+      quadraticVertex(-fw * 0.6, flameY - fh * 0.4, flicker * 0.5, flameY - fh);
+      quadraticVertex(fw * 0.6, flameY - fh * 0.4, fw + flicker, flameY + 3);
       endShape(CLOSE);
     }
   }
 
-  // Level 3+: marble statues flanking entrance
-  if (lvl >= 3) {
+  // ─── TIER 4+: ETERNAL ROOF FLAME ───
+  if (tier >= 4) {
+    let roofFlameY = pedY - pedH - 14;
+    // Bronze tripod
+    fill(170, 140, 58);
+    rect(-4, roofFlameY + 4, 8, 10);
+    fill(180, 150, 68);
+    rect(-3, roofFlameY + 5, 6, 3);
+    // Multi-layer flame (always on)
+    let flameH = 14 + sin(frameCount * 0.07) * 2;
+    for (let f = 0; f < 3; f++) {
+      let fw = (3 - f) * 3;
+      let fh = flameH * (1 - f * 0.2);
+      let flicker = sin(frameCount * 0.15 + f * 2) * 1.5;
+      fill(lerpColor(color(255, 140, 30, 200), color(255, 220, 60, 180), f / 3));
+      beginShape();
+      vertex(-fw + flicker, roofFlameY + 3);
+      quadraticVertex(-fw * 0.5, roofFlameY - fh * 0.4, flicker * 0.3, roofFlameY - fh);
+      quadraticVertex(fw * 0.5, roofFlameY - fh * 0.4, fw + flicker, roofFlameY + 3);
+      endShape(CLOSE);
+    }
+    // White-gold core
+    fill(255, 240, 160, 120);
+    ellipse(0, roofFlameY - 2, 4, 6);
+  }
+
+  // ─── FLANKING STATUES (Tier 3+) ───
+  if (tier >= 3) {
+    let statH = tier >= 4 ? 36 : 22;
+    let pedH2 = tier >= 4 ? 14 : 10;
+    let statCol = tier >= 4 ? color(240, 234, 224) : color(205, 200, 190);
     for (let side = -1; side <= 1; side += 2) {
-      let statX = side * (baseW / 2 + 12);
-      // Ornate pedestal with molding
+      let statX = side * (baseW / 2 + 16);
+      // Pedestal
       fill(175, 168, 158);
-      rect(statX - 6, 4, 12, 4, 1);
+      rect(statX - 7, 6, 14, 4, 1);
       fill(180, 174, 164);
-      rect(statX - 5, 0, 10, 5, 1);
+      rect(statX - 6, 6 - pedH2, 12, pedH2, 1);
       fill(190, 184, 174);
-      rect(statX - 6, -1, 12, 2, 1);
-      // Statue figure — Roman senator/god
-      fill(205, 200, 190);
-      // Toga/body
-      rect(statX - 3, -12, 6, 13, 1);
-      // Toga drape detail
-      fill(195, 190, 180);
-      rect(statX - 2 * side, -10, 3, 10);
-      // Head with laurel
-      fill(210, 205, 195);
-      circle(statX, -16, 7);
-      // Laurel wreath on statue
-      fill(160, 175, 80, 100);
-      rect(statX - 3, -18, 2, 1);
-      rect(statX + 1, -18, 2, 1);
-      // Arm raised holding torch/spear
-      fill(200, 195, 185);
-      rect(statX + 3 * side, -14, 2, 8, 1);
-      // Spear in hand
-      fill(170, 140, 58);
-      rect(statX + 4 * side, -22, 1, 14);
-      // Spear tip
-      fill(190, 190, 200);
-      rect(statX + 4 * side, -24, 1, 3);
+      rect(statX - 7, 6 - pedH2 - 2, 14, 2, 1);
+      // Figure
+      fill(statCol);
+      let figBase = 6 - pedH2 - 2;
+      rect(statX - 4, figBase - statH, 8, statH, 1);
+      // Toga drape
+      fill(red(statCol) - 10, green(statCol) - 10, blue(statCol) - 10);
+      rect(statX - 2 * side, figBase - statH + 4, 4, statH - 6);
+      // Head
+      fill(statCol);
+      circle(statX, figBase - statH - 4, tier >= 4 ? 9 : 7);
+      // Arm + attribute
+      fill(red(statCol) - 5, green(statCol) - 5, blue(statCol) - 5);
+      rect(statX + 3 * side, figBase - statH + 2, 2, statH * 0.5, 1);
+      if (side === -1) {
+        // Jupiter thunderbolt / spear
+        fill(170, 140, 58);
+        rect(statX + 4 * side, figBase - statH - 8, 1, statH * 0.7);
+      } else {
+        // Minerva fasces / owl spear
+        fill(170, 140, 58);
+        rect(statX + 4 * side, figBase - statH - 6, 1, statH * 0.6);
+      }
+      // Crystal growth on statue bases (Tier 5, lv25)
+      if (tier === 5 && lvl >= 25) {
+        fill(94, 236, 208, 180);
+        beginShape();
+        vertex(statX - 5, figBase);
+        vertex(statX - 3, figBase - 14);
+        vertex(statX - 1, figBase);
+        endShape(CLOSE);
+        fill(80, 240, 200, 140);
+        beginShape();
+        vertex(statX + 2, figBase);
+        vertex(statX + 4, figBase - 10);
+        vertex(statX + 6, figBase);
+        endShape(CLOSE);
+      }
     }
   }
 
-  // Level 5: golden roof tiles shimmer
-  if (lvl >= 5) {
-    let shimmer = sin(frameCount * 0.03) * 0.3 + 0.7;
-    fill(220, 190, 60, 30 * shimmer);
-    triangle(-pedW + 5, pedY, pedW - 5, pedY, 0, pedY - pedH + 4);
-    // Gold acroteria
-    fill(220, 195, 60);
-    ellipse(0, pedY - pedH - 2, 8, 10);
-    ellipse(-pedW + 2, pedY - 3, 7, 8);
-    ellipse(pedW - 2, pedY - 3, 7, 8);
+  // ─── TIER 2: BRAZIERS ───
+  if (tier === 2) {
+    for (let side = -1; side <= 1; side += 2) {
+      let bx = side * (baseW / 2 + 6);
+      fill(140, 100, 50);
+      rect(bx - 2, cellaTop - 6, 4, 8);
+      rect(bx - 3, cellaTop - 7, 6, 2);
+      let fFlicker = sin(frameCount * 0.12 + side) * 1;
+      fill(255, 140, 32, 180);
+      ellipse(bx + fFlicker, cellaTop - 9, 6, 8);
+      fill(255, 220, 80, 120);
+      ellipse(bx + fFlicker, cellaTop - 11, 3, 5);
+    }
   }
 
-  // Level 25: glowing golden apex
-  if (lvl >= 25) {
-    let gPulse = sin(frameCount * 0.04) * 0.3 + 0.7;
-    fill(255, 220, 60, 40 * gPulse);
-    ellipse(0, pedY - pedH - 2, 24, 24);
-    fill(255, 200, 40, 60 * gPulse);
-    ellipse(0, pedY - pedH - 2, 14, 14);
-    fill(255, 240, 120);
-    ellipse(0, pedY - pedH - 2, 6, 6);
+  // ─── TIER 3+: TORCH BRACKETS ON COLUMNS ───
+  if (tier >= 3) {
+    let torchCols = [0, colCount - 1];
+    if (tier >= 4) torchCols = [0, 2, colCount - 3, colCount - 1];
+    for (let ci = 0; ci < torchCols.length; ci++) {
+      let cx2 = colStartX + torchCols[ci] * colSpacing;
+      fill(100, 80, 50);
+      rect(cx2 + 3, colBase - colH * 0.55, 5, 2);
+      let fFlicker = sin(frameCount * 0.12 + ci) * 1;
+      fill(255, 160, 40, 180);
+      ellipse(cx2 + 6 + fFlicker, colBase - colH * 0.55 - 3, 5, 7);
+      fill(255, 220, 80, 120);
+      ellipse(cx2 + 6 + fFlicker, colBase - colH * 0.55 - 5, 3, 4);
+    }
   }
 
-  // Night golden glow — temple radiates warmth after dark
-  let tBright = getSkyBrightness();
-  if (tBright < 0.5) {
-    let nightGlow = map(tBright, 0, 0.5, 1, 0);
+  // ─── TIER 5: CRYSTAL FORMATIONS ───
+  if (tier === 5) {
+    // Crystal apex beacon behind pediment
+    let crystH = 15 + (lvl - 20) * 9; // 15 at lv20, 60 at lv25
+    let apexY = pedY - pedH - 8;
+    // Main crystal prism
+    fill(94, 236, 208, 200);
+    beginShape();
+    vertex(-6, apexY);
+    vertex(-3, apexY - crystH);
+    vertex(3, apexY - crystH);
+    vertex(6, apexY);
+    endShape(CLOSE);
+    // Bright core
+    fill(223, 255, 255, 160);
+    beginShape();
+    vertex(-2, apexY - 4);
+    vertex(-1, apexY - crystH + 4);
+    vertex(1, apexY - crystH + 4);
+    vertex(2, apexY - 4);
+    endShape(CLOSE);
+    // Teal glow around crystal
+    for (let gr = 30; gr > 0; gr -= 5) {
+      fill(80, 240, 200, 4 * (gr / 30));
+      circle(0, apexY - crystH * 0.5, gr * 2);
+    }
+
+    // Secondary crystal clusters on stylobate corners (lv22+)
+    if (lvl >= 22) {
+      for (let side = -1; side <= 1; side += 2) {
+        let cx = side * (baseW / 2 + 4);
+        let shardH = 8 + (lvl - 22) * 3;
+        fill(80, 220, 190, 180);
+        beginShape();
+        vertex(cx - 3, 8);
+        vertex(cx - 1, 8 - shardH);
+        vertex(cx + 1, 8 - shardH + 2);
+        vertex(cx + 3, 8);
+        endShape(CLOSE);
+        fill(94, 236, 208, 140);
+        beginShape();
+        vertex(cx + 2, 8);
+        vertex(cx + 3, 8 - shardH * 0.7);
+        vertex(cx + 5, 8);
+        endShape(CLOSE);
+      }
+    }
+
+    // Large flanking crystal clusters (lv25)
+    if (lvl >= 25) {
+      for (let side = -1; side <= 1; side += 2) {
+        let cx = side * (baseW / 2 - 8);
+        fill(80, 236, 208, 190);
+        beginShape();
+        vertex(cx - 6, cellaTop);
+        vertex(cx - 2, cellaTop - 40);
+        vertex(cx + 2, cellaTop - 38);
+        vertex(cx + 6, cellaTop);
+        endShape(CLOSE);
+        fill(200, 255, 240, 100);
+        beginShape();
+        vertex(cx - 2, cellaTop - 4);
+        vertex(cx, cellaTop - 36);
+        vertex(cx + 2, cellaTop - 4);
+        endShape(CLOSE);
+      }
+    }
+
+    // Golden beam (lv22+, night/dusk)
+    let tBright = getSkyBrightness();
+    if (lvl >= 22 && tBright < 0.6) {
+      let beamAlpha = map(tBright, 0.6, 0, 0, 1);
+      let beamPulse = sin(frameCount * 0.013) * 0.2 + 0.8;
+      let ba = beamAlpha * beamPulse;
+      let beamTop = apexY - crystH;
+      // Wide halo
+      stroke(255, 240, 120, 6 * ba);
+      strokeWeight(20);
+      line(0, beamTop, 0, beamTop - 400);
+      // Medium beam
+      stroke(255, 230, 100, 18 * ba);
+      strokeWeight(8);
+      line(0, beamTop, 0, beamTop - 400);
+      // Tight core
+      stroke(255, 255, 200, 80 * ba);
+      strokeWeight(2.5);
+      line(0, beamTop, 0, beamTop - 300);
+      noStroke();
+    }
+
+    // Crystal ring (lv23+)
+    if (lvl >= 23) {
+      let ringCY = apexY - crystH - 6;
+      for (let r = 0; r < 12; r++) {
+        let angle = r * TWO_PI / 12 + frameCount * 0.01;
+        let shardAlpha = sin(frameCount * 0.05 + r * 0.5) * 0.3 + 0.7;
+        let shX = cos(angle) * 18;
+        let shY = ringCY + sin(angle) * 8;
+        fill(80, 240, 200, 200 * shardAlpha);
+        beginShape();
+        vertex(shX, shY - 3);
+        vertex(shX - 1.5, shY);
+        vertex(shX, shY + 3);
+        vertex(shX + 1.5, shY);
+        endShape(CLOSE);
+      }
+    }
+
+    // Ground glow plaza (lv24+)
+    if (lvl >= 24) {
+      let gpulse = sin(frameCount * 0.03) * 0.15 + 0.85;
+      for (let i = 0; i < 4; i++) {
+        fill(0, 200, 160, 6 * gpulse * (1 - i * 0.2));
+        ellipse(0, 8, 280 - i * 20, 60 - i * 4);
+      }
+    }
+  }
+
+  // ─── NIGHT GLOW (all tiers) ───
+  let tBrightN = getSkyBrightness();
+  if (tBrightN < 0.5) {
+    let nightGlow = map(tBrightN, 0, 0.5, 1, 0);
     let glowPulse = sin(pyr.chargePhase * 0.5) * 0.15 + 0.85;
-    // Warm golden aura around temple
+    // Warm aura
+    let glowR = tier === 1 ? 40 : (tier === 2 ? 60 : (tier === 3 ? 90 : (tier === 4 ? 130 : 200)));
     fill(255, 200, 80, 8 * nightGlow * glowPulse);
-    ellipse(0, cellaTop - cellaH * 0.3, baseW * 1.5, colH * 1.2);
-    // Window/doorway light spill
-    fill(255, 190, 70, 35 * nightGlow * glowPulse);
-    rect(-6, cellaTop - cellaH * 0.5, 12, cellaH * 0.5);
-    // Column highlighting from interior light
-    fill(255, 210, 100, 10 * nightGlow);
-    for (let c = 0; c < colCount; c++) {
-      let cx2 = colStartX + c * colSpacing;
-      rect(cx2 - colW, colBase - colH * 0.5, colW * 2, colH * 0.4);
+    ellipse(0, cellaTop - cellaH * 0.3, glowR * 2, glowR * 0.8);
+    // Doorway light spill (Tier 2+)
+    if (tier >= 2) {
+      fill(255, 190, 70, 35 * nightGlow * glowPulse);
+      rect(-8, cellaTop - cellaH * 0.5, 16, cellaH * 0.5);
+    }
+    // Column front highlighting
+    if (tier >= 2) {
+      fill(255, 210, 100, 10 * nightGlow);
+      for (let c = 0; c < colCount; c++) {
+        let cx2 = colStartX + c * colSpacing;
+        rect(cx2 - colW, colBase - colH * 0.5, colW * 2, colH * 0.4);
+      }
+    }
+    // Gold shimmer on metalwork (Tier 4+)
+    if (tier >= 4) {
+      let shimPulse = sin(frameCount * 0.04) * 0.2 + 0.8;
+      fill(255, 220, 80, 12 * nightGlow * shimPulse);
+      // Acroteria glow
+      if (pedY !== undefined) {
+        circle(0, pedY - pedH - 2, 16);
+      }
     }
   }
 
   // ─── INTERACTION PROMPT ───
   let playerDist = dist2(state.player.x, state.player.y, pyr.x, pyr.y);
   if (playerDist < 70 && !state.buildMode) {
+    let promptY2 = tier === 1 ? (colTop - 15) : (pedY - pedH - 25);
     fill(color(C.hudBg));
     stroke(color(C.hudBorder));
     strokeWeight(1);
-    let promptY2 = pedY - pedH - 25;
     rect(-50, promptY2 - 2, 100, 16, 3);
     noStroke();
     fill(color(C.crystalGlow));
@@ -20206,7 +20457,9 @@ function addClampedCrystal(x, y, cx, cy) {
 
 function getTempleExclusion() {
   let lvl = state.pyramid ? state.pyramid.level : 1;
-  return 100 + lvl * 20; // 120 at lv1, up to 200 at lv5
+  let tier = lvl <= 4 ? 1 : lvl <= 8 ? 2 : lvl <= 14 ? 3 : lvl <= 19 ? 4 : 5;
+  let radii = [80, 120, 160, 200, 250];
+  return radii[tier - 1];
 }
 
 function addClampedTree(x, y, cx, cy) {
