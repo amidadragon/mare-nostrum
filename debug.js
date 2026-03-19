@@ -84,6 +84,25 @@ const Debug = {
           this.addLog('+' + sd + ' seeds', '#88cc44');
           break;
 
+        case '/dev':
+        case '/home':
+          // Skip wreck, jump straight to home island with full resources
+          state.gameMode = 'home';
+          state.introPhase = 'done';
+          state.cutscene = null;
+          state.wreckPhase = 'done';
+          state.isInitialized = true;
+          if (!state.progression) state.progression = {};
+          state.progression.raftBuilt = true;
+          state.progression.villaCleared = true;
+          state.progression.wreckComplete = true;
+          if (!state.buildings || state.buildings.length === 0) buildIsland();
+          state.player.x = WORLD.islandCX;
+          state.player.y = WORLD.islandCY;
+          cam.x = state.player.x; cam.y = state.player.y;
+          this.addLog('Teleported to home island', '#88ff88');
+          break;
+
         case '/level':
           let lvl = parseInt(args[0]) || 20;
           // Give resources so expandIsland doesn't fail on cost check
