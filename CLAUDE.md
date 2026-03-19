@@ -22,30 +22,33 @@ npm run build     # Create itch.io zip at dist/mare-nostrum-v1.0.0.zip
 
 ## Architecture
 ```
-index.html          — Shell, loads p5.js CDN + all JS files
-sketch.js           — Main game (~21k lines, core systems)
-  ├── State/Init    — Game state, initState(), setup(), analytics
+index.html          — Shell, loads p5.js CDN + all 19 JS files
+sketch.js           — Core game (~17k lines, state, init, draw loop, save/load)
+  ├── State/Init    — Game state, initState(), setup(), BLUEPRINTS, analytics
   ├── Draw loop     — draw() → drawInner() dispatcher
-  ├── World         — Island terrain, floating island rendering
-  ├── Player        — Movement, inventory, actions, tools
-  ├── Farming       — Crops, growth stages, harvest combos
-  ├── Building      — 20 building types, placement, BLUEPRINTS, demolish
-  ├── Companions    — 4 autonomous AI critters
-  ├── NPCs          — 4 villagers (Livia, Marcus, Vesta, Felix)
+  ├── Building      — 26 building types, placement, drawOneBuilding, demolish
+  ├── Companions    — 4 autonomous AI critters (cat, tortoise, crow, centurion)
   ├── DayNight      — Time cycle, seasons, weather, solar energy
-  ├── Particles     — Sunbeams, pollen, sparkles, combat effects
-  ├── UI/HUD        — Resource display, dialogue, hotbar
-  ├── Save/Load     — localStorage with version migration + island loot
-  └── Conquest      — Terra Nova expedition system
+  ├── Particles     — Pollen, sparkles, combat effects
+  ├── Save/Load     — localStorage v7 with version migration + island loot
+  ├── Conquest      — Terra Nova expedition system
+  └── Expansion     — expandIsland(), buildIsland(), zone-based building spawn
+world.js            — Island terrain, coastline, hills, sky, ports, Atlantis rings
+player.js           — Movement, animation, combat input, wardrobe, drawPlayer
+farming.js          — Crops, growth stages, harvest combos, farm grid
+fishing.js          — 3-phase bobber fishing, fish types, codex data
+npc.js              — 4 NPCs, dialogue, daily wants, favor, ambient citizens
+ui.js               — HUD, hotbar, build menu, shop, codex, journal, screenshot mode
+events.js           — Random events (11 types), festivals (4 seasonal)
 cinematics.js       — Intro cinematic, sailing cutscene, pre-repair scene
 menu.js             — Menu screen, settings panel, scrolling credits
 wreck.js            — Wreck beach island (17 functions)
-combat.js           — Combat system, 9-skill tree (3 branches), XP scaling
+combat.js           — Combat system, 9-skill tree, arena waves, 9 enemy types
 diving.js           — Underwater exploration, treasure
-economy.js          — Trade routes, colony income, specializations
+economy.js          — Trade routes, Hanno merchant, colony income
 islands.js          — 4 explorable islands (Vulcan, Hyperborea, Plenty, Necropolis)
-narrative.js        — 10-chapter quest chain, NPC quests, 20 lore tablets
-sound.js            — Procedural lyre (6 modes), 25+ SFX, ambient layers
+narrative.js        — 10-chapter quest chain, NPC quests, daily wants data, lore
+sound.js            — Procedural lyre (6 modes), 25+ SFX, harmony, rain ambient
 engine.js           — Event bus, object pooling, camera culling
 debug.js            — Debug console (` key), 25+ cheat commands
 sw.js               — Service worker for offline caching
