@@ -1819,7 +1819,7 @@ function drawInner() {
     updateVestaCrystals(dt);
     updateBlessing(dt);
     updateCats(dt);
-    updateCitizens();
+    updateCitizens(dt);
     updateCooking(dt);
     updateWeather(dt);
     updateHarvestCombo(dt);
@@ -23218,13 +23218,13 @@ function drawOneChicken(ch) {
 }
 
 // ─── AMBIENT CITIZENS ─────────────────────────────────────────────────
-function updateCitizens() {
+function updateCitizens(dt) {
   if (!state.citizens) return;
   let srx = getSurfaceRX(), sry = getSurfaceRY();
   let cx = WORLD.islandCX, cy = WORLD.islandCY;
 
   state.citizens.forEach(c => {
-    c.timer--;
+    c.timer -= dt;
     if (c.state === 'idle') {
       if (c.timer <= 0) {
         let a = random(TWO_PI);
@@ -23244,8 +23244,8 @@ function updateCitizens() {
       } else {
         c.vx = (dx / d) * c.speed;
         c.vy = (dy / d) * c.speed;
-        c.x += c.vx;
-        c.y += c.vy;
+        c.x += c.vx * dt;
+        c.y += c.vy * dt;
         c.facing = c.vx > 0 ? 1 : -1;
       }
     }
