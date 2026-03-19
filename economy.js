@@ -500,3 +500,94 @@ function drawEconomyUIOverlay() {
     }
   }
 }
+
+// ─── HANNO'S MERCHANT STOCK ─────────────────────────────────────────────────
+
+const HANNO_STOCK_POOL = [
+  // Tools & upgrades
+  { id: 'copper_hook',     name: 'Copper Hook',      price: 25,  currency: 'gold', category: 'tool',     desc: 'Better fishing line -- catch rate +20%' },
+  { id: 'iron_sickle',     name: 'Iron Sickle',      price: 40,  currency: 'gold', category: 'tool',     desc: 'Harvest two crops at once' },
+  { id: 'bronze_lantern',  name: 'Bronze Lantern',   price: 30,  currency: 'gold', category: 'tool',     desc: 'See further at night' },
+  // Seeds & farming
+  { id: 'saffron_seeds',   name: 'Saffron Seeds',    price: 35,  currency: 'gold', category: 'seed',     desc: 'Exotic spice -- grows in summer only' },
+  { id: 'silk_cotton',     name: 'Silk Cotton Seeds', price: 50,  currency: 'gold', category: 'seed',     desc: 'Rare fiber crop -- high trade value' },
+  { id: 'imported_emmer',  name: 'Imported Emmer',   price: 20,  currency: 'gold', category: 'seed',     desc: 'Hardy wheat -- grows in any season' },
+  // Materials
+  { id: 'etruscan_marble', name: 'Etruscan Marble',  price: 60,  currency: 'gold', category: 'material', desc: '3 white stone blocks for building' },
+  { id: 'phoenician_dye',  name: 'Phoenician Dye',   price: 45,  currency: 'gold', category: 'material', desc: 'Purple dye -- cosmetic unlock ingredient' },
+  { id: 'damascus_iron',   name: 'Damascus Iron',    price: 55,  currency: 'gold', category: 'material', desc: '5 iron ingots of superior quality' },
+  // Food & recipes
+  { id: 'cretan_honey',    name: 'Cretan Honey',     price: 15,  currency: 'gold', category: 'food',     desc: 'Sweet honey -- gift for any NPC (+2 hearts)' },
+  { id: 'garum_amphora',   name: 'Garum Amphora',    price: 20,  currency: 'gold', category: 'food',     desc: 'Fermented fish sauce -- cooking ingredient' },
+  { id: 'alexandrian_wine',name: 'Alexandrian Wine',  price: 35,  currency: 'gold', category: 'food',     desc: 'Fine wine -- doubles feast effect' },
+  // Rare collectibles
+  { id: 'etruscan_coin',   name: 'Etruscan Coin',    price: 80,  currency: 'gold', category: 'relic',    desc: 'Ancient coin -- adds to Codex relic collection' },
+  { id: 'greek_scroll',    name: 'Greek Scroll',     price: 70,  currency: 'gold', category: 'relic',    desc: 'Philosophical text -- Felix loves these' },
+  { id: 'persian_rug',     name: 'Persian Rug',      price: 90,  currency: 'gold', category: 'relic',    desc: 'Decorative -- unlocks villa carpet cosmetic' },
+  // Crystal & magic
+  { id: 'charged_crystal', name: 'Charged Crystal',  price: 3,   currency: 'crystals', category: 'crystal', desc: 'Pre-charged -- 100 solar energy stored' },
+  { id: 'crystal_lens',    name: 'Crystal Lens',     price: 5,   currency: 'crystals', category: 'crystal', desc: 'Focus lens -- crystal shrine charge rate +50%' },
+  // Combat
+  { id: 'gladius_oil',     name: 'Gladius Oil',      price: 30,  currency: 'gold', category: 'combat',   desc: 'Weapon maintenance -- +3 damage for 5 fights' },
+  { id: 'health_salve',    name: 'Health Salve',     price: 20,  currency: 'gold', category: 'combat',   desc: 'Healing potion -- restores 50 HP' },
+  { id: 'shield_polish',   name: 'Shield Polish',    price: 25,  currency: 'gold', category: 'combat',   desc: 'Block chance +15% for 3 fights' },
+];
+
+// ─── HANNO'S DAILY DIALOGUE ─────────────────────────────────────────────────
+
+const HANNO_DIALOGUE = [
+  "Hanno of Carthage, at your service. I've sailed worse seas for lesser ports.",
+  "The winds favored me today. See anything you like? I won't be here long.",
+  "Business is business, friend. But between us -- I keep the good stuff for regulars.",
+  "My grandfather traded with Rome. Look how that turned out. Still, coin is coin.",
+  "I've heard stories about this island. Crystal towers? Glowing water? You Romans are strange.",
+  "Every port has its treasure. Yours is that temple. Mine is knowing when to leave.",
+  "Fresh stock from Carthage, Alexandria, and one very suspicious port in Crete.",
+];
+
+// Seeded random -- deterministic per day
+function _hannoSeededRandom(seed) {
+  let x = Math.sin(seed * 9301 + 49297) * 49297;
+  return x - Math.floor(x);
+}
+
+// Get Hanno's stock for a given day
+function getHannoStock(dayCount) {
+  let daySeed = Math.floor(Date.now() / 86400000); // real-world day
+  let isMarketDay = dayCount % 7 === 0;
+  let numSlots = isMarketDay ? 5 : 3;
+
+  // Deterministic shuffle using day seed
+  let indices = [];
+  for (let i = 0; i < HANNO_STOCK_POOL.length; i++) indices.push(i);
+  // Fisher-Yates with seeded random
+  for (let i = indices.length - 1; i > 0; i--) {
+    let j = Math.floor(_hannoSeededRandom(daySeed * 1000 + i) * (i + 1));
+    let tmp = indices[i]; indices[i] = indices[j]; indices[j] = tmp;
+  }
+
+  let stock = [];
+  for (let s = 0; s < numSlots && s < indices.length; s++) {
+    let item = Object.assign({}, HANNO_STOCK_POOL[indices[s]]);
+    // Quantity: 1-3 per item
+    item.qty = 1 + Math.floor(_hannoSeededRandom(daySeed * 100 + s * 7) * 3);
+    // Rare flag: ~1 in 7 chance per slot
+    item.isRare = _hannoSeededRandom(daySeed * 50 + s * 13) < 0.143;
+    // Market day discount
+    if (isMarketDay) item.price = Math.floor(item.price * 0.8);
+    stock.push(item);
+  }
+  return stock;
+}
+
+// Get Hanno's daily dialogue line
+function getHannoDialogue(dayCount) {
+  let daySeed = Math.floor(Date.now() / 86400000);
+  let idx = Math.floor(_hannoSeededRandom(daySeed * 777) * HANNO_DIALOGUE.length);
+  return HANNO_DIALOGUE[idx];
+}
+
+// Check if today is market day
+function isMarketDay(dayCount) {
+  return dayCount % 7 === 0;
+}
