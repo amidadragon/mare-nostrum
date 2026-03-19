@@ -84,24 +84,48 @@ const Debug = {
           this.addLog('+' + sd + ' seeds', '#88cc44');
           break;
 
-        case '/dev':
-        case '/home':
-          // Skip wreck, jump straight to home island with full resources
-          state.gameMode = 'home';
-          state.introPhase = 'done';
-          state.cutscene = null;
-          state.wreckPhase = 'done';
-          state.isInitialized = true;
-          if (!state.progression) state.progression = {};
-          state.progression.raftBuilt = true;
-          state.progression.villaCleared = true;
-          state.progression.wreckComplete = true;
-          if (!state.buildings || state.buildings.length === 0) buildIsland();
-          state.player.x = WORLD.islandCX;
-          state.player.y = WORLD.islandCY;
-          cam.x = state.player.x; cam.y = state.player.y;
-          this.addLog('Teleported to home island', '#88ff88');
+        case '/dev': {
+          const alreadyHome = state.progression && state.progression.homeIslandReached;
+          if (alreadyHome) {
+            // Already on home island — god mode + max resources
+            state.player.hp = 99999;
+            state.player.maxHp = 99999;
+            state.player.attackDamage = 999;
+            state.gold += 9999; state.wood += 999; state.stone += 999;
+            state.crystals += 999; state.seeds += 99; state.harvest += 500;
+            state.fish += 99; state.ironOre += 999; state.ancientRelic += 99;
+            state.titanBone += 50; state.grapeSeeds += 50; state.oliveSeeds += 50;
+            state.meals += 50; state.wine += 50; state.oil += 50;
+            state.solar = state.maxSolar || 100;
+            this.addLog('GOD MODE — invincible, max damage, max resources', '#ffdd44');
+          } else {
+            // On wreck beach — fully transition to home island
+            if (!state.progression) state.progression = {};
+            state.progression.gameStarted = true;
+            state.progression.homeIslandReached = true;
+            state.progression.raftBuilt = true;
+            state.progression.villaCleared = true;
+            state.progression.wreckComplete = true;
+            state.progression.farmCleared = true;
+            state.progression.triremeRepaired = true;
+            state.gameMode = 'home';
+            state.introPhase = 'done';
+            state.cutscene = null;
+            state.wreckPhase = 'done';
+            state.isInitialized = true;
+            state.rowing = state.rowing || {}; state.rowing.active = false;
+            state.conquest = state.conquest || {}; state.conquest.active = false;
+            state.adventure = state.adventure || {}; state.adventure.active = false;
+            if (!state.buildings || state.buildings.length === 0) buildIsland();
+            state.player.x = WORLD.islandCX;
+            state.player.y = WORLD.islandCY;
+            cam.x = state.player.x; cam.y = state.player.y;
+            camSmooth.x = cam.x; camSmooth.y = cam.y;
+            this.addLog('Teleported to home island', '#88ff88');
+            this.addLog('Type /dev again for god mode + max resources', '#aaffaa');
+          }
           break;
+        }
 
         case '/level':
           let lvl = parseInt(args[0]) || 20;
@@ -287,8 +311,7 @@ const Debug = {
           }
           break;
 
-        case '/devmode':
-        case '/dev': {
+        case '/devmode': {
           // Instant mid-game state — skip all early progression
           // Resources
           state.gold += 5000; state.wood += 500; state.stone += 500;
