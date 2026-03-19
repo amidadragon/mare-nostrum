@@ -165,6 +165,11 @@ const WORLD = {
   tileSize: 32,     // grid snap for building
 };
 
+function getEra() {
+  let lv = state.islandLevel || 1;
+  return lv <= 8 ? 'village' : lv <= 17 ? 'city' : 'atlantis';
+}
+
 // ─── STATE ────────────────────────────────────────────────────────────────
 let state;
 let cam = { x: 600, y: 400 };
@@ -214,6 +219,8 @@ const BLUEPRINTS = {
   // Level 20+ (Consul->Imperator)
   arch:    { name: 'Arch',     w: 48, h: 52, cost: { stone: 20, gold: 100, crystals: 10 }, key: '', blocks: false, minLevel: 20 },
   villa:   { name: 'Villa',    w: 60, h: 44, cost: { stone: 15, wood: 10, gold: 75 },   key: '', blocks: true,  minLevel: 20 },
+  // Level 8+ (auto-spawned, not player-buildable)
+  castrum: { name: 'Castrum',  w: 52, h: 40, cost: { stone: 10, wood: 8, ironOre: 5, gold: 50 }, key: '', blocks: true, minLevel: 8 },
 };
 
 function initState() {
@@ -831,6 +838,12 @@ function initState() {
     // Victory
     won: false,          // true after Imperator ceremony completes
     victoryCeremony: null, // { timer, phase } — active victory cutscene
+
+    // Legia military system
+    legia: {
+      recruits: 0, maxRecruits: 5, trainingQueue: 0, trainingTimer: 0,
+      castrumLevel: 0, castrumX: 0, castrumY: 0, deployed: 0, legiaUIOpen: false,
+    },
 
     isInitialized: false,
   };
@@ -1695,6 +1708,7 @@ function drawInner() {
     updateVisitor(dt);
     updateDiscoveryEvents(dt);
     updateBridgeConstruction(dt);
+    updateLegia(dt);
     if (typeof updateDiving === 'function') updateDiving(dt);
     updateNotifications(dt);
     // Narrative engine updates
@@ -1806,6 +1820,7 @@ function drawInner() {
     drawRowingBoat();
     // Diving overlay — underwater tint + entities drawn in world space
     if (state.diving && state.diving.active && typeof drawDivingOverlay === 'function') drawDivingOverlay();
+    drawLegionPatrol();
     // Build mode ghost — drawn inside island float/shake context so it matches placed buildings
     if (state.buildMode) {
       drawBuildGhost();
@@ -1982,6 +1997,7 @@ function drawInner() {
     drawEmpireDashboard();
     drawInventoryScreen();
     if (typeof drawSkillTree === 'function') drawSkillTree();
+    drawLegiaUI();
     drawAchievementPopup();
     if (typeof drawEconomyUIOverlay === 'function') drawEconomyUIOverlay();
     drawScreenTransition();
@@ -8342,6 +8358,30 @@ function drawOneBuilding(b) {
         fill(195, 160, 55, 120);
         rect(-bw / 2 + 2, -bh / 2 + 2, bw - 4, 2);
         rect(-bw / 2 + 2, bh / 2 - 4, bw - 4, 2);
+        break;
+      case 'castrum':
+        // Roman military fort — stone walls, tower corners, red standard
+        noStroke();
+        // Stone perimeter
+        fill(140, 128, 110);
+        rect(-bw / 2, -bh / 2, bw, bh, 2);
+        // Interior parade ground
+        fill(158, 145, 120);
+        rect(-bw / 2 + 5, -bh / 2 + 5, bw - 10, bh - 10);
+        // Corner towers
+        fill(128, 116, 98);
+        rect(-bw / 2, -bh / 2, 9, 9);
+        rect(bw / 2 - 9, -bh / 2, 9, 9);
+        rect(-bw / 2, bh / 2 - 9, 9, 9);
+        rect(bw / 2 - 9, bh / 2 - 9, 9, 9);
+        // Gate (south)
+        fill(60, 45, 25);
+        rect(-6, bh / 2 - 7, 12, 7);
+        // Red standard pole
+        fill(100, 80, 50);
+        rect(-1, -bh / 2 + 2, 2, 14);
+        fill(180, 35, 35);
+        rect(0, -bh / 2 + 3, 8, 5);
         break;
     }
     pop();
@@ -15138,6 +15178,126 @@ function drawModifierSelectUI() {
   pop();
 }
 
+// ─── LEGIA MILITARY SYSTEM ───────────────────────────────────────────────
+
+function updateLegia(dt) {
+  let lg = state.legia;
+  if (!lg) return;
+  if (lg.trainingQueue > 0 && lg.trainingTimer > 0) {
+    lg.trainingTimer -= dt;
+    if (lg.trainingTimer <= 0) {
+      lg.recruits = min(lg.recruits + 1, lg.maxRecruits);
+      lg.trainingQueue--;
+      lg.trainingTimer = lg.trainingQueue > 0 ? 300 : 0;
+      addFloatingText(w2sX(lg.castrumX), w2sY(lg.castrumY) - 30, 'Legionary Ready!', '#cc4444');
+    }
+  }
+}
+
+function handleLegiaKey(k) {
+  let lg = state.legia;
+  if (!lg || lg.castrumLevel < 1) return false;
+  if (k === '1') {
+    if (state.gold < 20) { addFloatingText(width / 2, height * 0.3, 'Need 20 gold', '#ff6644'); return true; }
+    if (state.meals < 1) { addFloatingText(width / 2, height * 0.3, 'Need 1 meal', '#ff6644'); return true; }
+    if (lg.recruits + lg.trainingQueue >= lg.maxRecruits) { addFloatingText(width / 2, height * 0.3, 'Legion at capacity!', '#ff6644'); return true; }
+    state.gold -= 20;
+    state.meals -= 1;
+    lg.trainingQueue++;
+    if (lg.trainingTimer <= 0) lg.trainingTimer = 300;
+    addFloatingText(width / 2, height * 0.3, 'Training legionary... (300 frames)', '#cc8844');
+    return true;
+  }
+  if (k === '2') {
+    if (lg.castrumLevel === 1) {
+      if (state.gold < 100 || state.stone < 20) { addFloatingText(width / 2, height * 0.3, 'Need 100g + 20 stone', '#ff6644'); return true; }
+      state.gold -= 100; state.stone -= 20;
+      lg.castrumLevel = 2; lg.maxRecruits = 10;
+      addFloatingText(width / 2, height * 0.3, 'Castrum upgraded! Max 10 legionaries', '#cc8844');
+    } else if (lg.castrumLevel === 2) {
+      if (state.gold < 300 || state.stone < 50 || state.ironOre < 10) { addFloatingText(width / 2, height * 0.3, 'Need 300g + 50 stone + 10 iron', '#ff6644'); return true; }
+      state.gold -= 300; state.stone -= 50; state.ironOre -= 10;
+      lg.castrumLevel = 3; lg.maxRecruits = 20;
+      addFloatingText(width / 2, height * 0.3, 'Castrum fortified! Max 20 legionaries', '#cc4444');
+    } else {
+      addFloatingText(width / 2, height * 0.3, 'Castrum at max level', '#aaaaaa');
+    }
+    return true;
+  }
+  return false;
+}
+
+function drawLegiaUI() {
+  let lg = state.legia;
+  if (!lg || !lg.legiaUIOpen) return;
+  push();
+  let pw = 240, ph = 150;
+  let px = width / 2 - pw / 2, py = height / 2 - ph / 2;
+  // Parchment background
+  fill(210, 190, 140, 230); stroke(140, 110, 70); strokeWeight(2);
+  rect(px, py, pw, ph, 6);
+  noStroke();
+  fill(90, 60, 30); textAlign(CENTER, TOP); textSize(12);
+  text('LEGIO NOSTRA', px + pw / 2, py + 10);
+  fill(100, 75, 40); textSize(9); textAlign(LEFT, TOP);
+  text('Recruits: ' + lg.recruits + ' / ' + lg.maxRecruits, px + 14, py + 32);
+  text('Training: ' + lg.trainingQueue + ' queued', px + 14, py + 46);
+  if (lg.trainingTimer > 0) {
+    text('Next ready in: ' + ceil(lg.trainingTimer) + ' frames', px + 14, py + 60);
+  }
+  text('Castrum Level: ' + lg.castrumLevel, px + 14, py + 76);
+  // Action hints
+  fill(60, 40, 20); textSize(8);
+  text('[1] Train Legionary (20g + 1 meal)', px + 14, py + 98);
+  if (lg.castrumLevel < 3) {
+    let upg = lg.castrumLevel === 1 ? '100g + 20 stone' : '300g + 50 stone + 10 iron';
+    text('[2] Upgrade Castrum (' + upg + ')', px + 14, py + 112);
+  }
+  text('[ESC] Close', px + 14, py + 126);
+  pop();
+}
+
+function drawLegionPatrol() {
+  let lg = state.legia;
+  if (!lg || lg.castrumLevel < 1 || lg.recruits < 1) return;
+  let cx = lg.castrumX, cy = lg.castrumY;
+  let count = min(lg.recruits, 6);
+  let t = frameCount * 0.018;
+  for (let i = 0; i < count; i++) {
+    let a = t + (i / count) * TWO_PI;
+    let r = 30 + i * 4;
+    let sx = w2sX(cx + cos(a) * r);
+    let sy = w2sY(cy + sin(a) * r);
+    if (sx < -20 || sx > width + 20 || sy < -20 || sy > height + 20) continue;
+    push();
+    translate(sx, sy + floatOffset);
+    // Body — red tunic
+    fill(170, 40, 40); noStroke();
+    rect(-4, -6, 8, 8);
+    // Helmet
+    fill(160, 140, 80);
+    ellipse(0, -8, 8, 6);
+    rect(-4, -10, 8, 4);
+    // Shield (left arm)
+    fill(120, 90, 50); stroke(80, 60, 30); strokeWeight(1);
+    rect(-7, -5, 4, 8, 1);
+    // Legs
+    fill(90, 70, 50); noStroke();
+    rect(-4, 2, 3, 5);
+    rect(1, 2, 3, 5);
+    pop();
+  }
+  // [E] prompt when player near
+  let px = state.player.x, py2 = state.player.y;
+  if (dist(px, py2, cx, cy) < 50) {
+    push();
+    fill(255, 255, 255, 200); noStroke();
+    textAlign(CENTER, CENTER); textSize(10);
+    text('[E] Legia', w2sX(cx), w2sY(cy) - 35 + floatOffset);
+    pop();
+  }
+}
+
 // ─── FOG OF WAR ─────────────────────────────────────────────────────────
 const FOG_GRID = 20; // grid cell size in world units
 const FOG_REVEAL_R = 5; // reveal radius in cells (~100px)
@@ -18993,6 +19153,7 @@ function keyPressed() {
     if (state.nightMarket && state.nightMarket.shopOpen) { state.nightMarket.shopOpen = false; return; }
     if (state.ship && state.ship.shopOpen) { state.ship.shopOpen = false; return; }
     if (state.tradeRouteUI) { state.tradeRouteUI = false; return; }
+    if (state.legia && state.legia.legiaUIOpen) { state.legia.legiaUIOpen = false; return; }
     saveGame();
     gameScreen = 'menu';
     menuFadeIn = 0;
@@ -19325,6 +19486,12 @@ function keyPressed() {
     // Collect bottles
     let nearBottle = state.bottles.find(b => !b.collected && dist(state.player.x, state.player.y, b.x, b.y) < 40);
     if (nearBottle) { collectBottle(nearBottle); return; }
+    // Legia castrum interaction
+    if (state.legia && state.legia.castrumLevel > 0 &&
+        dist(state.player.x, state.player.y, state.legia.castrumX, state.legia.castrumY) < 50) {
+      state.legia.legiaUIOpen = !state.legia.legiaUIOpen;
+      return;
+    }
     // Night market interaction
     if (state.nightMarket.active) {
       let mp = getMarketPosition();
@@ -19498,6 +19665,12 @@ function keyPressed() {
       startFishing();
     }
   }
+  // Legia UI number keys
+  if (state.legia && state.legia.legiaUIOpen) {
+    if (handleLegiaKey(key)) return;
+    return; // block all other keys while legiaUI open
+  }
+
   // Trade number keys when shop is open
   if (state.ship.shopOpen && state.ship.state === 'docked') {
     let tradeIdx = parseInt(key) - 1;
@@ -20300,6 +20473,8 @@ function saveGame() {
       ghostTalked: (state.necropolis.ghostNPCs || []).map(g => g.talked),
       ghostPositions: (state.necropolis.ghostNPCs || []).map(g => ({ x: g.x, y: g.y })),
     },
+    // Legia military system
+    legia: state.legia || null,
     // Victory
     won: state.won || false,
     // Progression system
@@ -20478,6 +20653,18 @@ function loadGame() {
       if (nl.tombPositions) state.necropolis.tombs = nl.tombPositions.map((p, i) => ({ x: p.x, y: p.y, looted: nl.tombsLooted[i] || false }));
       if (nl.soulPositions) state.necropolis.soulNodes = nl.soulPositions.map((p, i) => ({ x: p.x, y: p.y, collected: nl.soulCollected[i] || false }));
       if (nl.ghostPositions) state.necropolis.ghostNPCs = nl.ghostPositions.map((p, i) => ({ x: p.x, y: p.y, talked: nl.ghostTalked[i] || false, dialogueIndex: 0 }));
+    }
+    // Legia military system
+    if (d.legia) {
+      state.legia.recruits = d.legia.recruits || 0;
+      state.legia.maxRecruits = d.legia.maxRecruits || 5;
+      state.legia.trainingQueue = d.legia.trainingQueue || 0;
+      state.legia.trainingTimer = d.legia.trainingTimer || 0;
+      state.legia.castrumLevel = d.legia.castrumLevel || 0;
+      state.legia.castrumX = d.legia.castrumX || 0;
+      state.legia.castrumY = d.legia.castrumY || 0;
+      state.legia.deployed = d.legia.deployed || 0;
+      state.legia.legiaUIOpen = false; // never restore open
     }
     // Victory state
     state.won = d.won || false;
@@ -22417,6 +22604,15 @@ function expandIsland() {
     // Farm extension every 2 levels
     if (lvl % 2 === 0) {
       addFarmPlots(farmCX, farmCY, lvl);
+    }
+    // Level 8 — Castrum auto-spawn
+    if (lvl === 8 && state.legia && state.legia.castrumLevel < 1) {
+      let _castrumX = cx + rx * 0.35, _castrumY = cy + ry * 0.45;
+      state.buildings.push({ x: _castrumX, y: _castrumY, w: 52, h: 40, type: 'castrum', rot: 0 });
+      state.legia.castrumLevel = 1;
+      state.legia.castrumX = _castrumX;
+      state.legia.castrumY = _castrumY;
+      addFloatingText(width / 2, height * 0.3, 'Castrum built! Train your legionaries.', '#cc4444');
     }
   }
 
