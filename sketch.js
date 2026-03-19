@@ -11625,6 +11625,8 @@ function handleLegiaKey(k) {
 function drawLegionPatrol() {
   let lg = state.legia;
   if (!lg || lg.castrumLevel < 1 || lg.recruits < 1) return;
+  // Skip orbital circles if ambient soldier entities exist (they're drawn in Y-sorted pass)
+  if (lg.soldiers && lg.soldiers.length > 0) return;
   let cx = lg.castrumX, cy = lg.castrumY;
   let count = min(lg.recruits, 6);
   let t = frameCount * 0.018;
@@ -16098,6 +16100,7 @@ function loadGame() {
     // Load progression — old saves without progression = fully unlocked (veteran)
     if (d.progression) {
       state.progression = d.progression;
+      if (!state.progression.tutorialsSeen) state.progression.tutorialsSeen = {};
       // Safety: if player has hearts with Livia, villa must be cleared
       if (state.npc.hearts >= 2 && !state.progression.villaCleared) {
         state.progression.villaCleared = true;

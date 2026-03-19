@@ -1,8 +1,51 @@
 ---
-name: project_overview
-description: Architecture overview of Mare Nostrum game files and key systems
+name: Project Overview — Mare Nostrum
+description: Game architecture, file roles, load order, key systems, modularization status
 type: project
 ---
+
+# Mare Nostrum — QA Overview
+
+## Architecture
+19 JS files loaded via plain script tags (no modules). p5.js global mode. All files share one global scope.
+
+## Load Order (index.html)
+1. engine.js — event bus, object pooling, camera culling (Engine object)
+2. sound.js — procedural audio (SoundManager class → snd instance)
+3. narrative.js — quest chains, NPC dialogue pools, lore tablets, DAILY_WANTS, favor system
+4. cinematics.js — intro, sailing cutscene, pre-repair scene, doFirstRepair, completeSailToHome
+5. fishing.js — FISH_TYPES, NAT_FISH_DATA, startFishing, updateFishing, drawFishing, reelFish
+6. farming.js — SEASONAL_CROPS, NAT_CROP_DATA, all farm functions including drawFarmZoneBG
+7. npc.js — NPC dialogue constants, drawNPC, drawNewNPC, citizens, daily wants
+8. events.js — FESTIVALS, EVENT_DEFS, checkRandomEvent, updateActiveEvent, festival system
+9. world.js — drawIsland, drawSky, drawOcean, drawCoastlineShape, terrain, ports
+10. player.js — updatePlayer, drawPlayer, wardrobe (wardrobeOpen let var), TUNIC_COLORS, HEADWEAR
+11. ui.js — drawHUD, drawHotbar, drawBuildUI, drawShopUI, EXPEDITION_MODIFIERS, all overlay UIs
+12. sketch.js — MAIN: state, initState, draw loop, save/load, BLUEPRINTS, combat AI, conquest
+13. wreck.js — wreck beach island, updateWreckBeach, drawWreckIsland, handleWreckInteract
+14. menu.js — drawMenuScreen, handleMenuClick, settings/credits panels
+15. islands.js — Vulcan, Hyperborea, Plenty, Necropolis all enter/exit/update/draw functions
+16. diving.js — startDive, updateDiving, drawDivingOverlay, initDiveWorld
+17. combat.js — skill tree, arena, grantXP, tryDodgeRoll, handleCombatSkillKey, drawSkillTree
+18. economy.js — trade routes, HANNO merchant, colony specs, TRADE_GOODS
+19. debug.js — Debug object, ` key console, cheat commands
+
+## Key Globals (sketch.js)
+state, WORLD, cam, camSmooth, particles, floatOffset, horizonOffset, shakeX, shakeY,
+gameScreen, snd (created in setup), C (color constants), BLUEPRINTS, wardrobeOpen (in player.js!)
+
+## State Machine Paths
+- menu → startNewGame() → wreck beach → raft built → sail → home island
+- menu → startLoadGame() → wherever last saved
+- home island → rowboat → arena / conquest / islands
+- ESC → saveGame() → menu
+
+## Save Format
+Version 7. Key: 'sunlitIsles_save'. Handles migration from older saves.
+
+## Modularization Status (post-audit 2026-03-19)
+Complete. 7 systems extracted from sketch.js: world.js, player.js, farming.js, fishing.js, npc.js, ui.js, events.js
+KNOWN REGRESSION: drawNightLighting() call left in sketch.js:1897 but function never defined. See BUG-101.
 
 # Mare Nostrum — Project Overview
 

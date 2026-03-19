@@ -14,3 +14,4 @@
 - [design_retention.md](design_retention.md) — Prioritized retention features: daily hooks, long-term progression, emergent content (sprints 1–4)
 - [design_atlantis_vision.md](design_atlantis_vision.md) — Three-era island evolution (Village/City/Megalopolis), Atlantis ring system, emotional arc, implementation notes
 - [design_temple_vision.md](design_temple_vision.md) — Five-tier temple progression system: exterior evolution, interior rooms, crystal beacon, dominance system, implementation order
+- [project_island_map.md](project_island_map.md) — Master building placement map (ISLAND_MAP.md): all zones, level schedule, roads, coordinate constants

@@ -15,7 +15,7 @@ Browser-playable p5.js game. Shipwrecked Roman exile rebuilds on floating island
 ```bash
 npm run dev       # Live-server with hot reload on port 8080
 npm run start     # Same but opens browser
-npm run check     # Syntax-check all 13 JS files
+npm run check     # Syntax-check all 19 JS files
 npm run count     # Line count per file
 npm run build     # Create itch.io zip at dist/mare-nostrum-v1.0.0.zip
 ```
@@ -88,9 +88,12 @@ manifest.json       — PWA manifest
 - **Distant islands**: Must use horizon-clamped draw functions (`drawArenaIsleDistant`, `drawConquestIsleDistant`) not the full render functions.
 - **Progression gate**: `state.progression.villaCleared` must be true to board ship. Safety: auto-set if Livia hearts >= 2 on load.
 
-## Modularization Status
-Extracted: sound.js, cinematics.js, menu.js, wreck.js
-Remaining: ui.js (~1500 lines), player.js (~800), farming.js (~600), npc.js (~1000), conquest.js (~2300), world.js (~1000)
+## Modularization Status (Complete)
+19 JS files. sketch.js reduced from 25k to 17k. All systems extracted:
+world.js, player.js, ui.js, npc.js, events.js, farming.js, fishing.js,
+combat.js, economy.js, narrative.js, sound.js, diving.js, islands.js,
+cinematics.js, menu.js, wreck.js, engine.js, debug.js
+Agents can now work on 12+ files in parallel. Only sketch.js needs sequential access.
 
 ## Agent Workflow
 When doing major work, use parallel agents:
