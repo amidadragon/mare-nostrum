@@ -1892,6 +1892,8 @@ function drawInner() {
     translate(shakeX, shakeY + floatOffset);
     drawIsland();
     drawWorldObjectsSorted();
+    drawCitySmoke();
+    drawLaundryLines();
     drawRuinOverlays();
     drawCompanionTrail();
     drawPlayerTrail();
@@ -5107,6 +5109,65 @@ function drawRuins() {
   });
 }
 
+function drawCitySmoke() {
+  if (state.islandLevel < 6) return;
+  let bright = getSkyBrightness();
+  let smokeAlpha = map(bright, 0.0, 0.5, 80, 25);
+
+  state.buildings.forEach(b => {
+    if (b.type !== 'house' && b.type !== 'villa') return;
+    let sx = w2sX(b.x);
+    let sy = w2sY(b.y);
+    let chimneyX = floor(sx - b.w * 0.15);
+    let chimneyY = floor(sy - b.h * 0.8);
+
+    for (let i = 0; i < 3; i++) {
+      let phase = frameCount * 0.015 + i * 2.1 + b.x * 0.01;
+      for (let p = 0; p < 4; p++) {
+        let pFrac = p / 3;
+        let px = chimneyX + floor(sin(phase + p * 0.7) * (2 + p * 1.5));
+        let py = chimneyY - floor(p * 6 + (frameCount * 0.7 + i * 30) % 24);
+        let size = 1 + floor(pFrac * 1.5);
+        let a = smokeAlpha * (1 - pFrac * 0.7);
+        fill(195, 190, 182, a);
+        noStroke();
+        rect(px, py, size, size);
+      }
+    }
+  });
+}
+
+function drawLaundryLines() {
+  if (state.islandLevel < 6) return;
+  let rx = getSurfaceRX(), ry = getSurfaceRY();
+  let cx = WORLD.islandCX, cy = WORLD.islandCY;
+
+  let lines = [
+    { x1: cx - rx*0.22, x2: cx - rx*0.12, y: cy - ry*0.22, colors: [[190,50,50],[60,60,140],[140,120,50]] },
+    { x1: cx - rx*0.32, x2: cx - rx*0.20, y: cy - ry*0.35, colors: [[100,110,160],[190,120,50],[60,150,120]] },
+  ];
+
+  lines.forEach((ln, li) => {
+    let sx1 = w2sX(ln.x1), sx2 = w2sX(ln.x2), sy = w2sY(ln.y);
+    let sway = sin(frameCount * 0.015 + li * 1.7) * 1.5;
+
+    stroke(80, 70, 60, 130);
+    strokeWeight(0.8);
+    line(sx1, sy + sway * 0.3, sx2, sy + sway * 0.5);
+    noStroke();
+
+    ln.colors.forEach((c, ci) => {
+      let t = (ci + 1) / (ln.colors.length + 1);
+      let lx = lerp(sx1, sx2, t);
+      let ly = sy + sway * t;
+      fill(c[0], c[1], c[2], 200);
+      rect(floor(lx) - 2, floor(ly), 4, 6);
+      fill(min(255, c[0]+30), min(255, c[1]+30), min(255, c[2]+30), 80);
+      rect(floor(lx) - 2, floor(ly), 4, 2);
+    });
+  });
+}
+
 // ─── Y-SORTED WORLD RENDERING ────────────────────────────────────────────
 function drawWorldObjectsSorted() {
   // Layer 0: ground-level flat objects (always behind characters)
@@ -5887,6 +5948,24 @@ function drawOneBuilding(b) {
         fill(100, 80, 40);
         rect(-2, -bh / 2 - 13, 4, 1);
         rect(-2, -bh / 2 - 11, 4, 1);
+        // Colorful awning over market
+        let awningColors = [[200,55,40],[220,180,50],[45,90,170],[190,90,35]];
+        let stripeW = floor(bw / 4);
+        for (let s = 0; s < 4; s++) {
+          let ac = awningColors[(floor(b.x * 0.1) + s) % 4];
+          fill(ac[0], ac[1], ac[2], 200);
+          beginShape();
+          vertex(-bw/2 + s * stripeW, -bh/2 - 2);
+          vertex(-bw/2 + (s+1) * stripeW, -bh/2 - 2);
+          vertex(-bw/2 + (s+1) * stripeW + 2, -bh/2 + 6);
+          vertex(-bw/2 + s * stripeW - 1, -bh/2 + 6);
+          endShape(CLOSE);
+        }
+        // Fringe
+        fill(220, 215, 200, 150);
+        for (let f = 0; f < floor(bw / 5); f++) {
+          rect(-bw/2 + f * 5 + 2, -bh/2 + 6, 2, 3);
+        }
         break;
 
       case 'forum':
