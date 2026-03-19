@@ -2116,6 +2116,7 @@ function drawInner() {
     drawInventoryScreen();
     if (typeof drawSkillTree === 'function') drawSkillTree();
     drawLegiaUI();
+    drawExpeditionSummaryOverlay();
     drawAchievementPopup();
     if (typeof drawEconomyUIOverlay === 'function') drawEconomyUIOverlay();
     drawScreenTransition();
@@ -16238,6 +16239,75 @@ function drawLegiaUI() {
   pop();
 }
 
+function drawExpeditionSummaryOverlay() {
+  let s = state._expedSummary;
+  if (!s) return;
+  s.timer--;
+  if (s.timer <= 0) { state._expedSummary = null; return; }
+
+  // Fade out in last 60 frames
+  let alpha = s.timer < 60 ? floor((s.timer / 60) * 220) : 220;
+  push();
+  noStroke();
+  fill(0, 0, 0, min(alpha, 160));
+  rect(0, 0, width, height);
+
+  let lootEntries = Object.entries(s.loot);
+  let bw = 340, bh = 200 + (s.soldiersStart > 0 ? 30 : 0) + lootEntries.length * 22;
+  let bx = width / 2 - bw / 2, by = height / 2 - bh / 2;
+
+  fill(30, 20, 10, alpha);
+  stroke(200, 170, 80, alpha); strokeWeight(2);
+  rect(bx, by, bw, bh, 8);
+  noStroke();
+
+  fill(s.isDeath ? color(255, 100, 60, alpha) : color(220, 185, 60, alpha));
+  textAlign(CENTER, TOP); textSize(18);
+  text(s.isDeath ? 'EXPEDITION ENDED' : 'EXPEDITION COMPLETE', width / 2, by + 14);
+
+  stroke(160, 130, 60, alpha * 0.7); strokeWeight(1);
+  line(bx + 20, by + 38, bx + bw - 20, by + 38);
+  noStroke();
+
+  let ty = by + 48;
+  fill(200, 185, 140, alpha); textSize(11); textAlign(LEFT, TOP);
+  text('Enemies Defeated:', bx + 24, ty);
+  fill(255, 220, 100, alpha); textAlign(RIGHT, TOP);
+  text(s.kills, bx + bw - 24, ty);
+
+  ty += 22;
+  fill(200, 185, 140, alpha); textAlign(LEFT, TOP);
+  text('Gold Earned:', bx + 24, ty);
+  fill(255, 200, 60, alpha); textAlign(RIGHT, TOP);
+  text('+' + s.gold, bx + bw - 24, ty);
+
+  for (let [name, qty] of lootEntries) {
+    ty += 22;
+    fill(180, 165, 120, alpha); textAlign(LEFT, TOP);
+    text(name + ':', bx + 24, ty);
+    let col = {Wood:[187,136,68], Iron:[170,187,204], Hide:[204,153,102], Relic:[255,136,255], Bone:[255,221,136]}[name] || [204,204,204];
+    fill(col[0], col[1], col[2], alpha); textAlign(RIGHT, TOP);
+    text('+' + qty, bx + bw - 24, ty);
+  }
+
+  if (s.soldiersStart > 0) {
+    ty += 28;
+    stroke(160, 130, 60, alpha * 0.5); strokeWeight(1);
+    line(bx + 20, ty - 8, bx + bw - 20, ty - 8);
+    noStroke();
+    let survived = s.soldiersStart - s.soldiersLost;
+    fill(200, 185, 140, alpha); textAlign(LEFT, TOP); textSize(11);
+    text('Soldiers:', bx + 24, ty);
+    fill(s.soldiersLost === 0 ? color(120, 220, 120, alpha) : color(255, 150, 80, alpha));
+    textAlign(RIGHT, TOP);
+    text(survived + ' survived, ' + s.soldiersLost + ' lost', bx + bw - 24, ty);
+  }
+
+  fill(140, 130, 100, alpha * 0.7); textAlign(CENTER, TOP); textSize(9);
+  text('Returning home...', width / 2, by + bh - 20);
+  pop();
+}
+
 function drawLegionPatrol() {
   let lg = state.legia;
   if (!lg || lg.castrumLevel < 1 || lg.recruits < 1) return;
@@ -21582,6 +21652,7 @@ function saveGame() {
     },
     // Legia military system
     legia: state.legia || null,
+    arenaHighWave: state.arenaHighWave || 0,
     // Random events
     activeEvent: state.activeEvent || null,
     eventCooldown: state.eventCooldown || {},
@@ -21777,6 +21848,7 @@ function loadGame() {
       state.legia.deployed = d.legia.deployed || 0;
       state.legia.legiaUIOpen = false; // never restore open
     }
+    state.arenaHighWave = d.arenaHighWave || 0;
     // Random events
     if (d.activeEvent) state.activeEvent = d.activeEvent;
     if (d.eventCooldown) state.eventCooldown = d.eventCooldown;
