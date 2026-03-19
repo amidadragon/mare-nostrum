@@ -14311,19 +14311,32 @@ const WAVE_DEFS = [
 
 // Generate a scaled wave def for waves beyond WAVE_DEFS.length
 function generateWaveDef(n) {
-  // Boss wave every 5th
-  if (n % 5 === 0) {
-    return [{ type: 'minotaur', count: 1 + floor((n - 5) / 10) }, { type: 'secutor', count: 2 }];
+  // Cycle repeats every 10 waves; HP scales by 1.1^(cycle) per full cycle
+  let cycle = floor((n - 1) / 10);
+  let phase = ((n - 1) % 10) + 1; // 1-10 within cycle
+  let hpMult = pow(1.1, cycle);
+
+  // Wave 10 in each cycle: Centurion boss + 2 basic enemies
+  if (phase === 10) {
+    return [{ type: 'centurion', count: 1 }, { type: 'wolf', count: 2 }, { type: '_hpMult', count: hpMult }];
   }
-  let hpMult = 1 + (n - WAVE_DEFS.length) * 0.08;
-  let extras = floor((n - WAVE_DEFS.length) / 3);
-  let wolves = 2 + extras;
-  let bandits = 1 + extras;
-  // Alternate harpy/secutor mix
-  if (n % 2 === 0) {
-    return [{ type: 'harpy', count: bandits }, { type: 'wolf', count: wolves }, { type: '_hpMult', count: hpMult }];
+  // Phases 1-3: basic enemies
+  if (phase <= 3) {
+    let count = 2 + floor(phase / 2);
+    if (phase % 2 === 0) return [{ type: 'bandit', count: count }, { type: '_hpMult', count: hpMult }];
+    return [{ type: 'wolf', count: count }, { type: '_hpMult', count: hpMult }];
   }
-  return [{ type: 'secutor', count: 1 + extras }, { type: 'bandit', count: bandits }, { type: '_hpMult', count: hpMult }];
+  // Phases 4-6: mixed with shield bearers
+  if (phase <= 6) {
+    let shields = 1 + floor((phase - 3) / 2);
+    let wolves = 2 + floor((phase - 3) / 2);
+    return [{ type: 'shield_bearer', count: shields }, { type: 'wolf', count: wolves }, { type: '_hpMult', count: hpMult }];
+  }
+  // Phases 7-9: mixed with archers
+  let archers = 1 + floor((phase - 6) / 2);
+  let bandits = 2 + floor((phase - 6) / 2);
+  let shields = 1;
+  return [{ type: 'archer', count: archers }, { type: 'shield_bearer', count: shields }, { type: 'bandit', count: bandits }, { type: '_hpMult', count: hpMult }];
 }
 
 function getEnemyStats(type) {
@@ -14333,6 +14346,9 @@ function getEnemyStats(type) {
     case 'harpy':    return { hp: 35, damage: 10, speed: 2.8, size: 14 };
     case 'secutor':  return { hp: 70, damage: 15, speed: 1.2, size: 16 };
     case 'minotaur': return { hp: 200, damage: 25, speed: 1.0, size: 24 };
+    case 'shield_bearer': return { hp: 80, damage: 12, speed: 0.8, size: 18, behavior: 'shield', blockChance: 0.5 };
+    case 'archer':   return { hp: 35, damage: 8, speed: 1.2, size: 14, behavior: 'ranged', projectileSpeed: 3, shootCooldown: 90, preferredRange: 150 };
+    case 'centurion': return { hp: 200, damage: 25, speed: 1.0, size: 22, behavior: 'boss', chargeSpeed: 4, chargeCooldown: 180 };
     default:         return { hp: 30, damage: 8, speed: 1.5, size: 12 };
   }
 }
@@ -14354,7 +14370,7 @@ function spawnWave(n) {
       let angle = (TWO_PI / total) * idx + random(-0.3, 0.3);
       let stats = getEnemyStats(def.type);
       let scaledHp = floor(stats.hp * hpMult);
-      a.enemies.push({
+      let eObj = {
         type: def.type,
         x: a.isleX + cos(angle) * (a.isleRX - 20),
         y: a.isleY + sin(angle) * (a.isleRY - 20),
@@ -14364,7 +14380,15 @@ function spawnWave(n) {
         state: 'chase', stateTimer: 0,
         attackCooldown: 0, facing: 1, flashTimer: 0,
         chargeAngle: 0, chargeTimer: 0,
-      });
+      };
+      if (stats.behavior) eObj.behavior = stats.behavior;
+      if (stats.blockChance) eObj.blockChance = stats.blockChance;
+      if (stats.projectileSpeed) eObj.projectileSpeed = stats.projectileSpeed;
+      if (stats.shootCooldown) { eObj.shootCooldown = stats.shootCooldown; eObj.shootTimer = 0; }
+      if (stats.preferredRange) eObj.preferredRange = stats.preferredRange;
+      if (stats.chargeSpeed) eObj.chargeSpeed = stats.chargeSpeed;
+      if (stats.chargeCooldown) eObj.chargeCooldownMax = stats.chargeCooldown;
+      a.enemies.push(eObj);
       idx++;
     }
   }
