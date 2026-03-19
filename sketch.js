@@ -14603,6 +14603,14 @@ function playerAttack() {
     if (e.type === 'secutor' && random() < 0.5) {
       addFloatingText(w2sX(e.x), w2sY(e.y) - 20, 'BLOCKED', '#aaaaaa');
       e.flashTimer = 4;
+      if (typeof snd !== 'undefined' && snd) snd.playSFX('shield_bash');
+      continue;
+    }
+    // Shield Bearer blocks frontal attacks
+    if (e.type === 'shield_bearer' && random() < (e.blockChance || 0.5)) {
+      addFloatingText(w2sX(e.x), w2sY(e.y) - 20, 'BLOCKED', '#ccbb88');
+      e.flashTimer = 4;
+      if (typeof snd !== 'undefined' && snd) snd.playSFX('shield_bash');
       continue;
     }
     e.hp -= dmg;
@@ -14631,6 +14639,70 @@ function updateEnemyAI(e, dt, p, a) {
       let dy = p.y - e.y;
       let d = sqrt(dx * dx + dy * dy);
       e.facing = dx > 0 ? 1 : -1;
+
+      // Archer behavior: maintain range, flee if too close
+      if (e.behavior === 'ranged') {
+        let pref = e.preferredRange || 150;
+        if (d < 60) {
+          // Flee away from player
+          let md = sqrt(dx * dx + dy * dy) || 1;
+          e.vx = (-dx / md) * e.speed * 1.5;
+          e.vy = (-dy / md) * e.speed * 1.5;
+        } else if (d > pref + 30) {
+          let md = sqrt(dx * dx + dy * dy) || 1;
+          e.vx = (dx / md) * e.speed;
+          e.vy = (dy / md) * e.speed;
+        } else {
+          // Strafe at preferred range
+          let perp = sin(frameCount * 0.03 + e.x) * 0.8;
+          e.vx = (-dy / (d || 1)) * e.speed * perp;
+          e.vy = (dx / (d || 1)) * e.speed * perp;
+        }
+        e.x += e.vx * dt;
+        e.y += e.vy * dt;
+        // Shoot projectile
+        if (!e.shootTimer) e.shootTimer = 0;
+        e.shootTimer -= dt;
+        if (e.shootTimer <= 0 && d < pref + 60 && d > 40) {
+          e.shootTimer = e.shootCooldown || 90;
+          let md2 = sqrt(dx * dx + dy * dy) || 1;
+          let spd = e.projectileSpeed || 3;
+          if (typeof _arenaProjectiles !== 'undefined') {
+            _arenaProjectiles.push({
+              x: e.x, y: e.y,
+              vx: (dx / md2) * spd, vy: (dy / md2) * spd,
+              damage: e.damage, life: 120,
+              color: [120, 100, 70],
+            });
+          }
+        }
+        break;
+      }
+
+      // Centurion boss behavior: chase then charge
+      if (e.behavior === 'boss') {
+        if (!e.bossChargeCooldown) e.bossChargeCooldown = 0;
+        e.bossChargeCooldown -= dt;
+        if (d < 100 && e.bossChargeCooldown <= 0) {
+          e.state = 'windup';
+          e.stateTimer = 45;
+          e.chargeAngle = atan2(dy, dx);
+          e.vx = 0; e.vy = 0;
+          e.bossChargeCooldown = e.chargeCooldownMax || 180;
+          break;
+        }
+        // Normal chase
+        let md3 = sqrt(dx * dx + dy * dy) || 1;
+        e.vx = (dx / md3) * e.speed;
+        e.vy = (dy / md3) * e.speed;
+        e.x += e.vx * dt;
+        e.y += e.vy * dt;
+        if (d < e.size + 20 && e.attackCooldown <= 0) {
+          e.state = 'attack';
+          e.stateTimer = 15;
+        }
+        break;
+      }
 
       // Harpy swoops sideways
       let mx = dx, my = dy;
@@ -14680,14 +14752,16 @@ function updateEnemyAI(e, dt, p, a) {
       break;
     }
     case 'charging': {
-      // Minotaur charge!
-      e.x += cos(e.chargeAngle) * e.speed * 5 * dt;
-      e.y += sin(e.chargeAngle) * e.speed * 5 * dt;
+      // Minotaur/Centurion charge!
+      let chSpd = e.chargeSpeed || (e.speed * 5);
+      e.x += cos(e.chargeAngle) * chSpd * dt;
+      e.y += sin(e.chargeAngle) * chSpd * dt;
       e.stateTimer -= dt;
-      // Damage player on contact
+      // Damage player on contact — boss deals double damage during charge
       if (dist(e.x, e.y, p.x, p.y) < e.size + p.size && p.invincTimer <= 0) {
         let armorR = [0, 3, 6, 10][p.armor] || 0;
-        let dmg = max(1, floor(e.damage * 1.5) - armorR);
+        let chargeMult = e.behavior === 'boss' ? 2.0 : 1.5;
+        let dmg = max(1, floor(e.damage * chargeMult) - armorR);
         p.hp -= dmg;
         p.invincTimer = 45;
         addFloatingText(w2sX(p.x), w2sY(p.y) - 25, '-' + dmg, '#ff6644');
@@ -14698,7 +14772,14 @@ function updateEnemyAI(e, dt, p, a) {
       let bx = (e.x - a.isleX) / (a.isleRX - 10);
       let by = (e.y - a.isleY) / (a.isleRY - 10);
       if (bx * bx + by * by > 1 || e.stateTimer <= 0) {
-        e.state = 'chase';
+        // Boss: brief stun after charge (1 second)
+        if (e.behavior === 'boss') {
+          e.state = 'stagger';
+          e.stateTimer = 60;
+          e.vx = 0; e.vy = 0;
+        } else {
+          e.state = 'chase';
+        }
         e.attackCooldown = 120;
       }
       break;
@@ -14769,6 +14850,12 @@ function enemyDeath(e, a) {
     state.codex.enemies[e.type].defeated = true;
   }
   spawnParticles(e.x, e.y, 'combat', 8);
+  // Kill burst particles (colored per enemy type)
+  if (typeof spawnKillBurst === 'function') {
+    let burstCol = { wolf: [130, 95, 55], bandit: [105, 80, 55], harpy: [85, 125, 75], secutor: [145, 135, 115],
+      minotaur: [110, 70, 45], shield_bearer: [140, 130, 115], archer: [120, 100, 70], centurion: [180, 50, 40] }[e.type] || [150, 150, 150];
+    spawnKillBurst(e.x, e.y, burstCol);
+  }
   // Drop loot
   let drops = [];
   switch (e.type) {
@@ -14788,6 +14875,19 @@ function enemyDeath(e, a) {
     case 'minotaur':
       drops.push({ type: 'gold', amount: 30 });
       drops.push({ type: 'crystal', amount: 3 });
+      spawnBossDefeated(e.x, e.y);
+      break;
+    case 'shield_bearer':
+      drops.push({ type: 'gold', amount: floor(random(8, 14)) });
+      if (random() < 0.35) drops.push({ type: 'stone', amount: 2 });
+      break;
+    case 'archer':
+      drops.push({ type: 'gold', amount: floor(random(6, 10)) });
+      if (random() < 0.25) drops.push({ type: 'wood', amount: 2 });
+      break;
+    case 'centurion':
+      drops.push({ type: 'gold', amount: 50 });
+      drops.push({ type: 'crystal', amount: 5 });
       spawnBossDefeated(e.x, e.y);
       break;
   }
@@ -17887,43 +17987,77 @@ function drawConquestIsleDistant() {
   if (sx < -350 || sx > width + 350 || sy < -350 || sy > height + 350) return;
   push();
   noStroke();
-  // Mist halo — pixel rect
-  fill(180, 210, 190, 25 + floor(sin(frameCount * 0.012) * 12));
-  let mhW = floor(c.isleRX * 0.8), mhH = floor(c.isleRY * 0.45);
-  rect(floor(sx - mhW / 2), floor(sy - mhH / 2), mhW, mhH);
-  // Dark forested island body — pixel rect
-  fill(35, 65, 30);
-  let ibW = floor(c.isleRX * 0.55), ibH = floor(c.isleRY * 0.22);
-  rect(floor(sx - ibW / 2), floor(sy + 2 - ibH / 2), ibW, ibH);
-  // Beach rim — pixel rect
-  fill(170, 155, 115, 80);
-  let brW = floor(c.isleRX * 0.58), brH = floor(c.isleRY * 0.18);
-  rect(floor(sx - brW / 2), floor(sy + 3 - brH / 2), brW, brH);
-  // Tree silhouettes — stacked pixel rects
-  fill(25, 55, 22);
-  for (let i = -4; i <= 4; i++) {
-    let th = 8 + (4 - abs(i)) * 2;
-    let tx = floor(sx + i * 8);
-    for (let r = 0; r < th; r += 2) {
-      let w = floor(map(r, 0, th, 2, 10));
-      rect(tx - floor(w / 2), floor(sy - 2 - th + r), w, 2);
+
+  if (c.colonized) {
+    // Colonized: proper island terrain (water, beach, grass ellipses)
+    let rx = c.isleRX, ry = c.isleRY;
+    // Water shadow
+    fill(20, 60, 80, 35);
+    ellipse(sx + 4, sy + 5, rx * 2.15, ry * 2.15);
+    // Shallow water ring
+    fill(55, 145, 165, 50);
+    ellipse(sx, sy, rx * 2.12, ry * 2.12);
+    // Shore waves
+    stroke(200, 220, 255, 25 + sin(frameCount * 0.04) * 12);
+    strokeWeight(1.5); noFill();
+    ellipse(sx, sy, rx * 2.08 + sin(frameCount * 0.025) * 3, ry * 2.08 + sin(frameCount * 0.025) * 2);
+    noStroke();
+    // Beach
+    fill(195, 180, 135);
+    ellipse(sx, sy, rx * 2, ry * 2);
+    // Beach detail
+    fill(180, 165, 120, 50);
+    for (let i = 0; i < 6; i++) {
+      let ba = (i / 6) * TWO_PI + 1.1;
+      ellipse(sx + cos(ba) * rx * 0.94, sy + sin(ba) * ry * 0.65, 10, 5);
+    }
+    // Grass
+    fill(60, 105, 42);
+    ellipse(sx, sy, rx * 1.85, ry * 1.85);
+    // Lighter meadow center
+    fill(70, 120, 48, 50);
+    ellipse(sx, sy + ry * 0.1, rx * 0.9, ry * 0.6);
+    // Golden colony glow
+    fill(255, 220, 100, 8);
+    ellipse(sx, sy, rx * 1.5, ry * 1.5);
+    // Dock indicator at south shore
+    fill(120, 90, 50);
+    rect(floor(sx - 4), floor(sy + ry * 0.88), 8, 14);
+    fill(100, 75, 40);
+    rect(floor(sx - 6), floor(sy + ry * 0.86), 12, 3);
+  } else {
+    // Unexplored / in-progress: dark silhouette
+    // Mist halo — pixel rect
+    fill(180, 210, 190, 25 + floor(sin(frameCount * 0.012) * 12));
+    let mhW = floor(c.isleRX * 0.8), mhH = floor(c.isleRY * 0.45);
+    rect(floor(sx - mhW / 2), floor(sy - mhH / 2), mhW, mhH);
+    // Dark forested island body — pixel rect
+    fill(35, 65, 30);
+    let ibW = floor(c.isleRX * 0.55), ibH = floor(c.isleRY * 0.22);
+    rect(floor(sx - ibW / 2), floor(sy + 2 - ibH / 2), ibW, ibH);
+    // Beach rim — pixel rect
+    fill(170, 155, 115, 80);
+    let brW = floor(c.isleRX * 0.58), brH = floor(c.isleRY * 0.18);
+    rect(floor(sx - brW / 2), floor(sy + 3 - brH / 2), brW, brH);
+    // Tree silhouettes — stacked pixel rects
+    fill(25, 55, 22);
+    for (let i = -4; i <= 4; i++) {
+      let th = 8 + (4 - abs(i)) * 2;
+      let tx = floor(sx + i * 8);
+      for (let r = 0; r < th; r += 2) {
+        let w = floor(map(r, 0, th, 2, 10));
+        rect(tx - floor(w / 2), floor(sy - 2 - th + r), w, 2);
+      }
+    }
+    // Beacon fire on settled islands — pixel rects
+    if (c.phase === 'settled' || c.buildings.length > 0) {
+      let fl = floor(sin(frameCount * 0.12) * 2);
+      fill(255, 160, 40, 140);
+      rect(floor(sx - 2), floor(sy - 17 + fl), 5, 7);
+      fill(255, 100, 20, 80);
+      rect(floor(sx - 1), floor(sy - 18 + fl), 3, 4);
     }
   }
-  // Beacon fire on settled islands — pixel rects
-  if (c.phase === 'settled' || c.buildings.length > 0) {
-    let fl = floor(sin(frameCount * 0.12) * 2);
-    fill(255, 160, 40, 140);
-    rect(floor(sx - 2), floor(sy - 17 + fl), 5, 7);
-    fill(255, 100, 20, 80);
-    rect(floor(sx - 1), floor(sy - 18 + fl), 3, 4);
-  }
-  // Label
-  fill(170, 160, 130, 140);
-  textSize(8); textAlign(CENTER); textStyle(ITALIC);
-  let label = c.phase === 'settled' ? 'Terra Nova (Settled)' :
-              c.phase === 'unexplored' ? 'Terra Nova — ???' : 'Terra Nova';
-  text(label, sx, sy + 22);
-  textStyle(NORMAL);
   pop();
 }
 
