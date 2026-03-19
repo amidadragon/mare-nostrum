@@ -16812,6 +16812,11 @@ function expandIsland() {
     state.buildings.push({ x: cx - 20, y: cy + 30, w: 24, h: 20, type: 'floor', rot: 0 });
     state.buildings.push({ x: cx,      y: cy + 30, w: 24, h: 20, type: 'floor', rot: 0 });
     state.buildings.push({ x: cx + 20, y: cy + 30, w: 24, h: 20, type: 'floor', rot: 0 });
+    // Lanterns flanking civic district entry
+    state.buildings.push({ x: cx + rx * 0.3, y: cy - ry * 0.15, w: 10, h: 20, type: 'lantern', rot: 0 });
+    state.buildings.push({ x: cx + rx * 0.3, y: cy + ry * 0.05, w: 10, h: 20, type: 'lantern', rot: 0 });
+    state.buildings.push({ x: cx + rx * 0.4, y: cy - ry * 0.1, w: 24, h: 20, type: 'floor', rot: 0 });
+    state.buildings.push({ x: cx + rx * 0.4, y: cy, w: 24, h: 20, type: 'floor', rot: 0 });
     addFloatingText(width / 2, height * 0.25, 'GOVERNOR — Temple & Market erected!', '#ffdd66');
     triggerScreenShake(6, 15);
     spawnParticles(cx + rx * 0.55, cy - ry * 0.35, 'build', 15);
@@ -17017,6 +17022,10 @@ function expandIsland() {
     addFarmPlots(farmCX, farmCY, lvl);
     // Torch near well (Town Center)
     state.buildings.push({ x: cx + rx * 0.35 + 16, y: cy + ry * 0.55, w: 8, h: 16, type: 'torch', rot: 0 });
+    // Floor tiles along path from farm to granary
+    state.buildings.push({ x: cx - rx * 0.1, y: cy - ry * 0.3, w: 24, h: 20, type: 'floor', rot: 0 });
+    state.buildings.push({ x: cx - rx * 0.1, y: cy - ry * 0.15, w: 24, h: 20, type: 'floor', rot: 0 });
+    state.buildings.push({ x: cx - rx * 0.1, y: cy, w: 24, h: 20, type: 'floor', rot: 0 });
   } else if (lvl >= 6 && lvl <= 25) {
     // IMPERIAL EXPANSION — shared procedural content (resources, trees, crystals, ruins)
     let angle0 = ((lvl - 6) / 20) * TWO_PI;
@@ -17074,17 +17083,26 @@ function expandIsland() {
       // Bath house southwest + Castrum
       state.buildings.push({ x: cx - rx * 0.3, y: cy + ry * 0.35, w: 44, h: 32, type: 'bath', rot: 0 });
       if (state.legia && state.legia.castrumLevel < 1) {
-        let _castrumX = cx + rx * 0.35, _castrumY = cy + ry * 0.45;
+        let _castrumX = cx + rx * 0.45, _castrumY = cy + ry * 0.5;
         state.buildings.push({ x: _castrumX, y: _castrumY, w: 52, h: 40, type: 'castrum', rot: 0 });
         state.legia.castrumLevel = 1;
         state.legia.castrumX = _castrumX;
         state.legia.castrumY = _castrumY;
+        // Torches flanking castrum
+        state.buildings.push({ x: _castrumX - 34, y: _castrumY + 16, w: 8, h: 16, type: 'torch', rot: 0 });
+        state.buildings.push({ x: _castrumX + 34, y: _castrumY + 16, w: 8, h: 16, type: 'torch', rot: 0 });
+        unlockJournal('legia_founded');
         addFloatingText(width / 2, height * 0.3, 'Baths & Castrum — Rome grows strong!', '#cc4444');
         spawnParticles(_castrumX, _castrumY, 'build', 12);
       } else {
         addFloatingText(width / 2, height * 0.3, 'Baths constructed — citizens rejoice!', '#88ccff');
         spawnParticles(cx - rx * 0.3, cy + ry * 0.35, 'build', 10);
       }
+      // Via militaris leading to castrum
+      state.buildings.push({ x: cx + rx * 0.35, y: cy + ry * 0.2, w: 24, h: 20, type: 'floor', rot: 0 });
+      state.buildings.push({ x: cx + rx * 0.35, y: cy + ry * 0.3, w: 24, h: 20, type: 'floor', rot: 0 });
+      state.buildings.push({ x: cx + rx * 0.35, y: cy + ry * 0.4, w: 24, h: 20, type: 'floor', rot: 0 });
+      state.buildings.push({ x: cx + rx * 0.4, y: cy + ry * 0.5, w: 32, h: 8, type: 'wall', rot: 0 });
     }
     if (lvl === 9) {
       // Three aqueduct segments spanning north
@@ -17122,6 +17140,8 @@ function expandIsland() {
       // Wall segments near castrum (Military SE)
       state.buildings.push({ x: cx + rx * 0.25, y: cy + ry * 0.35, w: 32, h: 8, type: 'wall', rot: 0 });
       state.buildings.push({ x: cx + rx * 0.45, y: cy + ry * 0.35, w: 32, h: 8, type: 'wall', rot: 0 });
+      // Watchtower visible from farming zone
+      state.buildings.push({ x: cx - rx * 0.1, y: cy + ry * 0.35, w: 20, h: 44, type: 'watchtower', rot: 0 });
       addFloatingText(width / 2, height * 0.3, 'Watchtower stands sentinel — walls fortified!', '#cc8844');
       spawnParticles(cx + rx * 0.7, cy, 'build', 10);
     }

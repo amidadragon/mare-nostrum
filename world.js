@@ -582,6 +582,7 @@ function drawAtlantisRings() {
 
 // ─── ISLAND ───────────────────────────────────────────────────────────────
 function drawIsland() {
+  if (typeof updatePortPositions === 'function') updatePortPositions();
   let ix = w2sX(WORLD.islandCX);
   let iy = w2sY(WORLD.islandCY);
   let iw = state.islandRX * 2;
