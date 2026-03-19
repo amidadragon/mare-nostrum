@@ -2117,6 +2117,7 @@ function drawInner() {
     if (typeof drawSkillTree === 'function') drawSkillTree();
     drawLegiaUI();
     drawExpeditionSummaryOverlay();
+    if (typeof drawArenaSummaryOverlay === 'function') drawArenaSummaryOverlay();
     drawAchievementPopup();
     if (typeof drawEconomyUIOverlay === 'function') drawEconomyUIOverlay();
     drawScreenTransition();
@@ -14395,7 +14396,7 @@ function spawnWave(n) {
   a.wave = n;
   a.waveState = 'fighting';
   a.waveTimer = 0;
-  let isBoss = n > WAVE_DEFS.length && n % 5 === 0;
+  let isBoss = n % 10 === 0;
   addFloatingText(width / 2, height * 0.25, isBoss ? 'BOSS WAVE ' + n + '!' : 'WAVE ' + n, isBoss ? '#ff6633' : '#ffcc44');
   if (isBoss) triggerScreenShake(8, 20);
   else triggerScreenShake(4, 10);
@@ -14413,6 +14414,9 @@ function enterAdventure() {
   a.enemies = [];
   a.loot = [];
   a.killCount = 0;
+  a.goldEarned = 0;
+  a.xpEarned = 0;
+  if (typeof _arenaProjectiles !== 'undefined') _arenaProjectiles.length = 0;
   state.rowing.active = false;
   p.hp = p.maxHp;
   p.x = a.isleX;
@@ -14480,10 +14484,11 @@ function updateAdventure(dt) {
       state.arenaHighWave = max(state.arenaHighWave, a.wave);
       let waveGold = 10 + a.wave * 5;
       state.gold += waveGold;
+      a.goldEarned = (a.goldEarned || 0) + waveGold;
       if (a.wave % 5 === 0) { state.crystals += 2; }
       addFloatingText(width / 2, height * 0.3, 'Wave ' + a.wave + ' Clear! +' + waveGold + ' Gold', '#aaddff');
       a.waveState = 'intermission';
-      a.waveTimer = 120; // 2 seconds between waves
+      a.waveTimer = 180; // 3 seconds rest between waves
     }
   }
 
@@ -14502,11 +14507,15 @@ function updateAdventure(dt) {
     }
   }
 
-  // Player death
+  // Update archer projectiles
+  if (typeof updateArenaProjectiles === 'function') updateArenaProjectiles(dt, p);
+
+  // Player death — show arena summary
   if (p.hp <= 0) {
     p.hp = floor(p.maxHp * 0.5);
     addFloatingText(width / 2, height * 0.35, 'Retreat!', '#ff6644');
     triggerScreenShake(8, 20);
+    if (typeof showArenaSummary === 'function') showArenaSummary(a, false);
     exitAdventure();
   }
 }
@@ -15574,6 +15583,173 @@ function drawOneEnemy(e) {
       }
       break;
     }
+    case 'shield_bearer': {
+      let wb = floor(walkBob);
+      // Pixel shadow
+      fill(0, 0, 0, 35);
+      rect(-12, 9, 24, 2);
+      // Pixel legs
+      fill(f ? 255 : 120, f ? 255 : 110, f ? 255 : 90);
+      let sbleg = floor(sin(frameCount * 0.09) * 1.5);
+      rect(-5, 6 + sbleg + wb, 4, 8);
+      rect(2, 6 - sbleg + wb, 4, 8);
+      // Pixel boots
+      fill(f ? 255 : 90, f ? 255 : 75, f ? 255 : 50);
+      rect(-6, 13 + sbleg + wb, 5, 3);
+      rect(1, 13 - sbleg + wb, 5, 3);
+      // Pixel body (heavy armor)
+      fill(f ? 255 : 140, f ? 255 : 130, f ? 255 : 115);
+      rect(-10, -8 + wb, 20, 16);
+      // Armor plate detail
+      fill(f ? 255 : 160, f ? 255 : 150, f ? 255 : 130);
+      rect(-8, -6 + wb, 16, 12);
+      // Cross rivets
+      fill(f ? 255 : 180, f ? 255 : 170, f ? 255 : 140);
+      rect(-1, -5 + wb, 2, 10);
+      rect(-6, 0 + wb, 12, 2);
+      // Large shield (held in front)
+      fill(f ? 255 : 120, f ? 255 : 105, f ? 255 : 75);
+      rect(-e.facing * 12, -12 + wb, 10, 22);
+      fill(f ? 255 : 145, f ? 255 : 130, f ? 255 : 95);
+      rect(-e.facing * 11, -9 + wb, 8, 16);
+      // Shield boss (center)
+      fill(f ? 255 : 180, f ? 255 : 160, f ? 255 : 100);
+      rect(-e.facing * 9, -2 + wb, 4, 4);
+      // Pixel arm + short sword
+      fill(f ? 255 : 185, f ? 255 : 155, f ? 255 : 115);
+      rect(e.facing * 9, -2 + wb, 3, 6);
+      fill(f ? 255 : 190, f ? 255 : 190, f ? 255 : 200);
+      rect(e.facing * 10, -10 + wb, 2, 8);
+      // Pixel helmet
+      fill(f ? 255 : 150, f ? 255 : 140, f ? 255 : 120);
+      rect(-6, -20 + wb, 12, 12);
+      // Face guard
+      fill(f ? 255 : 130, f ? 255 : 120, f ? 255 : 100);
+      rect(-4, -16 + wb, 8, 6);
+      // Eye slits
+      fill(30);
+      rect(-3, -14 + wb, 3, 2);
+      rect(1, -14 + wb, 3, 2);
+      break;
+    }
+    case 'archer': {
+      let wb = floor(walkBob);
+      // Pixel shadow
+      fill(0, 0, 0, 30);
+      rect(-7, 7, 14, 2);
+      // Pixel legs
+      fill(f ? 255 : 100, f ? 255 : 80, f ? 255 : 50);
+      let aleg = floor(sin(frameCount * 0.12) * 2);
+      rect(-3, 5 + aleg + wb, 3, 7);
+      rect(1, 5 - aleg + wb, 3, 7);
+      // Pixel sandals
+      fill(f ? 255 : 80, f ? 255 : 65, f ? 255 : 35);
+      rect(-4, 11 + aleg + wb, 4, 2);
+      rect(0, 11 - aleg + wb, 4, 2);
+      // Pixel body (light tunic)
+      fill(f ? 255 : 120, f ? 255 : 100, f ? 255 : 70);
+      rect(-6, -5 + wb, 12, 12);
+      // Pixel belt + quiver strap
+      fill(f ? 255 : 80, f ? 255 : 60, f ? 255 : 30);
+      rect(-5, 3 + wb, 10, 2);
+      rect(-e.facing * 4, -4 + wb, 1, 8);
+      // Pixel quiver on back
+      fill(f ? 255 : 90, f ? 255 : 70, f ? 255 : 40);
+      rect(-e.facing * 6, -6 + wb, 3, 10);
+      // Arrow tips
+      fill(f ? 255 : 180, f ? 255 : 180, f ? 255 : 190);
+      rect(-e.facing * 6, -8 + wb, 1, 2);
+      rect(-e.facing * 5, -7 + wb, 1, 2);
+      // Pixel arms + bow
+      fill(f ? 255 : 175, f ? 255 : 145, f ? 255 : 105);
+      rect(e.facing * 6, -2 + wb, 3, 5);
+      // Bow
+      fill(f ? 255 : 100, f ? 255 : 70, f ? 255 : 30);
+      rect(e.facing * 8, -10 + wb, 2, 16);
+      // Bowstring
+      stroke(f ? 255 : 180, f ? 255 : 170, f ? 255 : 150);
+      strokeWeight(0.5);
+      line(e.facing * 9, -10 + wb, e.facing * 9, 6 + wb);
+      noStroke();
+      // Pixel head
+      fill(f ? 255 : 190, f ? 255 : 160, f ? 255 : 120);
+      rect(-4, -13 + wb, 8, 8);
+      // Pixel hood
+      fill(f ? 255 : 90, f ? 255 : 75, f ? 255 : 45);
+      rect(-5, -15 + wb, 10, 6);
+      rect(-4, -16 + wb, 8, 2);
+      // Pixel eyes
+      fill(40);
+      rect(-3, -10 + wb, 2, 2);
+      rect(1, -10 + wb, 2, 2);
+      break;
+    }
+    case 'centurion': {
+      let wb = floor(walkBob);
+      // Pixel shadow
+      fill(0, 0, 0, 45);
+      rect(-16, 12, 32, 3);
+      // Pixel legs
+      fill(f ? 255 : 160, f ? 255 : 45, f ? 255 : 35);
+      let cleg = floor(sin(frameCount * 0.09) * 2);
+      rect(-7, 8 + cleg + wb, 5, 10);
+      rect(2, 8 - cleg + wb, 5, 10);
+      // Pixel boots
+      fill(f ? 255 : 100, f ? 255 : 30, f ? 255 : 20);
+      rect(-8, 17 + cleg + wb, 7, 3);
+      rect(1, 17 - cleg + wb, 7, 3);
+      // Pixel body (red + gold armor)
+      fill(f ? 255 : 180, f ? 255 : 50, f ? 255 : 40);
+      rect(-14, -12 + wb, 28, 22);
+      // Gold trim
+      fill(f ? 255 : 220, f ? 255 : 185, f ? 255 : 60);
+      rect(-14, -12 + wb, 28, 2);
+      rect(-14, 8 + wb, 28, 2);
+      rect(-14, -12 + wb, 2, 22);
+      rect(12, -12 + wb, 2, 22);
+      // Center emblem
+      fill(f ? 255 : 240, f ? 255 : 200, f ? 255 : 80);
+      rect(-3, -6 + wb, 6, 6);
+      rect(-1, -8 + wb, 2, 10);
+      // Pixel arms
+      fill(f ? 255 : 170, f ? 255 : 45, f ? 255 : 35);
+      rect(-18, -6 + wb, 4, 12);
+      rect(14, -6 + wb, 4, 12);
+      // Pixel sword (large)
+      fill(f ? 255 : 210, f ? 255 : 210, f ? 255 : 220);
+      rect(e.facing * 16, -24 + wb, 3, 20);
+      fill(f ? 255 : 200, f ? 255 : 170, f ? 255 : 60);
+      rect(e.facing * 14, -4 + wb, 7, 3);
+      // Pixel head
+      fill(f ? 255 : 200, f ? 255 : 170, f ? 255 : 130);
+      rect(-8, -24 + wb, 16, 12);
+      // Pixel helmet (transverse crest)
+      fill(f ? 255 : 190, f ? 255 : 55, f ? 255 : 40);
+      rect(-10, -30 + wb, 20, 8);
+      // Red crest
+      fill(f ? 255 : 200, f ? 255 : 30, f ? 255 : 20);
+      rect(-12, -34 + wb, 24, 4);
+      rect(-10, -36 + wb, 20, 2);
+      // Eye slits
+      fill(30);
+      rect(-5, -20 + wb, 3, 2);
+      rect(2, -20 + wb, 3, 2);
+      // Glowing eyes
+      fill(255, 200, 60, 120);
+      rect(-4, -20 + wb, 2, 1);
+      rect(3, -20 + wb, 2, 1);
+      // Charging aura
+      if (e.state === 'charging') {
+        fill(255, 40, 20, 30);
+        rect(-20, -12, 40, 2);
+        rect(-1, -36, 2, 50);
+      }
+      if (e.state === 'windup') {
+        fill(255, 200, 60, floor(sin(frameCount * 0.2) * 40 + 40));
+        rect(-16, -14 + wb, 32, 26);
+      }
+      break;
+    }
     case 'bear': {
       let wb = floor(walkBob);
       let ef = e.facing;
@@ -15805,6 +15981,8 @@ function drawAdventureEntities() {
   for (let it of items) it.draw();
   // Loot on ground (below everything but still visible)
   drawLoot(a);
+  // Archer projectiles
+  if (typeof drawArenaProjectiles === 'function') drawArenaProjectiles();
   // Slash arc on top
   drawSlashArc();
 }
@@ -15837,7 +16015,7 @@ function drawAdventureHUD() {
 
   // Wave indicator
   let waveText = '';
-  if (a.waveState === 'fighting') waveText = 'WAVE ' + a.wave + (a.wave > WAVE_DEFS.length ? ' (Endless)' : ' / ' + WAVE_DEFS.length);
+  if (a.waveState === 'fighting') waveText = 'WAVE ' + a.wave + (a.wave % 10 === 0 ? '  BOSS' : '');
   else if (a.waveState === 'intermission') waveText = 'Next wave in ' + ceil(a.waveTimer / 60) + '...';
   else if (a.waveState === 'victory') waveText = 'VICTORY! Press E to return';
   else if (a.waveState === 'idle') waveText = 'Prepare...';
@@ -20636,6 +20814,7 @@ function keyPressed() {
     if (key === ' ' || key === 'j' || key === 'J') { playerAttack(); return; }
     // Retreat (only between waves or victory)
     if ((key === 'e' || key === 'E') && state.adventure.waveState !== 'fighting') {
+      if (typeof showArenaSummary === 'function') showArenaSummary(state.adventure, true);
       exitAdventure(); return;
     }
     // Potion

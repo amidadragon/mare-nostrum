@@ -800,3 +800,151 @@ function drawSkillTree() {
 
   pop();
 }
+
+// ─── KILL BURST PARTICLES ────────────────────────────────────────────────
+
+function spawnKillBurst(x, y, col) {
+  for (let i = 0; i < 12; i++) {
+    let a = random(TWO_PI), spd = random(1.5, 4);
+    particles.push({
+      x: x, y: y,
+      vx: cos(a) * spd, vy: sin(a) * spd - 1,
+      life: random(20, 45), maxLife: 45,
+      type: 'burst', size: random(2, 5),
+      r: col[0] + random(-20, 20),
+      g: col[1] + random(-20, 20),
+      b: col[2] + random(-20, 20),
+      gravity: 0.08, world: true,
+    });
+  }
+}
+
+// ─── ARENA PROJECTILES (archer arrows) ──────────────────────────────────
+
+var _arenaProjectiles = [];
+
+function updateArenaProjectiles(dt, p) {
+  for (let i = _arenaProjectiles.length - 1; i >= 0; i--) {
+    let pr = _arenaProjectiles[i];
+    pr.x += pr.vx * dt;
+    pr.y += pr.vy * dt;
+    pr.life -= dt;
+    if (pr.life <= 0) { _arenaProjectiles.splice(i, 1); continue; }
+    // Hit player
+    if (dist(pr.x, pr.y, p.x, p.y) < 15 && p.invincTimer <= 0) {
+      let armorR = [0, 3, 6, 10][p.armor] || 0;
+      let dmg = max(1, pr.damage - armorR);
+      // Fortify damage reduction
+      if (typeof getFortifyReduction === 'function') {
+        dmg = max(1, floor(dmg * (1 - getFortifyReduction())));
+      }
+      p.hp -= dmg;
+      p.invincTimer = 20;
+      addFloatingText(w2sX(p.x), w2sY(p.y) - 25, '-' + dmg, '#ff6644');
+      triggerScreenShake(3, 6);
+      if (typeof snd !== 'undefined' && snd) snd.playSFX('player_hurt');
+      _arenaProjectiles.splice(i, 1);
+    }
+  }
+}
+
+function drawArenaProjectiles() {
+  for (let pr of _arenaProjectiles) {
+    let sx = w2sX(pr.x);
+    let sy = w2sY(pr.y);
+    push();
+    translate(sx, sy);
+    let angle = atan2(pr.vy, pr.vx);
+    rotate(angle);
+    // Arrow shaft
+    fill(120, 100, 70);
+    noStroke();
+    rect(-6, -1, 12, 2);
+    // Arrow head
+    fill(180, 180, 190);
+    triangle(6, -2, 6, 2, 10, 0);
+    // Fletching
+    fill(200, 50, 40);
+    rect(-6, -2, 2, 1);
+    rect(-6, 1, 2, 1);
+    pop();
+  }
+}
+
+// ─── ARENA SUMMARY SCREEN ───────────────────────────────────────────────
+
+var _arenaSummary = null;
+
+function showArenaSummary(a, isVictory) {
+  if (!a || a.wave < 1) return;
+  _arenaSummary = {
+    timer: 300, // 5 seconds
+    wave: a.wave,
+    kills: a.killCount || 0,
+    gold: a.goldEarned || 0,
+    victory: isVictory,
+    bestWave: state.arenaHighWave || 0,
+  };
+}
+
+function drawArenaSummaryOverlay() {
+  let s = _arenaSummary;
+  if (!s) return;
+  s.timer--;
+  if (s.timer <= 0) { _arenaSummary = null; return; }
+
+  let alpha = s.timer < 60 ? floor((s.timer / 60) * 220) : 220;
+  push();
+  noStroke();
+  fill(0, 0, 0, min(alpha, 160));
+  rect(0, 0, width, height);
+
+  let bw = 300, bh = 180;
+  let bx = width / 2 - bw / 2, by = height / 2 - bh / 2;
+
+  fill(30, 20, 10, alpha);
+  stroke(200, 170, 80, alpha); strokeWeight(2);
+  rect(bx, by, bw, bh, 8);
+  noStroke();
+
+  // Title
+  fill(s.victory ? color(220, 185, 60, alpha) : color(255, 100, 60, alpha));
+  textAlign(CENTER, TOP); textSize(18);
+  text(s.victory ? 'VICTORY!' : 'RETREAT...', width / 2, by + 14);
+
+  stroke(160, 130, 60, alpha * 0.7); strokeWeight(1);
+  line(bx + 20, by + 38, bx + bw - 20, by + 38);
+  noStroke();
+
+  let ty = by + 48;
+  // Wave reached
+  fill(200, 185, 140, alpha); textSize(11); textAlign(LEFT, TOP);
+  text('Wave Reached:', bx + 24, ty);
+  fill(255, 230, 100, alpha); textAlign(RIGHT, TOP);
+  text(s.wave, bx + bw - 24, ty);
+
+  // Best wave
+  ty += 22;
+  fill(200, 185, 140, alpha); textAlign(LEFT, TOP);
+  text('Best Wave:', bx + 24, ty);
+  fill(180, 220, 255, alpha); textAlign(RIGHT, TOP);
+  text(s.bestWave, bx + bw - 24, ty);
+
+  // Enemies defeated
+  ty += 22;
+  fill(200, 185, 140, alpha); textAlign(LEFT, TOP);
+  text('Enemies Defeated:', bx + 24, ty);
+  fill(255, 220, 100, alpha); textAlign(RIGHT, TOP);
+  text(s.kills, bx + bw - 24, ty);
+
+  // Gold earned
+  ty += 22;
+  fill(200, 185, 140, alpha); textAlign(LEFT, TOP);
+  text('Gold Earned:', bx + 24, ty);
+  fill(255, 200, 60, alpha); textAlign(RIGHT, TOP);
+  text('+' + s.gold, bx + bw - 24, ty);
+
+  fill(140, 130, 100, alpha * 0.7); textAlign(CENTER, TOP); textSize(9);
+  text('Returning home...', width / 2, by + bh - 20);
+  pop();
+}
