@@ -2,9 +2,12 @@
   "name": "mare-nostrum",
   "version": "1.0.0",
   "description": "Cozy Roman solarpunk life-sim — p5.js browser game",
+  "main": "electron.js",
   "scripts": {
     "dev": "npx http-server -p 8080 -c-1 --silent",
     "start": "npx http-server -p 8080 -c-1 -o",
+    "electron": "electron electron.js",
+    "electron-dev": "electron electron.js --dev",
     "build": "bash build.sh",
     "check": "node -c sketch.js && node -c ui.js && node -c player.js && node -c world.js && node -c events.js && node -c npc.js && node -c fishing.js && node -c farming.js && node -c wreck.js && node -c sound.js && node -c combat.js && node -c diving.js && node -c economy.js && node -c islands.js && node -c narrative.js && node -c engine.js && node -c debug.js && node -c cinematics.js && node -c menu.js && echo 'All files OK'",
     "lint": "npx eslint *.js --no-error-on-unmatched-pattern",
@@ -24,6 +27,7 @@
   "license": "MIT",
   "type": "commonjs",
   "devDependencies": {
+    "electron": "^41.0.3",
     "eslint": "^10.0.3",
     "http-server": "^14.1.1",
     "live-server": "^1.2.2",
