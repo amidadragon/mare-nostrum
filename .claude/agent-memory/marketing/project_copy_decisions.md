@@ -23,5 +23,13 @@ type: project
 
 **r/gamedev angle:** Technical credibility. Procedural audio architecture, p5.js single-file browser game, no build step. These are legitimately interesting to that audience.
 
-**Why:** Developed during initial marketing asset creation, March 2026.
+**itch.io short description format confirmed:** Under 140 chars (not 200), itch sidebar constraint. Approved version: "Shipwrecked. Sunlit. Reborn. Build a Roman colony on floating Mediterranean islands — farm, befriend, forge, and rise from exile to Imperator." (139 chars)
+
+**itch.io section headers confirmed:** Farming & Crafting / Combat & Exploration / NPCs & Relationships / Companions / Colony Building & The Imperial Bridge / The Story / Audio / What Makes It Special / System Requirements
+
+**Diving screenshot added:** Bioluminescent underwater zone with breath bar and light rays from surface — added as Screenshot 6 to the standard 5-shot set. Good for showing game depth and visual variety.
+
+**Twitter thread format:** Multi-tweet launch thread confirmed as a format (in addition to single punchy post). Thread structure: setup → story beat → NPCs → audio USP → bridge payoff → CTA.
+
+**Why:** Confirmed during itch.io store page production, March 2026.
 **How to apply:** Maintain these decisions across all future copy unless explicitly changed.

@@ -433,7 +433,12 @@ function getExpandedDialogue(npcName) {
     }
     return true;
   });
-  if (candidates.length === 0) return pool[0].text;
+  if (candidates.length === 0) {
+    // Relax: filter only by hearts range
+    candidates = pool.filter(d => h >= d.minH && h < d.maxH);
+    if (candidates.length === 0) candidates = pool;
+    return candidates[floor(random(candidates.length))].text;
+  }
   return candidates[floor(random(candidates.length))].text;
 }
 
@@ -609,6 +614,7 @@ function updateMainQuest() {
     }
     state.mainQuest.chapter = ch + 1;
     state.mainQuest.step = 0;
+    if (ch + 1 >= 2) trackMilestone('chapter_' + (ch + 1));
     // Quest compass nudges — stored as pending floats, shown after a delay
     if (!state.mainQuest.pendingNudges) state.mainQuest.pendingNudges = [];
     if (ch === 0) {
@@ -637,6 +643,7 @@ function tickPendingNudges(dt) {
 function advanceMainQuestCounter(counter, amount) {
   if (!state.mainQuest || !state.mainQuest.counters) return;
   state.mainQuest.counters[counter] = (state.mainQuest.counters[counter] || 0) + (amount || 1);
+  if (typeof snd !== 'undefined' && snd) snd.playSFX('quest_progress');
 }
 
 function advanceNPCQuestCounter(counter, amount) {

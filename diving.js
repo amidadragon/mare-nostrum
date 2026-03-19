@@ -205,6 +205,86 @@ function updateDiving(dt) {
     }
   }
 
+  // Sea enemies — hostile creatures that attack the diver
+  if (!d.seaEnemies) d.seaEnemies = [];
+  // Spawn enemies — max 3, spawn on dive start or periodically
+  if (d.seaEnemies.length === 0 && d.totalDives > 0) {
+    // Spawn initial enemies on first frame of dive
+    for (let i = 0; i < 2; i++) {
+      let angle = random(TWO_PI);
+      let spawnDist = 150 + random(100);
+      let types = ['shark', 'eel', 'crab_giant'];
+      let type = types[floor(random(types.length))];
+      let stats = { shark: { hp: 60, dmg: 12, spd: 1.2, size: 14 }, eel: { hp: 30, dmg: 8, spd: 0.9, size: 8 }, crab_giant: { hp: 80, dmg: 15, spd: 0.5, size: 12 } };
+      let s = stats[type];
+      d.seaEnemies.push({
+        x: px + cos(angle) * spawnDist, y: py + sin(angle) * spawnDist,
+        vx: 0, vy: 0, hp: s.hp, maxHp: s.hp, dmg: s.dmg, spd: s.spd,
+        size: s.size, type: type, attackTimer: 0, flashTimer: 0,
+      });
+    }
+  }
+  if (d.seaEnemies.filter(e => e.hp > 0).length < 3 && random() < 0.003 * dt) {
+    let angle = random(TWO_PI);
+    let spawnDist = 250 + random(100);
+    let types = ['shark', 'eel', 'crab_giant'];
+    let type = types[floor(random(types.length))];
+    let stats = { shark: { hp: 60, dmg: 12, spd: 1.2, size: 14 }, eel: { hp: 30, dmg: 8, spd: 0.9, size: 8 }, crab_giant: { hp: 80, dmg: 15, spd: 0.5, size: 12 } };
+    let s = stats[type];
+    d.seaEnemies.push({
+      x: px + cos(angle) * spawnDist, y: py + sin(angle) * spawnDist,
+      vx: 0, vy: 0, hp: s.hp, maxHp: s.hp, dmg: s.dmg, spd: s.spd,
+      size: s.size, type: type, attackTimer: 0, flashTimer: 0,
+    });
+  }
+  // Update sea enemies
+  for (let e of d.seaEnemies) {
+    if (e.hp <= 0) continue;
+    if (e.flashTimer > 0) e.flashTimer -= dt;
+    // Chase player
+    let edx = px - e.x, edy = py - e.y;
+    let ed = sqrt(edx * edx + edy * edy);
+    if (ed > 0 && ed < 200) {
+      e.vx += (edx / ed) * e.spd * 0.03 * dt;
+      e.vy += (edy / ed) * e.spd * 0.03 * dt;
+    }
+    let espd = sqrt(e.vx * e.vx + e.vy * e.vy);
+    if (espd > e.spd) { e.vx *= e.spd / espd; e.vy *= e.spd / espd; }
+    e.x += e.vx * dt; e.y += e.vy * dt;
+    e.attackTimer -= dt;
+    // Attack player on contact
+    if (ed < 20 && e.attackTimer <= 0) {
+      state.player.hp -= e.dmg;
+      e.attackTimer = 60;
+      addFloatingText(w2sX(px), w2sY(py) - 20, '-' + e.dmg + ' HP', '#ff4444');
+      if (typeof snd !== 'undefined' && snd) snd.playSFX('player_hurt');
+      if (state.player.hp <= 0) { exitDive(); addFloatingText(width / 2, height * 0.25, 'Dragged to surface!', '#ff6644'); }
+    }
+    // Player can attack them
+    if (e.hp > 0 && state.player.slashPhase > 0 && ed < state.player.attackRange + e.size && e.flashTimer <= 0) {
+      e.hp -= state.player.attackDamage;
+      e.flashTimer = 8;
+      addFloatingText(w2sX(e.x), w2sY(e.y) - 10, '-' + state.player.attackDamage, '#ffcc44');
+      // Knockback
+      if (ed > 0) { e.vx += (e.x - px) / ed * 3; e.vy += (e.y - py) / ed * 3; }
+      if (e.hp <= 0) {
+        // Loot drop
+        let loot = e.type === 'shark' ? 'rareHide' : e.type === 'crab_giant' ? 'ironOre' : 'fish';
+        let amt = e.type === 'shark' ? 2 : 1;
+        state[loot] = (state[loot] || 0) + amt;
+        addFloatingText(w2sX(e.x), w2sY(e.y) - 20, '+' + amt + ' ' + loot, '#88ddff');
+        if (typeof snd !== 'undefined' && snd) snd.playSFX('fish_catch');
+        if (typeof grantXP === 'function') grantXP(15);
+      }
+    }
+  }
+  // Mark dead enemies for removal — give 15 frame death animation
+  for (let e of d.seaEnemies) {
+    if (e.hp <= 0 && !e._deathTimer) e._deathTimer = 15;
+    if (e._deathTimer > 0) e._deathTimer -= dt;
+  }
+  d.seaEnemies = d.seaEnemies.filter(e => e.hp > 0 || (e._deathTimer && e._deathTimer > 0));
+
   // Player breath bubbles (world particles)
   if (frameCount % 25 === 0) {
     particles.push({
@@ -225,6 +305,32 @@ function drawDivingOverlay() {
   noStroke();
   fill(10, 40, 80, 90);
   rect(0, 0, width, height);
+
+  // Sandy seabed ground — gradient from mid-screen to bottom
+  let seabedTop = height * 0.6;
+  for (let band = 0; band < 6; band++) {
+    let y = seabedTop + band * (height - seabedTop) / 6;
+    let d2 = band / 5;
+    fill(lerp(60, 35, d2), lerp(80, 55, d2), lerp(55, 35, d2), 60 + d2 * 40);
+    rect(0, y, width, (height - seabedTop) / 6 + 2);
+  }
+  // Sand texture — scattered dots
+  fill(120, 110, 80, 25);
+  for (let i = 0; i < 30; i++) {
+    let sx = (i * 47 + floor(state.player.x * 0.3)) % width;
+    let sy = seabedTop + 20 + (i * 31) % floor(height - seabedTop - 20);
+    rect(sx, sy, 2 + (i % 3), 1);
+  }
+  // Distant coral reef silhouettes at seabed
+  fill(80, 40, 50, 40);
+  for (let i = 0; i < 8; i++) {
+    let rx = (i * 173 + floor(state.player.x * 0.2)) % (width + 100) - 50;
+    let rh = 15 + (i * 7) % 20;
+    rect(rx, height - rh - 10, 20 + (i % 3) * 8, rh, 3);
+    fill(60, 90, 45, 35);
+    rect(rx + 5, height - rh - 15, 8, 8, 2);
+    fill(80, 40, 50, 40);
+  }
 
   // Caustic light patterns
   let bright = typeof getSkyBrightness === 'function' ? getSkyBrightness() : 0.5;
@@ -389,6 +495,69 @@ function drawDivingOverlay() {
       ellipse(0, 0, 16, 12);
     }
     pop();
+  }
+
+  // Draw sea enemies
+  if (d.seaEnemies) {
+    for (let e of d.seaEnemies) {
+      if (e.hp <= 0 && (!e._deathTimer || e._deathTimer <= 0)) continue;
+      let ex = w2sX(e.x), ey = w2sY(e.y);
+      if (ex < -30 || ex > width + 30 || ey < -30 || ey > height + 30) continue;
+      push(); translate(ex, ey); noStroke();
+      let flipX = e.vx < 0 ? -1 : 1;
+      let deathScale = (e.hp <= 0 && e._deathTimer) ? max(0.1, e._deathTimer / 15) : 1;
+      scale(flipX * deathScale, deathScale);
+      if (e.hp <= 0) { drawingContext.globalAlpha = deathScale; }
+      let flash = e.flashTimer > 0 && floor(e.flashTimer) % 4 < 2;
+      if (e.type === 'shark') {
+        fill(flash ? 255 : 100, flash ? 100 : 100, flash ? 100 : 110);
+        // Body
+        beginShape();
+        vertex(-14, 0); vertex(-8, -5); vertex(6, -3); vertex(14, 0);
+        vertex(6, 4); vertex(-8, 5);
+        endShape(CLOSE);
+        // Dorsal fin
+        fill(flash ? 255 : 80, 80, 90);
+        triangle(0, -3, -4, -10, 4, -3);
+        // Tail
+        let tw = sin(frameCount * 0.12) * 3;
+        triangle(-14, 0, -20, -5 + tw, -20, 5 + tw);
+        // Eye
+        fill(0); ellipse(8, -1, 2, 2);
+        fill(255, 50, 50, 100); ellipse(8, -1, 1, 1);
+      } else if (e.type === 'eel') {
+        fill(flash ? 255 : 60, flash ? 120 : 80, flash ? 60 : 30);
+        let eelWave = sin(frameCount * 0.1) * 3;
+        for (let seg = -3; seg <= 3; seg++) {
+          let segY = sin(frameCount * 0.1 + seg * 0.8) * 2;
+          ellipse(seg * 4, segY + eelWave * (seg * 0.2), 5, 4);
+        }
+        fill(255, 200, 0); ellipse(12, eelWave * 0.6, 2, 2);
+      } else if (e.type === 'crab_giant') {
+        fill(flash ? 255 : 180, flash ? 100 : 60, flash ? 60 : 30);
+        ellipse(0, 0, 16, 10);
+        // Claws
+        let clawOpen = sin(frameCount * 0.08) * 2;
+        rect(-12, -4, 4, 3 + clawOpen);
+        rect(-12, 0, 4, 3);
+        rect(8, -4, 4, 3 + clawOpen);
+        rect(8, 0, 4, 3);
+        // Legs
+        for (let l = -2; l <= 2; l++) {
+          if (l === 0) continue;
+          rect(l * 5, 5, 2, 4);
+        }
+        fill(0); ellipse(-3, -2, 2, 2); ellipse(3, -2, 2, 2);
+      }
+      // HP bar
+      if (e.hp > 0 && e.hp < e.maxHp) {
+        let frac = max(0, e.hp / e.maxHp);
+        fill(30, 10, 10, 160); rect(-12, -e.size - 6, 24, 3, 1);
+        fill(lerp(220, 60, frac), lerp(40, 200, frac), 30); rect(-12, -e.size - 6, 24 * frac, 3, 1);
+      }
+      drawingContext.globalAlpha = 1;
+      pop();
+    }
   }
 
   // Breath HUD

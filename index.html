@@ -9,6 +9,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>MARE NOSTRUM — Cozy Roman Survival</title>
   <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  <link rel="manifest" href="manifest.json" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
@@ -82,15 +83,18 @@
     <div class="sub">NAVIGATING THE ANCIENT WATERS...</div>
   </div>
 
-  <script src="engine.js?v=200"></script>
-  <script src="sound.js?v=200"></script>
-  <script src="narrative.js?v=200"></script>
-  <script src="sketch.js?v=200"></script>
-  <script src="islands.js?v=200"></script>
-  <script src="diving.js?v=200"></script>
-  <script src="combat.js?v=200"></script>
-  <script src="economy.js?v=200"></script>
-  <script src="debug.js?v=200"></script>
+  <script src="engine.js?v=100"></script>
+  <script src="sound.js?v=100"></script>
+  <script src="narrative.js?v=100"></script>
+  <script src="cinematics.js?v=100"></script>
+  <script src="sketch.js?v=100"></script>
+  <script src="wreck.js?v=200"></script>
+  <script src="menu.js?v=100"></script>
+  <script src="islands.js?v=100"></script>
+  <script src="diving.js?v=100"></script>
+  <script src="combat.js?v=100"></script>
+  <script src="economy.js?v=100"></script>
+  <script src="debug.js?v=100"></script>
   <script>
     // Hide loading screen after p5 starts
     document.addEventListener('click', () => { document.querySelector('canvas')?.focus(); });
@@ -98,6 +102,11 @@
       const l = document.getElementById('loading');
       if (l) { l.style.opacity = '0'; setTimeout(() => l.remove(), 800); }
     }, 1500);
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
   </script>
 </body>
 </html>

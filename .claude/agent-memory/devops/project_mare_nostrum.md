@@ -12,7 +12,9 @@ Mare Nostrum (Sunlit Isles) is a p5.js browser game served as static files.
 
 **Save system**: localStorage key `sunlitIsles_save`, version field currently 7. Resources added over time — island resources (obsidian, frostCrystal, exoticSpices, soulEssence) added to save/load as of 2026-03-18. Diving resources (pearls, coral, sponges, amphoras, lungCapacity, diveSpeed, totalDives) added to save/load as of 2026-03-18.
 
-**Cache busting**: Manual `?v=N` on all script tags in index.html. All scripts should share the same version number. Currently at v=200.
+**Cache busting**: Manual `?v=N` on all script tags in index.html. All scripts should share the same version number. Currently at v=100.
+
+**Build**: `npm run build` runs `build.sh`, produces flat zip at `dist/mare-nostrum-v1.0.0.zip` (14 files, ~1.2MB). Ready for itch.io butler upload. Version is hardcoded in build.sh. The `dist/` directory is created on build.
 
 **Delta time**: `_delta` is calculated in seconds in the draw() preamble (line ~1282). `drawInner()` converts to frame-units via `min(2, _delta * 60)` — the clamp at 2 prevents death spirals on tab-switch.
 

@@ -1,10 +1,10 @@
 ---
 name: known_bugs
-description: Confirmed bugs and their status — updated 2026-03-18 (post-overhaul sprint audit pass 3)
+description: Confirmed bugs and their status — updated 2026-03-18 (post-overhaul sprint audit pass 4)
 type: project
 ---
 
-# Known Bugs — Updated 2026-03-18 (Pre-Release Audit)
+# Known Bugs — Updated 2026-03-18 (Audit Pass 4)
 
 ## CRITICAL
 
@@ -31,7 +31,21 @@ Level 25 milestone block does NOT use `cx`/`cy` so it survives.
 - `rite_mare_nostrum` — set in keyPressed handler at sketch.js:19270 (near crystal shrine, islandLevel>=25, all NPCs>=8 hearts)
 - **Status:** Fixed (partially — see BUG-018 for remaining issues)
 
-## CRITICAL (NEW)
+## CRITICAL (NEW — Audit Pass 4)
+
+### BUG-024: `drawArenaIsleDistant()` is dead code — arena renders without horizon clamping
+`drawArenaIsleDistant()` (sketch.js:12566) was created to pin the arena to the horizon when viewed from the home island, but it is never called. The render loop at sketch.js:1662 still calls `drawArena()` which uses raw `w2sY(a.isleY)` with no horizon clamping. The arena island can float above the water line when camera is panned. The new function is correctly implemented but never wired into the draw loop.
+- **Location:** sketch.js:1662 (calls `drawArena()`), sketch.js:12566 (`drawArenaIsleDistant()` — dead)
+- **Fix:** Replace `drawArena()` at line 1662 with `drawArenaIsleDistant()`. `drawArena()` at line 1577 (inside active arena mode) should remain.
+- **Status:** Open — High severity, visual regression, intended fix not applied
+
+### BUG-025: `drawConquestIsleDistant()` is dead code — Terra Nova renders without horizon clamping
+Same pattern as BUG-024. `drawConquestIsleDistant()` (sketch.js:15330) correctly clamps Terra Nova to the horizon, but is never called. The render loop at sketch.js:1665 still calls `drawConquestIsland()` which uses raw `w2sY(c.isleY)`. Terra Nova can float above the water line.
+- **Location:** sketch.js:1665 (calls `drawConquestIsland()`), sketch.js:15330 (`drawConquestIsleDistant()` — dead)
+- **Fix:** Replace `drawConquestIsland()` at line 1665 with `drawConquestIsleDistant()`. The call at line 1540 (inside active conquest mode) should remain as `drawConquestIsland()`.
+- **Status:** Open — High severity, visual regression, intended fix not applied
+
+## CRITICAL (from Pass 3, still open)
 
 ### BUG-018: `rite_mare_nostrum` heart threshold mismatch — Chapter X cannot complete
 Chapter X `all_hearts_max` objective requires ALL NPCs at hearts >= 10 (narrative.js:121). The `rite_mare_nostrum` flag fires at hearts >= 8 (sketch.js:19265-19268). The rite triggers at 8 hearts, but the chapter objective check needs 10 hearts. A player can perform the rite at 8 hearts, flag is set, but Chapter X never completes because `all_hearts_max` check still fails. The chapter advances when ALL objectives pass; `final_ceremony` (interact: rite_mare_nostrum) is satisfied, but `all_hearts_max` is not.
@@ -42,14 +56,19 @@ Note: The effect is the player experiences the rite dialogue but the Chapter X c
 
 ## HIGH
 
+### BUG-026: Hyperborea frost node save/load uses wrong field name — collection state lost on reload
+`saveGame()` at sketch.js:20058 saves `iceNodes: (state.hyperborea.iceNodes || []).map(...)` but the actual field is `state.hyperborea.frostNodes` (initialized at sketch.js:714, used in islands.js:116, reset daily at sketch.js:2003). `state.hyperborea.iceNodes` is never defined — the `|| []` guard makes the save write an empty array. `loadGame()` at sketch.js:20229 restores into `state.hyperborea.iceNodes` — a phantom field that does nothing. After any reload, ALL Hyperborea frost node collection states are lost.
+- **Location:** sketch.js:20058 (save), sketch.js:20229 (load), sketch.js:714 (correct field: `frostNodes`)
+- **Fix:** Change `state.hyperborea.iceNodes` to `state.hyperborea.frostNodes` at both lines 20058 and 20229.
+- **Status:** Open — introduced in audit pass 4 island loot save work
+
 ### BUG-019: Island states (vulcan/hyperborea/plenty/necropolis) not saved
 None of the four explorable island states are included in `saveData`. Specifically:
 - `hyperborea.frozenRuins[*].looted` — resets on reload; player must re-loot all ruins to unlock obelisk ritual. The `learn_ritual` narrativeFlag IS saved, so a completed ritual persists, but partial ruin-looting progress is lost.
 - `vulcan.obsidianNodes[*].collected` — resets on reload
 - `necropolis.tombs[*].looted`, `soulNodes[*].collected`, `ghostNPCs[*].talked` — reset on reload
 - `plenty.fruitTrees[*].fruit`/`timer`, `spiceNodes[*].collected` — reset on reload
-- **Location:** sketch.js:21238-21335 (saveGame — no island state)
-- **Status:** Open — medium impact (narrative flags survive, so quest completion persists; only resource/loot states reset)
+- **Status:** FIXED in audit pass 4 (island loot save now added — but see BUG-026 for Hyperborea frost node naming bug)
 
 ### BUG-003: Conquest error recovery clears soldiers but not conquest.phase — STILL OPEN
 - **Status:** Open
@@ -62,6 +81,24 @@ None of the four explorable island states are included in `saveData`. Specifical
 - **Status:** Fixed
 
 ## MEDIUM
+
+### BUG-027: `steelPick` and `tools.lantern` sold in shop but have no gameplay effect
+`steelPick` (Steel Pickaxe → "2x mining speed") and `tools.lantern` (Lantern → "night visibility") are listed in the merchant shop (sketch.js:11774-11775) and deduct gold, but no code reads `state.tools.steelPick` or `state.tools.lantern` for any gameplay modifier. Players pay gold for items that do nothing.
+- **Location:** sketch.js:11774-11775 (shop adds offers), nowhere (no effect implemented)
+- **Fix:** Add pickaxe speed bonus in stone/resource mining code (e.g., quarrier update or quarry hit rate), and add lantern night visibility radius expansion in the night lighting code (sketch.js near torch radius handling at 5637-5638).
+- **Status:** Open — Medium severity, players misled by shop description
+
+### BUG-028: `skeleton_death` SFX defined but never played
+`snd.playSFX('skeleton_death')` (sound.js:674) is defined and synthesized, but no call site exists in islands.js or sketch.js. Skeletons die silently — `islands.js:315` filters dead skeletons without firing any audio event.
+- **Location:** islands.js:315 (filter without SFX), sound.js:674 (definition)
+- **Fix:** Add `if (snd) snd.playSFX('skeleton_death');` in the necropolis skeleton update loop when `sk.hp <= 0` is first detected (before the filter at line 315).
+- **Status:** Open — Low severity, missing audio feedback
+
+### BUG-029: `player.xpBoost` and `player.xpBoostTimer` not saved — Honeyed Figs effect lost on reload
+`useHoneyedFigs()` (sketch.js:13515) sets `state.player.xpBoost` and `state.player.xpBoostTimer` as dynamic properties. Neither is included in `saveGame()` playerXp/playerSkills block nor loaded in `loadGame()`. If a player uses Honeyed Figs and saves/reloads before the timer expires, the XP boost is silently lost.
+- **Location:** sketch.js:13518-13519 (sets fields), sketch.js:19972-19989 (save — fields absent)
+- **Fix:** Add `playerXpBoost: state.player.xpBoost || 0, playerXpBoostTimer: state.player.xpBoostTimer || 0` to saveData, and restore them in loadGame after the playerSkills block.
+- **Status:** Open — Low severity (1 game day duration, survives most sessions)
 
 ### BUG-008: `mq_standard_found` counter never incremented — STILL OPEN
 - **Status:** Open

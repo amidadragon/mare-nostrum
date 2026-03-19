@@ -10,8 +10,9 @@ type: project
 All quest objectives using `interact:` require manual flag setting in code. There is NO automatic flag-setting on discovery/events. Each new interact objective must be paired with `state.narrativeFlags['flag_name'] = true` in the appropriate handler. This has been fixed for all 7 Chapters VII-X flags as of 2026-03-18 audit. Easy to break again with new objectives.
 
 ## 2. Save/Load Field Parity
-`saveGame()` and `loadGame()` are manually maintained parallel lists. New state fields must be added to BOTH. Known omissions after 2026-03-18 audit:
-- Island states: vulcan/hyperborea/plenty/necropolis exploration progress not saved
+`saveGame()` and `loadGame()` are manually maintained parallel lists. New state fields must be added to BOTH. Known omissions after 2026-03-18 audit pass 4:
+- Island loot states now saved — but Hyperborea uses wrong field name (iceNodes vs frostNodes — BUG-026)
+- player.xpBoost / xpBoostTimer not saved (BUG-029)
 - Crafted resources: steel, marble, perfume, scrolls not saved (unused currently)
 Check both functions any time state is extended.
 
@@ -32,3 +33,9 @@ Global var tracking enemy count for XP. `exitConquest()` zeroing `enemies = []` 
 
 ## 8. Quarrier unlock double-notification on legacy saves
 If `quarrierUnlocked` is absent from save (pre-quarrier save), loadGame defaults to `false`. Next `updateQuarrier` call at level 5+ will re-show "Quarrier joined!" notification. This is a cosmetic annoyance. Migration path: if `d.quarrierUnlocked === undefined && d.islandLevel >= 5` then set `q.unlocked = true` silently.
+
+## 9. Distant island rendering — "Distant" functions pattern
+Pattern established in audit pass 4: horizon-clamped distant rendering functions exist as `drawArenaIsleDistant()` and `drawConquestIsleDistant()`. When adding new island rendering, ALWAYS check that the new distant-rendering function is actually wired into the draw loop. BUG-024 and BUG-025 are examples of functions created but never called.
+
+## 10. Island state field naming consistency
+Hyperborea: state field is `frostNodes` but save/load used `iceNodes` (BUG-026). When saving island loot, cross-reference the field name against `initState()`. Do not invent names — copy from the object literal.

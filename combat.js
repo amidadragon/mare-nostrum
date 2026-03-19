@@ -5,6 +5,7 @@
 
 function grantXP(amount) {
   let p = state.player;
+  if (p.xpBoostTimer > 0) amount = floor(amount * 1.15);
   p.xp = (p.xp || 0) + amount;
   p.totalXp = (p.totalXp || 0) + amount;
   let level = p.level || 1;
@@ -234,7 +235,9 @@ function updateCombatSystem(dt) {
   let currentCount = enemies.length;
   if (currentCount < _combatLastEnemyCount) {
     let killed = _combatLastEnemyCount - currentCount;
-    grantXP(killed * 25);
+    let dangerLevel = state.conquest.active ? (state.conquest.dangerLevel || 1) : 1;
+    let xpPerKill = 25 + dangerLevel * 5;
+    grantXP(killed * xpPerKill);
     for (let i = 0; i < killed; i++) _registerComboHit();
   }
   _combatLastEnemyCount = currentCount;

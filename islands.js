@@ -17,6 +17,7 @@ function enterVulcan() {
     for (let i = 0; i < 6; i++) { let a = random(TWO_PI), r = random(0.1, 0.5) * v.isleRX; v.smokeVents.push({ x: v.isleX + cos(a) * r, y: v.isleY + sin(a) * r * 0.7, phase: random(TWO_PI) }); }
   }
   if (state.narrativeFlags) state.narrativeFlags['discover_vulcan'] = true;
+  trackMilestone('first_island');
   addFloatingText(width / 2, height * 0.3, 'ISLE OF VULCAN', '#ff5533');
 }
 function exitVulcan() {
@@ -119,6 +120,7 @@ function enterHyperborea() {
     h.frozenObelisk = { x: h.isleX, y: h.isleY };
   }
   if (state.narrativeFlags) state.narrativeFlags['discover_hyperborea'] = true;
+  trackMilestone('first_island');
   addFloatingText(width / 2, height * 0.3, 'HYPERBOREA', '#88ddff');
 }
 function exitHyperborea() {
@@ -222,6 +224,7 @@ function enterPlenty() {
     for (let i = 0; i < 6; i++) { let a = random(TWO_PI), r = random(0.2, 0.6) * pl.isleRX; pl.spiceNodes.push({ x: pl.isleX + cos(a) * r, y: pl.isleY + sin(a) * r * 0.7, collected: false }); }
   }
   if (state.narrativeFlags) state.narrativeFlags['discover_plenty'] = true;
+  trackMilestone('first_island');
   addFloatingText(width / 2, height * 0.3, 'ISLE OF PLENTY', '#44cc44');
 }
 function exitPlenty() {
@@ -291,6 +294,7 @@ function enterNecropolis() {
     for (let i = 0; i < 5; i++) { let a = random(TWO_PI), r = random(0.2, 0.6) * n.isleRX; n.soulNodes.push({ x: n.isleX + cos(a) * r, y: n.isleY + sin(a) * r * 0.7, collected: false }); }
   }
   if (state.narrativeFlags) state.narrativeFlags['discover_necropolis'] = true;
+  trackMilestone('first_island');
   addFloatingText(width / 2, height * 0.3, 'NECROPOLIS', '#9944cc');
 }
 function exitNecropolis() {
@@ -311,7 +315,7 @@ function updateNecropolisIsland(dt) {
     else { sk.patrolAngle += random(-0.05, 0.05); sk.vx = cos(sk.patrolAngle) * 0.3; sk.vy = sin(sk.patrolAngle) * 0.3; sk.facing = sk.vx > 0 ? 1 : -1; }
     sk.x += sk.vx * dt; sk.y += sk.vy * dt; if (!isOnNecropolisIsland(sk.x, sk.y)) { sk.patrolAngle += PI; sk.x -= sk.vx * dt * 2; sk.y -= sk.vy * dt * 2; }
     sk.attackTimer = max(0, sk.attackTimer - dt);
-    if (p.slashPhase > 0 && dToP < p.attackRange && sk.flashTimer <= 0) { sk.hp -= p.attackDamage; sk.flashTimer = 10; addFloatingText(w2sX(sk.x), w2sY(sk.y) - 10, '-' + p.attackDamage, '#ffcc44'); if (sk.hp <= 0) { state.soulEssence += 1; addFloatingText(w2sX(sk.x), w2sY(sk.y) - 20, '+1 Soul Essence', '#cc88ff'); } } }
+    if (p.slashPhase > 0 && dToP < p.attackRange && sk.flashTimer <= 0) { sk.hp -= p.attackDamage; sk.flashTimer = 10; addFloatingText(w2sX(sk.x), w2sY(sk.y) - 10, '-' + p.attackDamage, '#ffcc44'); if (sk.hp <= 0) { state.soulEssence += 1; addFloatingText(w2sX(sk.x), w2sY(sk.y) - 20, '+1 Soul Essence', '#cc88ff'); if (typeof snd !== 'undefined' && snd) snd.playSFX('skeleton_death'); } } }
   n.skeletons = n.skeletons.filter(s => s.hp > 0 || s.flashTimer > 0);
   if (frameCount % 4 === 0) n.wisps.push({ x: n.isleX + random(-n.isleRX * 0.7, n.isleRX * 0.7), y: n.isleY + random(-n.isleRY * 0.5, n.isleRY * 0.5), vx: random(-0.15, 0.15), vy: random(-0.4, -0.1), life: 150, size: random(2, 5) });
   n.wisps.forEach(w => { w.x += w.vx + sin(frameCount * 0.02 + w.x * 0.01) * 0.1; w.y += w.vy; w.life -= dt; }); n.wisps = n.wisps.filter(w => w.life > 0);

@@ -5,7 +5,7 @@ p5.disableFriendlyErrors = true;
 
 // ─── GLOBAL TEXT READABILITY — enforce minimum size + dark outlines ──────
 const _origTextSize = p5.prototype.textSize;
-const MIN_TEXT_SIZE = 9;
+const MIN_TEXT_SIZE = 10;
 p5.prototype.textSize = function(s) {
   return _origTextSize.call(this, max(s, MIN_TEXT_SIZE));
 };
@@ -24,6 +24,27 @@ function outlinedText(str, x, y, outlineColor, mainColor) {
   text(str, x, y);
   pop();
 }
+
+// ─── PLAY ANALYTICS (localStorage only, no network) ─────────────────────
+const _ANALYTICS_KEY = 'mare_nostrum_analytics';
+let _analyticsData = null;
+function _loadAnalytics() {
+  if (_analyticsData) return _analyticsData;
+  try { _analyticsData = JSON.parse(localStorage.getItem(_ANALYTICS_KEY)) || {}; } catch(e) { _analyticsData = {}; }
+  return _analyticsData;
+}
+function trackMilestone(name) {
+  let d = _loadAnalytics();
+  if (d[name]) return;
+  d[name] = { ts: Date.now(), t: new Date().toISOString() };
+  localStorage.setItem(_ANALYTICS_KEY, JSON.stringify(d));
+}
+function trackPlayTime() {
+  let d = _loadAnalytics();
+  d.play_time = (d.play_time || 0) + 60;
+  localStorage.setItem(_ANALYTICS_KEY, JSON.stringify(d));
+}
+setInterval(trackPlayTime, 60000);
 
 // ─── GAME SCREEN STATE MACHINE ───────────────────────────────────────────
 let gameScreen = 'menu'; // 'menu' | 'settings' | 'credits' | 'game'
@@ -214,7 +235,7 @@ function initState() {
     fish: 0,
 
     // Fishing
-    fishing: { active: false, timer: 0, biteTime: 0, bite: false, caught: false },
+    fishing: { active: false, timer: 0, biteTime: 0, bite: false, caught: false, streak: 0 },
 
     // Diving — underwater exploration
     diving: {
@@ -360,6 +381,10 @@ function initState() {
       x: WORLD.islandCX - 440, y: WORLD.islandCY - 15,
     },
 
+    // Port positions — stored in state, updated on island expansion
+    portLeft: null,   // rowboat dock (left side)
+    portRight: null,  // merchant dock (right side)
+
     plots: [],
     resources: [],
     crystalNodes: [],
@@ -414,6 +439,23 @@ function initState() {
       unlocked: false,
     },
 
+    // Cook NPC — auto-cooks meals near brazier, unlocks at level 8
+    cook: {
+      x: WORLD.islandCX - 100, y: WORLD.islandCY + 40,
+      vx: 0, vy: 0, speed: 1.2,
+      task: 'idle', timer: 0, cookTimer: 0,
+      unlocked: false,
+    },
+
+    // Fisherman NPC — sits on boat at shore, brings fish periodically
+    fisherman: {
+      x: 0, y: 0, // positioned at port on init
+      boatX: 0, boatY: 0,
+      timer: 0, catchTimer: 0,
+      unlocked: false,
+      fishCaught: 0,
+    },
+
     // Central pyramid
     pyramid: {
       x: WORLD.islandCX,
@@ -426,6 +468,7 @@ function initState() {
 
     // Build mode
     buildMode: false,
+    demolishMode: false,
     buildType: 'wall',
     buildRotation: 0,
 
@@ -455,6 +498,10 @@ function initState() {
     meals: 0,        // cooked meals (grain + fish or harvest + wood)
     wine: 0,         // wine (grape harvest)
     oil: 0,          // olive oil
+    stew: 0,         // stew (harvest + fish + wood) — heals 30 HP
+    garum: 0,        // garum (3 fish) — trade value 25g
+    honeyedFigs: 0,  // honeyed figs (exotic spice + harvest) — +15% XP 1 day
+    ambrosia: 0,     // ambrosia (soul essence + wine + crystal) — full heal + invuln
     cooking: { active: false, timer: 0, recipe: null },
 
     // Weather
@@ -787,6 +834,7 @@ function initState() {
 function buildIsland() {
   let cx = WORLD.islandCX, cy = WORLD.islandCY;
   let srx = getSurfaceRX(), sry = getSurfaceRY();
+  updatePortPositions();
 
   // ─── ZONE LAYOUT ───
   // Left: farm garden | Center: pyramid + NPC | Right: forest grove
@@ -798,7 +846,7 @@ function buildIsland() {
 
   // Chickens near farm
   state.chickens = [];
-  let farmCX = getFarmCenterX(), farmCY = getFarmCenterY();
+  let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
   for (let i = 0; i < 3; i++) {
     state.chickens.push({
       x: farmCX + random(-60, 60), y: farmCY + random(-30, 30),
@@ -849,7 +897,7 @@ function buildIsland() {
     let tx = slot.x, ty = slot.y;
     // Skip if off island surface
     let ex = (tx - cx) / srx, ey = (ty - cy) / sry;
-    if (ex * ex + ey * ey > 0.72) continue;
+    if (ex * ex + ey * ey > 0.65) continue;
     // Temple exclusion
     let pcx = tx - pyrCX, pcy = ty - pyrCY;
     if (pcx * pcx + pcy * pcy < texcl * texcl) continue;
@@ -858,7 +906,7 @@ function buildIsland() {
       x: tx, y: ty,
       health: 3, maxHealth: 3, alive: true, regrowTimer: 0,
       size: 0.75 + (idx * 7 % 11) * 0.04, swayPhase: idx * 1.3 + (idx % 3) * 0.7,
-      type: 'oak',
+      type: ['oak', 'pine', 'olive'][idx % 3],
     });
   }
 
@@ -1008,6 +1056,7 @@ function setup() {
 
 function startNewGame() {
   initState();
+  trackMilestone('game_start');
   // ─── SHIPWRECK START: player begins on barren wreck beach ───
   state.progression.gameStarted = true;
   state.journal = ['shipwreck'];
@@ -1147,9 +1196,9 @@ function windowResized() {
 
 // ─── CAMERA ───────────────────────────────────────────────────────────────
 function updateCamera() {
-  // Smooth follow player
+  // Smooth follow player — bias upward so horizon stays visible
   cam.x = state.player.x;
-  cam.y = state.player.y;
+  cam.y = state.player.y - height * 0.12; // player sits in lower 60% of screen
   camSmooth.x = lerp(camSmooth.x, cam.x, 0.08);
   camSmooth.y = lerp(camSmooth.y, cam.y, 0.08);
 }
@@ -1185,12 +1234,7 @@ function isOnIsland(wx, wy) {
   return (dx * dx + dy * dy) <= 1.0;
 }
 
-// Check if world point is on wreck beach (wider, natural shape)
-function isOnWreck(wx, wy) {
-  let dx = (wx - WRECK.cx) / (WRECK.rx * 0.9);
-  let dy = (wy - WRECK.cy) / (WRECK.ry * 0.55);
-  return (dx * dx + dy * dy) <= 1.0;
-}
+// ═══ WRECK SYSTEM — moved to wreck.js ═════════════════════════
 
 // Check if point is on a bridge tile (player-built or ship gangplank)
 function isOnBridge(wx, wy) {
@@ -1280,7 +1324,7 @@ function spawnClear(margin, minDist) {
     let pdx = pt.x - cx, pdy = pt.y - cy;
     if (pdx * pdx + pdy * pdy < 150 * 150) { continue; }
     // Farm zone exclusion (left side arc)
-    let farmCX = getFarmCenterX(), farmCY = getFarmCenterY();
+    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
     let fdx = pt.x - farmCX, fdy = pt.y - farmCY;
     if (fdx * fdx / (110 * 110) + fdy * fdy / (50 * 50) < 1) { continue; }
     // Check against all placed objects
@@ -1308,6 +1352,8 @@ function snapToGrid(v) {
 let _prevTime = 0;
 let _delta = 0.016; // seconds per frame
 let _fpsSmooth = 60;
+let _lowFpsFrames = 0;
+let _particleCap = 300;
 
 function draw() {
   // Engine camera bounds for culling
@@ -1322,6 +1368,13 @@ function draw() {
     _slowMoFrames--;
   }
   _fpsSmooth = lerp(_fpsSmooth, 1 / _delta, 0.05);
+
+  // ─── FPS WATCHDOG ───
+  if (_fpsSmooth < 30) { _lowFpsFrames++; } else { _lowFpsFrames = 0; }
+  if (_lowFpsFrames > 60 && _particleCap > 150) {
+    _particleCap = 150;
+    console.warn('[perf] FPS below 30 for 60+ frames — particle cap reduced to 150');
+  }
 
   // ─── MUSIC (plays on all screens) ───
   if (snd && snd.ready) snd.updateLyre();
@@ -1369,1716 +1422,12 @@ function _dith(x, y, t) {
 }
 
 
-// ═══ MENU SYSTEM — Image background + animated overlays ═════════════════════
-// ═══════════════════════════════════════════════════════════════════════════════
+// ═══ MENU SYSTEM — moved to menu.js ═════════════════════════════════════════
+// ═══ CINEMATICS — moved to cinematics.js ════════════════════════════════════
+// Functions: drawIntroCinematic, skipIntro, startPreRepairCutscene,
+// drawPreRepairCutscene, startSailingCutscene, drawSailingCutscene,
+// skipCutscene, doFirstRepair, completeSailToHome
 
-// Seeded sparkle positions (generated once)
-let _menuSparkles = null;
-let _menuDust = null;
-
-function _initMenuParticles() {
-  if (_menuSparkles) return;
-  _menuSparkles = [];
-  for (let i = 0; i < 35; i++) {
-    _menuSparkles.push({
-      x: 0.30 + (((i * 73 + 17) % 100) / 100) * 0.50, // sea area x: 30%-80%
-      y: 0.35 + (((i * 53 + 31) % 100) / 100) * 0.35,  // sea area y: 35%-70%
-      freq: 2.0 + (i % 7) * 1.3,
-      phase: i * 2.7,
-      gold: i % 4 === 0, // every 4th is gold instead of white
-    });
-  }
-  _menuDust = [];
-  for (let i = 0; i < 25; i++) {
-    _menuDust.push({
-      x: ((i * 97 + 11) % 100) / 100,
-      y: 0.05 + ((i * 61 + 23) % 100) / 100 * 0.70,
-      driftX: 0.002 + (i % 5) * 0.001,
-      driftY: 0.001 + (i % 3) * 0.0005,
-      freqX: 0.15 + (i % 4) * 0.08,
-      freqY: 0.10 + (i % 3) * 0.06,
-      phase: i * 1.9,
-      fadeFreq: 0.4 + (i % 5) * 0.15,
-    });
-  }
-}
-
-function drawMenuScreen() {
-  let w = width, h = height;
-  let t0 = millis() / 1000;
-  let aF = menuFadeIn / 255;
-  noStroke();
-  _initMenuParticles();
-
-  // ─── DRAW BACKGROUND IMAGE (cover mode, subtle rocking) ───
-  if (menuBgImg) {
-    let scale = max(w / menuBgImg.width, h / menuBgImg.height);
-    let iw = menuBgImg.width * scale;
-    let ih = menuBgImg.height * scale;
-    // Slow parallax drift
-    let driftX = sin(t0 * 0.04) * w * 0.02;
-    let driftY = cos(t0 * 0.03) * h * 0.01;
-    // Subtle harbor rocking — very gentle rotation around center
-    let rockAngle = sin(t0 * 0.3) * 0.002;
-    push();
-    translate(w / 2, h / 2);
-    rotate(rockAngle);
-    image(menuBgImg, -iw / 2 + driftX, -ih / 2 + driftY, iw, ih);
-    pop();
-  } else {
-    // Procedural sky fallback — deep Mediterranean dusk
-    for (let y = 0; y < h; y += 2) {
-      let t = y / h;
-      let r = lerp(8, 25, t);
-      let g = lerp(12, 18, t);
-      let b = lerp(30, 15, t);
-      fill(r, g, b);
-      rect(0, y, w, 2);
-    }
-  }
-
-  // ─── CURSOR ───
-  cursor(ARROW);
-
-  // ─── SUB-SCREENS ───
-  if (gameScreen === 'settings') { drawSettingsPanel(1); return; }
-  if (gameScreen === 'credits') { drawCreditsPanel(1); return; }
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // ─── ANIMATED SCENE OVERLAY — brings the background art to life ───
-  // ═══════════════════════════════════════════════════════════════════════
-
-  // ─── SUN GLOW PULSE — warm halo behind the sun ───
-  let sunCX = w * 0.66, sunCY = h * 0.25;
-  let sunPulse = 0.85 + sin(t0 * 0.6) * 0.15;
-  fill(255, 220, 120, floor(12 * sunPulse * aF));
-  ellipse(sunCX, sunCY, w * 0.35 * sunPulse, h * 0.3 * sunPulse);
-  fill(255, 200, 80, floor(8 * sunPulse * aF));
-  ellipse(sunCX, sunCY, w * 0.5 * sunPulse, h * 0.45 * sunPulse);
-
-  // ─── WATER SHIMMER — horizontal scan lines on the sea ───
-  let waterTop = h * 0.48, waterBot = h * 0.95;
-  for (let y = floor(waterTop); y < floor(waterBot); y += 4) {
-    let waveOff = sin(t0 * 1.2 + y * 0.03) * 3;
-    let waveAlpha = (sin(t0 * 0.8 + y * 0.05) + 1) * 0.5;
-    let deepFactor = (y - waterTop) / (waterBot - waterTop);
-    fill(100, 180, 255, floor(4 * waveAlpha * aF * (1 - deepFactor * 0.6)));
-    rect(waveOff, y, w, 2);
-  }
-
-  // ─── SUN REFLECTION COLUMN — shimmering golden path on water ───
-  let refX = w * 0.66;
-  for (let y = floor(h * 0.38); y < floor(h * 0.85); y += 3) {
-    let t = (y - h * 0.38) / (h * 0.47);
-    let spreadX = 15 + t * 60;
-    let shimA = (sin(t0 * 2.5 + y * 0.08) + 1) * 0.5;
-    let offX = sin(t0 * 0.9 + y * 0.04) * spreadX * 0.3;
-    fill(255, 210, 120, floor((18 - t * 14) * shimA * aF));
-    rect(floor(refX - spreadX / 2 + offX), y, floor(spreadX), 2);
-  }
-
-  // ─── BOATS BOBBING — 6 boats at fixed positions, gentle rock ───
-  let boats = [
-    { x: 0.42, y: 0.72, size: 0.6, phase: 0 },     // small rowboat left
-    { x: 0.52, y: 0.62, size: 0.8, phase: 1.2 },    // medium boat center-left
-    { x: 0.62, y: 0.68, size: 0.7, phase: 2.4 },    // boat center
-    { x: 0.73, y: 0.58, size: 1.2, phase: 0.8 },    // large sailboat right
-    { x: 0.55, y: 0.78, size: 0.5, phase: 3.1 },    // tiny boat near shore
-    { x: 0.78, y: 0.75, size: 0.55, phase: 1.9 },   // small boat far right
-    { x: 0.48, y: 0.88, size: 0.45, phase: 4.2 },   // beached boat
-  ];
-  for (let boat of boats) {
-    let bx = boat.x * w;
-    let bobY = sin(t0 * 0.8 + boat.phase) * 2.5 * boat.size;
-    let rockAngle = sin(t0 * 0.6 + boat.phase + 1) * 0.03;
-    let by = boat.y * h + bobY;
-    // Subtle water displacement around boat
-    fill(80, 160, 210, floor(15 * aF));
-    ellipse(bx, by + 3, 20 * boat.size, 4 * boat.size);
-    // Wake ripple
-    let wakeA = (sin(t0 * 1.5 + boat.phase) + 1) * 0.3;
-    fill(200, 230, 255, floor(12 * wakeA * aF));
-    ellipse(bx, by + 2, 25 * boat.size, 3);
-  }
-
-  // ─── WOMAN'S HAIR & DRESS SWAY ───
-  let womanX = w * 0.34, womanY = h * 0.72;
-  // Hair sway — golden streaks
-  let hairSway = sin(t0 * 1.5) * 4;
-  let hairSway2 = sin(t0 * 1.8 + 0.5) * 3;
-  fill(220, 190, 120, floor(25 * aF));
-  // Hair strands blowing in wind
-  for (let s = 0; s < 5; s++) {
-    let sx = womanX - 8 + s * 3 + hairSway * (s * 0.2 + 0.5);
-    let sy = womanY - 30 + s * 2;
-    let sLen = 15 + s * 3;
-    rect(floor(sx), floor(sy + hairSway2 * 0.3), 2, sLen);
-  }
-  // Dress hem flutter
-  fill(220, 215, 225, floor(15 * aF));
-  for (let d = 0; d < 4; d++) {
-    let dx = womanX - 5 + d * 4 + sin(t0 * 2 + d) * 2;
-    let dy = womanY + 15;
-    rect(floor(dx), floor(dy + sin(t0 * 1.2 + d * 0.8) * 2), 3, 5);
-  }
-
-  // ─── BIRDS — flying across the sky ───
-  if (!drawMenuScreen._birds) {
-    drawMenuScreen._birds = [];
-    for (let i = 0; i < 5; i++) {
-      drawMenuScreen._birds.push({
-        x: random(0.5, 1.0), y: random(0.12, 0.28),
-        speed: random(0.008, 0.015), wingPhase: random(TWO_PI),
-        size: random(3, 6),
-      });
-    }
-  }
-  for (let bird of drawMenuScreen._birds) {
-    bird.x -= bird.speed * 0.016;
-    if (bird.x < -0.05) { bird.x = 1.05; bird.y = random(0.1, 0.3); }
-    let bx = bird.x * w, by = bird.y * h;
-    let wingUp = sin(t0 * 5 + bird.wingPhase) * bird.size * 0.7;
-    fill(30, 25, 40, floor(120 * aF));
-    // Body
-    rect(floor(bx - 1), floor(by), 3, 2);
-    // Wings
-    rect(floor(bx - bird.size), floor(by - wingUp), bird.size, 1);
-    rect(floor(bx + 1), floor(by + wingUp * 0.8), bird.size, 1);
-  }
-
-  // ─── SHORE FOAM — animated waterline on the beach (multi-layer) ───
-  let shoreY = h * 0.76;
-  let foamAdvance = sin(t0 * 0.5) * 4;
-  // Layer 1 — leading foam edge
-  for (let x = floor(w * 0.08); x < floor(w * 0.42); x += 4) {
-    let foamY = shoreY + foamAdvance + sin(x * 0.03 + t0 * 1.2) * 2;
-    let foamA = (sin(t0 * 1.5 + x * 0.05) + 1) * 0.5;
-    fill(230, 245, 255, floor(25 * foamA * aF));
-    rect(x, floor(foamY), 4, 2);
-  }
-  // Layer 2 — receding foam line (offset phase, moves right)
-  let foamAdv2 = sin(t0 * 0.5 + 1.8) * 5;
-  for (let x = floor(w * 0.06); x < floor(w * 0.44); x += 3) {
-    let foamY2 = shoreY + 4 + foamAdv2 + sin(x * 0.04 + t0 * 1.6 + 2.0) * 2.5;
-    let foamA2 = (sin(t0 * 1.2 + x * 0.06 + 1.0) + 1) * 0.5;
-    fill(240, 250, 255, floor(18 * foamA2 * aF));
-    rect(x, floor(foamY2), 3, 1);
-  }
-  // Layer 3 — thin trailing foam wisps
-  let foamAdv3 = sin(t0 * 0.4 + 3.5) * 3;
-  for (let x = floor(w * 0.10); x < floor(w * 0.40); x += 6) {
-    let foamY3 = shoreY + 8 + foamAdv3 + sin(x * 0.05 + t0 * 0.9 + 4.0) * 1.5;
-    let foamA3 = (sin(t0 * 0.9 + x * 0.08 + 2.5) + 1) * 0.5;
-    fill(255, 255, 255, floor(12 * foamA3 * aF));
-    rect(x, floor(foamY3), 5, 1);
-  }
-
-  // ─── WINDOW LIGHTS — warm glow in building windows (oil lamp flicker) ───
-  // Initialize per-light random phases once
-  if (!drawMenuScreen._winPhases) {
-    drawMenuScreen._winPhases = [];
-    for (let i = 0; i < 10; i++) {
-      drawMenuScreen._winPhases.push({
-        phase1: (i * 7.3 + 2.1) % 6.28,
-        phase2: (i * 4.9 + 0.8) % 6.28,
-        phase3: (i * 11.1 + 5.3) % 6.28,
-        speed1: 2.0 + (i % 4) * 0.7,
-        speed2: 3.5 + (i % 3) * 1.2,
-        speed3: 5.8 + (i % 5) * 0.9,
-      });
-    }
-  }
-  let windows = [
-    [0.12, 0.38], [0.15, 0.42], [0.18, 0.35], [0.22, 0.40],
-    [0.08, 0.43], [0.25, 0.37], [0.10, 0.46], [0.20, 0.44],
-    [0.14, 0.50], [0.06, 0.40],
-  ];
-  for (let i = 0; i < windows.length; i++) {
-    let wx = windows[i][0] * w, wy = windows[i][1] * h;
-    let wp = drawMenuScreen._winPhases[i];
-    // Multi-frequency flicker for realistic oil lamp effect
-    let flicker = 0.6
-      + sin(t0 * wp.speed1 + wp.phase1) * 0.18
-      + sin(t0 * wp.speed2 + wp.phase2) * 0.12
-      + sin(t0 * wp.speed3 + wp.phase3) * 0.08;
-    // Occasional dim dip (lamp guttering)
-    let gutter = sin(t0 * 0.4 + wp.phase1 * 3.0);
-    if (gutter > 0.85) flicker *= 0.5;
-    fill(255, 200, 100, floor(24 * flicker * aF));
-    rect(floor(wx - 1), floor(wy - 1), 3, 3);
-    // Inner bright core
-    fill(255, 230, 160, floor(14 * flicker * aF));
-    rect(floor(wx), floor(wy), 1, 1);
-    // Warm glow halo
-    fill(255, 170, 60, floor(10 * flicker * aF));
-    ellipse(wx, wy, 14, 10);
-  }
-
-  // ─── CYPRESS TREE SWAY — trees on the hillside ───
-  let cypresses = [
-    [0.28, 0.20, 1.0], [0.32, 0.18, 0.8], [0.38, 0.22, 0.9],
-    [0.85, 0.25, 1.1], [0.88, 0.30, 0.85], [0.92, 0.22, 0.95],
-    [0.44, 0.28, 0.7],
-  ];
-  for (let cp of cypresses) {
-    let cx2 = cp[0] * w, cy2 = cp[1] * h;
-    let sway = sin(t0 * 0.8 + cp[0] * 10) * 2 * cp[2];
-    // Subtle overlay sway hint
-    fill(30, 60, 30, floor(10 * aF));
-    rect(floor(cx2 - 3 + sway), floor(cy2 - 20 * cp[2]), 6, floor(20 * cp[2]));
-  }
-
-  // ─── CLOUD DRIFT — semi-transparent shapes drifting slowly ───
-  if (!drawMenuScreen._clouds) {
-    drawMenuScreen._clouds = [];
-    for (let i = 0; i < 4; i++) {
-      drawMenuScreen._clouds.push({
-        x: random(-0.1, 1.1), y: random(0.05, 0.2),
-        w: random(0.08, 0.15), h: random(0.02, 0.04),
-        speed: random(0.003, 0.008), alpha: random(5, 12),
-      });
-    }
-  }
-  for (let cl of drawMenuScreen._clouds) {
-    cl.x += cl.speed * 0.016;
-    if (cl.x > 1.15) cl.x = -cl.w - 0.05;
-    fill(255, 220, 200, floor(cl.alpha * aF));
-    ellipse(cl.x * w, cl.y * h, cl.w * w, cl.h * h);
-    fill(255, 230, 210, floor(cl.alpha * 0.6 * aF));
-    ellipse(cl.x * w + cl.w * w * 0.2, cl.y * h - cl.h * h * 0.3, cl.w * w * 0.6, cl.h * h * 0.7);
-  }
-
-  // ─── BEACH SHELL SPARKLES — occasional glints on the foreground ───
-  let shells = [[0.18, 0.85], [0.30, 0.90], [0.42, 0.92], [0.85, 0.88], [0.25, 0.87]];
-  for (let i = 0; i < shells.length; i++) {
-    let sparkOn = sin(t0 * 1.8 + i * 2.3) > 0.7;
-    if (sparkOn) {
-      let shx = shells[i][0] * w, shy = shells[i][1] * h;
-      fill(255, 250, 230, floor(80 * aF));
-      rect(floor(shx - 1), floor(shy - 2), 2, 4);
-      rect(floor(shx - 2), floor(shy - 1), 4, 2);
-    }
-  }
-
-  // ─── CINEMATIC VIGNETTE — dark edges, light center ───
-  // Top vignette
-  for (let y = 0; y < h * 0.25; y += 2) {
-    let a = floor((1 - y / (h * 0.25)) * 120 * aF);
-    fill(0, 0, 0, a);
-    rect(0, y, w, 2);
-  }
-  // Bottom vignette — stronger, where menu lives
-  for (let y = floor(h * 0.45); y < h; y += 2) {
-    let t = (y - h * 0.45) / (h * 0.55);
-    let a = floor(t * t * 220 * aF);
-    fill(5, 3, 8, a);
-    rect(0, y, w, 2);
-  }
-  // Side vignettes
-  for (let x = 0; x < w * 0.15; x += 2) {
-    let a = floor((1 - x / (w * 0.15)) * 80 * aF);
-    fill(0, 0, 0, a);
-    rect(x, 0, 2, h);
-    rect(w - x - 2, 0, 2, h);
-  }
-
-  // ─── WATER SPARKLES — sea area ───
-  for (let i = 0; i < _menuSparkles.length; i++) {
-    let sp = _menuSparkles[i];
-    let sx = floor(sp.x * w), sy = floor(sp.y * h);
-    let on = sin(t0 * sp.freq + sp.phase) > 0.3;
-    if (on) {
-      let pulse = (sin(t0 * sp.freq * 1.5 + sp.phase) + 1) * 0.5;
-      let a = floor((100 + pulse * 120) * aF);
-      fill(sp.gold ? 255 : 255, sp.gold ? 210 : 250, sp.gold ? 80 : 230, a);
-      rect(sx, sy, 2, 2);
-      fill(sp.gold ? 255 : 240, sp.gold ? 200 : 240, sp.gold ? 60 : 210, floor(a * 0.2));
-      ellipse(sx + 1, sy + 1, 7, 7);
-    }
-  }
-
-  // ─── GOLDEN DUST — floating motes ───
-  for (let i = 0; i < _menuDust.length; i++) {
-    let d = _menuDust[i];
-    let dx = (d.x + sin(t0 * d.freqX + d.phase) * 0.04 + t0 * d.driftX) % 1.0;
-    let dy = d.y + sin(t0 * d.freqY + d.phase * 0.7) * 0.03;
-    dy = ((dy % 0.85) + 0.85) % 0.85 + 0.05;
-    let fadeA = (sin(t0 * d.fadeFreq + d.phase) + 1) * 0.5;
-    let a = floor(fadeA * 140 * aF);
-    if (a > 8) {
-      let px = floor(dx * w), py = floor(dy * h);
-      fill(255, 210, 90, floor(a * 0.25));
-      ellipse(px, py, 6, 6);
-      fill(255, 225, 120, a);
-      rect(px - 1, py - 1, 2, 2);
-    }
-  }
-
-  // ─── GOD RAYS — from upper right ───
-  let sunX = floor(w * 0.65), sunY = floor(h * 0.2);
-  let rayRot = t0 * PI / 240;
-  for (let i = 0; i < 9; i++) {
-    let angle = -PI * 0.55 + (i - 4) * 0.14 + rayRot;
-    let rayLen = h * 0.7;
-    let rw = 10 + (i % 3) * 8;
-    let rayAlpha = floor((6 + (i % 2) * 4) * aF);
-    fill(255, 215, 100, rayAlpha);
-    beginShape();
-    vertex(sunX, sunY);
-    vertex(sunX + cos(angle) * rayLen - rw, sunY + sin(angle) * rayLen);
-    vertex(sunX + cos(angle) * rayLen + rw, sunY + sin(angle) * rayLen);
-    endShape(CLOSE);
-  }
-
-  // ─── ANIMATED HORIZON LINE — golden shimmer ───
-  let horizY = floor(h * 0.42);
-  let shimmer = sin(t0 * 0.8) * 0.3 + 0.7;
-  fill(255, 200, 80, floor(18 * shimmer * aF));
-  rect(0, horizY - 1, w, 3);
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // ─── TITLE — large, centered, with golden glow ───
-  // ═══════════════════════════════════════════════════════════════════════
-  let titleAlpha = constrain(menuFadeIn / 180, 0, 1);
-  let titleY = floor(h * 0.52);
-  let ts = max(36, floor(min(w * 0.06, h * 0.08)));
-  let titleBob = sin(t0 * 0.5) * 2;
-
-  textAlign(CENTER, CENTER);
-  textFont('Cinzel, Georgia, serif');
-
-  // Title glow halo
-  fill(255, 200, 80, floor(20 * titleAlpha));
-  noStroke();
-  ellipse(w / 2, titleY + titleBob, ts * 10, ts * 3);
-
-  // Ornamental line above title
-  let ornW = min(w * 0.35, 280);
-  let ornY = titleY - ts * 0.7 + titleBob;
-  stroke(200, 170, 100, floor(80 * titleAlpha));
-  strokeWeight(1);
-  line(w / 2 - ornW / 2, ornY, w / 2 - 20, ornY);
-  line(w / 2 + 20, ornY, w / 2 + ornW / 2, ornY);
-  // Diamond ornament center
-  noStroke();
-  fill(220, 190, 120, floor(160 * titleAlpha));
-  let dSize = 5;
-  beginShape();
-  vertex(w / 2, ornY - dSize);
-  vertex(w / 2 + dSize, ornY);
-  vertex(w / 2, ornY + dSize);
-  vertex(w / 2 - dSize, ornY);
-  endShape(CLOSE);
-
-  // Title text — multi-layer for depth + golden glow pulse
-  textStyle(BOLD);
-  textSize(ts);
-  // Pulsing golden glow shadow (sin-based size oscillation)
-  let glowPulse = 0.5 + sin(t0 * 0.8) * 0.5; // 0..1, slow
-  let glowSize = floor(2 + glowPulse * 4); // 2..6px spread
-  let glowAlpha = floor((15 + glowPulse * 25) * titleAlpha);
-  fill(255, 200, 80, glowAlpha);
-  for (let gd = -glowSize; gd <= glowSize; gd += 2) {
-    text('MARE NOSTRUM', w / 2 + gd, titleY + titleBob);
-    text('MARE NOSTRUM', w / 2, titleY + titleBob + gd);
-  }
-  // Outer glow
-  fill(180, 140, 60, floor(40 * titleAlpha));
-  text('MARE NOSTRUM', w / 2, titleY + titleBob + 3);
-  text('MARE NOSTRUM', w / 2, titleY + titleBob - 1);
-  // Drop shadow
-  fill(10, 5, 0, floor(200 * titleAlpha));
-  text('MARE NOSTRUM', w / 2 + 2, titleY + titleBob + 3);
-  // Main gold text
-  let goldPulse = 0.9 + sin(t0 * 1.2) * 0.1;
-  fill(244 * goldPulse, 213 * goldPulse, 141, floor(255 * titleAlpha));
-  text('MARE NOSTRUM', w / 2, titleY + titleBob);
-  // Top highlight
-  fill(255, 240, 200, floor(80 * titleAlpha));
-  text('MARE NOSTRUM', w / 2, titleY + titleBob - 1);
-
-  // ─── SUBTITLE ───
-  let subAlpha = constrain((menuFadeIn - 80) / 175, 0, 1);
-  let subY = titleY + ts * 0.65 + titleBob;
-  textStyle(ITALIC);
-  let subSize = max(11, floor(ts * 0.32));
-  textSize(subSize);
-  // Shadow
-  fill(10, 5, 0, floor(150 * subAlpha));
-  text('Shipwrecked.  Sunlit.  Reborn.', w / 2 + 1, subY + 1);
-  // Text with pulsing brightness
-  let subPulse = 0.85 + sin(t0 * 0.7 + 1) * 0.15;
-  fill(212 * subPulse, 169 * subPulse, 106, floor(255 * subAlpha));
-  text('Shipwrecked.  Sunlit.  Reborn.', w / 2, subY);
-
-  // Ornamental line below subtitle
-  let ornY2 = subY + subSize * 0.8;
-  stroke(200, 170, 100, floor(50 * subAlpha));
-  strokeWeight(1);
-  line(w / 2 - ornW * 0.4, ornY2, w / 2 + ornW * 0.4, ornY2);
-  noStroke();
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // ─── MENU ITEMS — vertical, centered, with hover effects ───
-  // ═══════════════════════════════════════════════════════════════════════
-  textStyle(BOLD);
-  textFont('Cinzel, Georgia, serif');
-  let itemSize = max(13, floor(min(w * 0.02, h * 0.028)));
-  textSize(itemSize);
-
-  let hasSave = !!localStorage.getItem('sunlitIsles_save');
-  let items = [];
-  if (hasSave) items.push('CONTINUE VOYAGE');
-  items.push('NEW VOYAGE');
-  items.push('SETTINGS', 'CREDITS');
-  let itemCount = items.length;
-
-  let menuStartY = floor(h * 0.68);
-  let itemGap = max(28, floor(h * 0.048));
-  menuHover = -1;
-  let isCursorPointer = false;
-
-  for (let i = 0; i < itemCount; i++) {
-    // Staggered slide-in: each item delayed, but all reach full alpha
-    let slideProgress = constrain((menuFadeIn - 160 - i * 25) / 60, 0, 1);
-    let itemAlpha = constrain(menuFadeIn / 255, 0, 1); // overall fade applies equally
-    if (slideProgress <= 0) continue;
-
-    let iy = menuStartY + i * itemGap;
-    let iw = textWidth(items[i]);
-    let hitPad = 16;
-    let hovered = mouseX > w / 2 - iw / 2 - hitPad && mouseX < w / 2 + iw / 2 + hitPad &&
-                  mouseY > iy - hitPad && mouseY < iy + hitPad;
-    if (hovered) { menuHover = i; menuKeyIdx = -1; isCursorPointer = true; }
-    let selected = hovered || menuKeyIdx === i;
-
-    // Slide-in offset (items slide in from right, eased)
-    let slideEase = 1 - pow(1 - slideProgress, 3); // cubic ease-out
-    let slideX = (1 - slideEase) * 60;
-
-    if (selected) {
-      // Highlight bar behind text
-      let barW = iw + 60;
-      fill(200, 170, 80, floor(25 * itemAlpha));
-      rect(w / 2 - barW / 2 + slideX, iy - itemSize * 0.55, barW, itemSize * 1.2, 3);
-
-      // Left ornament — animated laurel/arrow
-      let arrowX = w / 2 - iw / 2 - 22 + slideX;
-      let arrowBob = sin(t0 * 3) * 1.5;
-      fill(244, 213, 141, floor(255 * itemAlpha));
-      // Roman chevron >>>
-      triangle(arrowX + arrowBob, iy - 4, arrowX + arrowBob, iy + 4, arrowX + 8 + arrowBob, iy);
-      triangle(arrowX + 6 + arrowBob, iy - 3, arrowX + 6 + arrowBob, iy + 3, arrowX + 12 + arrowBob, iy);
-
-      // Right ornament — mirrored
-      let arrowX2 = w / 2 + iw / 2 + 10 + slideX;
-      triangle(arrowX2 - arrowBob, iy - 4, arrowX2 - arrowBob, iy + 4, arrowX2 - 8 - arrowBob, iy);
-      triangle(arrowX2 - 6 - arrowBob, iy - 3, arrowX2 - 6 - arrowBob, iy + 3, arrowX2 - 12 - arrowBob, iy);
-
-      // Bright gold text
-      fill(10, 5, 0, floor(160 * itemAlpha));
-      text(items[i], w / 2 + 1 + slideX, iy + 1);
-      fill(255, 230, 160, floor(255 * itemAlpha));
-      text(items[i], w / 2 + slideX, iy);
-    } else {
-      // Dim text with subtle shadow
-      fill(10, 5, 0, floor(80 * itemAlpha));
-      text(items[i], w / 2 + 1 + slideX, iy + 1);
-      fill(170, 150, 120, floor(200 * itemAlpha));
-      text(items[i], w / 2 + slideX, iy);
-    }
-  }
-
-  // Set cursor style
-  if (isCursorPointer) cursor(HAND);
-
-  // ─── VERSION + HINT at bottom ───
-  let botAlpha = constrain((menuFadeIn - 200) / 55, 0, 1);
-  textStyle(NORMAL);
-  textSize(8);
-  fill(120, 110, 90, floor(120 * botAlpha));
-  text('v0.9  -  Shipwrecked. Sunlit. Reborn.', w / 2, h - 18);
-
-  // ─── FADES ───
-  if (aF < 1) { fill(0, 0, 0, floor(255 * (1 - aF))); rect(0, 0, w, h); }
-  if (menuFadeOut > 0) { fill(0, 0, 0, floor(menuFadeOut)); rect(0, 0, w, h); }
-}
-
-// ─── SETTINGS PANEL (overlay) ────────────────────────────────────────────
-function drawSettingsPanel(fadeA) {
-  let w = width, h = height;
-  let panW = 280, panH = 340;
-  let px = floor(w / 2 - panW / 2), py = floor(h * 0.26);
-
-  fill(0, 0, 0, 160); rect(0, 0, w, h);
-
-  fill(25, 20, 15, 245); rect(px - 2, py - 2, panW + 4, panH + 4);
-  fill(40, 34, 26, 252); rect(px, py, panW, panH);
-  fill(180, 150, 55, 130);
-  rect(px, py, panW, 2); rect(px, py + panH - 2, panW, 2);
-  rect(px, py, 2, panH); rect(px + panW - 2, py, 2, panH);
-
-  textAlign(CENTER, CENTER);
-  fill(220, 195, 60); textSize(14);
-  text('SETTINGS', w / 2, py + 20);
-
-  let fsY = py + 50;
-  let fsOn = document.fullscreenElement != null;
-  fill(180, 160, 120, 200); textSize(10);
-  text('Fullscreen', w / 2 - 30, fsY);
-  let tbx = floor(w / 2 + 40), tby = fsY - 7;
-  fill(fsOn ? 85 : 45, fsOn ? 130 : 55, fsOn ? 50 : 40, 230);
-  rect(tbx, tby, 28, 14);
-  fill(220, 210, 180); rect(tbx + (fsOn ? 16 : 2), tby + 2, 10, 10);
-
-  if (snd) {
-    let sliderY = py + 80, sliderW = 120, slX = floor(w / 2 + 10);
-    let keys = ['master', 'sfx', 'ambient', 'music'];
-    let labels = ['Master', 'SFX', 'Ambient', 'Music'];
-    for (let ki = 0; ki < keys.length; ki++) {
-      fill(180, 160, 120, 200); textSize(10);
-      text(labels[ki], w / 2 - 45, sliderY);
-      let vol = snd.vol ? snd.vol[keys[ki]] || 0.5 : 0.5;
-      fill(40, 35, 28); rect(slX, sliderY - 3, sliderW, 6);
-      fill(190, 165, 60); rect(slX, sliderY - 3, floor(vol * sliderW), 6);
-      fill(220, 200, 120); rect(slX + floor(vol * sliderW) - 3, sliderY - 5, 6, 10);
-      sliderY += 24;
-    }
-  }
-
-  let delY = py + 250;
-  fill(140, 50, 40, 200); textSize(10);
-  text('Delete Save Data', w / 2, delY);
-
-  let backY = py + panH - 25;
-  let bkH = mouseX > w/2 - 40 && mouseX < w/2 + 40 && mouseY > backY - 8 && mouseY < backY + 10;
-  fill(bkH ? 220 : 180, bkH ? 195 : 165, bkH ? 100 : 70);
-  textSize(11); text('[ BACK ]', w / 2, backY);
-  textAlign(LEFT, TOP);
-}
-
-// ─── CREDITS PANEL ───────────────────────────────────────────────────────
-function drawCreditsPanel(fadeA) {
-  let w = width, h = height;
-  let panW = 280, panH = 240;
-  let px = floor(w / 2 - panW / 2), py = floor(h * 0.32);
-
-  fill(0, 0, 0, 160); rect(0, 0, w, h);
-
-  fill(25, 20, 15, 245); rect(px - 2, py - 2, panW + 4, panH + 4);
-  fill(40, 34, 26, 252); rect(px, py, panW, panH);
-  fill(180, 150, 55, 130);
-  rect(px, py, panW, 2); rect(px, py + panH - 2, panW, 2);
-  rect(px, py, 2, panH); rect(px + panW - 2, py, 2, panH);
-
-  textAlign(CENTER, CENTER);
-  fill(220, 195, 60); textSize(14);
-  text('CREDITS', w / 2, py + 20);
-
-  fill(200, 180, 140, 220); textSize(9);
-  let cy = py + 50;
-  let lines = [
-    'MARE NOSTRUM', 'Shipwrecked. Sunlit. Reborn.', '',
-    'Design & Code', 'Aurelian Forge Studio', '',
-    'Engine: p5.js', 'Art: Hand-placed pixel rects', '',
-    'Built with love, olive oil,', 'and far too many rect() calls.',
-  ];
-  for (let i = 0; i < lines.length; i++) {
-    let isT = i === 0 || i === 3;
-    fill(isT ? 220 : 180, isT ? 195 : 165, isT ? 60 : 120, isT ? 255 : 180);
-    textSize(isT ? 11 : 9);
-    text(lines[i], w / 2, cy + i * 14);
-  }
-
-  let backY = py + panH - 25;
-  let bkH = mouseX > w/2 - 40 && mouseX < w/2 + 40 && mouseY > backY - 8 && mouseY < backY + 10;
-  fill(bkH ? 220 : 180, bkH ? 195 : 165, bkH ? 100 : 70);
-  textSize(11); text('[ BACK ]', w / 2, backY);
-  textAlign(LEFT, TOP);
-}
-
-// ─── MENU CLICK HANDLER ─────────────────────────────────────────────────
-function handleMenuClick() {
-  if (gameScreen === 'settings') {
-    let py = floor(height * 0.28);
-    let fsY = py + 50;
-    let tbx = floor(width / 2 + 40), tby = fsY - 7;
-    if (mouseX > tbx && mouseX < tbx + 28 && mouseY > tby && mouseY < tby + 14) {
-      if (document.fullscreenElement) document.exitFullscreen();
-      else document.documentElement.requestFullscreen().catch(() => {});
-      return;
-    }
-    if (snd) {
-      let sliderY = py + 80, sliderW = 120, slX = floor(width / 2 + 10);
-      let keys = ['master', 'sfx', 'ambient', 'music'];
-      for (let k of keys) {
-        if (mouseX >= slX - 4 && mouseX <= slX + sliderW + 4 && mouseY >= sliderY - 10 && mouseY <= sliderY + 10) {
-          snd.setVolume(k, constrain((mouseX - slX) / sliderW, 0, 1));
-          return;
-        }
-        sliderY += 24;
-      }
-    }
-    let delY = py + 250;
-    if (mouseX > width/2 - 60 && mouseX < width/2 + 60 && mouseY > delY - 10 && mouseY < delY + 12) {
-      if (localStorage.getItem('sunlitIsles_save')) localStorage.removeItem('sunlitIsles_save');
-      return;
-    }
-    let backY = py + 340 - 25;
-    if (mouseX > width/2 - 40 && mouseX < width/2 + 40 && mouseY > backY - 8 && mouseY < backY + 10) {
-      gameScreen = 'menu'; return;
-    }
-    return;
-  }
-  if (gameScreen === 'credits') {
-    let panH = 240, py = floor(height * 0.32);
-    let backY = py + panH - 25;
-    if (mouseX > width/2 - 40 && mouseX < width/2 + 40 && mouseY > backY - 8 && mouseY < backY + 10) {
-      gameScreen = 'menu'; return;
-    }
-    return;
-  }
-  if (menuHover < 0 || menuFadeOut > 0) return;
-  let hasSave = !!localStorage.getItem('sunlitIsles_save');
-  let btns = [];
-  if (hasSave) btns.push('load');
-  btns.push('new', 'settings', 'credits');
-  let action = btns[menuHover];
-  if (action === 'settings') { gameScreen = 'settings'; return; }
-  if (action === 'credits') { gameScreen = 'credits'; return; }
-  // Fade to black, then execute action
-  menuFadeOut = 1;
-  menuFadeAction = action === 'new' ? startNewGame : startLoadGame;
-}
-
-// ─── INTRO CINEMATIC — SHIPWRECK SCENE ────────────────────────────────────
-function drawIntroCinematic(dt) {
-  state.introTimer += dt;
-  let t = state.introTimer;
-  let w = width, h = height;
-
-  // Phase timings (in frames at 60fps)
-  let FADE_IN = 60;       // 1 sec black fade
-  let WRECKAGE = 240;     // 4 sec wreckage scene
-  let TEXT_START = 120;    // text appears 2 sec into wreckage
-  let WAKE = 360;          // 6 sec — player wakes
-  let DONE = 420;          // 7 sec — game starts
-
-
-  // --- INTRO AUDIO CUES ---
-  if (snd && snd.ready) {
-    let masterVol = snd.vol.master * snd.vol.ambient;
-    // Storm ambient during wreckage (frames 0-240): low rumble wind
-    if (t < WRECKAGE) {
-      let stormIntensity = min(1, t / FADE_IN);
-      snd._windGain.amp(0.14 * stormIntensity * masterVol, 0.3);
-      snd._windFilter.freq(40 + sin(frameCount * 0.004) * 20);
-      snd._waveGain.amp(0.10 * stormIntensity * masterVol, 0.3);
-      snd._waveFilter.freq(180 + sin(frameCount * 0.003) * 40);
-    }
-    // Thunder crack at frame 180
-    if (t >= 180 && t < 182 && !state._introThunderPlayed) {
-      state._introThunderPlayed = true;
-      snd.playSFX('thunder');
-    }
-    // Gentle wave transition after wreckage (frames 240+): calm down storm
-    if (t >= WRECKAGE && t < DONE) {
-      let calm = min(1, (t - WRECKAGE) / 120);
-      snd._windGain.amp(lerp(0.14, 0.02, calm) * masterVol, 0.5);
-      snd._windFilter.freq(lerp(40, 400, calm));
-      snd._waveGain.amp(lerp(0.10, 0.05, calm) * masterVol, 0.5);
-      snd._waveFilter.freq(lerp(180, 350, calm));
-    }
-    // Soft lyre note at exact wake moment (frame 360) -- D4 sine, gentle
-    if (t >= WAKE && t < WAKE + 2 && !state._introLyrePlayed) {
-      state._introLyrePlayed = true;
-      snd._pluckLyre(0, 293.7, 0.10 * snd.vol.master * snd.vol.music, 800);
-    }
-  }
-
-
-  // Background — dawn sky gradient
-  let skyAlpha = min(1, t / FADE_IN);
-  // Deep night → warm dawn
-  let skyTop = lerpColor(color(10, 12, 20), color(45, 55, 85), skyAlpha);
-  let skyBot = lerpColor(color(10, 12, 20), color(140, 90, 60), skyAlpha);
-  noStroke();
-  for (let y = 0; y < h; y += 4) {
-    let amt = y / h;
-    fill(lerpColor(skyTop, skyBot, amt));
-    rect(0, y, w, 4);
-  }
-
-  // Thunder screen shake near lightning (frame 178-184)
-  let thunderShakeX = 0, thunderShakeY = 0;
-  if (t >= 176 && t <= 186) {
-    let shakeMag = max(0, 1 - abs(t - 180) / 6) * 4;
-    thunderShakeX = sin(t * 17.3) * shakeMag;
-    thunderShakeY = cos(t * 13.7) * shakeMag;
-  }
-  push();
-  translate(thunderShakeX, thunderShakeY);
-
-  // Ocean — dark choppy water
-  let oceanY = floor(h * 0.55);
-  fill(25, 50, 65);
-  rect(0, oceanY, w, h - oceanY);
-  // Wave lines
-  for (let i = 0; i < 8; i++) {
-    let wy = oceanY + 12 + i * 18;
-    let waveOff = floor(sin(frameCount * 0.02 + i * 0.7) * 4);
-    fill(35, 65, 80, 40);
-    rect(0, wy + waveOff, w, 2);
-  }
-
-  // Beach strip
-  let beachY = oceanY - 8;
-  fill(170, 155, 120);
-  rect(0, beachY, w, 16);
-  fill(155, 140, 105, 80);
-  for (let x = 0; x < w; x += 20) rect(x + floor(sin(x) * 3), beachY + 2, 8, 2);
-
-  // ─── RAIN STREAKS during wreckage phase ───
-  if (t > FADE_IN && t < WAKE) {
-    let rainAlpha = min(1, (t - FADE_IN) / 60);
-    for (let ri = 0; ri < 40; ri++) {
-      let rx = ((ri * 137 + floor(t * 3.7)) % w);
-      let ry = ((ri * 89 + floor(t * 5.2)) % (h * 0.8));
-      let ra = floor((30 + (ri % 3) * 10) * rainAlpha);
-      fill(200, 210, 230, ra);
-      // Diagonal rain — wind from left
-      rect(floor(rx), floor(ry), 1, 6);
-      rect(floor(rx + 1), floor(ry + 6), 1, 4);
-    }
-  }
-
-  // ─── FLOATING DEBRIS in ocean during wreckage ───
-  if (t > FADE_IN + 20 && t < WAKE) {
-    let debAlpha = min(255, (t - FADE_IN - 20) * 3);
-    let debPieces = [
-      { x: 0.20, y: 0.62, w: 14, h: 3, phase: 0.0 },
-      { x: 0.65, y: 0.65, w: 10, h: 2, phase: 1.5 },
-      { x: 0.75, y: 0.60, w: 12, h: 3, phase: 2.8 },
-      { x: 0.30, y: 0.70, w: 8,  h: 2, phase: 4.1 },
-      { x: 0.80, y: 0.72, w: 11, h: 2, phase: 0.9 },
-      { x: 0.50, y: 0.68, w: 9,  h: 3, phase: 3.3 },
-      { x: 0.15, y: 0.75, w: 7,  h: 2, phase: 5.0 },
-    ];
-    for (let dp of debPieces) {
-      let dx = dp.x * w + sin(frameCount * 0.01 + dp.phase) * 8;
-      let dy = dp.y * h + sin(frameCount * 0.025 + dp.phase) * 3;
-      fill(65, 42, 20, debAlpha);
-      rect(floor(dx), floor(dy), dp.w, dp.h);
-      // Highlight on top edge
-      fill(90, 60, 30, debAlpha * 0.5);
-      rect(floor(dx + 1), floor(dy), dp.w - 2, 1);
-    }
-  }
-
-  if (t > FADE_IN) {
-    let sceneAlpha = min(255, (t - FADE_IN) * 4);
-
-    // ─── LIGHTNING FLASH at frame 180 ───
-    if (t >= 178 && t <= 181) {
-      fill(255, 255, 255, floor(200 * (1 - abs(t - 180) / 3)));
-      rect(0, 0, w, h);
-    }
-
-    // ─── WRECKAGE SCENE ───
-    let cx = floor(w * 0.35);
-    let cy = beachY - 2;
-
-    // Broken hull — tilted, half-submerged
-    push();
-    translate(cx, cy);
-    rotate(-0.15);
-    // Hull planks — dark waterlogged wood
-    fill(55, 35, 18, sceneAlpha);
-    rect(-40, -8, 80, 12);
-    rect(-35, -14, 60, 6);
-    rect(-30, 4, 50, 6);
-    // Broken ribs
-    fill(70, 45, 22, sceneAlpha);
-    for (let i = -3; i <= 3; i++) {
-      rect(i * 10 - 1, -16, 3, 20);
-    }
-    // Snapped mast stump
-    fill(80, 55, 25, sceneAlpha);
-    rect(-3, -30, 6, 16);
-    // Torn sail scrap draped over hull
-    fill(190, 175, 150, sceneAlpha * 0.6);
-    rect(-20, -22, 30, 10);
-    fill(140, 35, 25, sceneAlpha * 0.5);
-    rect(-15, -18, 20, 4); // red stripe remains
-    pop();
-
-    // Scattered debris on beach
-    fill(65, 42, 20, sceneAlpha);
-    rect(cx + 60, cy + 2, 12, 3);   // plank
-    rect(cx + 80, cy + 4, 8, 2);    // plank
-    rect(cx - 55, cy + 3, 10, 2);   // plank
-    // Amphora (broken jar)
-    fill(160, 100, 55, sceneAlpha);
-    rect(cx + 50, cy - 4, 6, 8);
-    fill(140, 85, 45, sceneAlpha);
-    rect(cx + 51, cy - 6, 4, 3);    // neck
-    // Rope coil
-    fill(120, 95, 55, sceneAlpha);
-    rect(cx - 40, cy, 5, 5);
-    rect(cx - 39, cy + 1, 3, 3);
-
-    // ─── PLAYER FIGURE — lying on beach ───
-    let playerX = floor(w * 0.55);
-    let playerY = cy - 1;
-    let wakeProgress = max(0, (t - WAKE) / 60); // 0 → 1 as player wakes
-
-    // Dark silhouette shadow behind figure during wake (dramatic backlit effect)
-    if (wakeProgress > 0 && wakeProgress < 1.2) {
-      let silAlpha = floor(min(1, wakeProgress) * 80);
-      let silH = floor(lerp(4, 14, min(1, wakeProgress)));
-      let silW = floor(lerp(20, 8, min(1, wakeProgress)));
-      fill(10, 5, 0, silAlpha);
-      rect(playerX - silW / 2, playerY - silH + 2, silW, silH);
-      // Ground shadow elongated by dawn light
-      fill(10, 5, 0, floor(silAlpha * 0.4));
-      rect(playerX - silW, playerY + 2, silW * 2, 3);
-    }
-
-    push();
-    translate(playerX, playerY);
-
-    if (wakeProgress <= 0) {
-      // Lying down — horizontal figure
-      // Cape spread on sand
-      fill(160, 50, 38, sceneAlpha * 0.7);
-      rect(-14, 0, 28, 4);
-      // Body horizontal
-      fill(175, 58, 44, sceneAlpha);
-      rect(-10, -3, 20, 5); // tunic
-      fill(196, 162, 70, sceneAlpha);
-      rect(-8, -3, 16, 2);  // armor
-      // Head
-      fill(212, 165, 116, sceneAlpha);
-      rect(10, -5, 6, 6);   // head to the right
-      // Dark hair
-      fill(61, 43, 31, sceneAlpha);
-      rect(10, -5, 6, 2);
-      // Arms spread
-      fill(212, 165, 116, sceneAlpha);
-      rect(-12, -2, 3, 2);
-      rect(16, -1, 3, 2);
-      // Sandals
-      fill(107, 66, 38, sceneAlpha);
-      rect(-14, -2, 3, 2);
-    } else {
-      // Waking up — transitioning from lying to sitting to standing
-      let sitAmount = min(1, wakeProgress * 2);
-      let standAmount = max(0, (wakeProgress - 0.5) * 2);
-      let bodyAngle = lerp(-HALF_PI, 0, sitAmount);
-
-      rotate(bodyAngle);
-      // Cape
-      fill(196, 64, 50, sceneAlpha);
-      rect(-3, -4, 3, 14);
-      // Body
-      fill(175, 58, 44, sceneAlpha);
-      rect(-6, -4, 12, 16);
-      fill(196, 162, 70, sceneAlpha);
-      rect(-5, -4, 10, 6); // armor
-      // Head
-      fill(212, 165, 116, sceneAlpha);
-      rect(-4, -12, 8, 7);
-      fill(61, 43, 31, sceneAlpha);
-      rect(-4, -12, 8, 2); // hair
-      // Arms
-      fill(212, 165, 116, sceneAlpha);
-      rect(-7, 0, 2, 4);
-      rect(5, 0, 2, 4);
-    }
-    pop();
-  }
-
-  pop(); // end thunder shake transform
-
-  // ─── TEXT OVERLAYS ───
-  textAlign(CENTER, CENTER);
-  noStroke();
-
-  // Title text — fades in during wreckage phase (character-by-character reveal)
-  if (t > TEXT_START && t < DONE) {
-    let textAlpha = min(255, (t - TEXT_START) * 3);
-    if (t > WAKE) textAlpha = max(0, textAlpha - (t - WAKE) * 5); // fade out
-
-    fill(220, 195, 140, textAlpha);
-    textSize(14);
-    // Character-by-character reveal (1 char per 2 frames)
-    let line1 = 'Shipwrecked by cursed storm...';
-    let charsShown1 = min(line1.length, floor((t - TEXT_START) / 2));
-    text(line1.substring(0, charsShown1), w / 2, h * 0.2);
-
-    if (t > TEXT_START + 60) {
-      let subAlpha = min(255, (t - TEXT_START - 60) * 3);
-      if (t > WAKE) subAlpha = max(0, subAlpha - (t - WAKE) * 5);
-      fill(180, 160, 120, subAlpha);
-      textSize(10);
-      let line2 = 'Rebuild under Sol Invictus.';
-      let charsShown2 = min(line2.length, floor((t - TEXT_START - 60) / 2));
-      text(line2.substring(0, charsShown2), w / 2, h * 0.2 + 22);
-    }
-  }
-
-  // Skip hint
-  if (t > 30 && t < DONE) {
-    fill(120, 110, 90, 80 + sin(frameCount * 0.05) * 30);
-    textSize(8);
-    textAlign(CENTER, BOTTOM);
-    text('[ click or press any key to skip ]', w / 2, h - 16);
-  }
-
-  // Black fade-in from nothing
-  if (t < FADE_IN) {
-    fill(0, 0, 0, 255 - (t / FADE_IN) * 255);
-    rect(0, 0, w, h);
-  }
-
-  // Transition to gameplay
-  if (t >= DONE) {
-    // Fade to white then start game
-    let fadeOut = min(255, (t - DONE) * 6);
-    fill(255, 245, 220, fadeOut);
-    rect(0, 0, w, h);
-    if (fadeOut >= 255) {
-      state.introPhase = 'done';
-      state.time = 6 * 60; // dawn
-      // Snap camera to player (wreck beach or home)
-      cam.x = state.player.x; cam.y = state.player.y;
-      camSmooth.x = cam.x; camSmooth.y = cam.y;
-      // First-minute tutorial hint
-      showTutorialHint('Gather materials — walk to glowing nodes and press [E]', state.player.x, state.player.y - 40);
-    }
-  }
-
-  textAlign(LEFT, TOP);
-}
-
-// Skip intro on click or keypress
-function skipIntro() {
-  if (state.introPhase !== 'done') {
-    state.introPhase = 'done';
-    state.time = 6 * 60;
-    cam.x = state.player.x; cam.y = state.player.y;
-    camSmooth.x = cam.x; camSmooth.y = cam.y;
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// ─── PRE-REPAIR CUTSCENE — "The Wreck Assessment" ───────────────────
-// ═══════════════════════════════════════════════════════════════════════
-function startPreRepairCutscene() {
-  state.cutscene = 'pre_repair';
-  state.cutsceneTimer = 0;
-}
-
-function drawPreRepairCutscene(dt) {
-  state.cutsceneTimer += dt;
-  let t = state.cutsceneTimer;
-  let w = width, h = height;
-  let P = 2;
-
-  // Timings
-  let FADE_IN = 40;
-  let EXAMINE = 180;    // character walks to wreck
-  let ASSESS = 300;     // looks up at hull
-  let PLAN = 400;       // text: "She can be saved"
-  let DONE = 480;
-
-  // Background — warm beach scene, late afternoon
-  let skyAlpha = min(1, t / FADE_IN);
-  noStroke();
-
-  // Sky gradient (golden hour)
-  for (let y = 0; y < h * 0.5; y += 4) {
-    let amt = y / (h * 0.5);
-    let r = lerp(60, 220, amt) * skyAlpha;
-    let g = lerp(40, 140, amt) * skyAlpha;
-    let b = lerp(80, 55, amt) * skyAlpha;
-    fill(r, g, b);
-    rect(0, y, w, 4);
-  }
-
-  // Sea
-  let seaY = floor(h * 0.50);
-  for (let y = seaY; y < h * 0.78; y += 4) {
-    let amt = (y - seaY) / (h * 0.28);
-    fill(lerp(45, 18, amt) * skyAlpha, lerp(75, 35, amt) * skyAlpha, lerp(95, 52, amt) * skyAlpha);
-    rect(0, y, w, 4);
-  }
-  // Wave lines
-  for (let i = 0; i < 6; i++) {
-    let wy = seaY + 10 + i * 14;
-    let wOff = floor(sin(t * 0.03 + i * 0.8) * 3);
-    fill(55, 85, 105, 50 * skyAlpha);
-    rect(0, wy + wOff, w, 2);
-  }
-
-  // Beach
-  let beachY = floor(h * 0.78);
-  fill(165 * skyAlpha, 148 * skyAlpha, 110 * skyAlpha);
-  rect(0, beachY, w, h - beachY);
-  // Wet sand shimmer
-  fill(140, 120, 85, 60 * skyAlpha);
-  for (let x = 0; x < w; x += 18) {
-    rect(x + floor(sin(t * 0.02 + x * 0.1) * 2), beachY + 2, 8, 2);
-  }
-
-  // Sun (setting, large, warm)
-  let sunX = floor(w * 0.7), sunY = floor(h * 0.42);
-  fill(255, 200, 80, 60 * skyAlpha);
-  ellipse(sunX, sunY, 80, 80);
-  fill(255, 220, 120, 120 * skyAlpha);
-  ellipse(sunX, sunY, 40, 40);
-  fill(255, 240, 190, 200 * skyAlpha);
-  ellipse(sunX, sunY, 20, 20);
-
-  // ─── THE WRECK — large, detailed, center-right ───
-  let wrX = floor(w * 0.55), wrY = beachY - 4;
-  let sceneA = min(255, t * 6);
-
-  // Hull — beached, tilted
-  push();
-  translate(wrX, wrY);
-  rotate(-0.12);
-
-  // Waterlogged hull planks
-  fill(50, 32, 16, sceneA);
-  rect(-55, -10, 110, 16);
-  rect(-50, -18, 90, 8);
-  rect(-45, 6, 80, 8);
-
-  // Hull ribs (exposed)
-  fill(65, 42, 20, sceneA);
-  for (let i = -4; i <= 4; i++) {
-    rect(i * 12 - 1, -20, 3, 24);
-  }
-
-  // Snapped mast — tall stump
-  fill(75, 50, 22, sceneA);
-  rect(-3, -50, 7, 32);
-  // Jagged break at top
-  fill(60, 38, 18, sceneA);
-  rect(-4, -52, 3, 4);
-  rect(3, -54, 4, 3);
-
-  // Torn sail remnants draped over hull
-  fill(185, 170, 140, sceneA * 0.7);
-  rect(-25, -32, 40, 14);
-  rect(-20, -20, 30, 6);
-  // Red stripe on sail
-  fill(145, 38, 28, sceneA * 0.5);
-  rect(-18, -26, 28, 4);
-
-  // Barnacles on hull
-  fill(90, 95, 80, sceneA * 0.5);
-  rect(-40, 4, 4, 3); rect(-20, 5, 3, 2); rect(10, 6, 5, 3); rect(30, 4, 3, 3);
-
-  // Anchor chain trailing
-  fill(80, 75, 65, sceneA * 0.6);
-  rect(45, -2, 3, 12);
-  rect(48, 8, 2, 6);
-
-  pop();
-
-  // Scattered debris
-  fill(60, 38, 18, sceneA);
-  rect(wrX + 75, wrY + 4, 14, 3);
-  rect(wrX - 70, wrY + 6, 10, 2);
-  rect(wrX + 90, wrY + 2, 8, 2);
-  // Broken oar
-  fill(70, 48, 25, sceneA);
-  rect(wrX - 85, wrY + 1, 22, 3);
-  rect(wrX - 87, wrY, 4, 5);
-  // Rope
-  fill(115, 90, 50, sceneA * 0.8);
-  rect(wrX + 65, wrY + 3, 6, 6);
-
-  // ─── PLAYER CHARACTER — walking toward wreck, then examining ───
-  let figX, figY;
-  let examineT = max(0, (t - FADE_IN) / (EXAMINE - FADE_IN));
-  examineT = min(1, examineT);
-  // Walk from left toward wreck
-  let startX = floor(w * 0.15), endX = floor(w * 0.40);
-  figX = floor(lerp(startX, endX, examineT));
-  figY = beachY - 2;
-
-  // Draw character
-  let charA = min(255, (t - 20) * 8);
-  if (charA > 0) {
-    // Shadow
-    fill(0, 0, 0, charA * 0.2);
-    ellipse(figX, figY + 2, 14, 4);
-
-    // Looking up at wreck after reaching it
-    let lookUp = t > EXAMINE ? min(1, (t - EXAMINE) / 40) : 0;
-
-    // Cape
-    let capeFlap = floor(sin(t * 0.04) * 2);
-    fill(155, 48, 38, charA);
-    rect(figX - 5 - capeFlap, figY - 16, 4 + capeFlap, 14);
-
-    // Body / tunic
-    fill(165, 52, 40, charA);
-    rect(figX - 5, figY - 18, 10, 16);
-
-    // Armor strips
-    fill(190, 155, 65, charA);
-    rect(figX - 4, figY - 18, 8, 5);
-
-    // Head (tilted up when examining)
-    let headOff = floor(lookUp * -3);
-    fill(205, 160, 110, charA);
-    rect(figX - 3, figY - 24 + headOff, 7, 6);
-    // Hair
-    fill(55, 38, 25, charA);
-    rect(figX - 3, figY - 24 + headOff, 7, 2);
-
-    // Arms — one reaching toward wreck when close
-    fill(205, 160, 110, charA);
-    if (t > ASSESS) {
-      // Arm reaching toward hull
-      rect(figX + 5, figY - 14, 8, 3);
-      rect(figX + 12, figY - 13, 3, 2);
-    } else {
-      rect(figX - 6, figY - 14, 2, 5);
-      rect(figX + 4, figY - 14, 2, 5);
-    }
-
-    // Legs
-    fill(120, 60, 35, charA);
-    rect(figX - 3, figY - 2, 3, 4);
-    rect(figX + 1, figY - 2, 3, 4);
-    // Sandals
-    fill(100, 60, 30, charA);
-    rect(figX - 4, figY + 2, 4, 2);
-    rect(figX + 1, figY + 2, 4, 2);
-  }
-
-  // ─── Footprints in sand (behind character) ───
-  if (t > FADE_IN + 20) {
-    fill(145, 128, 95, 40 * skyAlpha);
-    for (let fp = 0; fp < min(8, floor((t - FADE_IN - 20) / 15)); fp++) {
-      let fpx = floor(lerp(startX, figX, fp / 8));
-      rect(fpx, figY + 2, 3, 2);
-      rect(fpx + 5, figY + 3, 3, 2);
-    }
-  }
-
-  // ─── TEXT OVERLAYS ───
-  textAlign(CENTER, CENTER);
-  noStroke();
-
-  // "She's still in one piece..." — examining phase
-  if (t > EXAMINE + 30 && t < DONE) {
-    let tA = min(255, (t - EXAMINE - 30) * 4);
-    if (t > PLAN + 40) tA = max(0, tA - (t - PLAN - 40) * 5);
-    fill(220, 195, 140, tA);
-    textSize(13);
-    text('"She is beyond repair... but the wood can be salvaged."', w / 2, h * 0.18);
-  }
-
-  // "I will need wood and stone..." — planning phase
-  if (t > PLAN && t < DONE) {
-    let tA = min(255, (t - PLAN) * 3);
-    if (t > DONE - 40) tA = max(0, tA - (t - DONE + 40) * 6);
-    fill(180, 160, 120, tA);
-    textSize(10);
-    text('Planks for a raft. Rope and cloth for a sail.', w / 2, h * 0.18 + 24);
-    if (t > PLAN + 40) {
-      let tA2 = min(255, (t - PLAN - 40) * 3);
-      if (t > DONE - 40) tA2 = max(0, tA2 - (t - DONE + 40) * 6);
-      fill(160, 140, 100, tA2);
-      textSize(9);
-      text('I must build a raft... and find my way home.', w / 2, h * 0.18 + 44);
-    }
-  }
-
-  // Skip hint
-  if (t > 20 && t < DONE) {
-    fill(120, 110, 90, 60 + sin(t * 0.05) * 20);
-    textSize(8); textAlign(CENTER, BOTTOM);
-    text('[ click or press any key to skip ]', w / 2, h - 16);
-  }
-
-  // Black fade-in
-  if (t < FADE_IN) {
-    fill(0, 0, 0, 255 - (t / FADE_IN) * 255);
-    rect(0, 0, w, h);
-  }
-
-  // Transition out — warm fade
-  if (t >= DONE) {
-    let fadeOut = min(255, (t - DONE) * 5);
-    fill(255, 240, 210, fadeOut);
-    rect(0, 0, w, h);
-    if (fadeOut >= 255) {
-      state.cutscene = null;
-      // Now do the actual first repair
-      doFirstRepair();
-    }
-  }
-
-  textAlign(LEFT, TOP);
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// ─── SAILING CUTSCENE — "Departure from the Wreck" ─────────────────
-// ═══════════════════════════════════════════════════════════════════════
-function startSailingCutscene() {
-  state.cutscene = 'sailing';
-  state.cutsceneTimer = 0;
-}
-
-function drawSailingCutscene(dt) {
-  state.cutsceneTimer += dt;
-  let t = state.cutsceneTimer;
-  let w = width, h = height;
-
-  // Timings
-  let FADE_IN = 50;
-  let PUSH_OFF = 120;    // ship pushed into water
-  let SAILING = 300;     // ship crosses open water
-  let ISLAND_APPEAR = 400; // home island fades in
-  let ARRIVAL = 520;     // approaching shore
-  let DONE = 600;
-
-  // --- SAILING AUDIO CUES ---
-  if (snd && snd.ready) {
-    let masterVol = snd.vol.master * snd.vol.ambient;
-    // Steady wind ambient (~300Hz filtered noise)
-    let windAmt = min(1, t / FADE_IN);
-    snd._windGain.amp(0.08 * windAmt * masterVol, 0.3);
-    snd._windFilter.freq(300 + sin(frameCount * 0.002) * 60);
-    // Gentle waves
-    snd._waveGain.amp(0.05 * windAmt * masterVol, 0.3);
-    snd._waveFilter.freq(280 + sin(frameCount * 0.003) * 50);
-    // Oar splash every ~120 frames
-    if (t > PUSH_OFF && t < DONE && floor(t) % 120 === 0 && floor(t) !== floor(t - dt)) {
-      snd.playSFX('oar_splash');
-    }
-    // Seagull call every ~200 frames
-    if (t > PUSH_OFF && t < DONE && floor(t) % 200 === 0 && floor(t) !== floor(t - dt)) {
-      snd.playSFX('seagull');
-    }
-  }
-
-  let skyAlpha = min(1, t / FADE_IN);
-  noStroke();
-
-  // ─── SKY — dawn breaking over open sea ───
-  for (let y = 0; y < h * 0.45; y += 4) {
-    let amt = y / (h * 0.45);
-    let r = lerp(25, 240, amt) * skyAlpha;
-    let g = lerp(20, 160, amt) * skyAlpha;
-    let b = lerp(55, 65, amt) * skyAlpha;
-    fill(r, g, b);
-    rect(0, y, w, 4);
-  }
-
-  // Sun rising (dramatic)
-  let sunRise = min(1, max(0, (t - PUSH_OFF) / 200));
-  let sunX = floor(w * 0.5), sunY = floor(h * 0.38 - sunRise * 30);
-  if (t > PUSH_OFF) {
-    // Sun glow
-    fill(255, 200, 80, 30 * skyAlpha * sunRise);
-    ellipse(sunX, sunY, 120, 120);
-    fill(255, 220, 100, 60 * skyAlpha * sunRise);
-    ellipse(sunX, sunY, 60, 60);
-    fill(255, 240, 180, 180 * skyAlpha * sunRise);
-    ellipse(sunX, sunY, 24, 24);
-
-    // God rays
-    for (let ri = 0; ri < 5; ri++) {
-      let angle = -1.0 + ri * 0.4 + sin(t * 0.005 + ri) * 0.05;
-      let rayLen = 60 + ri * 20;
-      fill(255, 220, 100, 8 * skyAlpha * sunRise);
-      for (let rd = 12; rd < rayLen; rd += 4) {
-        let rx = sunX + floor(cos(angle) * rd);
-        let ry = sunY + floor(sin(angle) * rd);
-        if (ry > 0 && ry < h * 0.45) rect(rx, ry, 3, 3);
-      }
-    }
-  }
-
-  // ─── SEA — vast, open water ───
-  let seaY = floor(h * 0.45);
-  for (let y = seaY; y < h; y += 4) {
-    let amt = (y - seaY) / (h - seaY);
-    let r = lerp(40, 15, amt) * skyAlpha;
-    let g = lerp(70, 28, amt) * skyAlpha;
-    let b = lerp(95, 48, amt) * skyAlpha;
-    fill(r, g, b);
-    rect(0, y, w, 4);
-  }
-
-  // Wave crests
-  for (let i = 0; i < 10; i++) {
-    let wy = seaY + 8 + i * floor((h - seaY) / 10);
-    let wOff = floor(sin(t * 0.025 + i * 1.1) * 3);
-    let wLen = 30 + floor(sin(i * 2.3) * 15);
-    let wX = floor(w * 0.3 + sin(t * 0.01 + i * 0.7) * w * 0.2);
-    fill(55, 85, 110, 35 * skyAlpha);
-    rect(wX, wy + wOff, wLen, 2);
-  }
-
-  // Sun reflection path on water
-  if (t > PUSH_OFF) {
-    for (let y = seaY + 4; y < h; y += 6) {
-      let shimmer = sin(t * 0.04 + y * 0.12) * 0.5 + 0.5;
-      if (shimmer > 0.4) {
-        let reflW = floor((2 + shimmer * 6) * (1 - (y - seaY) / (h - seaY)));
-        let reflX = sunX + floor(sin(t * 0.015 + y * 0.03) * 8);
-        fill(255, 210, 90, floor(shimmer * 25 * skyAlpha * sunRise));
-        rect(reflX - reflW / 2, y, max(1, reflW), 2);
-      }
-    }
-  }
-
-  // ─── SEAGULLS — flying overhead ───
-  if (!drawSailingCutscene._gulls) {
-    drawSailingCutscene._gulls = [
-      { x: 0.3, y: 0.18, speed: 0.012, wingPhase: 0, size: 5 },
-      { x: 0.6, y: 0.22, speed: 0.009, wingPhase: 2.1, size: 4 },
-      { x: 0.8, y: 0.14, speed: 0.015, wingPhase: 4.3, size: 3.5 },
-    ];
-  }
-  for (let gull of drawSailingCutscene._gulls) {
-    gull.x -= gull.speed * 0.016;
-    if (gull.x < -0.05) { gull.x = 1.1; gull.y = 0.12 + (gull.wingPhase * 37 % 15) / 100; }
-    let gx = gull.x * w, gy = gull.y * h;
-    let wingUp = sin(t * 0.08 + gull.wingPhase) * gull.size * 0.6;
-    fill(40, 35, 50, floor(140 * skyAlpha));
-    // Body
-    rect(floor(gx - 1), floor(gy), 3, 2);
-    // V-shape wings
-    rect(floor(gx - gull.size), floor(gy - wingUp), floor(gull.size), 1);
-    rect(floor(gx + 1), floor(gy + wingUp * 0.7), floor(gull.size), 1);
-  }
-
-  // ─── SUN SHIMMER LINE on water — golden reflection band ───
-  if (t > PUSH_OFF) {
-    let shimBand = floor(seaY + 6);
-    for (let sy = shimBand; sy < shimBand + 12; sy += 2) {
-      let shimW = floor(20 + sin(t * 0.03 + sy * 0.2) * 12);
-      let shimX = sunX + floor(sin(t * 0.02 + sy * 0.1) * 6) - shimW / 2;
-      let shimA = floor((sin(t * 0.05 + sy * 0.15) + 1) * 12 * skyAlpha * sunRise);
-      fill(255, 220, 100, shimA);
-      rect(floor(shimX), sy, shimW, 2);
-    }
-  }
-
-  // ─── DISTANT ISLAND SILHOUETTE — gradually appearing on horizon ───
-  if (t > SAILING && t < ISLAND_APPEAR + 60) {
-    let distAppear = min(1, (t - SAILING) / 200);
-    let distX = floor(w * 0.88);
-    let distY = floor(seaY + 2);
-    let distA = floor(distAppear * 60 * skyAlpha);
-    // Low dark landmass on horizon
-    fill(25, 30, 40, distA);
-    rect(distX - 20, distY - 4, 40, 6);
-    rect(distX - 14, distY - 7, 28, 4);
-    rect(distX - 6, distY - 10, 12, 4);
-  }
-
-  // ─── WRECK ISLAND — receding behind (left side, shrinking) ───
-  if (t < ISLAND_APPEAR + 60) {
-    let recede = min(1, max(0, (t - PUSH_OFF) / 250));
-    let isleX = floor(lerp(w * 0.2, -w * 0.1, recede));
-    let isleScale = lerp(1.0, 0.4, recede);
-    let isleY = floor(h * 0.43);
-    let isleA = floor((1 - recede * 0.7) * 180 * skyAlpha);
-
-    // Island silhouette
-    fill(35, 30, 22, isleA);
-    let iW = floor(80 * isleScale), iH = floor(20 * isleScale);
-    rect(isleX - iW / 2, isleY - iH, iW, iH);
-    // Hill
-    rect(isleX - iW * 0.3, isleY - iH - floor(8 * isleScale), floor(iW * 0.5), floor(8 * isleScale));
-    // Palm
-    rect(isleX + floor(iW * 0.2), isleY - iH - floor(14 * isleScale), floor(2 * isleScale), floor(12 * isleScale));
-  }
-
-  // ─── THE TRIREME — sailing across ───
-  let shipProgress = min(1, max(0, (t - PUSH_OFF) / (ARRIVAL - PUSH_OFF)));
-  // Ease in-out
-  let shipEase = shipProgress < 0.5 ?
-    2 * shipProgress * shipProgress :
-    1 - pow(-2 * shipProgress + 2, 2) / 2;
-
-  let shipX = floor(lerp(w * 0.25, w * 0.65, shipEase));
-  let shipY = floor(h * 0.55);
-  let bob = floor(sin(t * 0.04) * 3);
-  shipY += bob;
-
-  let shipA = min(255, t * 5);
-
-  // Wake trail behind ship
-  if (t > PUSH_OFF) {
-    for (let wi = 0; wi < 8; wi++) {
-      let wakeX = shipX - 15 - wi * 12;
-      let wakeY = shipY + 8 + floor(sin(t * 0.03 + wi * 0.5) * 2);
-      let wakeA = max(0, 40 - wi * 5) * skyAlpha;
-      fill(170, 200, 215, wakeA);
-      rect(wakeX, wakeY, 10 - wi, 2);
-    }
-  }
-
-  push();
-  translate(shipX, shipY);
-
-  // Hull
-  fill(55, 35, 18, shipA);
-  rect(-30, 0, 60, 2);
-  rect(-28, 2, 56, 2);
-  rect(-32, -2, 64, 2);
-  rect(-34, -4, 68, 2);
-  rect(-32, -6, 64, 2);
-  rect(-30, -8, 60, 2);
-
-  // Stern (left)
-  rect(-35, -6, 2, 2);
-  rect(-36, -8, 2, 2);
-  rect(-37, -10, 2, 2);
-  rect(-36, -12, 2, 2);
-  rect(-34, -13, 2, 2); // curl
-
-  // Prow (right) — proud and forward
-  rect(32, -4, 2, 2);
-  rect(34, -6, 2, 2);
-  rect(35, -8, 3, 2);
-  // Ram
-  rect(36, 0, 4, 2);
-
-  // Hull plank detail
-  fill(45, 28, 14, shipA * 0.7);
-  rect(-24, -2, 48, 1);
-  rect(-22, 1, 44, 1);
-
-  // Patched hull sections (lighter wood — repaired!)
-  fill(100, 75, 40, shipA * 0.6);
-  rect(-18, -4, 12, 4);
-  rect(8, -4, 10, 4);
-
-  // Rim light
-  fill(190, 155, 65, shipA * 0.3);
-  rect(-28, -8, 56, 1);
-
-  // ─── MAST — repaired, standing tall ───
-  fill(70, 48, 22, shipA);
-  rect(-1, -42, 4, 34);
-  // Cross yard
-  rect(-16, -38, 34, 2);
-
-  // ─── SAIL — patched but full of wind ───
-  let sailBillow = floor(sin(t * 0.05) * 2);
-  // Main body (cream, billowing right = moving right)
-  fill(195, 180, 155, shipA * 0.85);
-  rect(-14, -36, 16 + sailBillow, 4);
-  rect(-13, -32, 18 + sailBillow, 4);
-  rect(-12, -28, 20 + sailBillow * 2, 4);
-  rect(-11, -24, 18 + sailBillow, 4);
-  rect(-10, -20, 14 + sailBillow, 4);
-
-  // Patch marks (darker spots showing repairs)
-  fill(140, 120, 90, shipA * 0.5);
-  rect(-8, -30, 6, 4);
-  rect(0 + sailBillow, -22, 5, 3);
-
-  // Red stripe (Roman eagle sail marking)
-  fill(150, 42, 30, shipA * 0.6);
-  rect(-12, -28, 18 + sailBillow, 3);
-
-  // Rope rigging
-  fill(100, 80, 50, shipA * 0.5);
-  // Stays to mast
-  rect(-16, -38, 1, 8); rect(18, -38, 1, 8);
-
-  // ─── OARS — rowing in unison ───
-  for (let oi = 0; oi < 4; oi++) {
-    let oarPhase = sin(t * 0.06 + oi * 0.8);
-    let ox = -18 + oi * 10;
-    let oarDip = floor(oarPhase * 3);
-    fill(60, 40, 20, shipA * 0.7);
-    rect(ox, 2, 2, 8 + oarDip);
-    // Blade
-    rect(ox - 1, 8 + oarDip, 4, 2);
-  }
-
-  // ─── FIGURE on deck — standing at prow ───
-  // Body
-  fill(165, 52, 40, shipA);
-  rect(20, -16, 6, 10);
-  // Head
-  fill(205, 160, 110, shipA);
-  rect(21, -20, 5, 4);
-  // Cape flowing back
-  let capeF = floor(sin(t * 0.04) * 2);
-  fill(150, 42, 32, shipA * 0.8);
-  rect(16 - capeF, -14, 4 + capeF, 8);
-  // Arm pointing forward
-  fill(205, 160, 110, shipA * 0.9);
-  rect(26, -14, 5, 2);
-
-  pop();
-
-  // ─── HOME ISLAND — appearing on right horizon ───
-  if (t > ISLAND_APPEAR) {
-    let appear = min(1, (t - ISLAND_APPEAR) / 120);
-    let homeX = floor(lerp(w * 1.1, w * 0.82, appear));
-    let homeY = floor(h * 0.43);
-    let homeA = floor(appear * 200 * skyAlpha);
-
-    // Island mass — larger, with buildings
-    fill(45, 55, 35, homeA);
-    rect(homeX - 50, homeY - 12, 100, 16);
-    rect(homeX - 40, homeY - 20, 80, 10);
-    rect(homeX - 30, homeY - 26, 60, 8);
-    // Hill peak
-    rect(homeX - 15, homeY - 32, 30, 8);
-
-    // Temple/villa on hilltop
-    fill(140, 125, 95, homeA * 0.8);
-    // Columns
-    for (let ci = -2; ci <= 2; ci++) {
-      rect(homeX + ci * 5, homeY - 40, 2, 8);
-    }
-    // Pediment
-    rect(homeX - 12, homeY - 41, 24, 2);
-    rect(homeX - 8, homeY - 43, 16, 2);
-    rect(homeX - 4, homeY - 45, 8, 2);
-
-    // Warm glow from windows
-    let glow = sin(t * 0.02) * 0.3 + 0.7;
-    fill(255, 200, 80, homeA * 0.3 * glow);
-    rect(homeX - 6, homeY - 38, 3, 3);
-    rect(homeX + 3, homeY - 38, 3, 3);
-
-    // Trees
-    fill(35, 55, 28, homeA * 0.7);
-    rect(homeX - 40, homeY - 24, 8, 6);
-    rect(homeX + 30, homeY - 22, 10, 6);
-    rect(homeX - 25, homeY - 28, 6, 5);
-
-    // Lighthouse/port beacon
-    if (appear > 0.5) {
-      let beaconA = floor((appear - 0.5) * 2 * 255);
-      fill(255, 220, 100, beaconA * 0.5 * glow);
-      ellipse(homeX + 40, homeY - 18, 6, 6);
-      fill(180, 140, 80, beaconA * 0.4);
-      rect(homeX + 39, homeY - 16, 3, 10);
-    }
-  }
-
-  // ─── TEXT OVERLAYS ───
-  textAlign(CENTER, CENTER);
-  noStroke();
-
-  // Departure text
-  if (t > PUSH_OFF - 30 && t < SAILING) {
-    let tA = min(255, (t - PUSH_OFF + 30) * 3);
-    if (t > SAILING - 40) tA = max(0, tA - (t - SAILING + 40) * 5);
-    fill(220, 200, 155, tA);
-    textSize(14);
-    text('The sea opens before me...', w / 2, h * 0.15);
-  }
-
-  // Mid-voyage text
-  if (t > SAILING + 20 && t < ISLAND_APPEAR + 30) {
-    let tA = min(255, (t - SAILING - 20) * 3);
-    if (t > ISLAND_APPEAR) tA = max(0, tA - (t - ISLAND_APPEAR) * 4);
-    fill(190, 170, 130, tA);
-    textSize(11);
-    text('The wind catches the sail. Sol guides the way.', w / 2, h * 0.15);
-  }
-
-  // Island sighted
-  if (t > ISLAND_APPEAR + 40 && t < DONE) {
-    let tA = min(255, (t - ISLAND_APPEAR - 40) * 3);
-    if (t > DONE - 50) tA = max(0, tA - (t - DONE + 50) * 5);
-    fill(240, 215, 150, tA);
-    textSize(14);
-    text('Land! A new beginning...', w / 2, h * 0.15);
-    if (t > ISLAND_APPEAR + 90) {
-      let tA2 = min(255, (t - ISLAND_APPEAR - 90) * 3);
-      if (t > DONE - 50) tA2 = max(0, tA2 - (t - DONE + 50) * 5);
-      fill(200, 180, 140, tA2);
-      textSize(10);
-      text('Home.', w / 2, h * 0.15 + 22);
-    }
-  }
-
-  // Skip hint
-  if (t > 20 && t < DONE) {
-    fill(120, 110, 90, 60 + sin(t * 0.05) * 20);
-    textSize(8); textAlign(CENTER, BOTTOM);
-    text('[ click or press any key to skip ]', w / 2, h - 16);
-  }
-
-  // Black fade-in
-  if (t < FADE_IN) {
-    fill(0, 0, 0, 255 - (t / FADE_IN) * 255);
-    rect(0, 0, w, h);
-  }
-
-  // Fade to white — transition to home
-  if (t >= DONE) {
-    let fadeOut = min(255, (t - DONE) * 4);
-    fill(255, 245, 220, fadeOut);
-    rect(0, 0, w, h);
-    if (fadeOut >= 255) {
-      state.cutscene = null;
-      completeSailToHome();
-    }
-  }
-
-  textAlign(LEFT, TOP);
-}
-
-function skipCutscene() {
-  if (state.cutscene === 'pre_repair') {
-    state.cutscene = null;
-    doFirstRepair();
-  } else if (state.cutscene === 'sailing') {
-    state.cutscene = null;
-    completeSailToHome();
-  }
-}
-
-// Actually perform the first repair step (called after pre-repair cutscene)
-function doFirstRepair() {
-  // Legacy: now triggers first raft build instead
-  buildRaft();
-  state.progression.tutorialsSeen.firstRepairCutscene = true;
-}
-
-// Transfer to home island (called after sailing cutscene)
-function completeSailToHome() {
-  state.progression.homeIslandReached = true;
-  saveGame();
-  state.progression.wreckExplored = true;
-  unlockJournal('home_found');
-
-  if (snd) snd.playSFX('sail');
-  let port = getPortPosition();
-  state.player.x = port.x + 40;
-  state.player.y = port.y;
-  state.player.facing = 'left';
-  cam.x = state.player.x; cam.y = state.player.y;
-  camSmooth.x = cam.x; camSmooth.y = cam.y;
-
-  state.wood += 5; state.stone += 3; state.seeds += 3;
-
-  addFloatingText(width / 2, height * 0.3, 'HOME ISLAND REACHED', C.solarGold);
-  addFloatingText(width / 2, height * 0.36, 'Explore the ruins...', C.textDim);
-}
 
 function drawInner() {
   floatOffset = sin(frameCount * 0.015) * 1.5;
@@ -3102,7 +1451,7 @@ function drawInner() {
 
   updateTime(dt);
   updateTutorialHint(dt);
-  if (snd) { snd.updateAmbient(); snd.updateLyre(); }
+  if (snd) { snd.updateAmbient(); }
 
   // === WRECK BEACH MODE — before home island is reached ===
   if (state.progression.gameStarted && !state.progression.homeIslandReached &&
@@ -3300,6 +1649,8 @@ function drawInner() {
       if (_full || _pg.companionsAwakened.lares) updateCompanion(dt);
       if (_full || _pg.companionsAwakened.woodcutter) updateWoodcutter(dt);
       updateQuarrier(dt);
+      updateCook(dt);
+      updateFisherman(dt);
       if (_full || _pg.companionsAwakened.centurion) updateCenturion(dt);
     }
     updateParticles(dt);
@@ -3342,10 +1693,13 @@ function drawInner() {
       // When sailing, ocean covers almost the entire screen
       horizonOffset = height * 0.19;
     } else {
-      // Sky stays fixed — only slight parallax from camera, not 1:1 tracking
-      let camOffsetY = (camSmooth.y - WORLD.islandCY) * 0.05; // very gentle parallax
-      let baseHorizon = height * 0.22;
-      let horizonY = constrain(baseHorizon - camOffsetY, height * 0.06, height * 0.25);
+      // Horizon must always be above the island's outermost visual top edge
+      // The shallow water ring is drawn at iw*1.12, ih*0.50 — that's the tallest ellipse
+      let islandScreenY = w2sY(WORLD.islandCY) + floatOffset;
+      let visualTopRadius = state.islandRY * 0.50 * 1.12; // outermost shallow water ring
+      let islandTopScreen = islandScreenY - visualTopRadius - 10;
+      let horizonY = min(islandTopScreen, height * 0.35);
+      horizonY = max(horizonY, height * 0.05);
       horizonOffset = (height * 0.25) - horizonY;
     }
     push();
@@ -3353,15 +1707,16 @@ function drawInner() {
     drawSky();
     drawSkyBirds();
     drawOcean();
+    drawAmbientShips();
     pop();
 
     // Full island rendering (visible from boat/home) — no floatOffset for distant islands
     push();
     translate(shakeX, shakeY);
-    drawArena();
+    drawArenaIsleDistant();
     drawArenaDistantLabel();
     drawImperialBridge(); // Draw bridge BEHIND islands
-    drawConquestIsland();
+    drawConquestIsleDistant();
     drawConquestDistantEntities();
     drawConquestDistantLabel();
     drawColonyOverlay(); // Colony buildings/farms on settled Terra Nova
@@ -3432,13 +1787,17 @@ function drawInner() {
     drawRowingBoat();
     // Diving overlay — underwater tint + entities drawn in world space
     if (state.diving && state.diving.active && typeof drawDivingOverlay === 'function') drawDivingOverlay();
+    // Build mode ghost — drawn inside island float/shake context so it matches placed buildings
+    if (state.buildMode) {
+      drawBuildGhost();
+    }
     pop();
 
     // Rowboat proximity prompt — gate behind villa cleared or legacy save
     let _boatUnlocked = !state.progression.gameStarted || state.progression.villaCleared;
     if (!state.rowing.active && _boatUnlocked) {
       let port = getPortPosition();
-      let boatWX = port.x + 80;
+      let boatWX = port.x - 80;
       let boatWY = port.y + 20;
       if (dist(state.player.x, state.player.y, boatWX, boatWY) < 60) {
         let promptX = w2sX(boatWX);
@@ -3578,11 +1937,6 @@ function drawInner() {
       }
     }
 
-    // Build mode ghost
-    if (state.buildMode) {
-      drawBuildGhost();
-    }
-
     // Golden hour color grading — atmospheric tint over the world
     if (!state.conquest.active && !state.adventure.active) drawColorGrading();
 
@@ -3623,6 +1977,24 @@ function drawInner() {
     if (!photoMode) drawCursor();
   }
 
+  // Debug perf overlay
+  if (typeof Debug !== 'undefined' && Debug.visible) {
+    push();
+    textFont('monospace'); textSize(11); textAlign(LEFT, BOTTOM); noStroke();
+    let entities = (state.buildings ? state.buildings.length : 0) + (state.trees ? state.trees.length : 0) + (state.npc ? 1 : 0);
+    let lines = [
+      'FPS: ' + nf(_fpsSmooth, 1, 1),
+      'Particles: ' + particles.length + '/' + _particleCap,
+      'Entities: ' + entities,
+    ];
+    for (let i = 0; i < lines.length; i++) {
+      let ly = height - 8 - (lines.length - 1 - i) * 14;
+      fill(0, 160); text(lines[i], 9, ly + 1);
+      fill(_fpsSmooth < 30 ? color(255, 80, 80) : 220); text(lines[i], 8, ly);
+    }
+    pop();
+  }
+
   // Debug console — always on top of everything
   if (typeof Debug !== 'undefined') Debug.draw();
 }
@@ -3630,6 +2002,7 @@ function drawInner() {
 // ─── TIME ─────────────────────────────────────────────────────────────────
 function updateTime(dt) {
   state.time += 0.18 * dt;
+  if (state.player.xpBoostTimer > 0) state.player.xpBoostTimer -= dt;
   // Track play frames for early nudge (90 seconds at 60fps = 5400 frames)
   if (!state.playFrames) state.playFrames = 0;
   state.playFrames += dt;
@@ -3676,6 +2049,7 @@ function updateTime(dt) {
       spawnSeasonFanfare(newSeason);
       let names = ['VER (Spring)', 'AESTAS (Summer)', 'AUTUMNUS (Autumn)', 'HIEMS (Winter)'];
       addFloatingText(width / 2, height * 0.2, names[newSeason] + ' begins!', '#ffddaa');
+      if (snd) snd.playSFX('season_change');
     }
     state.showSummary = false;
     state.lastSummary = null;
@@ -3705,6 +2079,18 @@ function updateTime(dt) {
     }
     if (state.necropolis.phase !== 'unexplored') {
       state.necropolis.soulNodes.forEach(n => n.collected = false);
+    }
+    // Crystal rain event (15% chance per day after day 10)
+    if (state.day > 10 && random() < 0.15) {
+      let crystalAmt = floor(random(2, 5));
+      state.crystals += crystalAmt;
+      addFloatingText(width / 2, height * 0.35, 'Crystal rain! +' + crystalAmt + ' crystals', '#44ffaa');
+      spawnParticles(state.player.x, state.player.y, 'divine', 6);
+    }
+    // Vesta crystal gift at 6+ hearts (daily)
+    if (state.vesta && state.vesta.hearts >= 6 && random() < 0.4) {
+      state.crystals += 2;
+      addFloatingText(width / 2, height * 0.4, "Vesta's blessing: +2 crystals", '#aaddff');
     }
     // Cat passive: Grey finds stone, Golden gives gold
     state.cats.filter(c => c.adopted).forEach(cat => {
@@ -3857,7 +2243,7 @@ function drawSky() {
   }
 
   noStroke();
-  let skyH = height * 0.25 - horizonOffset;
+  let skyH = max(height * 0.12, height * 0.25 - horizonOffset); // never compress sky below 12% of screen
   skyH = max(skyH, height * 0.06);
 
   let hasHorizonBand = (h >= 5 && h < 8) || (h >= 16 && h < 20.5);
@@ -3882,9 +2268,11 @@ function drawSky() {
 
   if (bright > 0.05) {
     let sunX = map(h, 5, 20, width * 0.1, width * 0.9);
-    let sunArc = map(sin(map(h, 5, 20, 0, PI)), 0, 1, skyH * 1.05, height * 0.06);
-    let sunY = sunArc - horizonOffset * 0.5;
-    drawSun(sunX, sunY, min(bright, 1));
+    let fixedSkyH = height * 0.25;
+    let sunArc = map(sin(map(h, 5, 20, 0, PI)), 0, 1, fixedSkyH * 1.05, height * 0.06);
+    let sunY = sunArc;
+    let sunBright = min(bright, 1) * (typeof stormActive !== 'undefined' && stormActive ? 0.2 : 1);
+    drawSun(sunX, sunY, sunBright);
     if (bright < 0.35) {
       let glowA = map(bright, 0.05, 0.35, 35, 0);
       fill(255, 160, 60, glowA);
@@ -4106,7 +2494,7 @@ function drawMoonPhased(bright) {
   let phase = (state.day % 32) / 32; // 0=new, 0.5=full, 1=new again
   let moonX = floor(map(h, 20, 30, width * 0.2, width * 0.8));
   if (h < 6) moonX = floor(map(h, 0, 6, width * 0.5, width * 0.9));
-  let moonY = floor(height * 0.08 + sin(frameCount * 0.002) * 3 - horizonOffset * 0.5);
+  let moonY = floor(height * 0.08 + sin(frameCount * 0.002) * 3);
   let moonAlpha = map(bright, 0, 0.25, 220, 0);
   noStroke();
 
@@ -4197,20 +2585,24 @@ function drawStormClouds() {
   let intensity = stormActive ? 1 : map(stormTimer, 0, 600, 0, 0.5);
   noStroke();
   let cloudData = [
-    { x: 0.1, y: 0.05 }, { x: 0.35, y: 0.02 }, { x: 0.6, y: 0.06 }, { x: 0.8, y: 0.03 },
+    { x: 0.0, y: 0.04, r: 140 }, { x: 0.12, y: 0.08, r: 130 },
+    { x: 0.25, y: 0.03, r: 150 }, { x: 0.35, y: 0.10, r: 120 },
+    { x: 0.45, y: 0.05, r: 160 }, { x: 0.55, y: 0.12, r: 135 },
+    { x: 0.65, y: 0.04, r: 145 }, { x: 0.75, y: 0.09, r: 130 },
+    { x: 0.85, y: 0.06, r: 155 }, { x: 0.95, y: 0.11, r: 125 },
+    { x: 0.20, y: 0.18, r: 140 }, { x: 0.50, y: 0.20, r: 150 },
   ];
   cloudData.forEach((c, i) => {
-    let cx = floor(c.x * width + sin(frameCount * 0.003 + i) * 20);
+    let cx = floor(c.x * width + sin(frameCount * 0.003 + i * 0.8) * 25);
     let cy = floor(c.y * height);
-    let r = 100 + i * 30;
-    // Soft storm clouds — ellipses
-    fill(30, 40, 60, 140 * intensity);
-    ellipse(cx, cy, r * 2, r * 0.5);
-    fill(25, 35, 55, 120 * intensity);
-    ellipse(cx - r * 0.3, cy - r * 0.1, r * 1.2, r * 0.35);
-    ellipse(cx + r * 0.3, cy + r * 0.05, r * 1.0, r * 0.3);
-    fill(20, 28, 48, 90 * intensity);
-    ellipse(cx, cy + r * 0.15, r * 1.5, r * 0.25);
+    let r = c.r;
+    fill(25, 32, 50, 160 * intensity);
+    ellipse(cx, cy, r * 2.2, r * 0.7);
+    fill(20, 28, 45, 140 * intensity);
+    ellipse(cx - r * 0.4, cy - r * 0.12, r * 1.4, r * 0.45);
+    ellipse(cx + r * 0.35, cy + r * 0.08, r * 1.3, r * 0.4);
+    fill(18, 24, 40, 110 * intensity);
+    ellipse(cx, cy + r * 0.18, r * 1.8, r * 0.35);
   });
 }
 
@@ -4392,6 +2784,63 @@ function drawOcean() {
   }
 }
 
+// Ambient ancient ships sailing in the distance
+let _ambientShips = null;
+function drawAmbientShips() {
+  if (!_ambientShips) {
+    _ambientShips = [];
+    for (let i = 0; i < 4; i++) {
+      _ambientShips.push({
+        angle: random(TWO_PI),
+        dist: random(600, 1000),
+        speed: random(0.0003, 0.0008) * (random() > 0.5 ? 1 : -1),
+        size: random(1.0, 1.8),
+        type: floor(random(3)), // 0=trireme, 1=merchant, 2=fishing
+      });
+    }
+  }
+  let cx = WORLD.islandCX, cy = WORLD.islandCY;
+  let oceanTop = max(height * 0.06, height * 0.25 - horizonOffset);
+  let bright = typeof getSkyBrightness === 'function' ? getSkyBrightness() : 0.5;
+  noStroke();
+  for (let ship of _ambientShips) {
+    ship.angle += ship.speed;
+    let wx = cx + cos(ship.angle) * ship.dist;
+    let wy = cy + sin(ship.angle) * ship.dist * 0.4;
+    let sx = w2sX(wx), sy = w2sY(wy);
+    // Clamp to ocean
+    sy = max(sy, oceanTop + 15);
+    if (sx < -50 || sx > width + 50 || sy > height - 30) continue;
+    // Distance fade — further from screen center = more transparent
+    let distFade = constrain(1 - abs(sy - height * 0.4) / (height * 0.4), 0.2, 1);
+    let sc = ship.size * distFade;
+    let dir = ship.speed > 0 ? 1 : -1;
+    push();
+    translate(floor(sx), floor(sy));
+    scale(dir * sc, sc);
+    // Hull
+    let hAlpha = 140 * distFade * bright;
+    fill(100, 70, 35, hAlpha);
+    beginShape();
+    vertex(-10, -1); vertex(-8, 3); vertex(8, 3); vertex(10, -1);
+    vertex(7, -2); vertex(-7, -2);
+    endShape(CLOSE);
+    // Mast
+    fill(80, 55, 25, hAlpha);
+    rect(-1, -12, 2, 11);
+    // Sail
+    let puff = sin(frameCount * 0.03 + ship.angle * 10) * 1;
+    fill(235, 225, 205, hAlpha * 0.9);
+    beginShape();
+    vertex(0, -11); vertex(6 + puff, -6); vertex(0, -1);
+    endShape(CLOSE);
+    // Wake
+    fill(180, 210, 230, 20 * distFade);
+    ellipse(-12, 1, 6, 2);
+    pop();
+  }
+}
+
 // Shore waves — drawn in the island context (after all island objects)
 // Creates foam ring around the full island perimeter
 function drawShoreWaves() {
@@ -4508,6 +2957,7 @@ function startFestival() {
   addFloatingText(width / 2, height * 0.25, f.name + '!', f.color);
   addFloatingText(width / 2, height * 0.32, f.desc, '#ffffff');
   spawnSeasonFanfare(season);
+  if (snd) snd.playSFX('festival_start');
   if (f.effect.forceRain) {
     state.weather = { type: 'rain', timer: 1440, intensity: 0.7 };
   }
@@ -5293,6 +3743,10 @@ const RECIPES = [
   { name: 'Wine',       item: 'wine',  needs: { harvest: 3, grapeSeeds: 1 }, hearts: 3, desc: '3 Harvest + 1 Grape → Wine' },
   { name: 'Olive Oil',  item: 'oil',   needs: { harvest: 2, oliveSeeds: 1 }, hearts: 3, desc: '2 Harvest + 1 Olive → Oil' },
   { name: 'Feast',      item: 'meals', qty: 3, needs: { harvest: 5, fish: 2, wood: 3 }, hearts: 5, desc: '5 Harvest + 2 Fish + 3 Wood → Grand Feast (3)' },
+  { name: 'Stew',       item: 'stew', needs: { harvest: 2, fish: 1, wood: 2 }, hearts: 2, desc: '2 Harvest + 1 Fish + 2 Wood → Stew (heals 30 HP)' },
+  { name: 'Garum',      item: 'garum', needs: { fish: 3 }, hearts: 1, desc: '3 Fish → Garum (trade: 25g)' },
+  { name: 'Honeyed Figs', item: 'honeyedFigs', needs: { exoticSpices: 1, harvest: 2 }, hearts: 3, desc: '1 Spice + 2 Harvest → Honeyed Figs (+15% XP)' },
+  { name: 'Ambrosia',   item: 'ambrosia', needs: { soulEssence: 2, wine: 1, crystals: 1 }, hearts: 5, desc: '2 Essence + 1 Wine + 1 Crystal → Ambrosia (full heal)' },
 ];
 
 function canCook(recipe) {
@@ -5406,6 +3860,10 @@ function drawWeatherEffects() {
   if (w.type === 'clear') return;
 
   if (w.type === 'rain') {
+    // Storm darkening overlay — full screen
+    noStroke();
+    fill(15, 20, 35, 40 * w.intensity);
+    rect(0, 0, width, height);
     // Spawn raindrops — more intense, angled
     let spawnRate = floor(w.intensity * 12);
     for (let i = 0; i < spawnRate; i++) {
@@ -6404,7 +4862,7 @@ function drawIsland() {
 
   // Edge warning glow when player is near deep water (skip when rowing)
   let playerEdge = islandEdgeDist(state.player.x, state.player.y);
-  if (!state.rowing.active && playerEdge > 0.05 && !isOnBridge(state.player.x, state.player.y) && !isInShallows(state.player.x, state.player.y)) {
+  if (!state.rowing.active && !(state.diving && state.diving.active) && playerEdge > 0.05 && !isOnBridge(state.player.x, state.player.y) && !isInShallows(state.player.x, state.player.y)) {
     let warn = map(playerEdge, 0.05, 0.15, 0, 1);
     noFill();
     stroke(255, 60, 40, 80 * warn);
@@ -6718,9 +5176,8 @@ function drawPort() {
 }
 
 function getMerchantPortPosition() {
-  let mpx = WORLD.islandCX + getSurfaceRX() * 0.82;
-  let mpy = WORLD.islandCY - 8; // same Y as Via Romana centerline
-  return { x: mpx, y: mpy };
+  if (!state.portRight) updatePortPositions();
+  return state.portRight;
 }
 
 function drawMerchantPort() {
@@ -7424,6 +5881,20 @@ function drawNightLighting() {
       }
     }
   });
+
+  // Lantern tool: player carries a portable light source at night
+  if (state.tools && state.tools.lantern && state.player) {
+    let px = w2sX(state.player.x), py = w2sY(state.player.y);
+    let flicker = sin(frameCount * 0.09 + 1.3) * 0.12 + 0.88;
+    let lanternR = 90;
+    for (let gr = lanternR; gr > 0; gr -= 3) {
+      let ga = 7 * nightStr * flicker * (gr / lanternR);
+      fill(255, 190, 70, ga);
+      circle(px, py - 8, gr * 2);
+    }
+    fill(255, 220, 130, 18 * nightStr * flicker);
+    circle(px, py - 10, 14);
+  }
 }
 
 function drawGrassTufts() {
@@ -7589,8 +6060,8 @@ function drawPyramid() {
   let lvl = pyr.level;
 
   // Proportional scaling — temple grows wider AND taller gracefully
-  let baseW = 55 + lvl * 16;
-  let colH = 35 + lvl * 10;
+  let baseW = min(180, 55 + lvl * 12);
+  let colH = min(80, 35 + lvl * 6);
   let colCount = 4 + (lvl >= 3 ? 2 : 0) + (lvl >= 5 ? 2 : 0); // 4, 4, 6, 6, 8
   let colW = 4 + (lvl >= 3 ? 1 : 0);  // thicker columns at high level
   let steps = 2 + Math.min(lvl, 3);
@@ -8057,6 +6528,48 @@ function drawRuins() {
     rect(r.w * 0.4 - 1, 1, 3, 2);
     rect(r.w * 0.05 - 2, 4, 4, 2);
 
+    // Headless marble statue torso (Roman senator)
+    fill(200, 195, 185);
+    rect(r.w * 0.3, -12, 6, 10, 1); // torso
+    fill(190, 185, 175);
+    rect(r.w * 0.3 - 1, -8, 8, 3); // shoulders
+    rect(r.w * 0.3 + 1, -2, 4, 3, 1); // base
+    fill(210, 205, 195);
+    rect(r.w * 0.3 + 2, -11, 2, 4); // toga drape
+    // Broken neck
+    fill(170, 165, 155);
+    rect(r.w * 0.3 + 1, -13, 4, 2);
+
+    // Terracotta amphora with handles
+    fill(180, 120, 60);
+    rect(-r.w * 0.4, -8, 5, 8, 1); // body
+    fill(160, 100, 45);
+    rect(-r.w * 0.4 - 1, -9, 7, 2, 1); // rim
+    rect(-r.w * 0.4 + 1, -1, 3, 2); // base
+    // Handles
+    stroke(170, 110, 50); strokeWeight(1);
+    noFill();
+    arc(-r.w * 0.4 - 1, -5, 4, 6, HALF_PI, PI + HALF_PI);
+    arc(-r.w * 0.4 + 5, -5, 4, 6, -HALF_PI, HALF_PI);
+    noStroke();
+    // Painted band
+    fill(140, 40, 30, 120);
+    rect(-r.w * 0.4, -5, 5, 2);
+
+    // Mosaic fragment (only on wider ruins)
+    if (r.w > 28) {
+      fill(50, 45, 38); rect(-8, 3, 12, 8, 1); // dark grout base
+      // Colored tesserae
+      let mColors = [[180,40,30],[40,80,150],[200,180,60],[240,235,220]];
+      for (let my = 0; my < 3; my++) {
+        for (let mx = 0; mx < 4; mx++) {
+          let mc = mColors[(mx + my) % 4];
+          fill(mc[0], mc[1], mc[2], 180);
+          rect(-7 + mx * 3, 4 + my * 2, 2, 1.5);
+        }
+      }
+    }
+
     // Subtle golden glow (ancient energy)
     let runeAlpha = 15 + sin(frameCount * 0.03 + r.rot * 20) * 10;
     fill(200, 170, 80, runeAlpha);
@@ -8081,10 +6594,16 @@ function drawWorldObjectsSorted() {
   // Layer 1: tall objects + all characters (Y-sorted together)
   let items = [];
   // Temple and ruins — sort by bottom edge (steps extend ~12px below center)
-  items.push({ y: state.pyramid.y + 12, draw: drawPyramid });
+  // Pyramid — sort well behind so player always walks in front of it
+  items.push({ y: state.pyramid.y - 40, draw: drawPyramid });
   items.push({ y: WORLD.islandCY - 30, draw: drawRuins });
-  // Buildings — sort by bottom edge so characters in front overlap correctly
-  state.buildings.forEach(b => items.push({ y: b.y + (b.h || 0) / 2, draw: () => drawOneBuilding(b) }));
+  // Buildings — flat items (floor, mosaic, bridge) sort BEHIND everything at their position
+  // Tall items (wall, door, etc.) sort by bottom edge for correct overlap
+  let flatTypes = ['floor', 'mosaic', 'bridge'];
+  state.buildings.forEach(b => {
+    let sortY = flatTypes.includes(b.type) ? b.y - 9999 : b.y + (b.h || 0) / 2;
+    items.push({ y: sortY, draw: () => drawOneBuilding(b) });
+  });
   // Trees
   state.trees.forEach(t => items.push({ y: t.y, draw: () => drawOneTree(t) }));
   // Crystal shrine
@@ -8107,6 +6626,10 @@ function drawWorldObjectsSorted() {
     items.push({ y: state.woodcutter.y, draw: drawWoodcutter });
   if (state.quarrier && state.quarrier.unlocked)
     items.push({ y: state.quarrier.y, draw: drawQuarrier });
+  if (state.cook && state.cook.unlocked)
+    items.push({ y: state.cook.y, draw: drawCook });
+  if (state.fisherman && state.fisherman.unlocked)
+    items.push({ y: state.fisherman.boatY, draw: drawFisherman });
   if (!state.rowing.active && (fullyUnlocked || prog.companionsAwakened.centurion))
     items.push({ y: state.centurion.y, draw: drawCenturion });
   // Main NPC — always present once home reached
@@ -8147,48 +6670,46 @@ function drawOneBuilding(b) {
 
     switch (b.type) {
       case 'wall':
-        // Roman stone wall — ashlar blocks with visible mortar
+        // Roman stone wall — renders upward from placement point
         noStroke();
+        let wallH = 24;
         // Shadow base
         fill(0, 0, 0, 30);
-        rect(-bw / 2 + 1, -bh / 2 - 18, bw, 22 + bh, 1);
+        rect(-bw / 2 + 1, -2, bw, 4, 1);
         // Main wall face — warm limestone
         fill(195, 185, 168);
-        rect(-bw / 2, -bh / 2 - 20, bw, 20 + bh, 1);
-        // Top capstone — lighter with molding
+        rect(-bw / 2, -wallH, bw, wallH, 1);
+        // Top capstone
         fill(210, 200, 182);
-        rect(-bw / 2, -bh / 2 - 22, bw, 4, 1);
+        rect(-bw / 2, -wallH - 2, bw, 4, 1);
         fill(215, 208, 192);
-        rect(-bw / 2, -bh / 2 - 22, bw, 1.5);
-        // Bottom molding — heavier base
+        rect(-bw / 2, -wallH - 2, bw, 1.5);
+        // Bottom molding
         fill(180, 170, 152);
-        rect(-bw / 2, -bh / 2 + bh - 2, bw, 3, 1);
-        fill(170, 160, 142);
-        rect(-bw / 2, -bh / 2 + bh, bw, 1);
+        rect(-bw / 2, -2, bw, 3, 1);
         // Ashlar stone blocks with mortar lines
-        // Mortar fill (lighter than stone)
         stroke(155, 148, 132, 80);
         strokeWeight(0.8);
-        for (let ly = -bh / 2 - 16; ly < -bh / 2 + bh - 2; ly += 5) {
+        for (let ly = -wallH + 2; ly < -2; ly += 5) {
           line(-bw / 2 + 1, ly, bw / 2 - 1, ly);
-          let off = (floor((ly + 16) / 5) % 2) * 8;
+          let off = (floor((ly + wallH) / 5) % 2) * 8;
           for (let lx = -bw / 2 + off + 6; lx < bw / 2 - 2; lx += 14) {
             line(lx, ly, lx, ly + 5);
           }
         }
         noStroke();
-        // Individual stone block color variation
-        for (let ly = -bh / 2 - 16; ly < -bh / 2 + bh - 2; ly += 5) {
-          let off = (floor((ly + 16) / 5) % 2) * 8;
+        // Stone block color variation
+        for (let ly = -wallH + 2; ly < -2; ly += 5) {
+          let off = (floor((ly + wallH) / 5) % 2) * 8;
           for (let lx = -bw / 2 + off + 1; lx < bw / 2 - 2; lx += 14) {
             let cv = sin(lx * 0.3 + ly * 0.5) * 8;
             fill(195 + cv, 185 + cv, 168 + cv, 30);
             rect(lx, ly + 0.5, 12, 4);
           }
         }
-        // Sunlit highlight on top-left
+        // Sunlit highlight
         fill(225, 218, 200, 35);
-        rect(-bw / 2 + 1, -bh / 2 - 20, bw / 3, 18, 1);
+        rect(-bw / 2 + 1, -wallH, bw / 3, wallH * 0.7, 1);
         // Weathering — dark spots
         fill(160, 150, 132, 25);
         rect(bw / 4, -bh / 2 - 8, 4, 6);
@@ -8238,39 +6759,41 @@ function drawOneBuilding(b) {
         break;
 
       case 'door':
-        // Roman arched doorway — stone frame with wooden door
+        // Roman arched doorway — renders upward from placement point
         noStroke();
+        let doorH = 30;
         // Stone frame
         fill(190, 182, 165);
-        rect(-bw / 2, -bh / 2 - 28, bw, 28 + bh, 1);
+        rect(-bw / 2, -doorH, bw, doorH, 1);
         // Arch top
         fill(200, 192, 175);
-        arc(0, -bh / 2 - 10, bw - 4, 18, PI, TWO_PI);
+        arc(0, -doorH + 10, bw - 4, 18, PI, TWO_PI);
         // Dark interior / door
         fill(60, 40, 22);
-        rect(-bw / 2 + 4, -bh / 2 - 22, bw - 8, 22 + bh - 4, 1);
+        rect(-bw / 2 + 4, -doorH + 4, bw - 8, doorH - 8, 1);
         fill(50, 32, 16);
-        arc(0, -bh / 2 - 10, bw - 10, 14, PI, TWO_PI);
+        arc(0, -doorH + 10, bw - 10, 14, PI, TWO_PI);
         // Door planks
         stroke(72, 50, 28, 100);
         strokeWeight(0.6);
-        line(-2, -bh / 2 - 20, -2, bh / 2 - 4);
-        line(4, -bh / 2 - 20, 4, bh / 2 - 4);
+        line(-2, -doorH + 6, -2, -4);
+        line(4, -doorH + 6, 4, -4);
         noStroke();
         // Iron ring handle
         stroke(120, 115, 105);
         strokeWeight(1.5);
         noFill();
-        arc(bw / 6, -bh / 2 - 4, 5, 6, 0, PI);
+        arc(bw / 6, -10, 5, 6, 0, PI);
         noStroke();
-        // Keystone at arch top
+        // Keystone
         fill(210, 200, 180);
         beginShape();
-        vertex(-3, -bh / 2 - 18);
-        vertex(3, -bh / 2 - 18);
-        vertex(2, -bh / 2 - 24);
-        vertex(-2, -bh / 2 - 24);
+        vertex(-3, -doorH + 2); vertex(3, -doorH + 2);
+        vertex(2, -doorH - 2); vertex(-2, -doorH - 2);
         endShape(CLOSE);
+        // Shadow base
+        fill(0, 0, 0, 25);
+        rect(-bw / 2 + 1, -1, bw, 3, 1);
         break;
 
       case 'chest':
@@ -9033,8 +7556,9 @@ function drawOneBuilding(b) {
 }
 
 function drawBuildGhost() {
-  let wx = snapToGrid(s2wX(mouseX));
-  let wy = snapToGrid(s2wY(mouseY));
+  // Called inside translate(shakeX, shakeY + floatOffset) — compensate mouse coords
+  let wx = snapToGrid(s2wX(mouseX - shakeX));
+  let wy = snapToGrid(s2wY(mouseY - shakeY - floatOffset));
   let bp = BLUEPRINTS[state.buildType];
   let bw = bp.w;
   let bh = bp.h;
@@ -9044,7 +7568,7 @@ function drawBuildGhost() {
   }
 
   let sx = w2sX(wx);
-  let sy = w2sY(wy) + floatOffset;
+  let sy = w2sY(wy);
 
   let posValid;
   if (state.buildType === 'bridge') {
@@ -9056,31 +7580,22 @@ function drawBuildGhost() {
   }
   let valid = posValid && canAfford(state.buildType);
 
-  // Draw the actual building sprite as ghost
-  push();
-  translate(sx, sy);
-  if (valid) {
-    tint(0, 255, 136, 120);
-    drawFilter = BLEND;
-  }
-  // Semi-transparent version of the actual building
-  push();
-  if (valid) {
-    drawingContext.globalAlpha = 0.5;
-  } else {
-    drawingContext.globalAlpha = 0.3;
-  }
-  // Draw the actual building sprite
+  // Ghost building sprite with transparency
   let ghostBuilding = { x: wx, y: wy, w: bw, h: bh, type: state.buildType };
-  pop();
-  pop();
-
-  // Use drawOneBuilding with transparency
   push();
   drawingContext.globalAlpha = valid ? 0.55 : 0.25;
-  translate(0, floatOffset);
   drawOneBuilding(ghostBuilding);
   drawingContext.globalAlpha = 1.0;
+  pop();
+
+  // Anchor crosshair — gold "+" at exact placement point
+  push();
+  translate(sx, sy);
+  stroke(210, 180, 50);
+  strokeWeight(1.5);
+  line(-4, 0, 4, 0);
+  line(0, -4, 0, 4);
+  noStroke();
   pop();
 
   // Placement indicator ring
@@ -9201,6 +7716,7 @@ function placeBuilding(wx, wy) {
   state.dailyActivities.built++;
   checkQuestProgress('build', 1);
   if (typeof advanceMainQuestCounter === 'function') advanceMainQuestCounter('mq_built', 1);
+  trackMilestone('first_build');
 }
 
 // ─── CRYSTAL NODES ────────────────────────────────────────────────────────
@@ -10066,19 +8582,25 @@ function updateFishing(dt) {
   f.timer += dt;
   if (!f.bite && f.timer >= f.biteTime) {
     f.bite = true;
+    f.biteFlash = 12; // visual bobber dip
     f.timer = 0;
     if (state.tools.net) {
-      // Auto-catch with fishing net
       reelFish();
       return;
     }
-    addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 40, '! BITE !', '#ffaa00');
+    addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 40, '!! BITE !!', '#ffdd00');
+    spawnParticles(state.player.x + (state.player.facing === 'left' ? -20 : 20), state.player.y, 'build', 4);
+    if (snd) snd.playSFX('fish_cast');
+    triggerScreenShake(2, 4);
   }
-  if (f.bite && f.timer > 90) {
+  if (f.bite && f.timer > 50) {
     // Missed the catch
     f.active = false;
     f.bite = false;
+    f.streak = 0;
     addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 30, 'Got away...', C.textDim);
+    if (snd) snd.playSFX('water');
+    triggerScreenShake(1, 3);
   }
 }
 
@@ -10088,7 +8610,8 @@ function startFishing() {
     // Near island edge
     state.fishing.active = true;
     state.fishing.timer = 0;
-    state.fishing.biteTime = random(60, 180);
+    let rodBonus = state.tools.ironRod ? 0.7 : state.tools.copperRod ? 0.85 : 1.0;
+    state.fishing.biteTime = random(60, 180) * rodBonus;
     state.fishing.bite = false;
     state.fishing.caught = false;
     state.player.vx = 0;
@@ -10107,12 +8630,15 @@ function reelFish() {
   if (f.active && f.bite) {
     f.active = false;
     f.bite = false;
+    f.streak = (f.streak || 0) + 1;
     let fishType = rollFishType();
     let amt = fishType.weight >= 3 ? 2 : 1;
     if (state.heartRewards.includes('golden')) amt *= 2;
     if (state.prophecy && state.prophecy.type === 'fish') amt += 1;
     let fest = getFestival();
     if (fest && fest.effect.fish) amt *= fest.effect.fish;
+    // Streak bonus: +1 fish at streak 3+
+    if (f.streak >= 3) amt += 1;
     state.fish += amt;
     if (snd) snd.playSFX('fish_catch');
     state.dailyActivities.fished += amt;
@@ -10120,6 +8646,9 @@ function reelFish() {
     state.codex.fishCaught[fishType.name.toLowerCase()] = true;
     unlockJournal('first_fish');
     addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 40, '+' + amt + ' ' + fishType.name + '!', fishType.color);
+    if (f.streak >= 3) {
+      addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 58, '+' + f.streak + ' streak!', '#ffdd55');
+    }
     spawnParticles(state.player.x, state.player.y, 'build', 6);
   }
 }
@@ -10287,8 +8816,101 @@ function drawPlayer() {
   }
 
   let inWater = isInShallows(p.x, p.y);
+  let isDiving = state.diving && state.diving.active;
 
-  if (inWater) {
+  if (isDiving) {
+    // Underwater swimming — tilted body, fluid arm/leg motion
+    push();
+    let swimSpeed = p.moving ? 1 : 0.3;
+    let t = frameCount * swimSpeed;
+    // Body tilts forward when moving
+    let tiltAngle = p.moving ? fDir * 0.25 : fDir * 0.05;
+    rotate(tiltAngle);
+    // Gentle underwater float bob
+    let floatY = sin(frameCount * 0.04) * 3;
+    translate(0, floatY);
+
+    // Shadow/glow on seabed below
+    fill(0, 20, 40, 20);
+    ellipse(0, 18, 22, 6);
+
+    // Legs — flutter kick (offset sine waves)
+    fill(220, 185, 150);
+    let kickL = sin(t * 0.15) * 5 * swimSpeed;
+    let kickR = sin(t * 0.15 + PI) * 5 * swimSpeed;
+    push(); translate(-2, 8);
+    rotate(kickL * 0.04);
+    rect(-2, 0, 3, 10); // left thigh
+    rect(-2, 9, 4, 3); // left foot
+    pop();
+    push(); translate(2, 8);
+    rotate(kickR * 0.04);
+    rect(-1, 0, 3, 10); // right thigh
+    rect(-1, 9, 4, 3); // right foot
+    pop();
+    // Sandals
+    fill(107, 66, 38);
+    rect(-4, 17 + kickL * 0.5, 4, 2);
+    rect(1, 17 + kickR * 0.5, 4, 2);
+
+    // Tunic body
+    fill(180, 50, 40);
+    rect(-7, -4, 14, 14, 2);
+    // Tunic ripple in water
+    fill(160, 40, 35, 150);
+    let ripple = sin(t * 0.06) * 1.5;
+    rect(-8 + ripple, 2, 16, 3);
+    // Belt
+    fill(200, 170, 50);
+    rect(-7, 3, 14, 2);
+    fill(220, 190, 60);
+    rect(-2, 2, 4, 3); // buckle
+
+    // Arms — breaststroke motion
+    fill(220, 185, 150);
+    let armPhase = t * 0.1;
+    let armLx = sin(armPhase) * 8 * swimSpeed;
+    let armLy = cos(armPhase) * 4;
+    let armRx = sin(armPhase + PI) * 8 * swimSpeed;
+    let armRy = cos(armPhase + PI) * 4;
+    // Left arm
+    push(); translate(-7, -1);
+    rect(armLx - 3, armLy, 3, 7);
+    pop();
+    // Right arm
+    push(); translate(7, -1);
+    rect(armRx, armRy, 3, 7);
+    pop();
+
+    // Weapon trail when attacking
+    if (p.slashPhase > 0) {
+      let slashArc = map(p.slashPhase, 10, 0, -1, 1);
+      stroke(255, 220, 100, p.slashPhase * 20);
+      strokeWeight(2);
+      let sx1 = fDir * 10, sy1 = -5 + slashArc * 8;
+      let sx2 = fDir * 18, sy2 = slashArc * 12;
+      line(sx1, sy1, sx2, sy2);
+      noStroke();
+      // Weapon
+      fill(180, 180, 190);
+      rect(fDir * 12, -4 + slashArc * 6, fDir * 8, 2);
+    }
+
+    // Head
+    drawPlayerHead(fDir, facingUp, a);
+
+    pop();
+
+    // Breath bubbles
+    if (frameCount % 15 < 2) {
+      fill(180, 225, 255, 140);
+      let bx = fDir * 4 + sin(frameCount * 0.2) * 3;
+      ellipse(bx, -20 + floatY, 3, 3);
+      fill(200, 235, 255, 100);
+      ellipse(bx + random(-3, 3), -25 + floatY, 2, 2);
+      ellipse(bx + random(-2, 2), -29 + floatY, 1.5, 1.5);
+    }
+  } else if (inWater) {
     // Swimming mode — only draw upper body, add water line
     drawPlayerBody();
     drawPlayerArms(p.moving ? floor(sin(frameCount * 0.15) * 2) : 0); // swim stroke
@@ -10326,11 +8948,17 @@ function drawPlayer() {
 }
 
 function drawPlayerShadow(s) {
-  // Elliptical shadow — more natural, scales with player
-  fill(0, 0, 0, 45);
-  ellipse(0, s, 20, 5);
-  fill(0, 0, 0, 25);
-  ellipse(0, s, 14, 3);
+  // Shadow scales with time of day — longer at dawn/dusk
+  let hr = (state.time || 720) / 60;
+  let shadowStretch = 1;
+  if (hr < 8) shadowStretch = map(hr, 5, 8, 2, 1);
+  else if (hr > 17) shadowStretch = map(hr, 17, 20, 1, 2);
+  shadowStretch = constrain(shadowStretch, 1, 2);
+  let shadowAlpha = hr > 20 || hr < 5 ? 15 : 45;
+  fill(0, 0, 0, shadowAlpha);
+  ellipse(0, s, 20 * shadowStretch, 5);
+  fill(0, 0, 0, shadowAlpha * 0.55);
+  ellipse(0, s, 14 * shadowStretch, 3);
 }
 
 function drawPlayerFeet(s, legOff) {
@@ -11207,6 +9835,7 @@ function updateCenturion(dt) {
   let cen = state.centurion;
   let p = state.player;
   if (state.rowing.active) { cen.x = p.x + 15; cen.y = p.y + 8; cen.vx = 0; cen.vy = 0; return; }
+  if (state.diving && state.diving.active) { cen.vx = 0; cen.vy = 0; return; } // stay put while player dives
   if (cen.flashTimer > 0) cen.flashTimer -= dt;
   if (cen.attackTimer > 0) cen.attackTimer -= dt;
 
@@ -11333,6 +9962,11 @@ function updateQuarrier(dt) {
           state.stone += 2;
           checkQuestProgress('stone', 2);
           addFloatingText(w2sX(tx), w2sY(ty) - 15, '+2 Stone', '#aaaaaa');
+          // Iron ore chance at level 7+
+          if (state.islandLevel >= 7 && random() < 0.15) {
+            state.ironOre = (state.ironOre || 0) + 1;
+            addFloatingText(w2sX(tx), w2sY(ty) - 28, '+1 Iron Ore!', '#aabbcc');
+          }
           spawnParticles(tx, ty, 'collect', 5);
           if (snd) snd.playSFX('stone_mine');
           q.energy = max(0, q.energy - 10);
@@ -11419,6 +10053,139 @@ function drawQuarrier() {
   noStroke(); fill(140, 135, 120, 120);
   textSize(7); textAlign(CENTER, TOP);
   text('QUARRIER', floor(sx), floor(sy + 16));
+  textAlign(LEFT, TOP);
+}
+
+// ─── COOK NPC ────────────────────────────────────────────────────────────
+function updateCook(dt) {
+  let c = state.cook;
+  if (!c.unlocked) {
+    if (state.islandLevel >= 8) { c.unlocked = true; addFloatingText(width / 2, height * 0.3, 'Cook joined your island!', '#ddaa44'); }
+    else return;
+  }
+  if (state.rowing.active) return;
+  c.timer += dt;
+  // Auto-cook a meal every ~30 seconds if ingredients available
+  if (c.timer > 1800) {
+    c.timer = 0;
+    if (state.harvest >= 2 && state.fish >= 1) {
+      state.harvest -= 2; state.fish -= 1;
+      state.meals = (state.meals || 0) + 1;
+      addFloatingText(w2sX(c.x), w2sY(c.y) - 20, '+1 Meal (Cook)', '#ddaa44');
+      if (snd) snd.playSFX('ding');
+      c.cookTimer = 30;
+    }
+  }
+  if (c.cookTimer > 0) c.cookTimer -= dt;
+  // Idle near a brazier
+  let brazier = state.buildings.find(b => b.type === 'torch');
+  if (brazier) {
+    let dx = brazier.x + 15 - c.x, dy = brazier.y - c.y;
+    let d = sqrt(dx * dx + dy * dy);
+    if (d > 25) { c.x += (dx / d) * c.speed * dt; c.y += (dy / d) * c.speed * dt; }
+  }
+}
+
+function drawCook() {
+  let c = state.cook;
+  if (!c.unlocked) return;
+  let sx = w2sX(c.x), sy = w2sY(c.y);
+  let bob = floor(sin(frameCount * 0.04) * 1);
+  push(); translate(floor(sx), floor(sy + bob)); noStroke();
+  // Shadow
+  fill(0, 0, 0, 25); ellipse(0, 10, 14, 4);
+  // Feet
+  fill(120, 80, 40); rect(-4, 7, 3, 3); rect(1, 7, 3, 3);
+  // Apron (white)
+  fill(230, 225, 210); rect(-5, -3, 10, 11, 1);
+  // Tunic underneath
+  fill(180, 120, 50); rect(-6, -4, 12, 6, 1);
+  // Head
+  fill(195, 160, 120); rect(-3, -10, 6, 7);
+  // Chef hat
+  fill(240, 235, 220); rect(-4, -15, 8, 6, 1);
+  rect(-3, -17, 6, 3);
+  // Eyes
+  fill(40, 30, 20); rect(-2, -8, 1, 1); rect(1, -8, 1, 1);
+  // Ladle (when cooking)
+  if (c.cookTimer > 0) {
+    fill(140, 120, 80); rect(5, -5, 2, 10);
+    fill(160, 140, 90); ellipse(6, 6, 5, 3);
+  }
+  pop();
+  noStroke(); fill(140, 120, 80, 120);
+  textSize(7); textAlign(CENTER, TOP);
+  text('COOK', floor(sx), floor(sy + 14));
+  textAlign(LEFT, TOP);
+}
+
+// ─── FISHERMAN NPC ───────────────────────────────────────────────────────
+function updateFisherman(dt) {
+  let f = state.fisherman;
+  if (!f.unlocked) {
+    if (state.islandLevel >= 6) { f.unlocked = true; addFloatingText(width / 2, height * 0.3, 'Fisherman set up at the port!', '#4488aa'); }
+    else return;
+  }
+  // Position at port shoreline
+  let port = getPortPosition();
+  f.boatX = port.x - 30;
+  f.boatY = port.y + 40;
+  f.x = f.boatX; f.y = f.boatY;
+  // Catch fish every ~20 seconds
+  f.timer += dt;
+  f.catchTimer -= dt;
+  if (f.timer > 1200) {
+    f.timer = 0;
+    let amt = 1 + floor(random(0, 2));
+    state.fish = (state.fish || 0) + amt;
+    f.fishCaught += amt;
+    addFloatingText(w2sX(f.x), w2sY(f.y) - 25, '+' + amt + ' Fish (Fisherman)', '#4488aa');
+    if (snd) snd.playSFX('fish_catch');
+    f.catchTimer = 20;
+  }
+}
+
+function drawFisherman() {
+  let f = state.fisherman;
+  if (!f.unlocked) return;
+  let sx = w2sX(f.boatX), sy = w2sY(f.boatY);
+  let bob = floor(sin(frameCount * 0.025) * 2);
+  push(); translate(floor(sx), floor(sy + bob)); noStroke();
+  // Small fishing boat
+  fill(110, 75, 35);
+  beginShape();
+  vertex(-14, 2); vertex(-10, 6); vertex(10, 6); vertex(14, 2);
+  vertex(8, 0); vertex(-8, 0);
+  endShape(CLOSE);
+  // Deck
+  fill(140, 100, 50); rect(-8, 0, 16, 3, 1);
+  // Fisherman sitting
+  fill(190, 155, 120); rect(-2, -8, 4, 5); // head
+  fill(50, 80, 130); rect(-3, -3, 6, 5, 1); // blue tunic
+  fill(40, 30, 20); rect(-1, -6, 1, 1); rect(1, -6, 1, 1); // eyes
+  // Straw hat
+  fill(200, 180, 120); rect(-4, -10, 8, 3, 1);
+  rect(-5, -8, 10, 1);
+  // Fishing rod
+  stroke(120, 90, 40); strokeWeight(1);
+  line(3, -5, 18, -15); // rod
+  stroke(180, 180, 180, 120); strokeWeight(0.5);
+  let lineEnd = 8 + sin(frameCount * 0.04) * 3;
+  line(18, -15, 18, lineEnd); // line into water
+  noStroke();
+  // Water ripple at line
+  if (f.catchTimer > 0) {
+    fill(180, 220, 255, 80); ellipse(18, lineEnd + 2, 6, 2);
+  }
+  // Fish basket
+  fill(160, 130, 70); rect(-12, -1, 5, 4, 1);
+  if (f.fishCaught > 0) {
+    fill(100, 160, 200, 150); rect(-11, -2, 3, 2);
+  }
+  pop();
+  noStroke(); fill(70, 120, 160, 120);
+  textSize(7); textAlign(CENTER, TOP);
+  text('FISHERMAN', floor(sx), floor(sy + 10));
   textAlign(LEFT, TOP);
 }
 
@@ -11636,6 +10403,8 @@ function drawNPC() {
   let sy = w2sY(n.y);
   let bob = sin(frameCount * 0.03) * 1.2;
   let breathe = sin(frameCount * 0.04) * 0.4;
+  let pDist = dist(state.player.x, state.player.y, n.x, n.y);
+  let faceDir = (pDist < 100 && state.player.x < n.x) ? -1 : 1;
 
   push();
   translate(floor(sx), floor(sy + bob));
@@ -11645,7 +10414,7 @@ function drawNPC() {
   fill(0, 0, 0, 35);
   ellipse(0, 17, 18, 5);
 
-  scale(0.72);
+  scale(0.72 * faceDir, 0.72);
   translate(0, -2);
 
   noStroke();
@@ -12021,7 +10790,7 @@ function updateParticles(dt) {
   }
 
   // Hard cap: prevent particle explosion
-  if (particles.length > 300) particles.splice(0, particles.length - 250);
+  if (particles.length > _particleCap) particles.splice(0, particles.length - (_particleCap - 50));
 
   particles.forEach(p => {
     p.x += p.vx * dt;
@@ -13145,6 +11914,8 @@ function drawTrees() {
   state.trees.forEach(t => drawOneTree(t));
 }
 function drawOneTree(t) {
+    // Skip trees outside the visible grass surface
+    if (!isOnIsland(t.x, t.y)) return;
     if (!t.alive) {
       // Stump — pixel bark
       let sx = w2sX(t.x);
@@ -13170,7 +11941,7 @@ function drawOneTree(t) {
     let sx = w2sX(t.x);
     let sy = w2sY(t.y);
     let s = t.size;
-    let sway = sin(frameCount * 0.015 + t.swayPhase) * 3 * s;
+    let sway = floor(sin(frameCount * 0.01 + t.swayPhase) * 2 * s); // slower, pre-rounded to prevent flicker
     // Chop wobble
     if (t.shakeTimer > 0) {
       sway += sin(t.shakeTimer * 1.5) * t.shakeTimer * 0.8;
@@ -13178,55 +11949,61 @@ function drawOneTree(t) {
     }
 
     push();
-    translate(sx + sway, sy);
+    translate(sx, sy); // base stays fixed
 
-    // Shadow — elliptical, natural
+    // Shadow — elliptical
     noStroke();
-    fill(0, 0, 0, 35);
-    ellipse(2 * s, 3, 22 * s, 6 * s);
+    fill(0, 0, 0, 30);
+    ellipse(2 * s, 3, 18 * s, 5 * s);
 
     if (t.type === 'oak') {
-      // Cypress — tall, narrow, dark green column (iconic Mediterranean)
-      // Trunk — thin and straight
-      fill(65, 45, 24);
-      rect(-2 * s, -30 * s, 4 * s, 34 * s);
-      fill(78, 56, 30);
-      rect(-1 * s, -28 * s, 2 * s, 30 * s);
-      // Bark texture
-      fill(55, 38, 18, 80);
-      for (let bi = 0; bi < 5; bi++) {
-        rect(0, (-25 + bi * 7) * s, 1 * s, 2 * s);
+      // Mediterranean Cypress — elegant tapered column, base fixed, top sways
+      // Trunk — rooted firmly, no sway at base
+      fill(62, 42, 22);
+      beginShape();
+      vertex(-3 * s, 2); vertex(-2 * s, -28 * s); vertex(2 * s, -28 * s); vertex(3 * s, 2);
+      endShape(CLOSE);
+      // Bark detail
+      fill(72, 52, 28);
+      rect(-1.5 * s, -26 * s, 3 * s, 26 * s);
+      fill(50, 35, 16, 60);
+      rect(-0.5 * s, -20 * s, 1 * s, 8 * s);
+      rect(0.5 * s, -10 * s, 1 * s, 6 * s);
+
+      // Foliage — sway increases toward top (realistic wind)
+      for (let layer = 0; layer < 8; layer++) {
+        let t_frac = layer / 7; // 0=bottom, 1=top
+        let layerSway = floor(sway * t_frac); // pre-rounded to prevent flicker
+        let layerY = -30 * s - layer * 9 * s;
+        let layerW = (7 - abs(layer - 3.5) * 1.3) * s; // tapered: wider in middle, narrow at top/bottom
+        let darkG = 20 + layer * 4;
+        let lightG = 48 + layer * 5;
+        // Dark base layer
+        fill(darkG, darkG + 30, darkG - 2);
+        rect(floor(-layerW + layerSway), floor(layerY), floor(layerW * 2), floor(9 * s), 1);
+        // Lighter inner layer
+        fill(darkG + 10, lightG, darkG + 5, 180);
+        rect(floor(-layerW * 0.7 + layerSway), floor(layerY + 1), floor(layerW * 1.4), floor(7 * s), 1);
+        // Sunlit edge — right side highlight
+        fill(45 + layer * 3, 85 + layer * 4, 35, 80);
+        rect(floor(layerW * 0.3 + layerSway), floor(layerY + 2), floor(layerW * 0.4), floor(5 * s));
       }
-      // Tall narrow conical foliage — dense dark green column
-      fill(22, 55, 20);
-      rect(-3 * s, -95 * s, 6 * s, 8 * s);
-      rect(-4 * s, -87 * s, 8 * s, 10 * s);
-      rect(-5 * s, -77 * s, 10 * s, 12 * s);
-      rect(-6 * s, -65 * s, 12 * s, 14 * s);
-      rect(-6 * s, -51 * s, 12 * s, 16 * s);
-      rect(-5 * s, -35 * s, 10 * s, 12 * s);
-      // Mid layer — slightly lighter
-      fill(32, 68, 28);
-      rect(-2 * s, -93 * s, 4 * s, 6 * s);
-      rect(-3 * s, -87 * s, 6 * s, 10 * s);
-      rect(-4 * s, -77 * s, 8 * s, 12 * s);
-      rect(-5 * s, -65 * s, 10 * s, 12 * s);
-      rect(-4 * s, -53 * s, 8 * s, 14 * s);
-      // Sunlit highlight — right side
-      fill(45, 88, 38, 130);
-      rect(1 * s, -85 * s, 3 * s, 40 * s);
-      rect(0, -60 * s, 2 * s, 20 * s);
-      // Tip — pointed top
-      fill(25, 58, 22);
-      rect(-1 * s, -98 * s, 2 * s, 4 * s);
-      rect(0, -100 * s, 1 * s, 3 * s);
-      // Leaf texture dots
-      fill(38, 75, 30, 100);
-      for (let li = 0; li < 6; li++) {
-        let ly = floor(-88 * s + li * 10 * s);
-        rect(floor(sin(li * 2.1) * 2 * s), ly, 2 * s, 2 * s);
+      // Pointed tip
+      let tipSway = sway;
+      fill(28, 58, 24);
+      beginShape();
+      vertex(tipSway, floor(-102 * s));
+      vertex(-2 * s + tipSway, floor(-94 * s));
+      vertex(2 * s + tipSway, floor(-94 * s));
+      endShape(CLOSE);
+      // Leaf texture — small dots scattered on foliage
+      fill(38, 72, 28, 80);
+      for (let li = 0; li < 5; li++) {
+        let ly = floor(-85 * s + li * 12 * s);
+        let lsway = sway * (0.3 + li * 0.14);
+        rect(floor(sin(li * 2.1 + t.swayPhase) * 3 * s + lsway), ly, 2 * s, 2 * s);
       }
-    } else if (t.type === 'pine') {
+    } else if (t.type === 'olive') {
       // Olive tree — gnarled trunk, silver-green canopy
       // Thick gnarled trunk with knots
       fill(88, 68, 38);
@@ -13276,7 +12053,7 @@ function drawOneTree(t) {
       rect(-6 * s, -26 * s, 2 * s, 2 * s);
       rect(8 * s, -24 * s, 2 * s, 2 * s);
       rect(2 * s, -34 * s, 2 * s, 2 * s);
-    } else {
+    } else if (t.type === 'pine') {
       // Mediterranean Stone Pine — umbrella-shaped (Pinus pinea)
       fill(80, 55, 30);
       // Tall straight trunk
@@ -13328,11 +12105,25 @@ function drawOneTree(t) {
 }
 
 // ─── MERCHANT SHIP ────────────────────────────────────────────────────────
+function updatePortPositions() {
+  // Ports always at the shoreline — just past the grass surface edge
+  let srx = getSurfaceRX();
+  let sry = getSurfaceRY();
+  // Left port: 5% past the surface edge (in the shallows)
+  state.portLeft = {
+    x: WORLD.islandCX - srx - 20,
+    y: WORLD.islandCY + sry * 0.15
+  };
+  // Right port: same principle
+  state.portRight = {
+    x: WORLD.islandCX + srx + 10,
+    y: WORLD.islandCY - sry * 0.05
+  };
+}
+
 function getPortPosition() {
-  // Port always sits at the island's left shoreline, scaling with size
-  let portX = WORLD.islandCX - getSurfaceRX() * 0.95;
-  let portY = WORLD.islandCY + getSurfaceRY() * 0.15;
-  return { x: portX, y: portY };
+  if (!state.portLeft) updatePortPositions();
+  return state.portLeft;
 }
 
 function updateShip(dt) {
@@ -13440,6 +12231,10 @@ function generateShopOffers() {
   if (!state.tools.sickle) offers.push({ type: 'tool', tool: 'sickle', price: 15, label: 'Bronze Sickle → 15 Gold (2x harvest)' });
   if (!state.tools.axe) offers.push({ type: 'tool', tool: 'axe', price: 20, label: 'Iron Axe → 20 Gold (1-hit chop)' });
   if (!state.tools.net) offers.push({ type: 'tool', tool: 'net', price: 25, label: 'Fishing Net → 25 Gold (auto fish)' });
+  if (!state.tools.copperRod) offers.push({ type: 'tool', tool: 'copperRod', price: 30, label: 'Copper Rod → 30 Gold (+15% catch rate)' });
+  else if (!state.tools.ironRod) offers.push({ type: 'tool', tool: 'ironRod', price: 60, label: 'Iron Rod → 60 Gold (+30% catch rate)' });
+  if (!state.tools.steelPick) offers.push({ type: 'tool', tool: 'steelPick', price: 40, label: 'Steel Pickaxe → 40 Gold (2x mining speed)' });
+  if (!state.tools.lantern) offers.push({ type: 'tool', tool: 'lantern', price: 35, label: 'Lantern → 35 Gold (night visibility)' });
   return offers;
 }
 
@@ -14231,60 +13026,44 @@ function drawConquestDistantEntities() {
 // ─── ARENA DRAWING ───────────────────────────────────────────────────────
 
 function drawArenaIsleDistant() {
-  // Draw the arena isle silhouette in the ocean (when on home island)
+  // Draw the arena as a tiny silhouette ON the horizon line
   if (state.adventure.active) return;
   let a = state.adventure;
   let sx = w2sX(a.isleX);
-  let sy = w2sY(a.isleY);
-  if (sx < -200 || sx > width + 200 || sy < -200 || sy > height + 200) return;
+  // Always pin to the horizon — looks like a distant island on the water
+  let horizonY = max(height * 0.06, height * 0.25 - horizonOffset);
+  let sy = horizonY + 5; // just below horizon line
+  if (sx < -200 || sx > width + 200) return;
   push();
   noStroke();
-  let pulse = sin(frameCount * 0.02) * 0.1 + 1;
-  // Mysterious glow on water — pixel
   let fsx = floor(sx), fsy = floor(sy);
-  let rw = floor(a.isleRX * 0.35), rh = floor(a.isleRY * 0.17);
-  fill(180, 120, 60, 15 * pulse);
-  rect(fsx - rw, fsy + 2, rw * 2, rh);
-  // Water reflection
-  fill(30, 80, 100, 35);
-  rect(fsx - floor(a.isleRX * 0.27), fsy + 8, floor(a.isleRX * 0.55), floor(a.isleRY * 0.1));
-  // Rocky base
-  fill(90, 80, 65);
-  rect(fsx - floor(a.isleRX * 0.25), fsy, floor(a.isleRX * 0.5), floor(a.isleRY * 0.08));
-  // Grass/land
-  fill(70, 100, 55);
-  rect(fsx - floor(a.isleRX * 0.23), fsy - 2, floor(a.isleRX * 0.46), floor(a.isleRY * 0.09));
-  // Beach fringe
-  fill(190, 175, 130, 180);
-  rect(fsx - floor(a.isleRX * 0.24), fsy + 1, floor(a.isleRX * 0.48), floor(a.isleRY * 0.04));
-  fill(70, 100, 55);
-  rect(fsx - floor(a.isleRX * 0.21), fsy - 3, floor(a.isleRX * 0.42), floor(a.isleRY * 0.07));
-  // Tiny colosseum silhouette — pixel rects
-  fill(150, 140, 120);
-  rect(fsx - 16, fsy - 10, 32, 6);
-  // Columns
-  for (let i = -2; i <= 2; i++) {
-    let ch = i === 0 ? 10 : (abs(i) === 1 ? 8 : 5);
-    rect(fsx + i * 7 - 1, fsy - 4 - ch, 2, ch);
-    rect(fsx + i * 7 - 2, fsy - 5 - ch, 4, 1);
+  // Haze — distant blue tint
+  let bright = getSkyBrightness();
+  let hazeA = lerp(60, 30, bright);
+  // Tiny island silhouette (very small — it's far away)
+  fill(60 + 30 * bright, 75 + 25 * bright, 50 + 20 * bright, hazeA + 40);
+  rect(fsx - 20, fsy - 3, 40, 5, 2);
+  fill(80 + 30 * bright, 95 + 25 * bright, 65 + 20 * bright, hazeA + 30);
+  rect(fsx - 16, fsy - 5, 32, 4, 1);
+  // Tiny colosseum silhouette
+  fill(120 + 30 * bright, 115 + 25 * bright, 100 + 20 * bright, hazeA + 25);
+  rect(fsx - 8, fsy - 8, 16, 3);
+  for (let i = -1; i <= 1; i++) {
+    let ch = i === 0 ? 5 : 3;
+    rect(fsx + i * 5 - 1, fsy - 5 - ch, 2, ch);
   }
-  // Tiny torch glow — pixel
-  let fl = floor(sin(frameCount * 0.12) * 1);
-  fill(255, 160, 40, 60 + fl * 20);
-  rect(fsx - 17, fsy - 9, 3, 3);
-  rect(fsx + 15, fsy - 9, 3, 3);
-  // Label with parchment style
-  fill(200, 185, 150, 140 + sin(frameCount * 0.03) * 30);
-  textSize(8);
-  textAlign(CENTER);
-  textStyle(ITALIC);
-  text('Arena Isle', sx, sy + 22);
+  // Subtle water reflection below
+  fill(30 + 20 * bright, 60 + 40 * bright, 80 + 30 * bright, 15);
+  rect(fsx - 18, fsy + 3, 36, 4);
+  // Label
+  fill(200, 185, 150, hazeA + 60);
+  textSize(7); textAlign(CENTER); textStyle(ITALIC);
+  text('Arena Isle', sx, sy + 14);
   textStyle(NORMAL);
-  // Best wave marker
   if (a.bestWave > 0) {
-    fill(180, 160, 120, 120);
-    textSize(7);
-    text('Best: Wave ' + a.bestWave, sx, sy + 31);
+    fill(180, 160, 120, hazeA + 40);
+    textSize(6);
+    text('Best: Wave ' + a.bestWave, sx, sy + 22);
   }
   pop();
 }
@@ -14997,6 +13776,24 @@ function drawSlashArc() {
 
   push();
   translate(sx, sy);
+
+  // Sword tip trailing arc — 4 fading segments behind the sweep
+  // slashPhase goes 10→0; sweep progresses from -0.3 to +0.3 PI offset
+  let sweepProgress = map(p.slashPhase, 10, 0, -0.3, 0.3);
+  let tipX = cos(fAngle + sweepProgress * PI) * r;
+  let tipY = sin(fAngle + sweepProgress * PI) * r;
+  for (let i = 1; i <= 4; i++) {
+    let trailOffset = sweepProgress - i * 0.12;
+    let trailAlpha = map(i, 1, 4, 150, 0);
+    let tx = cos(fAngle + trailOffset * PI) * (r - i * 2);
+    let ty = sin(fAngle + trailOffset * PI) * (r - i * 2);
+    stroke(255, 240, 180, trailAlpha);
+    strokeWeight(1.5);
+    line(tipX, tipY, tx, ty);
+    tipX = tx;
+    tipY = ty;
+  }
+
   noStroke();
   // Pixel slash — scatter rects along arc
   fill(255, 230, 140, alpha);
@@ -15147,11 +13944,16 @@ const ARMORS = [
 const POTION_COST = 15; // gold
 const POTION_HEAL = 40;
 const HOTBAR_ITEMS = [
-  { name: 'Sickle', icon: 'sickle', desc: 'Harvest crops' },
-  { name: 'Axe',    icon: 'axe',    desc: 'Chop trees' },
-  { name: 'Pick',   icon: 'pick',   desc: 'Mine stone' },
-  { name: 'Rod',    icon: 'rod',    desc: 'Fish' },
-  { name: 'Weapon', icon: 'weapon', desc: 'Fight enemies' },
+  { name: 'Sickle', icon: 'sickle', desc: 'Harvest crops', key: '1' },
+  { name: 'Axe',    icon: 'axe',    desc: 'Chop trees',    key: '2' },
+  { name: 'Pick',   icon: 'pick',   desc: 'Mine stone',    key: '3' },
+  { name: 'Rod',    icon: 'rod',    desc: 'Fish',          key: '4' },
+  { name: 'Weapon', icon: 'weapon', desc: 'Fight enemies', key: '5' },
+  { name: 'Potion', icon: 'potion', desc: 'Heal (Q)',      key: '6' },
+  { name: 'Stew',   icon: 'stew',   desc: 'Heal 30 HP',   key: '7' },
+  { name: 'Meal',   icon: 'meal',   desc: 'Gift to NPC',   key: '8' },
+  { name: 'Wine',   icon: 'wine',   desc: 'Gift (3 hearts)', key: '9' },
+  { name: 'Ambrosia', icon: 'ambrosia', desc: 'Full heal', key: '0' },
 ];
 
 function usePotion() {
@@ -15163,12 +13965,52 @@ function usePotion() {
   spawnParticles(p.x, p.y, 'harvest', 5);
 }
 
+function useStew() {
+  let p = state.player;
+  if (state.stew <= 0 || p.hp >= p.maxHp) return;
+  state.stew--;
+  p.hp = min(p.maxHp, p.hp + 30);
+  addFloatingText(w2sX(p.x), w2sY(p.y) - 25, '+30 HP (Stew)', '#cc8844');
+  spawnParticles(p.x, p.y, 'harvest', 5);
+  if (snd) snd.playSFX('ding');
+}
+
+function useGarum() {
+  if (state.garum <= 0) return;
+  state.garum--;
+  state.gold += 25;
+  addFloatingText(width / 2, height * 0.35, '+25g from Garum trade', '#ddcc44');
+  if (snd) snd.playSFX('ding');
+}
+
+function useHoneyedFigs() {
+  if (state.honeyedFigs <= 0) return;
+  state.honeyedFigs--;
+  state.player.xpBoost = (state.player.xpBoost || 0) + 1;
+  state.player.xpBoostTimer = 8000; // 1 game day (1440 game-min / 0.18 per frame = 8000 frames)
+  addFloatingText(width / 2, height * 0.35, 'XP +15% for 1 day!', '#ffaa44');
+  spawnParticles(state.player.x, state.player.y, 'divine', 5);
+  if (snd) snd.playSFX('skill_unlock');
+}
+
+function useAmbrosia() {
+  let p = state.player;
+  if (state.ambrosia <= 0) return;
+  state.ambrosia--;
+  p.hp = p.maxHp;
+  p.invincTimer = max(p.invincTimer, 300); // 5 seconds invuln
+  addFloatingText(w2sX(p.x), w2sY(p.y) - 25, 'AMBROSIA! Full heal + invulnerable!', '#ffd700');
+  spawnParticles(p.x, p.y, 'divine', 15);
+  if (snd) snd.playSFX('fanfare');
+}
+
 function buyWeapon(tier) {
   let w = WEAPONS[tier];
   if (!w || state.gold < w.cost || state.player.weapon >= tier) return false;
   state.gold -= w.cost;
   state.player.weapon = tier;
   addFloatingText(width / 2, height * 0.3, w.name + ' acquired!', '#ffcc44');
+  if (snd) snd.playSFX('purchase');
   return true;
 }
 
@@ -15178,6 +14020,7 @@ function buyArmor(tier) {
   state.gold -= a.cost;
   state.player.armor = tier;
   addFloatingText(width / 2, height * 0.3, a.name + ' Armor!', '#aaccff');
+  if (snd) snd.playSFX('purchase');
   return true;
 }
 
@@ -15481,9 +14324,10 @@ function drawModifierSelectUI() {
   let costG = 15 + en * 5 + state.conquest.soldiers.length * 5;
   let costW = 10 + en * 3;
   let costM = min(3, 1 + floor(en / 3));
-  let canGo = state.gold >= costG && state.wood >= costW && state.meals >= costM;
+  let totalFood = (state.meals || 0) + (state.stew || 0);
+  let canGo = state.gold >= costG && state.wood >= costW && totalFood >= costM;
   fill(canGo ? 140 : 180, canGo ? 130 : 60, canGo ? 100 : 50, 160); textSize(8); textAlign(CENTER);
-  text('Cost: ' + costG + 'g  ' + costW + ' wood  ' + costM + ' meals', px + panW / 2, py + panH - 24);
+  text('Cost: ' + costG + 'g  ' + costW + ' wood  ' + costM + ' food (have ' + totalFood + ')', px + panW / 2, py + panH - 24);
   // Confirm hint
   fill(180, 160, 100, 180); textSize(9);
   text('Click to select, double-click to embark  |  [ESC] Cancel', px + panW / 2, py + panH - 10);
@@ -15704,7 +14548,6 @@ function enterConquest() {
   }
 
   c.expeditionNum++;
-  if (typeof advanceMainQuestCounter === 'function') advanceMainQuestCounter('mq_expeditions', 1);
   // Init fog of war
   initFogOfWar();
   // Reveal around landing zone
@@ -15756,6 +14599,7 @@ function exitConquest(isDeath) {
   if (typeof advanceMainQuestCounter === 'function') {
     advanceMainQuestCounter('mq_expeditions', 1);
   }
+  trackMilestone('first_expedition');
 
   // Transfer expedition loot
   let lootMult = isDeath ? 0.5 : 1.0;
@@ -16961,6 +15805,9 @@ function drawConquestIsleDistant() {
   let c = state.conquest;
   let sx = w2sX(c.isleX);
   let sy = w2sY(c.isleY);
+  // Clamp to horizon — never float above water
+  let _horizY = max(height * 0.06, height * 0.25 - horizonOffset) + 10;
+  sy = max(sy, _horizY);
   if (sx < -350 || sx > width + 350 || sy < -350 || sy > height + 350) return;
   push();
   noStroke();
@@ -18002,7 +16849,7 @@ function drawInventoryScreen() {
 function drawHotbar() {
   let p = state.player;
   let slot = p.hotbarSlot;
-  let slotW = 28, slotH = 28, gap = 4;
+  let slotW = 36, slotH = 36, gap = 3;
   let totalW = HOTBAR_ITEMS.length * (slotW + gap) - gap;
   let bx = floor((width - totalW) / 2);
   let by = height - slotH - 12;
@@ -18029,6 +16876,11 @@ function drawHotbar() {
       rect(sx, by, 1, slotH);
       rect(sx + slotW - 1, by, 1, slotH);
     }
+
+    // Key number label (top-left of slot)
+    fill(selected ? 212 : 120, selected ? 160 : 100, selected ? 64 : 60, selected ? 220 : 120);
+    textSize(6); textAlign(LEFT, TOP);
+    text(HOTBAR_ITEMS[i].key, sx + 2, by + 1);
 
     // Pixel icon in slot
     let cx = sx + floor(slotW / 2);
@@ -18080,13 +16932,28 @@ function drawHotbar() {
       rect(cx - 2, cy + 2, 4, 2);  // guard
       fill(100, 70, 35);
       rect(cx - 1, cy + 4, 2, 3);  // grip
+    } else if (item.icon === 'potion') {
+      fill(60, 180, 80); rect(cx - 3, cy - 2, 6, 7, 2);
+      fill(80, 200, 100); rect(cx - 2, cy - 1, 4, 3);
+      fill(140, 110, 60); rect(cx - 1, cy - 5, 2, 4);
+      fill(200, 180, 100); textSize(5); textAlign(CENTER,CENTER); text(p.potions, cx, cy + 8);
+    } else if (item.icon === 'stew') {
+      fill(140, 90, 40); rect(cx - 4, cy - 1, 8, 5, 1);
+      fill(180, 120, 50); rect(cx - 3, cy - 2, 6, 3);
+      fill(200, 180, 100); textSize(5); textAlign(CENTER,CENTER); text(state.stew || 0, cx, cy + 8);
+    } else if (item.icon === 'meal') {
+      fill(200, 170, 80); rect(cx - 4, cy - 2, 8, 5, 2);
+      fill(220, 190, 100); rect(cx - 3, cy - 1, 6, 3);
+      fill(200, 180, 100); textSize(5); textAlign(CENTER,CENTER); text(state.meals || 0, cx, cy + 8);
+    } else if (item.icon === 'wine') {
+      fill(130, 30, 50); rect(cx - 2, cy - 2, 4, 6, 1);
+      fill(100, 70, 35); rect(cx - 1, cy - 5, 2, 4);
+      fill(200, 180, 100); textSize(5); textAlign(CENTER,CENTER); text(state.wine || 0, cx, cy + 8);
+    } else if (item.icon === 'ambrosia') {
+      fill(220, 180, 40); rect(cx - 3, cy - 2, 6, 6, 2);
+      fill(255, 220, 80, 150); ellipse(cx, cy, 8, 8);
+      fill(200, 180, 100); textSize(5); textAlign(CENTER,CENTER); text(state.ambrosia || 0, cx, cy + 8);
     }
-
-    // Slot number (tiny, top-left)
-    fill(selected ? 212 : 80, selected ? 160 : 70, selected ? 64 : 50, selected ? 255 : 140);
-    textSize(5);
-    textAlign(LEFT, TOP);
-    text(i + 1, sx + 2, by + 2);
   }
 
   // Selected item name below hotbar
@@ -18101,6 +16968,7 @@ function drawHotbar() {
 
 function drawHUD() {
   if (photoMode) return;
+  if (dialogState.active) return;
   let h = state.time / 60;
   let mins = floor(state.time % 60);
   let ampm = h >= 12 ? 'PM' : 'AM';
@@ -18182,6 +17050,12 @@ function drawHUD() {
   fill(seasonCol);
   textSize(7);
   text(getSeasonName(), 22, cookedY + 41 + qOff);
+  // Seasonal crop hint
+  let _scHint = typeof getSeasonalCrop === 'function' ? getSeasonalCrop() : null;
+  if (_scHint) {
+    fill(160, 150, 110, 160); textSize(6);
+    text('Best crop: ' + _scHint.name, 22, cookedY + 50 + qOff);
+  }
 
   // Ship status
   let hudY = cookedY + 53;
@@ -18258,13 +17132,13 @@ function drawHUD() {
   let cr = width - 12, cb = height - 12;
   let controlLines = [];
   if (state.buildMode) {
-    controlLines = ['WASD move  |  CLICK place  |  Q rotate  |  B close'];
+    controlLines = [state.demolishMode ? 'CLICK building to demolish  |  X cancel  |  B close' : 'WASD move  |  CLICK place  |  Q rotate  |  X demolish  |  B close'];
   } else if (state.rowing && state.rowing.active) {
     controlLines = ['WASD row  |  E dock  |  ESC menu'];
   } else if (state.wreck && state.wreck.active) {
     controlLines = ['WASD move  |  E gather  |  TAB raft'];
   } else {
-    controlLines = ['WASD move  |  E interact/dive  |  B build', 'TAB empire  |  K skills  |  P photo  |  ESC menu'];
+    controlLines = ['WASD move  |  1-5 tools  |  6-0 items  |  E interact', 'SPACE attack  |  B build  |  K skills  |  ESC menu'];
   }
   let controlH = 10 + controlLines.length * 12;
   drawHUDPanel(cr - 200, cb - controlH, 200, controlH);
@@ -18797,7 +17671,7 @@ function drawHUDPanel(x, y, w, h) {
   fill(0, 0, 0, 25);
   rect(x + 1, y + 1, w, h, 3);
   // Semi-transparent dark background
-  fill(25, 20, 15, 160);
+  fill(25, 20, 15, 200);
   rect(x, y, w, h, 3);
   // Single pixel golden border
   stroke(180, 150, 80, 120);
@@ -18999,8 +17873,25 @@ function mousePressed() {
     return;
   }
   if (state.buildMode) {
-    let wx = snapToGrid(s2wX(mouseX));
-    let wy = snapToGrid(s2wY(mouseY));
+    if (state.demolishMode) {
+      let wx = s2wX(mouseX), wy = s2wY(mouseY);
+      let landmark = ['granary', 'well', 'temple', 'market', 'forum'];
+      for (let i = state.buildings.length - 1; i >= 0; i--) {
+        let b = state.buildings[i];
+        if (landmark.includes(b.type)) continue;
+        if (abs(wx - b.x) < (b.w || 24) * 0.7 && abs(wy - b.y) < (b.h || 24) * 0.7) {
+          state.buildings.splice(i, 1);
+          addFloatingText(w2sX(wx), w2sY(wy) - 20, 'Demolished', '#ff6644');
+          spawnParticles(wx, wy, 'chop', 6);
+          if (snd) snd.playSFX('chop');
+          return;
+        }
+      }
+      addFloatingText(w2sX(wx), w2sY(wy) - 20, 'No building here', C.textDim);
+      return;
+    }
+    let wx = snapToGrid(s2wX(mouseX - shakeX));
+    let wy = snapToGrid(s2wY(mouseY - shakeY - floatOffset));
     placeBuilding(wx, wy);
     return;
   }
@@ -19084,6 +17975,7 @@ function mousePressed() {
         state.codex.cropsGrown[p.cropType || 'grain'] = true;
         checkQuestProgress('harvest', harvestAmt);
         if (typeof advanceMainQuestCounter === 'function') advanceMainQuestCounter('mq_harvested', harvestAmt);
+        trackMilestone('first_harvest');
         // Auto-seeds: each harvest gives 1-2 seeds back
         let seedBack = 1 + (random() < 0.5 ? 1 : 0);
         state.seeds += seedBack;
@@ -19168,7 +18060,8 @@ function mousePressed() {
       if (typeof advanceMainQuestCounter === 'function') advanceMainQuestCounter('mq_crystals_gathered', amt);
       unlockJournal('first_crystal');
       nearCrystal.charge = 0;
-      nearCrystal.respawnTimer = 800; // respawns after ~800 frames
+      // Steel Pickaxe halves respawn time (2x mining speed)
+      nearCrystal.respawnTimer = state.tools.steelPick ? 400 : 800;
       let csx = w2sX(nearCrystal.x), csy = w2sY(nearCrystal.y);
       addFloatingText(csx, csy - 15, '+' + amt + ' Crystal', C.crystalGlow);
       spawnCrystalPulse(nearCrystal.x, nearCrystal.y);
@@ -19228,7 +18121,7 @@ function mousePressed() {
 function mouseDragged() {
   // Drag volume sliders in settings
   if (gameScreen === 'settings' && snd) {
-    let py = floor(height * 0.28);
+    let py = floor(height * 0.26);
     let sliderY = py + 80;
     let sliderW = 120;
     let slX = floor(width / 2 + 10);
@@ -19257,6 +18150,11 @@ function keyPressed() {
     if (keyCode === 27 && (gameScreen === 'settings' || gameScreen === 'credits')) {
       gameScreen = 'menu';
     }
+    // ESC on menu = back to game (if save exists / game in progress)
+    if (keyCode === 27 && gameScreen === 'menu' && state && state.isInitialized) {
+      gameScreen = 'game';
+      return;
+    }
     // Menu keyboard navigation
     if (gameScreen === 'menu') {
       let hasSave = !!localStorage.getItem('sunlitIsles_save');
@@ -19277,8 +18175,14 @@ function keyPressed() {
   if (state.introPhase !== 'done') { skipIntro(); return; }
   if (state.cutscene) { skipCutscene(); return; }
 
-  // ESC — save and return to main menu
+  // ESC — close overlays first, then menu as last resort
   if (keyCode === 27) {
+    if (dialogState.active) { dialogState.active = false; return; }
+    if (state.expeditionModifierSelect) { state.expeditionModifierSelect = false; return; }
+    if (state.upgradeShopOpen) { state.upgradeShopOpen = false; return; }
+    if (state.nightMarket && state.nightMarket.shopOpen) { state.nightMarket.shopOpen = false; return; }
+    if (state.ship && state.ship.shopOpen) { state.ship.shopOpen = false; return; }
+    if (state.tradeRouteUI) { state.tradeRouteUI = false; return; }
     saveGame();
     gameScreen = 'menu';
     menuFadeIn = 0;
@@ -19342,14 +18246,19 @@ function keyPressed() {
         addFloatingText(width / 2, height * 0.3, 'Need ' + supplyCost.wood + ' wood!', '#ff6644');
         return;
       }
-      if (state.meals < supplyCost.meals) {
-        addFloatingText(width / 2, height * 0.3, 'Need ' + supplyCost.meals + ' meals!', '#ff6644');
+      let totalFood = (state.meals || 0) + (state.stew || 0);
+      if (totalFood < supplyCost.meals) {
+        addFloatingText(width / 2, height * 0.3, 'Need ' + supplyCost.meals + ' meals/stew! (have ' + totalFood + ')', '#ff6644');
         return;
       }
-      // Deduct and embark
+      // Deduct food — use meals first, then stew
       state.gold -= supplyCost.gold;
       state.wood -= supplyCost.wood;
-      state.meals -= supplyCost.meals;
+      let foodNeeded = supplyCost.meals;
+      let mealsUsed = min(state.meals, foodNeeded);
+      state.meals -= mealsUsed;
+      foodNeeded -= mealsUsed;
+      if (foodNeeded > 0) state.stew -= foodNeeded;
       state.expeditionModifierSelect = false;
       let modName = getModifier().name;
       addFloatingText(width / 2, height * 0.38, modName + ' Expedition', getModifier().color);
@@ -19468,12 +18377,18 @@ function keyPressed() {
 
   // Interact
   if (key === 'e' || key === 'E') {
-    // Dive — E near water (moved from D key to avoid movement conflict)
+    // Dive — E near water, but NOT if near the rowboat
     if (typeof startDive === 'function' && !state.rowing.active && !state.buildMode &&
-        !state.conquest.active && !state.adventure.active) {
-      let inWater = isInShallows(state.player.x, state.player.y) ||
-                    !isOnIsland(state.player.x, state.player.y);
-      if (inWater) { startDive(); return; }
+        !state.conquest.active && !state.adventure.active &&
+        !(state.vulcan && state.vulcan.active) && !(state.hyperborea && state.hyperborea.active) &&
+        !(state.plenty && state.plenty.active) && !(state.necropolis && state.necropolis.active)) {
+      let _port = typeof getPortPosition === 'function' ? getPortPosition() : { x: 0, y: 0 };
+      let _nearBoat = dist(state.player.x, state.player.y, _port.x - 80, _port.y + 20) < 70;
+      if (!_nearBoat) {
+        let inWater = isInShallows(state.player.x, state.player.y) ||
+                      !isOnIsland(state.player.x, state.player.y);
+        if (inWater) { startDive(); return; }
+      }
     }
 
     // Discovery event interaction (NPC rescue, etc.)
@@ -19602,6 +18517,7 @@ function keyPressed() {
                        state.felix && state.felix.hearts >= 8;
         if (lvlOk && heartsOk) {
           state.narrativeFlags['rite_mare_nostrum'] = true;
+          trackMilestone('game_complete');
           addFloatingText(width / 2, height * 0.18, 'RITE OF MARE NOSTRUM', '#ffd700');
           addFloatingText(width / 2, height * 0.26, 'The crystals sing. The sea is yours.', '#aaddff');
           addFloatingText(width / 2, height * 0.34, 'All hearts aligned. All islands joined.', '#ff88cc');
@@ -19766,6 +18682,34 @@ function keyPressed() {
     }
   }
 
+  // Dive attack — SPACE while underwater
+  if (state.diving && state.diving.active && (key === ' ' || key === 'j' || key === 'J')) {
+    let p = state.player;
+    if (p.attackTimer <= 0) {
+      p.attackTimer = p.attackCooldown;
+      p.slashPhase = 10;
+      p.toolSwing = 12;
+      if (snd) snd.playSFX('hit');
+    }
+    return;
+  }
+
+  // Hotbar 1-0 direct select
+  if (!state.buildMode && !state.conquest.active && !state.adventure.active) {
+    let numKey = key === '0' ? 9 : parseInt(key) - 1;
+    if (numKey >= 0 && numKey < HOTBAR_ITEMS.length) {
+      let item = HOTBAR_ITEMS[numKey];
+      // Consumable items (slots 5+) — use immediately instead of selecting
+      if (numKey === 5) { usePotion(); return; }
+      if (numKey === 6) { useStew(); return; }
+      if (numKey === 7 || numKey === 8) { state.player.hotbarSlot = numKey; addFloatingText(width / 2, height - 110, item.name, '#aaddaa'); return; }
+      if (numKey === 9) { useAmbrosia(); return; }
+      state.player.hotbarSlot = numKey;
+      addFloatingText(width / 2, height - 110, item.name, '#aaddaa');
+      return;
+    }
+  }
+
   // Dialog advance with Space
   if (dialogState.active && key === ' ') { advanceDialog(); return; }
 
@@ -19813,6 +18757,7 @@ function keyPressed() {
   // Build mode toggle
   if (key === 'b' || key === 'B') {
     state.buildMode = !state.buildMode;
+    state.demolishMode = false;
     if (state.buildMode) {
       addFloatingText(width / 2, height * 0.4, 'BUILD MODE ON', C.crystalGlow);
     } else {
@@ -19835,10 +18780,14 @@ function keyPressed() {
     if (key === '-') state.buildType = 'aqueduct';
     if (key === '=') state.buildType = 'bath';
     if (key === 'q' || key === 'Q') state.buildRotation = (state.buildRotation + 1) % 2;
+    if (key === 'x' || key === 'X') {
+      state.demolishMode = !state.demolishMode;
+      addFloatingText(width / 2, height * 0.4, state.demolishMode ? 'DEMOLISH MODE — click building' : 'DEMOLISH OFF', state.demolishMode ? '#ff6644' : C.textDim);
+    }
   }
 
-  // Expand island
-  if (key === 'x' || key === 'X') {
+  // Expand island (only when not in build mode)
+  if (!state.buildMode && (key === 'x' || key === 'X')) {
     expandIsland();
   }
 
@@ -19931,1173 +18880,7 @@ const WRECK_DEPTH_THRESHOLDS = [0.9, 1.05, 1.3, 1.6]; // beach|ankle|waist|swim|
 const WRECK_DEPTH_SPEEDS     = [1.0,  0.85, 0.65, 0.5, 0.45];
 const WRECK_DEPTH_LABELS     = ['beach','ankle','waist','swimming','deep'];
 
-// Returns 0=beach 1=ankle 2=waist 3=swimming 4=deep/dive
-function getWreckDepth(wx, wy) {
-  let ex = (wx - WRECK.cx) / WRECK.rx;
-  let ey = (wy - WRECK.cy) / (WRECK.ry * 0.55);
-  let d  = sqrt(ex * ex + ey * ey);
-  if (d < WRECK_DEPTH_THRESHOLDS[0]) return 0;
-  if (d < WRECK_DEPTH_THRESHOLDS[1]) return 1;
-  if (d < WRECK_DEPTH_THRESHOLDS[2]) return 2;
-  if (d < WRECK_DEPTH_THRESHOLDS[3]) return 3;
-  return 4;
-}
-
-function updateWreckBeach(dt) {
-  let p = state.player;
-
-  // ── Depth calculation ────────────────────────────────────────────────────
-  let prevDepth = state.diving.depth || 0;
-  let curDepth  = getWreckDepth(p.x, p.y);
-  state.diving.depth = curDepth;
-
-  // Speed multiplier by depth zone
-  let speedMul = WRECK_DEPTH_SPEEDS[curDepth] * 0.8; // 0.8 = wreck "injured" penalty
-
-  // ── Movement input ────────────────────────────────────────────────────────
-  let mx = 0, my = 0;
-  if (keyIsDown(65) || keyIsDown(LEFT_ARROW))  mx -= 1;
-  if (keyIsDown(68) || keyIsDown(RIGHT_ARROW)) mx += 1;
-  if (keyIsDown(87) || keyIsDown(UP_ARROW))    my -= 1;
-  if (keyIsDown(83) || keyIsDown(DOWN_ARROW))  my += 1;
-  if (mx !== 0 || my !== 0) {
-    let len = sqrt(mx * mx + my * my);
-    mx /= len; my /= len;
-    p.vx = mx * p.speed * speedMul;
-    p.vy = my * p.speed * speedMul;
-    p.moving = true;
-    if (abs(mx) > abs(my)) p.facing = mx > 0 ? 'right' : 'left';
-    else p.facing = my > 0 ? 'down' : 'up';
-  } else {
-    // Decelerate — faster drag in water
-    let drag = curDepth >= 3 ? 0.8 : 0.7;
-    p.vx *= drag; p.vy *= drag;
-    if (abs(p.vx) < 0.1 && abs(p.vy) < 0.1) { p.vx = 0; p.vy = 0; p.moving = false; }
-  }
-  p.x += p.vx * dt; p.y += p.vy * dt;
-
-  // ── Ocean current boundary (no teleport, no hard wall) ───────────────────
-  // Explorable area: 2.5x island radius in each direction
-  let boundRX = WRECK.rx * 2.5;
-  let boundRY = WRECK.ry * 1.8 * 2.5 / 2.2; // proportional
-  let bex = (p.x - WRECK.cx) / boundRX;
-  let bey = (p.y - WRECK.cy) / boundRY;
-  let bDist = bex * bex + bey * bey;
-  if (bDist > 1.0) {
-    // Graceful current pushback — scales with overshoot, never teleports
-    let ang = atan2(p.y - WRECK.cy, p.x - WRECK.cx);
-    let over = bDist - 1.0;
-    let pushStr = over * 3.5 + 0.8; // stronger the further out
-    p.vx -= cos(ang) * pushStr * dt;
-    p.vy -= sin(ang) * pushStr * dt;
-    // Message hint — only once per crossing
-    if (over > 0.02 && frameCount % 90 === 0) {
-      addFloatingText(w2sX(p.x), w2sY(p.y) - 20, 'The current is too strong...', '#88bbcc');
-    }
-  }
-
-  // ── Splash particles on zone transitions ─────────────────────────────────
-  if (curDepth !== prevDepth) {
-    let sx = w2sX(p.x), sy = w2sY(p.y);
-    // Entering water from beach
-    if (prevDepth === 0 && curDepth === 1) {
-      spawnWreckSplash(p.x, p.y, 4, 5);
-    } else if (prevDepth <= 1 && curDepth === 2) {
-      spawnWreckSplash(p.x, p.y, 8, 9);
-    } else if (prevDepth <= 2 && curDepth === 3) {
-      spawnWreckSplash(p.x, p.y, 12, 13);
-    } else if (prevDepth <= 3 && curDepth === 4) {
-      spawnWreckSplash(p.x, p.y, 18, 16);
-    }
-    // Surfacing — big exit splash
-    if (prevDepth === 4 && curDepth <= 3) {
-      spawnWreckSplash(p.x, p.y, 14, 14);
-    }
-    // Auto-exit dive if waded back to shallows
-    if (state.diving.active && curDepth < 4) {
-      if (typeof exitDive === 'function') exitDive();
-    }
-  }
-
-  // ── Ankle-deep walking splashes ───────────────────────────────────────────
-  if (curDepth === 1 && p.moving && frameCount % 18 === 0) {
-    spawnWreckSplash(p.x, p.y, 3, 4);
-  }
-  if (curDepth === 2 && p.moving && frameCount % 12 === 0) {
-    spawnWreckSplash(p.x, p.y, 5, 6);
-  }
-
-  // ── Update crabs + ambient ────────────────────────────────────────────────
-  updateWreckCrabs(dt);
-  updateWreckAmbient(dt);
-
-  // ── Tutorial hints ────────────────────────────────────────────────────────
-  if (!state.progression.tutorialsSeen.gather && state.wreck.scavNodes.some(n => !n.collected)) {
-    let nearest = getNearestScavNode();
-    if (nearest && dist(p.x, p.y, nearest.x, nearest.y) < 50) {
-      showTutorialHint('Press E to gather', nearest.x, nearest.y - 20);
-    }
-  }
-
-  // ── Raft hints ────────────────────────────────────────────────────────────
-  let raftX = WRECK.cx, raftY = WRECK.cy + 35;
-  if (state.wreck.raftBuilt) {
-    if (dist(p.x, p.y, raftX, raftY) < 55) {
-      showTutorialHint('Press E to launch the raft!', raftX, raftY - 25);
-    }
-  } else if (dist(p.x, p.y, raftX, raftY) < 55 && (state.wood > 0 || state.seeds > 0)) {
-    showTutorialHint('Press E to add materials to raft', raftX, raftY - 25);
-  }
-}
-
-function spawnWreckSplash(wx, wy, count, speed) {
-  for (let i = 0; i < count; i++) {
-    let ang = random(TWO_PI);
-    let spd = random(0.3, 1) * speed * 0.25;
-    particles.push({
-      x: wx + random(-4, 4), y: wy + random(-2, 2),
-      vx: cos(ang) * spd, vy: sin(ang) * spd * 0.5 - random(0.5, 1.5),
-      life: 20 + random(20), maxLife: 40,
-      type: 'splash_drop',
-      r: 180, g: 225, b: 255,
-      size: random(1.5, 3.5),
-      world: true,
-    });
-  }
-  // Ring flash
-  particles.push({
-    x: wx, y: wy,
-    vx: 0, vy: 0,
-    life: 10, maxLife: 10,
-    type: 'splash_ring',
-    r: 200, g: 240, b: 255,
-    size: speed * 2.5,
-    world: true,
-  });
-}
-
-function getNearestScavNode() {
-  let p = state.player;
-  let best = null, bestD = Infinity;
-  for (let n of state.wreck.scavNodes) {
-    if (n.collected) continue;
-    let d = dist(p.x, p.y, n.x, n.y);
-    if (d < bestD) { bestD = d; best = n; }
-  }
-  return bestD < 40 ? best : null;
-}
-
-function collectScavNode(node) {
-  node.collected = true;
-  if (snd) snd.playSFX('scavenge');
-  let t = node.type;
-  let label = '';
-  if (t === 'stick' || t === 'plank') { state.wood += (t === 'plank' ? 2 : 1); label = '+' + (t === 'plank' ? '2' : '1') + ' Wood'; }
-  else if (t === 'stone' || t === 'flint') { state.stone += (t === 'flint' ? 2 : 1); label = '+' + (t === 'flint' ? '2' : '1') + ' Stone'; }
-  else if (t === 'rope') { state.wood += 1; label = '+1 Rope'; }
-  else if (t === 'cloth') { state.seeds += 1; label = '+1 Cloth'; }
-  else if (t === 'coconut') { state.fish += 1; label = '+1 Coconut (Food)'; }
-  addFloatingText(w2sX(node.x), w2sY(node.y) - 10, label, C.solarGold);
-
-  // Mark tutorial seen
-  state.progression.tutorialsSeen.gather = true;
-
-  // Check if enough materials to hint at raft building
-  if (state.wood >= 2 && !state.progression.tutorialsSeen.repair) {
-    showTutorialHint('Head to the south beach to build a raft', WRECK.cx, WRECK.cy + 30);
-    state.progression.tutorialsSeen.repair = true;
-  }
-}
-
-function buildRaft() {
-  let w = state.wreck;
-  if (w.raftBuilt) return;
-  // Add whatever materials the player has, up to the requirements
-  let added = false;
-  let woodNeeded = 8 - w.raftWood;
-  let ropeNeeded = 4 - w.raftRope;
-  let clothNeeded = 2 - w.raftCloth;
-
-  // Wood: stored in state.wood (planks give 2, sticks give 1)
-  if (state.wood > 0 && woodNeeded > 0) {
-    let give = min(state.wood, woodNeeded);
-    state.wood -= give; w.raftWood += give; added = true;
-  }
-  // Rope: stored in state.wood too (rope nodes give +1 wood) — we use a heuristic:
-  // Actually rope was collected as wood. We'll just use wood for both wood+rope costs.
-  // Let's simplify: rope needed is tracked separately and also costs from wood pool.
-  if (state.wood > 0 && ropeNeeded > 0) {
-    let give = min(state.wood, ropeNeeded);
-    state.wood -= give; w.raftRope += give; added = true;
-  }
-  // Cloth: stored in state.seeds (cloth nodes give +1 seeds)
-  if (state.seeds > 0 && clothNeeded > 0) {
-    let give = min(state.seeds, clothNeeded);
-    state.seeds -= give; w.raftCloth += give; added = true;
-  }
-
-  if (added) {
-    if (snd) snd.playSFX('repair');
-    w.raftProgress = floor((w.raftWood / 8 + w.raftRope / 4 + w.raftCloth / 2) / 3 * 100);
-    let raftX = WRECK.cx, raftY = WRECK.cy + 35;
-    addFloatingText(w2sX(raftX), w2sY(raftY) - 15,
-      'RAFT ' + w.raftProgress + '%', w.raftProgress >= 100 ? C.crystalGlow : C.solarGold);
-    if (w.raftWood >= 8 && w.raftRope >= 4 && w.raftCloth >= 2) {
-      w.raftBuilt = true;
-      w.raftProgress = 100;
-      state.progression.triremeRepaired = true; // reuse flag for progression
-      addFloatingText(w2sX(raftX), w2sY(raftY) - 30,
-        'RAFT COMPLETE!', C.crystalGlow);
-      unlockJournal('trireme_repair');
-    }
-  } else {
-    addFloatingText(w2sX(WRECK.cx), w2sY(WRECK.cy + 35) - 15,
-      'Need more materials!', C.textDim);
-  }
-}
-
-function sailToHome() {
-  // Play sailing cutscene — completeSailToHome() called when done
-  startSailingCutscene();
-}
-
-// Handle E key on wreck beach
-function handleWreckInteract() {
-  let p = state.player;
-
-  // Collect nearest scavenge node (priority over crabs)
-  let node = getNearestScavNode();
-  if (node) { collectScavNode(node); return; }
-
-  // Catch nearest crab
-  let crab = getNearestCrab();
-  if (crab) { catchCrab(crab); return; }
-
-  // Build raft (south shore construction spot)
-  let raftX = WRECK.cx, raftY = WRECK.cy + 35;
-  if (dist(p.x, p.y, raftX, raftY) < 55 && !state.wreck.raftBuilt) {
-    buildRaft(); return;
-  }
-
-  // Launch raft to sail home
-  if (state.wreck.raftBuilt && dist(p.x, p.y, raftX, raftY) < 55) {
-    sailToHome(); return;
-  }
-
-  // Build campfire (costs 2 wood + 1 stone)
-  if (!state.wreck.campfire && state.wood >= 2 && state.stone >= 1) {
-    let cfX = WRECK.cx + 20, cfY = WRECK.cy + 5;
-    if (dist(p.x, p.y, cfX, cfY) < 60) {
-      state.wreck.campfire = true;
-      state.wood -= 2; state.stone -= 1;
-      addFloatingText(w2sX(cfX), w2sY(cfY) - 10, 'CAMPFIRE BUILT', C.solarFlare);
-    }
-  }
-}
-
-// Wreck beach rowing awareness — detect wreck island when sailing
-function updateWreckRowing(dt) {
-  if (!state.rowing.active) return;
-  let r = state.rowing;
-  // Detect proximity to wreck beach
-  let wDx = (r.x - WRECK.cx) / WRECK.rx;
-  let wDy = (r.y - WRECK.cy) / WRECK.ry;
-  let wDist = wDx * wDx + wDy * wDy;
-  if (wDist < 2.0 * 2.0) {
-    r.nearIsle = 'wreck';
-  }
-  // Collision
-  if (wDist < 0.8 * 0.8) {
-    let ang = atan2(r.y - WRECK.cy, r.x - WRECK.cx);
-    r.x = WRECK.cx + cos(ang) * WRECK.rx * 0.82;
-    r.y = WRECK.cy + sin(ang) * WRECK.ry * 0.82;
-    r.speed *= 0.3;
-  }
-}
-
-// ─── CRAB AI + CATCH ────────────────────────────────────────────────────
-function getNearestCrab() {
-  let p = state.player;
-  let best = null, bestD = Infinity;
-  for (let c of state.wreck.crabs) {
-    let d = dist(p.x, p.y, c.x, c.y);
-    if (d < bestD) { bestD = d; best = c; }
-  }
-  return bestD < 22 ? best : null; // tight range — must be right next to crab
-}
-
-function catchCrab(crab) {
-  let idx = state.wreck.crabs.indexOf(crab);
-  if (idx >= 0) state.wreck.crabs.splice(idx, 1);
-  state.fish += 1; // crab meat as food
-  state.stone += 1; // shell
-  if (snd) snd.playSFX('crab_catch');
-  addFloatingText(w2sX(crab.x), w2sY(crab.y) - 10, '+1 Crab Meat +1 Shell', C.solarGold);
-  // Bubble burst particles
-  for (let i = 0; i < 4; i++) {
-    particles.push({
-      x: w2sX(crab.x), y: w2sY(crab.y),
-      vx: random(-1, 1), vy: random(-1.5, -0.5),
-      life: 25, maxLife: 25, size: 2, type: 'sparkle',
-      color: [200, 220, 255],
-    });
-  }
-}
-
-function updateWreckCrabs(dt) {
-  let p = state.player;
-  for (let c of state.wreck.crabs) {
-    let pdist = dist(p.x, p.y, c.x, c.y);
-
-    // Flee if player is close
-    if (pdist < 45 && c.state !== 'flee') {
-      c.state = 'flee';
-      c.timer = 40;
-      let ang = atan2(c.y - p.y, c.x - p.x);
-      c.vx = cos(ang) * 1.2;
-      c.vy = sin(ang) * 1.2;
-      c.facing = c.vx > 0 ? 1 : -1;
-    }
-
-    c.timer -= dt;
-    if (c.timer <= 0) {
-      if (c.state === 'flee' || c.state === 'wander') {
-        c.state = 'idle';
-        c.timer = random(80, 200);
-        c.vx = 0; c.vy = 0;
-      } else {
-        // Start wandering
-        c.state = 'wander';
-        c.timer = random(30, 80);
-        let ang = random(TWO_PI);
-        c.vx = cos(ang) * 0.4;
-        c.vy = sin(ang) * 0.3;
-        c.facing = c.vx > 0 ? 1 : -1;
-      }
-    }
-
-    c.x += c.vx * dt;
-    c.y += c.vy * dt;
-
-    // Constrain to beach
-    let ex = (c.x - WRECK.cx) / (WRECK.rx * 0.75);
-    let ey = (c.y - WRECK.cy) / (WRECK.ry * 0.28);
-    if (ex * ex + ey * ey > 1.0) {
-      let ang = atan2(c.y - WRECK.cy, c.x - WRECK.cx);
-      c.x = WRECK.cx + cos(ang) * WRECK.rx * 0.73;
-      c.y = WRECK.cy + sin(ang) * WRECK.ry * 0.27;
-      c.vx = -c.vx; c.vy = -c.vy;
-      c.facing = c.vx > 0 ? 1 : -1;
-    }
-
-    // Bubble timer
-    c.bubbleTimer -= dt;
-    if (c.bubbleTimer <= 0 && c.state === 'idle') {
-      c.bubbleTimer = random(120, 300);
-      particles.push({
-        x: w2sX(c.x), y: w2sY(c.y) - 3,
-        vx: random(-0.2, 0.2), vy: -0.5,
-        life: 20, maxLife: 20, size: 2, type: 'sparkle',
-        color: [200, 230, 255],
-      });
-    }
-  }
-}
-
-// ─── WRECK AMBIENT — birds, glints ──────────────────────────────────────
-function updateWreckAmbient(dt) {
-  let w = state.wreck;
-  // Bird fly-bys — occasional
-  if (w.birds.length < 2 && random() < 0.003) {
-    let fromLeft = random() > 0.5;
-    w.birds.push({
-      x: fromLeft ? WRECK.cx - 300 : WRECK.cx + 300,
-      y: WRECK.cy - 40 - random(20),
-      vx: fromLeft ? 1.5 + random(0.5) : -1.5 - random(0.5),
-      phase: random(TWO_PI),
-    });
-  }
-  for (let b of w.birds) {
-    b.x += b.vx * dt;
-    b.y += sin(b.phase + frameCount * 0.02) * 0.1;
-  }
-  w.birds = w.birds.filter(b => abs(b.x - WRECK.cx) < 400);
-
-  // Sun glints on sand — sparkle randomly
-  if (w.glints.length < 3 && random() < 0.01) {
-    w.glints.push({
-      x: WRECK.cx + random(-WRECK.rx * 0.7, WRECK.rx * 0.7),
-      y: WRECK.cy + random(-5, 15),
-      timer: 30 + random(30),
-    });
-  }
-  for (let g of w.glints) g.timer -= dt;
-  w.glints = w.glints.filter(g => g.timer > 0);
-}
-
-// ─── DRAW WRECK ISLAND ──────────────────────────────────────────────────
-function drawWreckIsland() {
-  let cx = WRECK.cx, cy = WRECK.cy;
-  let rx = WRECK.rx, ry = WRECK.ry;
-  let sx = w2sX(cx), sy = w2sY(cy);
-
-  if (sx + rx < -400 || sx - rx > width + 400 || sy + ry < -300 || sy - ry > height + 300) return;
-
-  noStroke();
-  let sandRX = rx * 0.88, sandRY = ry * 0.50;
-  let bright = typeof getSkyBrightness === 'function' ? getSkyBrightness() : 0.6;
-  let t0 = frameCount * 0.01;
-
-  // ─── DEEP WATER SHADOW beneath island ───
-  fill(10, 25, 45, 40);
-  ellipse(sx + 5, sy + sandRY + 8, sandRX * 2.0, 25);
-
-  // ─── SHALLOW LAGOON — turquoise rings with wave distortion ───
-  for (let ring = 0; ring < 5; ring++) {
-    let ringScale = 1.35 - ring * 0.06;
-    let ringRX = sandRX * ringScale;
-    let ringRY = sandRY * ringScale * 1.15;
-    let alpha = 90 + ring * 25;
-    let r = lerp(35, 95, ring / 4);
-    let g = lerp(110, 185, ring / 4);
-    let b = lerp(155, 200, ring / 4);
-    fill(r * bright, g * bright, b, alpha);
-    for (let row = -ringRY; row < ringRY; row += 3) {
-      let t = row / ringRY;
-      let w2 = ringRX * sqrt(max(0, 1 - t * t));
-      let wave = sin(t0 * 2 + row * 0.06) * 3;
-      rect(floor(sx - w2 + wave), floor(sy + row), floor(w2 * 2), 3);
-    }
-  }
-
-  // ─── REEF / ROCKS in shallow water ───
-  let reefPositions = [
-    [-0.7, 0.6], [0.8, 0.5], [-0.5, -0.7], [0.6, -0.6], [-0.9, 0.1], [0.95, 0.2],
-    [-0.3, 0.8], [0.4, 0.75], [0.1, -0.8], [-0.8, -0.4],
-  ];
-  for (let rp of reefPositions) {
-    let rrx = sx + rp[0] * sandRX * 1.15;
-    let rry = sy + rp[1] * sandRY * 1.3;
-    // Dark rock
-    fill(60 * bright, 55 * bright, 48);
-    rect(floor(rrx - 5), floor(rry - 3), 10, 6, 1);
-    fill(75 * bright, 70 * bright, 58);
-    rect(floor(rrx - 4), floor(rry - 3), 8, 3, 1);
-    // Water foam around rock
-    let foam = sin(t0 * 3 + rp[0] * 5) * 0.3 + 0.7;
-    fill(220, 240, 255, 40 * foam);
-    rect(floor(rrx - 7), floor(rry - 1), 14, 2);
-  }
-
-  // ─── WET SAND RING ───
-  let wetRX = sandRX * 1.06, wetRY = sandRY * 1.08;
-  for (let row = -wetRY; row < wetRY; row += 2) {
-    let t = row / wetRY;
-    let w2 = wetRX * sqrt(max(0, 1 - t * t));
-    // Add organic wobble to the edge
-    let wobble = sin(row * 0.08 + 1.5) * 4 + sin(row * 0.15 + 3.2) * 2;
-    fill(165 * bright, 150 * bright, 115);
-    rect(floor(sx - w2 + wobble), floor(sy + row), floor(w2 * 2 - wobble * 2), 2);
-  }
-
-  // ─── SAND SURFACE — organic shape with wobble ───
-  for (let row = -sandRY; row < sandRY; row += 2) {
-    let t = row / sandRY;
-    let w2 = sandRX * sqrt(max(0, 1 - t * t));
-    // Organic edge — multiple sine waves create natural coastline
-    let wobble = sin(row * 0.06 + 0.7) * 6 + sin(row * 0.13 + 2.1) * 3 + sin(row * 0.21 + 4.5) * 2;
-    w2 += wobble;
-    let edgeDarken = abs(t) > 0.5 ? (abs(t) - 0.5) * 30 : 0;
-    let r = (228 - edgeDarken) * bright;
-    let g = (208 - edgeDarken * 0.8) * bright;
-    let b2 = (158 - edgeDarken * 0.5);
-    fill(r, g, b2);
-    rect(floor(sx - w2), floor(sy + row), floor(w2 * 2), 2);
-  }
-
-  // Sunlit highlight patch
-  for (let row = -sandRY * 0.35; row < sandRY * 0.15; row += 2) {
-    let t = row / sandRY;
-    let w2 = sandRX * 0.3 * sqrt(max(0, 1 - t * t * 8));
-    fill(245, 235, 200, 35 * bright);
-    rect(floor(sx - sandRX * 0.1 - w2), floor(sy + row), floor(w2 * 2), 2);
-  }
-
-  // ─── SAND TEXTURE ───
-  for (let i = 0; i < 55; i++) {
-    let angle = (i * 2.39996) % TWO_PI; // golden angle distribution
-    let r = ((i * 17 + 7) % 100) / 100 * 0.8;
-    let px = sx + cos(angle) * sandRX * r;
-    let py = sy + sin(angle) * sandRY * r * 0.5;
-    let dx = (px - sx) / sandRX, dy = (py - sy) / sandRY;
-    if (dx * dx + dy * dy < 0.6) {
-      if (i % 4 === 0) { fill(205, 188, 140, 80); rect(floor(px), floor(py), 5, 2); }
-      else if (i % 4 === 1) { fill(235, 220, 180, 50); rect(floor(px), floor(py), 3, 1); }
-      else if (i % 4 === 2) { fill(195, 175, 125, 60); rect(floor(px), floor(py), 4, 2); }
-      else { fill(215, 200, 160, 40); rect(floor(px), floor(py), 2, 3); }
-    }
-  }
-
-  // ─── TIDE LINE — dark wet sand line around beach perimeter ───
-  for (let i = -sandRX * 0.85; i < sandRX * 0.85; i += 4) {
-    let t = i / sandRX;
-    let edgeY = sandRY * 0.85 * sqrt(max(0, 1 - t * t));
-    let wave = sin(t0 * 1.5 + i * 0.05) * 1.5;
-    fill(160 * bright, 140 * bright, 100, 80);
-    rect(floor(sx + i), floor(sy + edgeY + wave), 4, 1);
-    // Scattered seaweed along tide line
-    if (abs(sin(i * 0.3 + 1.7)) > 0.92) {
-      fill(45, 80, 40, 120);
-      rect(floor(sx + i), floor(sy + edgeY + wave - 2), 3, 4);
-    }
-  }
-
-  // ─── DRIFTWOOD PILES — scattered larger pieces ───
-  let driftPiles = [[-0.4, 0.35], [0.55, 0.3], [-0.15, 0.4], [0.3, 0.38]];
-  for (let dp of driftPiles) {
-    let dpx = sx + dp[0] * sandRX, dpy = sy + dp[1] * sandRY;
-    fill(95 * bright, 65 * bright, 32);
-    rect(floor(dpx - 10), floor(dpy), 20, 3);
-    rect(floor(dpx - 6), floor(dpy + 2), 14, 2);
-    fill(80 * bright, 55 * bright, 28);
-    rect(floor(dpx - 8), floor(dpy + 1), 6, 1);
-  }
-
-  // ─── SEAWEED PATCHES on rocks and edges ───
-  let seaweedSpots = [[-0.6, 0.3], [0.7, 0.25], [-0.2, 0.42], [0.45, 0.38], [-0.85, 0.15]];
-  for (let sw of seaweedSpots) {
-    let swx = sx + sw[0] * sandRX, swy = sy + sw[1] * sandRY;
-    let sway = sin(t0 * 2 + sw[0] * 5) * 1;
-    fill(40, 75, 35, 130);
-    rect(floor(swx - 3 + sway), floor(swy - 3), 2, 6);
-    rect(floor(swx + sway), floor(swy - 2), 2, 5);
-    rect(floor(swx + 3 + sway), floor(swy - 1), 2, 4);
-    fill(55, 95, 45, 100);
-    rect(floor(swx - 1 + sway), floor(swy - 4), 2, 3);
-  }
-
-  // Shells, pebbles, coral scattered
-  let decoSeed = [[-65,8],[80,14],[-100,-12],[55,25],[30,18],[-90,20],[110,-5],[-40,30],[70,-15],[-20,-20]];
-  for (let i = 0; i < decoSeed.length; i++) {
-    let dx = decoSeed[i][0], dy = decoSeed[i][1];
-    let dsx = floor(sx + dx), dsy = floor(sy + dy);
-    if (i % 3 === 0) { fill(235, 225, 200); ellipse(dsx, dsy, 4, 3); fill(245, 238, 218); ellipse(dsx, dsy - 1, 2, 2); }
-    else if (i % 3 === 1) { fill(180, 165, 130); rect(dsx, dsy, 5, 3, 1); }
-    else { fill(215, 130, 110, 150); rect(dsx, dsy, 3, 4); rect(dsx + 2, dsy - 2, 2, 3); }
-  }
-
-  // ─── SHORE FOAM — multi-layered animated waves ───
-  let foamPhase = t0 * 2;
-  // Bottom foam — thick crashing waves
-  for (let i = -sandRX * 0.9; i < sandRX * 0.9; i += 5) {
-    let t = i / sandRX;
-    let edgeY = sandRY * sqrt(max(0, 1 - t * t)) + 5;
-    let wave1 = sin(foamPhase + i * 0.04) * 4;
-    let wave2 = sin(foamPhase * 0.7 + i * 0.06 + 2) * 2;
-    // Primary foam
-    fill(240, 248, 255, 70 + sin(foamPhase * 1.5 + i * 0.07) * 25);
-    rect(floor(sx + i), floor(sy + edgeY - 3 + wave1), 5, 3);
-    // Secondary foam line
-    fill(225, 238, 250, 40);
-    rect(floor(sx + i + 2), floor(sy + edgeY + 2 + wave2), 4, 2);
-    // Spray dots
-    if (abs(sin(foamPhase * 2 + i * 0.1)) > 0.85) {
-      fill(255, 255, 255, 60);
-      rect(floor(sx + i + 1), floor(sy + edgeY - 5 + wave1), 2, 1);
-    }
-  }
-  // Side foam
-  for (let row = -sandRY * 0.6; row < sandRY * 1.1; row += 5) {
-    let t = row < sandRY ? row / sandRY : 1.0;
-    let w2 = sandRX * sqrt(max(0, 1 - min(1, t) * min(1, t)));
-    let wave = sin(foamPhase * 0.8 + row * 0.03) * 3;
-    fill(235, 245, 255, 35);
-    rect(floor(sx - w2 - 3 + wave), floor(sy + row), 4, 4);
-    rect(floor(sx + w2 - 1 - wave), floor(sy + row), 4, 4);
-  }
-
-  // ─── ROCKY OUTCROP — north side of island (dramatic cliff) ───
-  let rockX = sx - sandRX * 0.5, rockY = sy - sandRY * 0.6;
-  for (let row = 0; row < 25; row += 2) {
-    let rw = 40 - row * 1.2;
-    fill((85 - row) * bright, (78 - row) * bright, 65 - row * 0.5);
-    rect(floor(rockX - rw / 2), floor(rockY + row), floor(rw), 2);
-  }
-  fill(100 * bright, 92 * bright, 78);
-  rect(floor(rockX - 15), floor(rockY), 30, 4, 1);
-  // Rock texture lines
-  fill(70 * bright, 65 * bright, 55, 80);
-  rect(floor(rockX - 10), floor(rockY + 8), 20, 1);
-  rect(floor(rockX - 8), floor(rockY + 14), 16, 1);
-
-  // Second rock cluster — east side
-  let rock2X = sx + sandRX * 0.6, rock2Y = sy - sandRY * 0.3;
-  for (let row = 0; row < 18; row += 2) {
-    let rw = 30 - row;
-    fill((80 - row) * bright, (72 - row) * bright, 60 - row * 0.5);
-    rect(floor(rock2X - rw / 2), floor(rock2Y + row), floor(rw), 2);
-  }
-
-  // ─── TIDAL POOLS — small water pools on the beach ───
-  let poolPositions = [[0.25, 0.2], [-0.3, 0.25], [0.5, 0.1]];
-  for (let pp of poolPositions) {
-    let ppx = sx + pp[0] * sandRX, ppy = sy + pp[1] * sandRY;
-    fill(70, 140, 170, 120);
-    ellipse(ppx, ppy, 16, 10);
-    fill(90, 160, 185, 80);
-    ellipse(ppx - 2, ppy - 1, 10, 6);
-    // Caustic shimmer
-    let cShim = sin(t0 * 3 + pp[0] * 10) * 0.3 + 0.7;
-    fill(140, 210, 240, 30 * cShim);
-    rect(floor(ppx - 3), floor(ppy - 2), 4, 2);
-  }
-
-  // ─── BROKEN TRIREME — scenery only, not repairable ───
-  let triX = w2sX(cx - 80), triY = w2sY(cy - 20);
-
-  push();
-  translate(floor(triX), floor(triY));
-  rotate(-0.08); // tilted — beached at an angle
-
-  // Always show as wrecked — dark weathered wood
-  let hullDark = [48, 30, 14];
-  let hullMid = [62, 40, 18];
-  let hullLight = [75, 50, 24];
-
-  // Sand piled against hull (buried effect)
-  fill(210 * bright, 192 * bright, 148);
-  beginShape();
-  vertex(-70, 12); vertex(-55, 8); vertex(-30, 14); vertex(0, 10);
-  vertex(30, 16); vertex(55, 12); vertex(60, 18); vertex(-70, 18);
-  endShape(CLOSE);
-
-  // Hull bottom — massive curved shape
-  fill(hullDark[0], hullDark[1], hullDark[2]);
-  beginShape();
-  vertex(-65, -5); vertex(-55, -14); vertex(-30, -20);
-  vertex(0, -22); vertex(30, -20); vertex(50, -14); vertex(55, -5);
-  vertex(55, 12); vertex(-65, 12);
-  endShape(CLOSE);
-
-  // Hull planking
-  fill(hullMid[0], hullMid[1], hullMid[2]);
-  rect(-60, -12, 110, 3);
-  rect(-55, -6, 105, 3);
-  rect(-50, 0, 100, 3);
-  rect(-48, 6, 96, 3);
-
-  // Ribs — exposed structural timbers
-  fill(hullLight[0], hullLight[1], hullLight[2]);
-  for (let i = -5; i <= 5; i++) {
-    let ribX = i * 10;
-    let ribH = 30 - abs(i) * 2;
-    rect(ribX - 1, -20 + abs(i), 3, ribH);
-  }
-
-  // Keel — spine of the ship
-  fill(hullDark[0] - 10, hullDark[1] - 8, hullDark[2] - 5);
-  rect(-60, -2, 115, 4);
-
-  // Bow (front) — pointed, sticking up
-  fill(hullMid[0], hullMid[1], hullMid[2]);
-  beginShape();
-  vertex(-65, -5); vertex(-75, -15); vertex(-72, -28);
-  vertex(-65, -22); vertex(-60, -14);
-  endShape(CLOSE);
-  // Ram (bronze, Roman trireme)
-  fill(140, 110, 50);
-  beginShape();
-  vertex(-75, -15); vertex(-82, -12); vertex(-78, -8); vertex(-72, -10);
-  endShape(CLOSE);
-
-  // Stern ornament — broken
-  fill(hullMid[0], hullMid[1], hullMid[2]);
-  rect(48, -18, 6, 14);
-  fill(hullLight[0], hullLight[1], hullLight[2]);
-  rect(50, -22, 4, 6);
-
-  // Broken mast — always wrecked (scenery)
-  fill(80, 55, 25);
-  rect(-2, -28, 5, 20);
-  fill(90, 65, 30);
-  beginShape();
-  vertex(-2, -28); vertex(0, -34); vertex(3, -30); vertex(5, -33); vertex(3, -28);
-  endShape(CLOSE);
-  // Fallen spar on deck
-  fill(70, 48, 22);
-  push(); rotate(0.3);
-  rect(-5, -15, 40, 3);
-  pop();
-
-  // Torn sail scrap on ground
-  fill(195, 180, 155, 100);
-  beginShape();
-  vertex(-30, 5); vertex(-5, 2); vertex(10, 8); vertex(-25, 12);
-  endShape(CLOSE);
-  fill(145, 38, 28, 70);
-  rect(-22, 6, 18, 3);
-
-  // Oar stubs sticking out of hull
-  fill(90, 65, 35);
-  for (let i = 0; i < 4; i++) {
-    let ox = -40 + i * 22, oy = -8;
-    rect(ox, oy, 2, 12);
-    if (i < 2) { // broken oars
-      rect(ox - 8, oy + 10, 10, 2);
-    }
-  }
-
-  // Barnacles on hull
-  fill(130, 125, 110, 100);
-  rect(-50, 6, 3, 3); rect(-30, 8, 2, 2);
-  rect(20, 7, 3, 2); rect(40, 5, 2, 3);
-
-  // Wreck atmosphere — no repair bar, just dramatic scenery
-  // Barnacle and algae stains
-  fill(40, 60, 35, 60);
-  rect(-45, 4, 12, 3); rect(15, 6, 8, 2); rect(-20, 8, 10, 2);
-
-  pop();
-
-  // ─── WRECKAGE DEBRIS in water ───
-  let debrisPositions = [
-    [-0.85, 0.4, 0.1], [-0.7, 0.7, -0.05], [0.75, 0.55, 0.15],
-    [0.9, 0.3, -0.08], [-0.6, -0.5, 0.12],
-  ];
-  for (let db of debrisPositions) {
-    let dbx = sx + db[0] * sandRX * 1.3;
-    let dby = sy + db[1] * sandRY * 1.2;
-    let bob = sin(t0 * 1.5 + db[0] * 3) * 2;
-    fill(65 * bright, 42 * bright, 20);
-    rect(floor(dbx - 8), floor(dby + bob), 16, 3);
-    rect(floor(dbx - 5), floor(dby - 2 + bob), 10, 2);
-  }
-
-  // ─── RAFT CONSTRUCTION ZONE — south shore ───
-  {
-    let raftSX = w2sX(cx), raftSY = w2sY(cy + 35);
-    let rw = state.wreck;
-    let prog = rw.raftBuilt ? 1 : (rw.raftWood / 8 + rw.raftRope / 4 + rw.raftCloth / 2) / 3;
-
-    // Flat cleared area on sand
-    fill(195 * bright, 178 * bright, 135);
-    ellipse(raftSX, raftSY, 50, 20);
-
-    // Log pile grows with progress
-    let logCount = floor(prog * 6);
-    for (let i = 0; i < logCount; i++) {
-      let lx = raftSX - 15 + i * 5;
-      let ly = raftSY - 2 + (i % 2) * 3;
-      fill(85, 55, 25);
-      rect(floor(lx), floor(ly), 12, 3);
-      fill(70, 45, 20);
-      rect(floor(lx + 1), floor(ly + 1), 10, 1);
-    }
-
-    // Rope coils (appear when rope added)
-    if (rw.raftRope > 0) {
-      fill(145, 120, 70);
-      for (let i = 0; i < min(rw.raftRope, 4); i++) {
-        ellipse(raftSX + 12 + i * 5, raftSY + 3, 5, 4);
-      }
-    }
-
-    // Cloth sheets (appear when cloth added)
-    if (rw.raftCloth > 0) {
-      fill(195, 180, 155, 180);
-      rect(floor(raftSX - 10), floor(raftSY - 6), 14, 4);
-      if (rw.raftCloth >= 2) {
-        fill(165, 40, 25, 120);
-        rect(floor(raftSX - 8), floor(raftSY - 5), 10, 2);
-      }
-    }
-
-    // Complete raft
-    if (rw.raftBuilt) {
-      // Raft platform
-      fill(100, 68, 30);
-      rect(floor(raftSX - 18), floor(raftSY - 5), 36, 10);
-      fill(85, 55, 25);
-      for (let i = 0; i < 5; i++) {
-        rect(floor(raftSX - 18), floor(raftSY - 5 + i * 2), 36, 1);
-      }
-      // Small mast + sail
-      fill(80, 55, 25);
-      rect(floor(raftSX - 1), floor(raftSY - 20), 3, 18);
-      fill(195, 180, 155, 200);
-      beginShape();
-      vertex(raftSX + 2, raftSY - 18);
-      vertex(raftSX + 16, raftSY - 14);
-      vertex(raftSX + 14, raftSY - 6);
-      vertex(raftSX + 2, raftSY - 4);
-      endShape(CLOSE);
-      // Glow when ready
-      fill(80, 230, 130, 25 + sin(frameCount * 0.05) * 12);
-      ellipse(raftSX, raftSY, 60, 30);
-    }
-
-    // Interaction hint
-    let pdist = dist(state.player.x, state.player.y, cx, cy + 35);
-    if (pdist < 55 && !rw.raftBuilt) {
-      fill(255, 240, 180, 30 + sin(frameCount * 0.06) * 15);
-      ellipse(raftSX, raftSY, 45, 22);
-    }
-  }
-
-  // ─── CAMPFIRE ───
-  if (state.wreck.campfire) {
-    let cfX = w2sX(cx + 40), cfY = w2sY(cy + 15);
-    // Stone ring — larger, more detailed
-    fill(90, 82, 68);
-    ellipse(cfX, cfY + 2, 20, 10);
-    fill(110, 100, 85);
-    for (let i = 0; i < 8; i++) {
-      let a = i / 8 * TWO_PI;
-      rect(floor(cfX + cos(a) * 8 - 2), floor(cfY + sin(a) * 4), 4, 3, 1);
-    }
-    // Charred center
-    fill(30, 25, 20);
-    ellipse(cfX, cfY, 12, 6);
-    // Fire — layered, animated
-    let flicker = sin(frameCount * 0.15) * 2;
-    let flicker2 = sin(frameCount * 0.22 + 1) * 1.5;
-    // Outer flame
-    fill(255, 100, 20, 150);
-    beginShape();
-    vertex(cfX - 5, cfY); vertex(cfX - 3 + flicker2, cfY - 14);
-    vertex(cfX, cfY - 18 + flicker); vertex(cfX + 3 - flicker2, cfY - 12);
-    vertex(cfX + 5, cfY);
-    endShape(CLOSE);
-    // Mid flame
-    fill(255, 170, 40, 200);
-    beginShape();
-    vertex(cfX - 3, cfY - 2); vertex(cfX - 1 + flicker, cfY - 12);
-    vertex(cfX + 1 - flicker, cfY - 10); vertex(cfX + 3, cfY - 2);
-    endShape(CLOSE);
-    // Inner core
-    fill(255, 240, 120, 220);
-    ellipse(cfX, cfY - 4, 4, 6);
-    // Embers
-    for (let e = 0; e < 3; e++) {
-      let ex = cfX + sin(frameCount * 0.1 + e * 2) * 8;
-      let ey = cfY - 10 - (frameCount * 0.3 + e * 20) % 20;
-      let ea = 200 - ((frameCount * 0.3 + e * 20) % 20) * 10;
-      if (ea > 0) {
-        fill(255, 180, 40, ea);
-        rect(floor(ex), floor(ey), 2, 2);
-      }
-    }
-    // Glow radius
-    fill(255, 160, 50, 12);
-    ellipse(cfX, cfY - 4, 60, 40);
-    // Smoke
-    for (let s = 0; s < 3; s++) {
-      let smokeY = cfY - 20 - s * 12 - (frameCount * 0.2) % 15;
-      let smokeX = cfX + sin(frameCount * 0.02 + s) * 6;
-      let smokeA = max(0, 40 - s * 12 - ((frameCount * 0.2) % 15) * 2);
-      fill(120, 115, 105, smokeA);
-      ellipse(smokeX, smokeY, 8 + s * 3, 5 + s * 2);
-    }
-  }
-
-  // ─── AMBIENT MIST over water (atmospheric) ───
-  for (let m = 0; m < 4; m++) {
-    let mx = sx + sin(t0 * 0.3 + m * 1.8) * sandRX * 1.3;
-    let my = sy + sandRY * 0.8 + cos(t0 * 0.2 + m * 2.3) * 15;
-    let ma = 15 + sin(t0 * 0.5 + m) * 8;
-    fill(200, 220, 240, ma * bright);
-    ellipse(mx, my, 80 + m * 20, 12);
-  }
-}
-
-function drawWreckEntities() {
-  noStroke();
-  let w = state.wreck;
-
-  // ─── BEACH DECOR (behind everything) ───
-  for (let d of w.decor) {
-    let sx = floor(w2sX(d.x)), sy = floor(w2sY(d.y));
-    if (d.type === 'shell') {
-      fill(225, 215, 195);
-      rect(sx - 2, sy, 4, 3);
-      fill(240, 230, 210);
-      rect(sx - 1, sy, 2, 2);
-    } else if (d.type === 'driftwood') {
-      fill(120, 95, 60);
-      rect(sx - 8, sy, 16, 2);
-      fill(100, 80, 50);
-      rect(sx - 6, sy + 1, 10, 1);
-    } else if (d.type === 'seaweed') {
-      fill(50, 90, 45, 150);
-      rect(sx - 4, sy, 2, 5);
-      rect(sx, sy - 1, 2, 6);
-      rect(sx + 3, sy + 1, 2, 4);
-    }
-  }
-
-  // ─── SUN GLINTS ───
-  for (let g of w.glints) {
-    let sx = floor(w2sX(g.x)), sy = floor(w2sY(g.y));
-    let a = min(200, g.timer * 5);
-    fill(255, 250, 220, a);
-    rect(sx - 1, sy - 3, 2, 6);
-    rect(sx - 3, sy - 1, 6, 2);
-    fill(255, 255, 240, a * 0.5);
-    rect(sx, sy - 1, 1, 2);
-  }
-
-  // ─── PALM TREES ───
-  for (let palm of w.palms) {
-    if (palm.chopped) continue;
-    let sx = floor(w2sX(palm.x)), sy = floor(w2sY(palm.y));
-    let sz = palm.size;
-    let sway = sin(frameCount * 0.015 + palm.swayPhase) * 3 * sz;
-
-    // Trunk — brown with segments
-    fill(110, 75, 40);
-    rect(floor(sx - 2 * sz), floor(sy - 20 * sz), floor(4 * sz), floor(22 * sz));
-    // Trunk highlights
-    fill(130, 90, 50, 80);
-    for (let seg = 0; seg < 4; seg++) {
-      rect(floor(sx - 2 * sz), floor(sy - 20 * sz + seg * 5 * sz), floor(4 * sz), floor(1));
-    }
-
-    // Fronds — 4 leaf fans, swaying
-    let topX = floor(sx + sway), topY = floor(sy - 22 * sz);
-    fill(60, 120, 40);
-    // Left fronds
-    rect(topX - floor(12 * sz), topY - floor(2 * sz), floor(12 * sz), floor(3 * sz));
-    rect(topX - floor(10 * sz), topY - floor(5 * sz), floor(8 * sz), floor(2 * sz));
-    // Right fronds
-    rect(topX, topY - floor(2 * sz), floor(12 * sz), floor(3 * sz));
-    rect(topX + floor(2 * sz), topY - floor(5 * sz), floor(8 * sz), floor(2 * sz));
-    // Center tuft
-    fill(70, 135, 50);
-    rect(topX - floor(3 * sz), topY - floor(6 * sz), floor(6 * sz), floor(4 * sz));
-    // Drooping tips
-    fill(50, 105, 35);
-    rect(topX - floor(14 * sz), topY + floor(1 * sz), floor(4 * sz), floor(1));
-    rect(topX + floor(10 * sz), topY + floor(1 * sz), floor(4 * sz), floor(1));
-
-    // Coconuts on tree
-    fill(120, 85, 40);
-    rect(topX - floor(2 * sz), topY + floor(1 * sz), floor(3 * sz), floor(3 * sz));
-    rect(topX + floor(1 * sz), topY + floor(2 * sz), floor(3 * sz), floor(3 * sz));
-
-    // Shadow at base
-    fill(0, 0, 0, 20);
-    rect(floor(sx - 6 * sz), floor(sy + 1), floor(12 * sz), floor(2));
-  }
-
-  // ─── SCAVENGE NODES ───
-  let nodes = w.scavNodes;
-  for (let n of nodes) {
-    if (n.collected) continue;
-    let sx = floor(w2sX(n.x)), sy = floor(w2sY(n.y));
-    let bob = sin(frameCount * 0.04 + n.x * 0.1) * 1;
-
-    // Glow when near player
-    let pDist = dist(state.player.x, state.player.y, n.x, n.y);
-    if (pDist < 40) {
-      fill(255, 220, 100, 30);
-      rect(sx - 8, sy - 2 + bob, 16, 3);
-      rect(sx - 1, sy - 8 + bob, 3, 12);
-    }
-
-    if (n.type === 'stick') {
-      fill(100, 70, 35);
-      rect(sx - 6, sy + bob, 12, 2);
-      fill(85, 60, 30);
-      rect(sx - 4, sy + 1 + bob, 8, 1);
-    } else if (n.type === 'stone') {
-      fill(130, 125, 115);
-      rect(sx - 4, sy + bob, 8, 5);
-      fill(110, 105, 95);
-      rect(sx - 3, sy + 1 + bob, 6, 3);
-    } else if (n.type === 'rope') {
-      fill(145, 120, 70);
-      rect(sx - 3, sy + bob, 6, 6);
-      fill(130, 105, 60);
-      rect(sx - 2, sy + 1 + bob, 4, 4);
-    } else if (n.type === 'plank') {
-      fill(90, 60, 25);
-      rect(sx - 10, sy + bob, 20, 3);
-      fill(75, 50, 20);
-      rect(sx - 8, sy + 1 + bob, 16, 1);
-    } else if (n.type === 'flint') {
-      fill(80, 75, 70);
-      rect(sx - 3, sy + bob, 5, 5);
-      fill(120, 115, 105, 100);
-      rect(sx - 2, sy + bob, 2, 2);
-    } else if (n.type === 'cloth') {
-      fill(190, 175, 150);
-      rect(sx - 5, sy + bob, 10, 4);
-      fill(160, 45, 30, 100);
-      rect(sx - 3, sy + 1 + bob, 6, 2);
-    } else if (n.type === 'coconut') {
-      fill(120, 85, 40);
-      rect(sx - 3, sy + bob, 6, 5);
-      fill(100, 70, 30);
-      rect(sx - 2, sy + 1 + bob, 4, 3);
-      // Three dots
-      fill(60, 40, 20);
-      rect(sx - 1, sy + 2 + bob, 1, 1);
-      rect(sx + 1, sy + 1 + bob, 1, 1);
-    }
-
-    // Label when very close — outlined for readability
-    if (pDist < 30) {
-      textSize(11); textAlign(CENTER, BOTTOM);
-      let lbl = n.type === 'coconut' ? 'COCONUT' : n.type.toUpperCase();
-      fill(0, 0, 0, 180);
-      text(lbl, sx + 1, sy - 5 + bob);
-      fill(240, 230, 200);
-      text(lbl, sx, sy - 6 + bob);
-    }
-  }
-
-  // ─── CRABS ───
-  for (let c of w.crabs) {
-    let sx = floor(w2sX(c.x)), sy = floor(w2sY(c.y));
-    let f = c.facing;
-    let scuttle = c.state !== 'idle' ? sin(frameCount * 0.3) * 1 : 0;
-
-    // Body — warm terracotta
-    fill(195, 95, 55);
-    rect(sx - 4, sy - 2 + scuttle, 8, 5);
-    // Shell highlight
-    fill(220, 120, 70);
-    rect(sx - 3, sy - 2 + scuttle, 6, 2);
-    // Eyes
-    fill(20, 20, 20);
-    rect(sx - 3, sy - 3 + scuttle, 1, 1);
-    rect(sx + 2, sy - 3 + scuttle, 1, 1);
-    // Eye stalks
-    fill(195, 95, 55);
-    rect(sx - 3, sy - 4 + scuttle, 1, 2);
-    rect(sx + 2, sy - 4 + scuttle, 1, 2);
-    // Claws
-    fill(210, 105, 60);
-    rect(sx - 6 * f, sy - 1 + scuttle, 3, 3);
-    rect(sx + 4 * f, sy - 1 + scuttle, 3, 3);
-    // Claw pincers
-    fill(180, 85, 50);
-    rect(sx - 7 * f, sy - 1 + scuttle, 1, 2);
-    rect(sx + 6 * f, sy - 1 + scuttle, 1, 2);
-    // Legs — 3 per side
-    fill(170, 80, 45);
-    for (let i = 0; i < 3; i++) {
-      let legOff = sin(frameCount * 0.2 + i) * (c.state !== 'idle' ? 1 : 0);
-      rect(sx - 5 - floor(legOff), sy + i * 1 + scuttle, 1, 1);
-      rect(sx + 4 + floor(legOff), sy + i * 1 + scuttle, 1, 1);
-    }
-
-    // "Catch" hint when close — outlined
-    let pdist = dist(state.player.x, state.player.y, c.x, c.y);
-    if (pdist < 30) {
-      textSize(11); textAlign(CENTER, BOTTOM);
-      fill(0, 0, 0, 180);
-      text('E: CATCH', sx + 1, sy - 7);
-      fill(240, 230, 200);
-      text('E: CATCH', sx, sy - 8);
-    }
-  }
-
-  // ─── FLYING BIRDS ───
-  for (let b of w.birds) {
-    let sx = floor(w2sX(b.x)), sy = floor(w2sY(b.y));
-    let wingUp = sin(frameCount * 0.08 + b.phase) > 0;
-    fill(60, 55, 50, 120);
-    // Simple bird silhouette — V shape
-    if (wingUp) {
-      rect(sx - 4, sy - 1, 3, 1);
-      rect(sx - 2, sy - 2, 2, 1);
-      rect(sx + 1, sy - 2, 2, 1);
-      rect(sx + 2, sy - 1, 3, 1);
-    } else {
-      rect(sx - 4, sy + 1, 3, 1);
-      rect(sx - 2, sy, 2, 1);
-      rect(sx + 1, sy, 2, 1);
-      rect(sx + 2, sy + 1, 3, 1);
-    }
-  }
-
-  textAlign(LEFT, TOP);
-}
-
-function drawWreckHUD() {
-  noStroke();
-  let hx = 12, hy = 12;
-  let w = state.wreck;
-  let panelH = 95;
-
-  // Dark semi-transparent background panel
-  fill(10, 8, 5, 220);
-  rect(hx - 6, hy - 6, 210, panelH, 4);
-  // Subtle gold border
-  stroke(150, 120, 50, 120);
-  strokeWeight(1);
-  noFill();
-  rect(hx - 6, hy - 6, 210, panelH, 4);
-  noStroke();
-
-  // Helper: outlined text for readability
-  let outText = function(txt, x, y, col) {
-    fill(0, 0, 0, 180);
-    text(txt, x + 1, y + 1);
-    fill(col || color(240, 230, 200));
-    text(txt, x, y);
-  };
-
-  textAlign(LEFT, TOP);
-
-  // Resource header
-  textSize(11);
-  outText('RAFT MATERIALS', hx, hy, color(220, 200, 140));
-
-  // Wood X/8
-  textSize(11);
-  let woodCol = w.raftWood >= 8 ? color(100, 255, 150) : color(200, 170, 100);
-  outText('Wood ' + (state.wood + w.raftWood) + '  (' + w.raftWood + '/8)', hx, hy + 15, woodCol);
-
-  // Rope X/4
-  let ropeCol = w.raftRope >= 4 ? color(100, 255, 150) : color(180, 150, 90);
-  outText('Rope ' + (state.wood > 0 ? '+' + state.wood : '') + '  (' + w.raftRope + '/4)', hx, hy + 29, ropeCol);
-
-  // Cloth X/2
-  let clothCol = w.raftCloth >= 2 ? color(100, 255, 150) : color(200, 180, 150);
-  outText('Cloth ' + (state.seeds > 0 ? '+' + state.seeds : '') + '  (' + w.raftCloth + '/2)', hx, hy + 43, clothCol);
-
-  // Raft progress bar
-  let barX = hx, barY = hy + 58, barW = 140, barH = 8;
-  let prog = w.raftBuilt ? 100 : w.raftProgress;
-  fill(20, 18, 12, 200);
-  rect(barX, barY, barW, barH, 2);
-  if (prog > 0) {
-    fill(w.raftBuilt ? color(80, 220, 120) : color(180, 150, 60));
-    rect(barX + 1, barY + 1, floor((barW - 2) * prog / 100), barH - 2, 1);
-  }
-  textSize(11);
-  outText(w.raftBuilt ? 'RAFT READY!' : 'Raft: ' + prog + '%', barX + barW + 6, barY - 1,
-    w.raftBuilt ? color(100, 255, 150) : color(200, 190, 150));
-
-  // Day/time + food
-  textSize(11);
-  let hrs = floor(state.time / 60), mins = floor(state.time % 60);
-  outText('Day ' + state.day + '  ' + nf(hrs, 2) + ':' + nf(mins, 2), hx, hy + 72, color(180, 170, 140));
-  outText('Food: ' + state.fish, hx + 100, hy + 72, color(100, 180, 255));
-
-  // Hint text at bottom of panel
-  textSize(11);
-  let hintAlpha = 140 + sin(frameCount * 0.03) * 40;
-  if (w.raftBuilt) {
-    fill(0, 0, 0, 150); text('Go to the raft and press E to set sail!', hx + 1, hy + panelH + 3);
-    fill(100, 255, 150, hintAlpha); text('Go to the raft and press E to set sail!', hx, hy + panelH + 2);
-  } else {
-    fill(0, 0, 0, 150); text('Explore the beach and shallows for materials', hx + 1, hy + panelH + 3);
-    fill(200, 190, 150, hintAlpha); text('Explore the beach and shallows for materials', hx, hy + panelH + 2);
-  }
-}
+// ═══ WRECK FUNCTIONS — moved to wreck.js ═════════════════════════
 
 // ─── TUTORIAL HINT SYSTEM ────────────────────────────────────────────────
 function showTutorialHint(text, wx, wy) {
@@ -21566,6 +19349,7 @@ function saveGame() {
     stone: state.stone, crystals: state.crystals, gold: state.gold, fish: state.fish,
     grapeSeeds: state.grapeSeeds, oliveSeeds: state.oliveSeeds,
     meals: state.meals, wine: state.wine, oil: state.oil,
+    stew: state.stew, garum: state.garum, honeyedFigs: state.honeyedFigs, ambrosia: state.ambrosia,
     weather: state.weather, heartRewards: state.heartRewards,
     marcusHearts: state.marcus ? state.marcus.hearts : 0,
     vestaHearts: state.vesta ? state.vesta.hearts : 0,
@@ -21575,6 +19359,10 @@ function saveGame() {
     islandLevel: state.islandLevel, islandRX: state.islandRX, islandRY: state.islandRY,
     pyramidLevel: state.pyramid.level,
     playerX: state.player.x, playerY: state.player.y, playerFacing: state.player.facing,
+    playerXp: state.player.xp, playerTotalXp: state.player.totalXp,
+    playerLevel: state.player.level, playerSkillPoints: state.player.skillPoints,
+    playerSkills: state.player.skills, playerMaxHp: state.player.maxHp,
+    playerXpBoost: state.player.xpBoost || 0, playerXpBoostTimer: state.player.xpBoostTimer || 0,
     npcHearts: state.npc.hearts,
     companionX: state.companion.x, companionY: state.companion.y, companionEnergy: state.companion.energy,
     woodcutterX: state.woodcutter.x, woodcutterY: state.woodcutter.y, woodcutterEnergy: state.woodcutter.energy,
@@ -21627,11 +19415,39 @@ function saveGame() {
     // Imperial Bridge
     imperialBridge: state.imperialBridge,
     bountyBoard: state.bountyBoard,
+    cook: state.cook ? { unlocked: state.cook.unlocked, x: state.cook.x, y: state.cook.y } : null,
+    fisherman: state.fisherman ? { unlocked: state.fisherman.unlocked, fishCaught: state.fisherman.fishCaught } : null,
     // Island exploration phases
     vulcanPhase: state.vulcan.phase,
     hyperboreaPhase: state.hyperborea.phase,
     plentyPhase: state.plenty.phase,
     necropolisPhase: state.necropolis.phase,
+    // Island loot states (BUG-019)
+    vulcanLoot: {
+      obsidianCollected: (state.vulcan.obsidianNodes || []).map(n => n.collected),
+      hotSprings: (state.vulcan.hotSprings || []).map(h => ({ x: h.x, y: h.y })),
+      lavaPools: (state.vulcan.lavaPools || []).map(l => ({ x: l.x, y: l.y, r: l.r })),
+      obsidianPositions: (state.vulcan.obsidianNodes || []).map(n => ({ x: n.x, y: n.y })),
+      smokeVents: (state.vulcan.smokeVents || []).map(s => ({ x: s.x, y: s.y })),
+    },
+    hyperboreaLoot: {
+      ruinsLooted: (state.hyperborea.frozenRuins || []).map(r => r.looted),
+      ruinPositions: (state.hyperborea.frozenRuins || []).map(r => ({ x: r.x, y: r.y })),
+      iceNodes: (state.hyperborea.frostNodes || []).map(n => ({ x: n.x, y: n.y, collected: n.collected })),
+    },
+    plentyLoot: {
+      spiceCollected: (state.plenty.spiceNodes || []).map(n => n.collected),
+      spicePositions: (state.plenty.spiceNodes || []).map(n => ({ x: n.x, y: n.y })),
+      fruitTrees: (state.plenty.fruitTrees || []).map(t => ({ x: t.x, y: t.y, fruit: t.fruit })),
+    },
+    necropolisLoot: {
+      tombsLooted: (state.necropolis.tombs || []).map(t => t.looted),
+      tombPositions: (state.necropolis.tombs || []).map(t => ({ x: t.x, y: t.y })),
+      soulCollected: (state.necropolis.soulNodes || []).map(n => n.collected),
+      soulPositions: (state.necropolis.soulNodes || []).map(n => ({ x: n.x, y: n.y })),
+      ghostTalked: (state.necropolis.ghostNPCs || []).map(g => g.talked),
+      ghostPositions: (state.necropolis.ghostNPCs || []).map(g => ({ x: g.x, y: g.y })),
+    },
     // Victory
     won: state.won || false,
     // Progression system
@@ -21687,6 +19503,7 @@ function loadGame() {
     state.fish = d.fish || 0;
     state.grapeSeeds = d.grapeSeeds || 0; state.oliveSeeds = d.oliveSeeds || 0;
     state.meals = d.meals || 0; state.wine = d.wine || 0; state.oil = d.oil || 0;
+    state.stew = d.stew || 0; state.garum = d.garum || 0; state.honeyedFigs = d.honeyedFigs || 0; state.ambrosia = d.ambrosia || 0;
     state.heartRewards = d.heartRewards || [];
     if (d.weather) state.weather = d.weather;
     if (state.marcus) state.marcus.hearts = d.marcusHearts || 0;
@@ -21736,6 +19553,8 @@ function loadGame() {
     state.conquest.woodPile = d.conquestWoodPile || 0;
     state.conquest.expeditionNum = d.conquestExpeditionNum || 0;
     if (d.bountyBoard) state.bountyBoard = d.bountyBoard;
+    if (d.cook) { state.cook.unlocked = d.cook.unlocked; state.cook.x = d.cook.x || state.cook.x; state.cook.y = d.cook.y || state.cook.y; }
+    if (d.fisherman) { state.fisherman.unlocked = d.fisherman.unlocked; state.fisherman.fishCaught = d.fisherman.fishCaught || 0; }
     if (d.conquestBuildings) state.conquest.buildings = d.conquestBuildings;
     if (d.conquestBlueprintQueue) state.conquest.blueprintQueue = d.conquestBlueprintQueue;
     if (d.conquestTrees) {
@@ -21766,6 +19585,7 @@ function loadGame() {
       if (d.conquestIsleRY) state.conquest.isleRY = d.conquestIsleRY;
     }
     // Imperial Bridge
+    updatePortPositions(); // always recompute from current island size
     if (d.imperialBridge) {
       state.imperialBridge = d.imperialBridge;
     }
@@ -21776,6 +19596,30 @@ function loadGame() {
     if (d.hyperboreaPhase) state.hyperborea.phase = d.hyperboreaPhase;
     if (d.plentyPhase) state.plenty.phase = d.plentyPhase;
     if (d.necropolisPhase) state.necropolis.phase = d.necropolisPhase;
+    // Island loot states (BUG-019)
+    if (d.vulcanLoot && state.vulcan.phase !== 'unexplored') {
+      let vl = d.vulcanLoot;
+      if (vl.obsidianPositions) state.vulcan.obsidianNodes = vl.obsidianPositions.map((p, i) => ({ x: p.x, y: p.y, collected: vl.obsidianCollected[i] || false }));
+      if (vl.hotSprings) state.vulcan.hotSprings = vl.hotSprings.map(h => ({ x: h.x, y: h.y, healTimer: 0 }));
+      if (vl.lavaPools) state.vulcan.lavaPools = vl.lavaPools.map(l => ({ x: l.x, y: l.y, r: l.r, phase: random(TWO_PI) }));
+      if (vl.smokeVents) state.vulcan.smokeVents = vl.smokeVents.map(s => ({ x: s.x, y: s.y, phase: random(TWO_PI) }));
+    }
+    if (d.hyperboreaLoot && state.hyperborea.phase !== 'unexplored') {
+      let hl = d.hyperboreaLoot;
+      if (hl.ruinPositions) state.hyperborea.frozenRuins = hl.ruinPositions.map((p, i) => ({ x: p.x, y: p.y, looted: hl.ruinsLooted[i] || false }));
+      if (hl.iceNodes) state.hyperborea.frostNodes = hl.iceNodes.map(n => ({ x: n.x, y: n.y, collected: n.collected || false }));
+    }
+    if (d.plentyLoot && state.plenty.phase !== 'unexplored') {
+      let pl = d.plentyLoot;
+      if (pl.spicePositions) state.plenty.spiceNodes = pl.spicePositions.map((p, i) => ({ x: p.x, y: p.y, collected: pl.spiceCollected[i] || false }));
+      if (pl.fruitTrees) state.plenty.fruitTrees = pl.fruitTrees.map(t => ({ x: t.x, y: t.y, fruit: t.fruit }));
+    }
+    if (d.necropolisLoot && state.necropolis.phase !== 'unexplored') {
+      let nl = d.necropolisLoot;
+      if (nl.tombPositions) state.necropolis.tombs = nl.tombPositions.map((p, i) => ({ x: p.x, y: p.y, looted: nl.tombsLooted[i] || false }));
+      if (nl.soulPositions) state.necropolis.soulNodes = nl.soulPositions.map((p, i) => ({ x: p.x, y: p.y, collected: nl.soulCollected[i] || false }));
+      if (nl.ghostPositions) state.necropolis.ghostNPCs = nl.ghostPositions.map((p, i) => ({ x: p.x, y: p.y, talked: nl.ghostTalked[i] || false, dialogueIndex: 0 }));
+    }
     // Victory state
     state.won = d.won || false;
     // Ensure prophecy exists
@@ -21783,6 +19627,10 @@ function loadGame() {
     // Load progression — old saves without progression = fully unlocked (veteran)
     if (d.progression) {
       state.progression = d.progression;
+      // Safety: if player has hearts with Livia, villa must be cleared
+      if (state.npc.hearts >= 2 && !state.progression.villaCleared) {
+        state.progression.villaCleared = true;
+      }
     } else {
       // Legacy save — mark everything as unlocked
       state.progression.gameStarted = false; // false = old save, skip progression gates
@@ -21819,6 +19667,14 @@ function loadGame() {
     if (d.pyramidLevel) state.pyramid.level = d.pyramidLevel;
     state.player.x = d.playerX || WORLD.islandCX; state.player.y = d.playerY || WORLD.islandCY;
     if (d.playerFacing) state.player.facing = d.playerFacing;
+    if (d.playerXp !== undefined) state.player.xp = d.playerXp;
+    if (d.playerTotalXp !== undefined) state.player.totalXp = d.playerTotalXp;
+    if (d.playerLevel) state.player.level = d.playerLevel;
+    if (d.playerSkillPoints !== undefined) state.player.skillPoints = d.playerSkillPoints;
+    if (d.playerSkills) state.player.skills = d.playerSkills;
+    if (d.playerMaxHp) state.player.maxHp = d.playerMaxHp;
+    if (d.playerXpBoost) state.player.xpBoost = d.playerXpBoost;
+    if (d.playerXpBoostTimer) state.player.xpBoostTimer = d.playerXpBoostTimer;
     state.npc.hearts = d.npcHearts || 0;
     if (d.companionX) { state.companion.x = d.companionX; state.companion.y = d.companionY; }
     state.companion.energy = d.companionEnergy || 100;
@@ -21870,7 +19726,7 @@ function loadGame() {
       randomSeed(millis());
       let validSlots = slots.filter(s => {
         let ex = (s.x - cx) / srx, ey = (s.y - cy) / sry;
-        if (ex * ex + ey * ey > 0.72) return false;
+        if (ex * ex + ey * ey > 0.65) return false;
         let pcx = s.x - pyrCX2, pcy = s.y - pyrCY2;
         if (pcx * pcx + pcy * pcy < texcl2 * texcl2) return false;
         return true;
@@ -21885,7 +19741,7 @@ function loadGame() {
           regrowTimer: saved.alive === false ? 600 : 0,
           size: 0.75 + (i * 7 % 11) * 0.04,
           swayPhase: i * 1.3 + (i % 3) * 0.7,
-          type: 'oak',
+          type: ['oak', 'pine', 'olive'][floor(random(3))],
         };
       });
     }
@@ -21958,7 +19814,7 @@ function loadGame() {
 // ─── ZONE PLACEMENT HELPERS ──────────────────────────────────────────────
 // Farm zone bounding box — used to keep other elements away
 function getFarmBounds() {
-  let farmCX = getFarmCenterX(), farmCY = getFarmCenterY();
+  let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
   // Grid grows: base 3x3 (38x28 spacing), expands per level
   let cols = 3 + (state.islandLevel >= 2 ? 1 : 0) + (state.islandLevel >= 4 ? 1 : 0);
   let rows = 3 + (state.islandLevel >= 3 ? 1 : 0) + (state.islandLevel >= 5 ? 1 : 0);
@@ -22014,7 +19870,7 @@ function getTempleExclusion() {
 }
 
 function addClampedTree(x, y, cx, cy) {
-  let p = clampToIsland(x, y, cx, cy, 0.72);
+  let p = clampToIsland(x, y, cx, cy, 0.65);
   if (isInFarmZone(p.x, p.y)) {
     let f = getFarmBounds();
     p.x = f.x + f.hw + 40;
@@ -22041,7 +19897,7 @@ function addClampedTree(x, y, cx, cy) {
     x: p.x, y: p.y,
     health: 3, maxHealth: 3, alive: true, regrowTimer: 0,
     size: random(0.8, 1.1), swayPhase: random(TWO_PI),
-    type: 'oak',
+    type: ['oak', 'pine', 'olive'][floor(random(3))],
   });
 }
 
@@ -22802,9 +20658,12 @@ function drawNewNPC(npc, type) {
   let a = npc.anim;
   let bob = floor(sin(frameCount * 0.03 + npc.x * 0.1) + a.breathe) * 1;
   let blinking = a.blinkFrame > 0;
+  let pDist = dist(state.player.x, state.player.y, npc.x, npc.y);
+  let npcFace = (pDist < 100 && state.player.x < npc.x) ? -1 : 1;
 
   push();
   translate(floor(sx), floor(sy + bob));
+  if (npcFace < 0) scale(-1, 1);
   noStroke();
 
   // Elliptical shadow — natural
@@ -23165,7 +21024,7 @@ function drawNewNPC(npc, type) {
   }
 
   // [E] prompt when player is near — with warm glow
-  if (pd < 80 && npc.dialogTimer <= 0) {
+  if (pd < 80 && npc.dialogTimer <= 0 && !(type === 'marcus' && !npc.present)) {
     fill(255, 230, 180, 180);
     textSize(7);
     textAlign(CENTER, CENTER);
@@ -23426,17 +21285,16 @@ function drawSeasonalCropSprite(x, y, scale, type) {
 }
 
 function getExpandCost(lvl) {
-  // Levels 1-5: crystals only (original)
+  // Levels 1-5: crystals only
   // Levels 6-10: crystals + stone
   // Levels 11-15: crystals + stone + iron
-  // Levels 16-20: crystals + stone + iron + relics
-  // Levels 21-25: all resources + titan bone
-  let crystalCost = [5, 10, 18, 28, 40, 55, 70, 90, 110, 135, 160, 190, 220, 255, 290, 330, 370, 415, 460, 510, 570, 630, 700, 780, 860][lvl - 1] || 860;
+  // Levels 16-25: crystals capped at 200, add relics/bone for variety
+  let crystalCost = [5, 10, 18, 28, 40, 55, 70, 90, 110, 135, 155, 170, 180, 190, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200][lvl - 1] || 200;
   let cost = { crystals: crystalCost };
-  if (lvl >= 6) cost.stone = 10 + (lvl - 6) * 8;
-  if (lvl >= 11) cost.ironOre = 5 + (lvl - 11) * 4;
-  if (lvl >= 16) cost.ancientRelic = 2 + (lvl - 16) * 2;
-  if (lvl >= 21) cost.titanBone = 1 + (lvl - 21) * 2;
+  if (lvl >= 6) cost.stone = 10 + (lvl - 6) * 5;
+  if (lvl >= 11) cost.ironOre = 3 + (lvl - 11) * 3;
+  if (lvl >= 16) cost.ancientRelic = 1 + (lvl - 16) * 1;
+  if (lvl >= 21) cost.titanBone = 1 + (lvl - 21) * 1;
   return cost;
 }
 
@@ -23485,6 +21343,7 @@ function expandIsland() {
   state.islandRX += rxGrowth;
   state.islandRY += ryGrowth;
   state.pyramid.level = state.islandLevel;
+  updatePortPositions(); // ports follow island edge
 
   // Milestone unlocks — landmark buildings auto-spawn at key levels
   let rx = getSurfaceRX(), ry = getSurfaceRY();
@@ -23547,7 +21406,7 @@ function expandIsland() {
     checkImperatorVictory();
   }
 
-  let farmCX = getFarmCenterX(), farmCY = getFarmCenterY();
+  let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
   let lvl = state.islandLevel;
 
   // Push existing trees away from temple (it grew)
@@ -23680,8 +21539,8 @@ function expandIsland() {
       let cSize = 14 + floor(lvl / 5) * 2;
       state.crystalNodes.push({ x: crx, y: cry, size: min(cSize, 24), phase: random(TWO_PI), charge: 50 + lvl * 5, respawnTimer: 0 });
     }
-    // Trees — 3-5 per level
-    let numTrees = 3 + floor(random(0, 3));
+    // Trees — scale with level to fill expanded island
+    let numTrees = 4 + lvl + floor(random(0, 3));
     for (let i = 0; i < numTrees; i++) {
       let ta = random(TWO_PI);
       let tr = random(0.4, 0.85);
@@ -23700,9 +21559,10 @@ function expandIsland() {
     }
   }
 
-  // Add grass tufts to new island area
+  // Add grass tufts to new island area — more at higher levels
   let grx = getSurfaceRX(), gry = getSurfaceRY();
-  for (let i = 0; i < 15; i++) {
+  let grassCount = 20 + lvl * 2;
+  for (let i = 0; i < grassCount; i++) {
     let angle = random(TWO_PI);
     let rim = random(0.72, 0.92);
     let gx = cx + cos(angle) * grx * rim;

@@ -57,6 +57,14 @@ class SoundManager {
     this._eerieGain = null;
     // Diving underwater state
     this._divingActive = false;
+    // Underwater ambient layers
+    this._uwRumbleOsc = null;
+    this._uwRumbleGain = null;
+    this._whaleOsc = null;
+    this._whaleGain = null;
+    this._whaleTimer = 0;
+    // Storm ambient
+    this._thunderTimer = 0;
   }
 
   init() {
@@ -186,7 +194,29 @@ class SoundManager {
       this._eerieOsc.freq(60);
       this._eerieOsc.amp(1.0);
 
+      // Underwater: low rumble oscillator (triangle for warmth)
+      this._uwRumbleOsc = new p5.Oscillator('triangle');
+      this._uwRumbleGain = new p5.Gain();
+      this._uwRumbleOsc.disconnect();
+      this._uwRumbleOsc.connect(this._uwRumbleGain);
+      this._uwRumbleGain.connect();
+      this._uwRumbleGain.amp(0);
+      this._uwRumbleOsc.start();
+      this._uwRumbleOsc.freq(55);
+      this._uwRumbleOsc.amp(1.0);
+
+      // Underwater: whale-like sweep (sine, slow pitch glide)
+      this._whaleOsc = new p5.Oscillator('sine');
+      this._whaleGain = new p5.Gain();
+      this._whaleOsc.disconnect();
+      this._whaleOsc.connect(this._whaleGain);
+      this._whaleGain.connect();
+      this._whaleGain.amp(0);
+      this._whaleOsc.start();
+      this._whaleOsc.amp(1.0);
+
       this.ready = true;
+      console.log('[SoundManager] init OK — 3 lyre voices, 4 sfx slots, ambient layers ready');
     } catch (e) {
       console.warn('SoundManager init failed:', e.message);
     }
@@ -237,10 +267,21 @@ class SoundManager {
     this._windGain.amp(max(0, windVol), 0.5);
     this._windFilter.freq(windFreq);
 
-    // Storm boost
+    // Storm boost — slightly louder wind, rare thunder
     if (typeof stormActive !== 'undefined' && stormActive && !diving) {
-      this._windGain.amp(0.12 * masterVol, 0.5);
+      this._windGain.amp(windVol * 1.3, 0.5);
       this._windFilter.freq(350);
+      // Thunder — every 20-40 seconds, with initial delay
+      if (this._thunderTimer <= 0) {
+        this._thunderTimer = floor(random(1200, 2400)); // initial delay
+      }
+      this._thunderTimer--;
+      if (this._thunderTimer === 1) {
+        this.playSFX('thunder');
+        this._thunderTimer = floor(random(1200, 2400)); // reset for next
+      }
+    } else {
+      this._thunderTimer = 0; // reset when storm ends
     }
 
     // ─── Bird chirps ───
@@ -327,6 +368,40 @@ class SoundManager {
       this._eerieGain.amp(max(0, eerieVol), 0.3);
     }
 
+    // ─── Underwater: rumble + whale calls ───
+    if (this._uwRumbleGain) {
+      let uwVol = diving ? 0.09 * masterVol : 0;
+      this._uwRumbleGain.amp(uwVol, 0.5);
+      if (diving) this._uwRumbleOsc.freq(55 + sin(frameCount * 0.004) * 10);
+    }
+    if (this._whaleGain) {
+      this._whaleTimer--;
+      if (diving && this._whaleTimer <= 0 && random() < 0.004) {
+        this._whaleTimer = floor(random(300, 600));
+        let startF = random(120, 200);
+        let endF = random(80, 140);
+        let whaleVol = random(0.04, 0.08) * masterVol;
+        let dur = floor(random(80, 150));
+        let step = 0;
+        this._whaleOsc.freq(startF);
+        this._whaleGain.amp(whaleVol, 0.3);
+        let whaleTick = () => {
+          step++;
+          let t = step / dur;
+          if (t >= 1) { this._whaleGain.amp(0, 0.5); return; }
+          try {
+            this._whaleOsc.freq(lerp(startF, endF, t) + sin(step * 0.15) * 8);
+            let env = sin(t * PI) * whaleVol;
+            this._whaleGain.amp(max(0, env), 0.03);
+          } catch(e) {}
+          setTimeout(whaleTick, 30);
+        };
+        setTimeout(whaleTick, 30);
+      } else if (!diving) {
+        this._whaleGain.amp(0, 0.3);
+      }
+    }
+
     // ─── Home island: chicken clucks & cat meows ───
     if (island === 'home' && !diving && typeof state !== 'undefined') {
       if (state.chickens && state.chickens.length > 0 && frameCount % 400 < 1 && random() < 0.5) {
@@ -361,6 +436,12 @@ class SoundManager {
         if (this._lyreMode !== 'eerie') this.setLyreMode('eerie');
       } else if (state.conquest && state.conquest.active) {
         if (this._lyreMode !== 'tense') this.setLyreMode('tense');
+      } else if (state.festival) {
+        if (this._lyreMode !== 'celebration') this.setLyreMode('celebration');
+      } else if (state.rowing && state.rowing.active) {
+        if (this._lyreMode !== 'sailing') this.setLyreMode('sailing');
+      } else if (state.time >= 1200 || state.time < 300) {
+        if (this._lyreMode !== 'night') this.setLyreMode('night');
       } else {
         if (this._lyreMode !== 'peaceful') this.setLyreMode('peaceful');
       }
@@ -402,7 +483,59 @@ class SoundManager {
         [[5,80,0.35,0],[-1,70,0,0],[3,90,0.3,0],[-1,90,0,0],[0,110,0.25,1],[-1,120,0,0]],
         [[0,100,0.3,0],[0,150,0.15,2],[-1,50,0,0],[1,80,0.3,0],[-1,100,0,0],[0,90,0.25,1],[-1,130,0,0]],
       ];
+    } else if (this._lyreMode === 'celebration') {
+      // Festival mode: fast tempo, trills, wide intervals, bright and joyful
+      scale = dorian;
+      phrases = [
+        [[4,20,0.8,0],[7,20,0.7,1],[4,20,0.6,0],[5,20,0.7,1],[7,25,0.8,0],[9,20,0.7,1],[-1,10,0,0],
+         [7,20,0.7,0],[5,20,0.6,1],[4,25,0.8,0],[2,20,0.6,0],[4,30,0.7,1],[-1,20,0,0]],
+        [[0,15,0.7,0],[2,15,0.6,1],[4,15,0.7,0],[7,20,0.8,1],[9,20,0.7,0],[7,15,0.6,1],[-1,8,0,0],
+         [4,15,0.7,0],[2,15,0.6,1],[0,20,0.7,0],[4,25,0.8,1],[7,30,0.9,0],[-1,25,0,0]],
+        [[7,15,0.8,0],[7,15,0.6,1],[5,15,0.7,0],[4,20,0.7,1],[2,15,0.6,0],[4,15,0.7,1],[-1,10,0,0],
+         [5,15,0.7,0],[7,20,0.8,1],[9,25,0.9,0],[7,20,0.7,0],[4,30,0.8,1],[-1,30,0,0]],
+        // Trill phrase: rapid alternation 4-5-4-5 then leap up
+        [[4,10,0.7,0],[5,10,0.6,1],[4,10,0.7,0],[5,10,0.6,1],[4,10,0.7,0],[5,10,0.7,1],[-1,6,0,0],
+         [7,15,0.8,0],[9,15,0.7,1],[11,20,0.9,0],[-1,8,0,0],[7,15,0.7,0],[4,20,0.8,1],[-1,20,0,0]],
+        // Wide leaps: octave jumps with harmony
+        [[0,12,0.8,0],[7,12,0.7,1],[-1,6,0,0],[0,12,0.7,0],[4,12,0.8,1],[7,15,0.9,0],[9,12,0.7,1],[-1,6,0,0],
+         [11,15,0.9,0],[9,12,0.7,1],[7,12,0.8,0],[4,15,0.7,1],[0,20,0.8,0],[-1,25,0,0]],
+      ];
+    } else if (this._lyreMode === 'night') {
+      // Night mode: long sustained notes, wide spacing, bass drone on voice 2
+      scale = dorian;
+      phrases = [
+        [[0,130,0.35,0],[0,200,0.12,2],[-1,80,0,0],[3,110,0.30,1],[-1,100,0,0],
+         [4,140,0.28,0],[-1,120,0,0],[0,160,0.20,2],[-1,150,0,0]],
+        [[5,120,0.30,0],[0,220,0.10,2],[-1,90,0,0],[3,130,0.25,1],[-1,110,0,0],
+         [0,150,0.28,0],[-1,140,0,0]],
+        [[4,100,0.30,0],[3,110,0.25,1],[0,200,0.10,2],[-1,100,0,0],[0,130,0.25,0],[-1,130,0,0],
+         [2,110,0.22,1],[0,160,0.28,0],[-1,180,0,0]],
+        // Sparse single notes with long drone underneath
+        [[7,140,0.25,0],[0,250,0.10,2],[-1,120,0,0],[4,120,0.22,1],[-1,140,0,0],
+         [3,130,0.20,0],[-1,160,0,0],[0,180,0.25,0],[0,200,0.08,2],[-1,200,0,0]],
+        // Very sparse — just two high notes over bass
+        [[4,160,0.22,0],[0,280,0.08,2],[-1,180,0,0],[5,140,0.20,1],[-1,220,0,0]],
+      ];
+    } else if (this._lyreMode === 'sailing') {
+      // Sailing: adventurous, ascending contour, pentatonic feel (D E G A B = 0,1,3,4,5 in dorian)
+      scale = dorian;
+      phrases = [
+        // Ascending run with momentum
+        [[0,35,0.7,0],[1,30,0.6,1],[3,30,0.7,0],[4,35,0.8,1],[7,40,0.9,0],[-1,15,0,0],
+         [4,30,0.6,0],[3,35,0.7,1],[4,40,0.8,0],[7,50,0.7,1],[-1,40,0,0]],
+        // Call and response: voice 0 ascends, voice 1 answers
+        [[0,40,0.7,0],[3,35,0.6,0],[4,35,0.7,0],[-1,20,0,0],
+         [7,40,0.7,1],[4,35,0.6,1],[3,40,0.7,1],[-1,15,0,0],
+         [4,45,0.8,0],[7,50,0.7,1],[9,55,0.8,0],[-1,50,0,0]],
+        // Rolling wave rhythm with bass anchor
+        [[0,50,0.6,0],[0,100,0.15,2],[4,30,0.7,0],[7,30,0.6,1],[4,30,0.7,0],[3,35,0.6,1],[-1,12,0,0],
+         [4,30,0.7,0],[7,35,0.8,0],[9,40,0.7,1],[7,45,0.6,0],[-1,60,0,0]],
+        // Triumphant high phrase
+        [[4,30,0.6,0],[7,30,0.7,1],[9,35,0.8,0],[11,40,0.9,0],[9,30,0.7,1],[-1,10,0,0],
+         [7,35,0.7,0],[4,40,0.6,1],[0,50,0.7,0],[-1,70,0,0]],
+      ];
     } else {
+      // Peaceful: warm Mediterranean, varied melodic phrases
       scale = dorian;
       phrases = [
         [[4,50,0.7,0],[7,50,0.5,1],[-1,20,0,0],[5,45,0.6,0],[3,55,0.7,0],[4,60,0.5,1],[-1,35,0,0],
@@ -415,6 +548,16 @@ class SoundManager {
          [4,30,0.7,0],[7,40,0.8,0],[9,35,0.6,1],[7,45,0.7,0],[4,55,0.6,0],[-1,70,0,0]],
         [[0,70,0.5,0],[4,65,0.4,1],[0,130,0.2,2],[-1,30,0,0],[2,60,0.5,0],[4,70,0.6,0],
          [7,80,0.7,0],[4,90,0.5,1],[0,100,0.6,0],[-1,120,0,0]],
+        // Ascending run — scale walk up with pauses
+        [[0,40,0.6,0],[1,35,0.5,1],[2,35,0.6,0],[3,40,0.7,1],[4,45,0.8,0],[-1,25,0,0],
+         [5,40,0.6,1],[7,50,0.8,0],[-1,20,0,0],[4,45,0.6,0],[2,50,0.5,1],[0,70,0.7,0],[-1,90,0,0]],
+        // Call-and-response: voice 0 plays, voice 1 echoes lower
+        [[4,50,0.7,0],[7,45,0.6,0],[-1,25,0,0],[2,50,0.5,1],[4,45,0.5,1],[-1,30,0,0],
+         [5,55,0.7,0],[7,50,0.7,0],[-1,20,0,0],[3,50,0.5,1],[0,60,0.6,1],[-1,100,0,0]],
+        // Two voices in harmony (thirds)
+        [[0,55,0.6,0],[2,55,0.5,1],[-1,20,0,0],[2,50,0.6,0],[4,50,0.5,1],[-1,20,0,0],
+         [4,55,0.7,0],[5,55,0.5,1],[-1,15,0,0],[7,60,0.8,0],[9,60,0.5,1],[-1,25,0,0],
+         [4,50,0.6,0],[5,50,0.5,1],[0,80,0.7,0],[-1,100,0,0]],
       ];
     }
 
@@ -437,6 +580,9 @@ class SoundManager {
       if (this._lyreMode === 'menu') this._lyreTimer += floor(random(180, 360));
       else if (this._lyreMode === 'tense') this._lyreTimer += floor(random(20, 50));
       else if (this._lyreMode === 'eerie') this._lyreTimer += floor(random(100, 200));
+      else if (this._lyreMode === 'celebration') this._lyreTimer += floor(random(15, 35));
+      else if (this._lyreMode === 'night') this._lyreTimer += floor(random(160, 300));
+      else if (this._lyreMode === 'sailing') this._lyreTimer += floor(random(40, 80));
       else this._lyreTimer += floor(random(60, 140));
     }
   }
@@ -610,13 +756,13 @@ class SoundManager {
       case 'stone_mine': play('sine', 180, 0.22, 120, 80, { attack: 3 }); break;  // deep thud + crumble
       // Cinematic
       case 'thunder':
-        play('sine', 45, 0.30, 25, 200, { attack: 3 });  // low sine hit
+        play('sine', 45, 0.15, 25, 300, { attack: 10 });  // low rumble, gentler
         setTimeout(() => {
           let s2 = this._getSfxSlot();
-          if (s2) { s2.osc.setType('triangle'); s2.osc.freq(90); s2._vol = 0.25 * vol; s2._peak = s2._vol;
-            s2.gain.amp(0,0); s2.gain.amp(s2._vol, 0.005); this._sfxEnvSmooth(s2, 90, 30, 180, { attack: 3 }); }
-        }, 20);
-        break;  // thunder crack: noise burst + low sine
+          if (s2) { s2.osc.setType('triangle'); s2.osc.freq(70); s2._vol = 0.12 * vol; s2._peak = s2._vol;
+            s2.gain.amp(0,0); s2.gain.amp(s2._vol, 0.01); this._sfxEnvSmooth(s2, 70, 25, 250, { attack: 15 }); }
+        }, 50);
+        break;  // distant thunder rumble
       case 'seagull':
         play('sine', 2800, 0.12, 2200, 150, { attack: 8 }); // high descending chirp
         setTimeout(() => {
@@ -644,6 +790,29 @@ class SoundManager {
             sm.gain.amp(0,0); sm.gain.amp(sm._vol, 0.008); this._sfxEnvSmooth(sm, 600, 400, 100, { attack: 8 }); }
         }, 80);
         break;  // soft descending meow
+      case 'skeleton_death':
+        play('triangle', 200, 0.18, 80, 200, { attack: 5 });  // crumble
+        setTimeout(() => {
+          let sd = this._getSfxSlot();
+          if (sd) { sd.osc.setType('sine'); sd.osc.freq(120); sd._vol = 0.12 * vol; sd._peak = sd._vol;
+            sd.gain.amp(0,0); sd.gain.amp(sd._vol, 0.005); this._sfxEnvSmooth(sd, 120, 60, 150, { attack: 3 }); }
+        }, 60);
+        break;
+      case 'season_change':
+        playTwo('sine', 440, 660, 0.14, 500, 180);  // A4->E5 soft chime
+        setTimeout(() => playTwo('sine', 523, 784, 0.12, 400, 150), 200);
+        break;
+      case 'festival_start':
+        playTwo('sine', 523, 784, 0.20, 400, 150);  // C5->G5 bright
+        setTimeout(() => playTwo('sine', 659, 988, 0.18, 350, 130), 150);
+        setTimeout(() => playTwo('sine', 784, 1175, 0.16, 300, 120), 300);
+        break;
+      case 'purchase':
+        playTwo('sine', 440, 660, 0.16, 250, 100);  // cash register feel
+        break;
+      case 'quest_progress':
+        play('sine', 600, 0.14, 800, 200, { attack: 10 });  // rising pip
+        break;
     }
   }
 
@@ -720,14 +889,28 @@ class SoundManager {
         if (v.music !== undefined) this.vol.music = v.music;
       }
     } catch(e) {}
+    // Safety: if master is 0 or any essential channel is 0, reset
+    if (this.vol.master <= 0.01 || (this.vol.sfx <= 0 && this.vol.music <= 0 && this.vol.ambient <= 0)) {
+      this.vol = { master: 0.5, sfx: 0.7, ambient: 0.5, music: 0.4 };
+      this._saveVolume();
+    }
   }
 
   // Resume AudioContext on user gesture (required by browsers)
   resume() {
-    if (typeof getAudioContext === 'function') {
-      let ctx = getAudioContext();
-      if (ctx.state === 'suspended') ctx.resume();
+    try {
+      if (typeof getAudioContext === 'function') {
+        let ctx = getAudioContext();
+        if (ctx.state === 'suspended') {
+          ctx.resume().then(() => {
+            console.log('[Sound] AudioContext resumed');
+            if (!this.ready) this.init();
+          });
+        }
+      }
+      if (!this.ready) this.init();
+    } catch(e) {
+      console.warn('[Sound] resume error:', e.message);
     }
-    if (!this.ready) this.init();
   }
 }
