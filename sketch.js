@@ -2416,6 +2416,53 @@ function getSkyBrightness() {
   return map(h, 17, 21, 1, 0);
 }
 
+function drawSunbeams(sunX, sunY, h) {
+  // Dawn: h ~5-7, Dusk: h ~17-20
+  let isDawn = h >= 5 && h < 7.5;
+  let isDusk = h >= 16.5 && h < 20;
+  if (!isDawn && !isDusk) return;
+  if (stormActive) return;
+
+  let intensity;
+  if (isDawn) {
+    intensity = 1 - abs(h - 6.2) / 1.2;
+  } else {
+    intensity = 1 - abs(h - 18) / 1.5;
+  }
+  intensity = constrain(intensity, 0, 1);
+  if (intensity < 0.02) return;
+
+  let skyH = max(height * 0.12, height * 0.25 - horizonOffset);
+  noStroke();
+  for (let i = 0; i < 6; i++) {
+    let angle = -HALF_PI + (i - 2.5) * 0.15;
+    let rayLen = skyH * 1.8;
+    let baseW = 2;
+    let tipW = 60 + i * 12;
+    let shimmer = sin(frameCount * 0.025 + i * 1.2) * 8;
+    let alpha = (16 + shimmer) * intensity;
+    let warmR = isDawn ? 255 : 255;
+    let warmG = isDawn ? 200 : 180;
+    let warmB = isDawn ? 130 : 100;
+
+    fill(warmR, warmG, warmB, alpha);
+    beginShape();
+    vertex(sunX - baseW, sunY);
+    vertex(sunX + baseW, sunY);
+    let endX = sunX + cos(angle) * rayLen;
+    let endY = sunY + sin(angle + HALF_PI) * rayLen;
+    vertex(endX + tipW / 2, endY);
+    vertex(endX - tipW / 2, endY);
+    endShape(CLOSE);
+  }
+
+  // Extra glow halo around sun during golden hour
+  fill(255, 220, 140, 30 * intensity);
+  ellipse(sunX, sunY, 70, 70);
+  fill(255, 230, 160, 18 * intensity);
+  ellipse(sunX, sunY, 110, 110);
+}
+
 // ─── SKY ──────────────────────────────────────────────────────────────────
 function drawSky() {
   let bright = getSkyBrightness();
@@ -2488,6 +2535,7 @@ function drawSky() {
     let sunY = sunArc;
     let sunBright = min(bright, 1) * (typeof stormActive !== 'undefined' && stormActive ? 0.2 : 1);
     drawSun(sunX, sunY, sunBright);
+    drawSunbeams(sunX, sunY, h);
     if (bright < 0.35) {
       let glowA = map(bright, 0.05, 0.35, 35, 0);
       fill(255, 160, 60, glowA);
@@ -2549,7 +2597,7 @@ function drawStarField(alpha) {
   if (!starPositions) {
     starPositions = [];
     // Background stars — varied sizes and colors
-    for (let i = 0; i < 160; i++) {
+    for (let i = 0; i < 200; i++) {
       let temp = random(); // 0=cool blue, 1=warm yellow
       starPositions.push({
         x: random(width), y: random(height * 0.5),
