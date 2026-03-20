@@ -328,15 +328,13 @@ function drawDriftClouds(bright) {
   drawDriftClouds._prevCamY = camSmooth.y;
 
   let h = state.time / 60;
-  if (bright < 0.2) return;
-
   if (!cloudPositions) {
     cloudPositions = [];
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 8; i++) {
       cloudPositions.push({
         x: random(width * 1.5),
         y: random(height * 0.03, height * 0.22),
-        w: random(30, 70),
+        w: random(55, 150),
         h: random(16, 38),
         speed: random(0.06, 0.22),
         depth: random(0.5, 1), // parallax depth
@@ -374,7 +372,7 @@ function drawDriftClouds(bright) {
     if (cl.x > width + cl.w) cl.x = -cl.w;
     cl.y -= camDY * 0.04;
     cl.y = constrain(cl.y, height * 0.02, height * 0.22);
-    let alpha = map(bright, 0.1, 0.5, 5, 25) * cl.depth;
+    let alpha = map(bright, 0.1, 0.5, 15, 55) * cl.depth;
     let cx = floor(cl.x), cy = floor(cl.y);
     let cw = floor(cl.w), ch = floor(cl.h);
 
@@ -826,14 +824,14 @@ function drawIsland() {
         let shadowY = iy - 18 + (cl.y / height) * ih * 0.6;
         let shadowW = cl.w * 0.4;
         let shadowH = cl.h * 0.2;
-        fill(0, 0, 0, 6 * bright * cl.depth);
+        fill(0, 0, 0, 12 * bright * cl.depth);
         ellipse(shadowX, shadowY, shadowW, shadowH);
       });
     } else {
       cloudShadows.forEach(cs => {
         let cx2 = ix + ((cs.x + frameCount * cs.speed * 0.001) % 1.6 - 0.8) * iw;
         let cy2 = iy - 18 + cs.y * ih * 0.3;
-        fill(0, 0, 0, 6 * bright);
+        fill(0, 0, 0, 12 * bright);
         ellipse(cx2, cy2, cs.w * 0.5, cs.h * 0.5);
       });
     }

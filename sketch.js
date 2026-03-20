@@ -2068,6 +2068,7 @@ function drawInner() {
     push();
     translate(shakeX, shakeY + floatOffset);
     drawIsland();
+    drawAmbientHouses();
     drawWorldObjectsSorted();
     drawCitySmoke();
     drawLaundryLines();
@@ -5556,6 +5557,50 @@ function drawWindowGlow() {
   });
 }
 
+// ─── AMBIENT BACKGROUND HOUSES ──────────────────────────────────────────
+function drawAmbientHouses() {
+  if (state.islandLevel < 9) return; // only Era 2+
+  let bright = getSkyBrightness();
+  let cx = WORLD.islandCX, cy = WORLD.islandCY;
+
+  // Fixed positions for ambient houses — fill gaps between main buildings
+  let ambientSlots = [
+    // NW residential fill
+    { x: 380, y: 350 }, { x: 380, y: 380 }, { x: 420, y: 380 },
+    { x: 350, y: 370 }, { x: 350, y: 400 },
+    // East of center fill
+    { x: 700, y: 420 }, { x: 730, y: 440 }, { x: 680, y: 460 },
+    // South fill
+    { x: 550, y: 500 }, { x: 580, y: 510 }, { x: 620, y: 500 },
+    { x: 650, y: 510 }, { x: 680, y: 490 },
+    // NE civic fill
+    { x: 720, y: 330 }, { x: 750, y: 345 },
+  ];
+
+  // Only draw slots that are on the island
+  ambientSlots.forEach(s => {
+    if (!isOnIsland(s.x, s.y)) return;
+    let sx = w2sX(s.x), sy = w2sY(s.y);
+    if (sx < -50 || sx > width + 50 || sy < -50 || sy > height + 50) return;
+
+    noStroke();
+    // Small background house — semi-transparent
+    let alpha = 140;
+    // Roof
+    fill(175, 95, 65, alpha);
+    rect(sx - 12, sy - 14, 24, 6);
+    // Walls
+    fill(200, 185, 160, alpha);
+    rect(sx - 10, sy - 8, 20, 14);
+    // Door
+    fill(120, 95, 65, alpha);
+    rect(sx - 3, sy - 2, 6, 8);
+    // Window
+    fill(160, 175, 190, alpha * 0.8);
+    rect(sx + 5, sy - 5, 4, 4);
+  });
+}
+
 // ─── Y-SORTED WORLD RENDERING ────────────────────────────────────────────
 function drawWorldObjectsSorted() {
   // Layer 0: ground-level flat objects (always behind characters)
@@ -7235,18 +7280,15 @@ function drawOneCrystal(node) {
 
     let pulse = sin(node.phase) * 0.3 + 0.7;
 
-    // Glow aura — pixel cross (only when player is nearby)
+    // Glow aura — pixel cross
     noStroke();
-    let playerDist = dist2(state.player.x, state.player.y, node.x, node.y);
-    if (playerDist < 200) {
-      let glS = floor(node.size * 0.5);
-      fill(0, 255, 136, floor(7 * pulse));
-      rect(nx - glS, ny - 1, glS * 2, 2);
-      rect(nx - 1, ny - glS, 2, glS * 2);
-      fill(0, 255, 136, floor(4 * pulse));
-      rect(nx - glS * 0.7, ny - 2, glS * 1.4, 4);
-      rect(nx - 2, ny - glS * 0.7, 4, glS * 1.4);
-    }
+    let glS = floor(node.size * 1.2);
+    fill(0, 255, 136, floor(12 * pulse));
+    rect(nx - glS, ny - 1, glS * 2, 2);
+    rect(nx - 1, ny - glS, 2, glS * 2);
+    fill(0, 255, 136, floor(6 * pulse));
+    rect(nx - glS * 0.7, ny - 2, glS * 1.4, 4);
+    rect(nx - 2, ny - glS * 0.7, 4, glS * 1.4);
 
     // Stone altar pedestal — pixel
     fill(120, 115, 100, 150);
@@ -7272,7 +7314,7 @@ function drawOneCrystal(node) {
     strokeWeight(1.5);
     noFill();
     let chargeAngle = map(node.charge, 0, 100, 0, TWO_PI);
-    arc(nx, ny, node.size * 1.75, node.size * 1.75, -HALF_PI, -HALF_PI + chargeAngle);
+    arc(nx, ny, node.size * 2.5, node.size * 2.5, -HALF_PI, -HALF_PI + chargeAngle);
     noStroke();
 
     // Click prompt when player is near
@@ -17668,11 +17710,11 @@ function _addProceduralPerimeter(lvl, cx, cy, rx, ry) {
     addClampedResource(px, py, ['stone', 'vine', 'leaf'][i % 3], cx, cy);
   }
 
-  // Crystal node on even levels
-  if (lvl % 2 === 0) {
+  // Crystal node every 3 levels
+  if (lvl % 3 === 0) {
     let ca = angle0 + PI;
-    let crx = cx + cos(ca) * state.islandRX * 0.8;
-    let cry = cy + sin(ca) * state.islandRY * 0.55;
+    let crx = cx + cos(ca) * state.islandRX * 0.85;
+    let cry = cy + sin(ca) * state.islandRY * 0.65;
     let cSize = min(14 + floor(lvl / 5) * 2, 24);
     state.crystalNodes.push({
       x: crx, y: cry,
@@ -17948,32 +17990,6 @@ function placeEraBuildings(lvl) {
   }
 }
 
-function spawnAmbientHousing(count) {
-  let cx = WORLD.islandCX, cy = WORLD.islandCY;
-  let srx = getSurfaceRX(), sry = getSurfaceRY();
-  let placed = 0;
-  for (let attempt = 0; attempt < count * 5 && placed < count; attempt++) {
-    let a = random(TWO_PI);
-    let r = random(0.15, 0.45);
-    let x = cx + cos(a) * srx * r;
-    let y = cy + sin(a) * sry * r;
-    if (!isOnIsland(x, y)) continue;
-    let tooClose = state.buildings.some(b => {
-      let dx = x - b.x, dy = y - b.y;
-      return dx * dx + dy * dy < 35 * 35;
-    });
-    if (tooClose) continue;
-    if (state.pyramid) {
-      let dx = x - state.pyramid.x, dy = y - state.pyramid.y;
-      if (dx * dx + dy * dy < 80 * 80) continue;
-    }
-    state.buildings.push({
-      x: x, y: y, w: 28, h: 22, type: 'house', rot: 0, ambient: true
-    });
-    placed++;
-  }
-}
-
 function expandIsland() {
   let cost = getExpandCost(state.islandLevel);
   if (!canAffordExpand()) {
@@ -18003,18 +18019,6 @@ function expandIsland() {
 
   // Place all buildings, resources, trees, crystals, ruins for this level
   placeEraBuildings(state.islandLevel);
-
-  // Ambient background houses to fill empty space
-  if (state.islandLevel === 8)  spawnAmbientHousing(6);
-  if (state.islandLevel === 10) spawnAmbientHousing(10);
-  if (state.islandLevel === 12) spawnAmbientHousing(8);
-  if (state.islandLevel === 13) spawnAmbientHousing(10);
-  if (state.islandLevel === 15) spawnAmbientHousing(10);
-  if (state.islandLevel === 16) spawnAmbientHousing(10);
-  if (state.islandLevel === 18) spawnAmbientHousing(8);
-  if (state.islandLevel === 19) spawnAmbientHousing(8);
-  if (state.islandLevel === 21) spawnAmbientHousing(6);
-  if (state.islandLevel === 22) spawnAmbientHousing(6);
 
   // Milestone journal unlocks and special effects
   let rx = getSurfaceRX(), ry = getSurfaceRY();

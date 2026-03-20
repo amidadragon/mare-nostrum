@@ -123,12 +123,12 @@ function drawFarmZoneBG() {
   let few = right - left, feh = bot - top;
 
   noStroke();
-  // Tilled earth background — warm rich soil
-  fill(65, 48, 28, 70);
+  // Tilled earth background — light warm soil
+  fill(90, 72, 48, 45);
   rect(fsx - 2, fsy - 2, few + 4, feh + 4, 6);
-  fill(78, 58, 34, 95);
+  fill(100, 82, 55, 60);
   rect(fsx, fsy, few, feh, 4);
-  fill(85, 65, 38, 50);
+  fill(110, 90, 60, 35);
   rect(fsx + 4, fsy + 4, few - 8, feh - 8, 3);
 
   // ─── Wooden fence around the farm ───
@@ -275,17 +275,17 @@ function drawOnePlot(p) {
     px = floor(px); py = floor(py);
     // Pixel stone border
     noStroke();
-    fill(140, 132, 118, 120);
+    fill(155, 148, 135, 80);
     rect(px - p.w/2 - 3, py - p.h/2 - 2, p.w + 6, p.h + 4);
     // Edge detail
-    fill(120, 112, 98, 80);
+    fill(140, 132, 118, 50);
     rect(px - p.w/2 - 3, py - p.h/2 - 2, p.w + 6, 1);
 
     // Pixel soil
-    fill(p.planted ? color(68, 48, 28) : color(52, 38, 22));
+    fill(p.planted ? color(88, 68, 45) : color(75, 60, 42));
     rect(px - p.w/2, py - p.h/2, p.w, p.h);
     // Furrow lines — pixel-style
-    stroke(p.planted ? color(52, 35, 18, 110) : color(38, 26, 14, 80));
+    stroke(p.planted ? color(72, 55, 35, 70) : color(58, 45, 30, 50));
     strokeWeight(0.8);
     for (let r = -2; r <= 2; r++) {
       let fy = py + r * (p.h * 0.18);
