@@ -17009,117 +17009,664 @@ function placeBuildingChecked(bld) {
   return false;
 }
 
-function spawnCluster(type, anchorX, anchorY) {
-  let builds = [];
+function _addProceduralPerimeter(lvl, cx, cy, rx, ry) {
+  let angle0 = ((lvl - 6) / 20) * TWO_PI;
 
-  if (type === 'market_block') {
-    // Market stall + 2 smaller stalls + floor + lantern
-    builds.push({ x: anchorX, y: anchorY, w: 44, h: 34, type: 'market', rot: 0 });
-    builds.push({ x: anchorX - 30, y: anchorY + 20, w: 24, h: 20, type: 'chest', rot: 0 });
-    builds.push({ x: anchorX + 30, y: anchorY + 20, w: 24, h: 20, type: 'chest', rot: 0 });
-    builds.push({ x: anchorX, y: anchorY + 30, w: 32, h: 32, type: 'floor', rot: 0 });
-    builds.push({ x: anchorX + 28, y: anchorY - 10, w: 10, h: 10, type: 'lantern', rot: 0 });
+  // Resources (3 to 6 per level)
+  let numRes = 3 + floor(lvl / 5);
+  for (let i = 0; i < numRes; i++) {
+    let a = angle0 + (i / numRes) * TWO_PI * 0.3 + random(-0.2, 0.2);
+    let r = random(0.55, 0.85);
+    let px = cx + cos(a) * state.islandRX * r * 0.9;
+    let py = cy + sin(a) * state.islandRY * r * 0.9;
+    addClampedResource(px, py, ['stone', 'vine', 'leaf'][i % 3], cx, cy);
   }
-  else if (type === 'temple_precinct') {
-    // Temple + processional floor tiles + flanking torches + flowers
-    builds.push({ x: anchorX, y: anchorY, w: 70, h: 50, type: 'temple', rot: 0 });
-    // 3x2 floor grid in front
-    for (let r = 0; r < 2; r++) for (let c = -1; c <= 1; c++) {
-      builds.push({ x: anchorX + c * 28, y: anchorY + 35 + r * 24, w: 26, h: 22, type: 'floor', rot: 0 });
+
+  // Crystal node on even levels
+  if (lvl % 2 === 0) {
+    let ca = angle0 + PI;
+    let crx = cx + cos(ca) * state.islandRX * 0.5;
+    let cry = cy + sin(ca) * state.islandRY * 0.4;
+    let cSize = min(14 + floor(lvl / 5) * 2, 24);
+    state.crystalNodes.push({
+      x: crx, y: cry,
+      size: cSize, phase: random(TWO_PI),
+      charge: 50 + lvl * 5, respawnTimer: 0,
+    });
+  }
+
+  // Trees (1 to 4 per level)
+  let numTrees = 1 + floor(lvl / 6);
+  for (let i = 0; i < numTrees; i++) {
+    let ta = random(TWO_PI);
+    let tr = random(0.4, 0.85);
+    addClampedTree(
+      cx + cos(ta) * state.islandRX * tr * 0.9,
+      cy + sin(ta) * state.islandRY * tr * 0.9,
+      cx, cy
+    );
+  }
+
+  // Ruin on every 3rd level
+  if (lvl % 3 === 0) {
+    let ra = angle0 + HALF_PI;
+    let rrx = cx + cos(ra) * state.islandRX * 0.6;
+    let rry = cy + sin(ra) * state.islandRY * 0.5;
+    state.ruins.push({
+      x: rrx, y: rry,
+      w: 28 + floor(lvl / 3) * 3,
+      h: 18 + floor(lvl / 4) * 2,
+      rot: random(-0.05, 0.05),
+    });
+  }
+}
+
+function placeEraBuildings(lvl) {
+  let rx = getSurfaceRX();
+  let ry = getSurfaceRY();
+  let cx = WORLD.islandCX;
+  let cy = WORLD.islandCY;
+
+  // Helper: place a building using overlap check, with small jitter fallback
+  function pb(x, y, w, h, type) {
+    placeBuildingChecked({ x: x, y: y, w: w, h: h, type: type, rot: 0 });
+  }
+
+  // Helper: place a row of N identical buildings spaced evenly along X
+  function pbRow(startX, y, spacingX, count, w, h, type) {
+    for (let i = 0; i < count; i++) {
+      pb(startX + i * spacingX, y, w, h, type);
+    }
+  }
+
+  // Helper: resource placement (clamped to island surface)
+  function res(x, y, type) {
+    addClampedResource(x, y, type, cx, cy);
+  }
+
+  // Helper: tree placement (clamped)
+  function tree(x, y) {
+    addClampedTree(x, y, cx, cy);
+  }
+
+  // Helper: crystal node
+  function crystal(dx, dy, size, charge) {
+    let sh = state.crystalShrine;
+    state.crystalNodes.push({
+      x: sh.x + dx, y: sh.y + dy,
+      size: size, phase: random(TWO_PI),
+      charge: charge, respawnTimer: 0,
+    });
+  }
+
+  // Helper: ruin
+  function ruin(x, y, w, h) {
+    state.ruins.push({ x: x, y: y, w: w, h: h, rot: random(-0.05, 0.05) });
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  // ERA 1: VILLAGE  (Lv 2-8)
+  // No grid. Organic. Farms, fences, first structures.
+  // ─────────────────────────────────────────────────────────────────
+
+  if (lvl === 2) {
+    // Farm perimeter fences (east side of farm plot)
+    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
+    pb(farmCX + 60, farmCY - 30, 32, 8, 'fence');
+    pb(farmCX + 60, farmCY + 10, 32, 8, 'fence');
+    // Town center brazier (campfire area)
+    pb(cx + rx * 0.05, cy + ry * 0.05, 8, 16, 'torch');
+    // Resources: south quarter
+    res(cx - 120, cy + 70, 'stone');
+    res(cx - 60,  cy + 75, 'stone');
+    res(cx + 30,  cy + 70, 'vine');
+    res(cx + 100, cy + 65, 'leaf');
+    // Crystal
+    crystal(50, 30, 14, 50);
+    // Grove east expansion
+    tree(cx + 180, cy + 40);
+    tree(cx + 230, cy + 30);
+    tree(cx + 300, cy - 10);
+    // Farm plots
+    addFarmPlots(farmCX, farmCY, lvl);
+    addFloatingText(width / 2, height * 0.3, 'Farm fenced — the homestead grows!', '#88cc66');
+    spawnParticles(farmCX + 60, farmCY - 10, 'build', 8);
+  }
+
+  if (lvl === 3) {
+    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
+    // Shrine plaza on Via Sacra approach (east, toward temple hill)
+    // Three floor tiles in a row, then shrine behind them
+    pb(cx + rx * 0.35 - 20, cy - ry * 0.3, 24, 20, 'floor');
+    pb(cx + rx * 0.35,      cy - ry * 0.3, 24, 20, 'floor');
+    pb(cx + rx * 0.35 + 20, cy - ry * 0.3, 24, 20, 'floor');
+    pb(cx + rx * 0.4,       cy - ry * 0.35, 32, 28, 'shrine');
+    // Resources: NE quarter
+    res(cx + 200, cy - 70, 'vine');
+    res(cx + 250, cy - 45, 'stone');
+    res(cx + 160, cy - 80, 'vine');
+    res(cx + 300, cy - 30, 'leaf');
+    // Crystal
+    crystal(-50, 30, 14, 50);
+    // Trees NE grove
+    tree(cx + 280, cy - 55);
+    tree(cx + 320, cy - 25);
+    tree(cx + 150, cy - 60);
+    // Ruin on NE edge
+    ruin(cx + 260, cy - 70, 30, 20);
+    // Farm plots
+    addFarmPlots(farmCX, farmCY, lvl);
+    addFloatingText(width / 2, height * 0.3, 'Shrine consecrated — the gods watch!', '#ffaaff');
+    spawnParticles(cx + rx * 0.4, cy - ry * 0.35, 'build', 10);
+  }
+
+  if (lvl === 4) {
+    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
+    // Well at town center (civic water access)
+    pb(cx + rx * 0.1, cy + ry * 0.3, 24, 24, 'well');
+    // Farm entrance fences NW
+    pb(cx - rx * 0.35, cy - ry * 0.1,  32, 8, 'fence');
+    pb(cx - rx * 0.35, cy + ry * 0.05, 32, 8, 'fence');
+    // Resources: NW quarter
+    res(cx - 250, cy - 50, 'vine');
+    res(cx - 300, cy - 20, 'leaf');
+    res(cx - 200, cy - 70, 'stone');
+    res(cx - 340, cy + 10, 'leaf');
+    // Crystal
+    crystal(0, -45, 16, 60);
+    // Trees east expansion
+    tree(cx + 250, cy - 40);
+    tree(cx + 200, cy + 50);
+    tree(cx + 340, cy + 15);
+    // Farm plots
+    addFarmPlots(farmCX, farmCY, lvl);
+    addFloatingText(width / 2, height * 0.3, 'Well dug — farm entrance fenced!', '#66aaff');
+    spawnParticles(cx + rx * 0.1, cy + ry * 0.3, 'build', 8);
+  }
+
+  if (lvl === 5) {
+    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
+    // GRANARY: north of farm on Via Granaria
+    pb(farmCX, farmCY - ry * 0.7, 58, 44, 'granary');
+    pb(farmCX - 28, farmCY - ry * 0.7 + 14, 8, 16, 'torch');
+    pb(farmCX + 28, farmCY - ry * 0.7 + 14, 8, 16, 'torch');
+    // Second well near market/east approach
+    pb(cx + rx * 0.35, cy + ry * 0.55, 24, 24, 'well');
+    pb(cx + rx * 0.35 + 16, cy + ry * 0.55, 8, 16, 'torch');
+    // Via Granaria paving (farm road leading north to granary)
+    pb(cx - rx * 0.1, cy - ry * 0.3,  24, 20, 'floor');
+    pb(cx - rx * 0.1, cy - ry * 0.15, 24, 20, 'floor');
+    pb(cx - rx * 0.1, cy,             24, 20, 'floor');
+    // Resources: grand perimeter ring
+    res(cx - 350, cy + 30, 'stone');
+    res(cx + 350, cy + 30, 'stone');
+    res(cx - 150, cy + 90, 'vine');
+    res(cx + 150, cy + 90, 'leaf');
+    res(cx,       cy + 85, 'stone');
+    // Crystals: two large flanking shrine
+    crystal(-60, -10, 18, 80);
+    crystal( 60, -10, 18, 80);
+    // Trees: grand perimeter
+    tree(cx + 360, cy);
+    tree(cx + 300, cy + 50);
+    tree(cx + 180, cy - 70);
+    tree(cx + 240, cy + 60);
+    tree(cx + 350, cy - 40);
+    // Ruin south
+    ruin(cx, cy + 80, 35, 22);
+    // Farm plots
+    addFarmPlots(farmCX, farmCY, lvl);
+    addFloatingText(width / 2, height * 0.25, 'Granary & Well constructed!', '#88cc66');
+    spawnParticles(farmCX, farmCY - ry * 0.3, 'build', 12);
+  }
+
+  if (lvl === 6) {
+    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
+    // RESIDENTIAL NW BLOCK — first two domus, side by side
+    let houseStreetY = cy - ry * 0.2;
+    let houseStartX  = cx - rx * 0.25;
+    pb(houseStartX,      houseStreetY, 44, 34, 'house');
+    pb(houseStartX + 50, houseStreetY, 44, 34, 'house');
+    // Torch between them on shared courtyard
+    pb(houseStartX + 25, houseStreetY + 18, 8, 16, 'torch');
+    // Shared garden in front
+    pb(houseStartX + 22, houseStreetY - 14, 20, 16, 'flower');
+    // Procedural: resources ring, crystal (even level), trees
+    _addProceduralPerimeter(lvl, cx, cy, rx, ry);
+    addFarmPlots(farmCX, farmCY, lvl);
+    addFloatingText(width / 2, height * 0.3, 'Citizens settle — first Domus built!', '#aaddff');
+    spawnParticles(houseStartX + 25, houseStreetY, 'build', 10);
+  }
+
+  if (lvl === 7) {
+    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
+    // MARKET BLOCK — east of center on Via Principalis
+    let mktX = cx + rx * 0.5;
+    let mktY = cy - 8; // ON the Decumanus centerline
+    pb(mktX,       mktY,      44, 34, 'market');
+    pb(mktX - 30,  mktY + 24, 24, 20, 'chest');
+    pb(mktX + 30,  mktY + 24, 24, 20, 'chest');
+    pb(mktX,       mktY + 36, 32, 32, 'floor');
+    pb(mktX - 26,  mktY - 8,  8, 16, 'torch');
+    pb(mktX + 26,  mktY - 8,  8, 16, 'torch');
+    // Procedural
+    _addProceduralPerimeter(lvl, cx, cy, rx, ry);
+    addFarmPlots(farmCX, farmCY, lvl);
+    addFloatingText(width / 2, height * 0.3, 'Market opens for trade!', '#ffcc66');
+    spawnParticles(mktX, mktY, 'build', 10);
+  }
+
+  if (lvl === 8) {
+    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
+    // BATH HOUSE — SW civic district
+    let bathX = cx - rx * 0.3;
+    let bathY = cy + ry * 0.35;
+    pb(bathX, bathY, 58, 44, 'bath');
+    pb(bathX - 36, bathY,      20, 16, 'flower');
+    pb(bathX + 36, bathY,      20, 16, 'flower');
+    pb(bathX,      bathY + 28, 32, 32, 'floor');
+    pb(bathX - 32, bathY + 24, 10, 20, 'lantern');
+
+    // CASTRUM — SE military compound (walled)
+    let castX = cx + rx * 0.45;
+    let castY = cy + ry * 0.5;
+    pb(castX,      castY,       64, 50, 'castrum');
+    pb(castX - 40, castY,       8,  50, 'wall');
+    pb(castX + 40, castY,       8,  50, 'wall');
+    pb(castX,      castY - 30,  80, 8,  'wall');
+    pb(castX + 44, castY - 28, 20, 44, 'watchtower');
+    pb(castX - 18, castY + 28,  8, 16, 'torch');
+    pb(castX + 18, castY + 28,  8, 16, 'torch');
+
+    // Via Militaris — paved approach road from center to castrum
+    pb(cx + rx * 0.35, cy + ry * 0.2,  24, 20, 'floor');
+    pb(cx + rx * 0.35, cy + ry * 0.3,  24, 20, 'floor');
+    pb(cx + rx * 0.35, cy + ry * 0.4,  24, 20, 'floor');
+
+    // South road from port toward center (5 tiles)
+    let _port = getPortPosition();
+    for (let i = 0; i < 5; i++) {
+      let t = (i + 1) / 6;
+      pb(lerp(_port.x, cx, t), lerp(_port.y, cy + 10, t), 24, 20, 'floor');
+    }
+
+    // Update legia state
+    if (state.legia) {
+      state.legia.castrumLevel = 1;
+      state.legia.castrumX = castX;
+      state.legia.castrumY = castY;
+    }
+    unlockJournal('legia_founded');
+
+    _addProceduralPerimeter(lvl, cx, cy, rx, ry);
+    addFarmPlots(farmCX, farmCY, lvl);
+    addFloatingText(width / 2, height * 0.3, 'Baths & Castrum — Rome grows strong!', '#cc4444');
+    spawnParticles(castX, castY, 'build', 12);
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  // ERA 2: CITY  (Lv 9-17)
+  // Grid takes shape. Cardo crosses Decumanus.
+  // ─────────────────────────────────────────────────────────────────
+
+  if (lvl === 9) {
+    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
+    // AQUEDUCT ROW — spans north of island on east-west axis
+    pb(cx - rx * 0.1, cy - ry * 0.55, 20, 40, 'aqueduct');
+    pb(cx + rx * 0.1, cy - ry * 0.55, 20, 40, 'aqueduct');
+    pb(cx + rx * 0.3, cy - ry * 0.55, 20, 40, 'aqueduct');
+    // Bridge — residential NW to civic NE
+    pb(cx, cy - ry * 0.3, 32, 32, 'bridge');
+    _addProceduralPerimeter(lvl, cx, cy, rx, ry);
+    addFarmPlots(farmCX, farmCY, lvl);
+    addFloatingText(width / 2, height * 0.3, 'Aqueduct spans the island!', '#66ccff');
+    spawnParticles(cx, cy - ry * 0.55, 'build', 12);
+  }
+
+  if (lvl === 10) {
+    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
+    // TEMPLE PRECINCT — civic NE, on Via Sacra
+    let tempX = cx + rx * 0.5;
+    let tempY = cy - ry * 0.35;
+    pb(tempX, tempY, 70, 50, 'temple');
+    // Processional floor grid in front of temple (3 cols x 2 rows)
+    for (let row = 0; row < 2; row++) {
+      for (let col = -1; col <= 1; col++) {
+        pb(tempX + col * 28, tempY + 35 + row * 24, 26, 22, 'floor');
+      }
     }
     // Flanking torches
-    builds.push({ x: anchorX - 40, y: anchorY + 10, w: 8, h: 16, type: 'torch', rot: 0 });
-    builds.push({ x: anchorX + 40, y: anchorY + 10, w: 8, h: 16, type: 'torch', rot: 0 });
+    pb(tempX - 40, tempY + 10, 8, 16, 'torch');
+    pb(tempX + 40, tempY + 10, 8, 16, 'torch');
     // Flower beds
-    builds.push({ x: anchorX - 42, y: anchorY - 10, w: 8, h: 8, type: 'flower', rot: 0 });
-    builds.push({ x: anchorX + 42, y: anchorY - 10, w: 8, h: 8, type: 'flower', rot: 0 });
-  }
-  else if (type === 'forum_plaza') {
-    // Forum + surrounding floor + 4 lanterns at corners + mosaic center
-    builds.push({ x: anchorX, y: anchorY, w: 80, h: 60, type: 'forum', rot: 0 });
-    // Floor tiles around forum
-    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
-      if (dx === 0 && dy === 0) continue;
-      builds.push({ x: anchorX + dx * 50, y: anchorY + dy * 35, w: 32, h: 32, type: 'floor', rot: 0 });
+    pb(tempX - 42, tempY - 10, 20, 16, 'flower');
+    pb(tempX + 42, tempY - 10, 20, 16, 'flower');
+
+    // SECOND MARKET — near port on eastern shore
+    let port = getPortPosition();
+    pb(port.x + 80, port.y - 30, 44, 34, 'market');
+
+    // TOWN CENTER PLAZA — six floor tiles at crossing
+    for (let r = 0; r < 2; r++) {
+      for (let c = -1; c <= 1; c++) {
+        pb(cx + c * 20, cy + 10 + r * 24, 26, 22, 'floor');
+      }
     }
-    // Corner lanterns
-    builds.push({ x: anchorX - 50, y: anchorY - 38, w: 10, h: 10, type: 'lantern', rot: 0 });
-    builds.push({ x: anchorX + 50, y: anchorY - 38, w: 10, h: 10, type: 'lantern', rot: 0 });
-    builds.push({ x: anchorX - 50, y: anchorY + 38, w: 10, h: 10, type: 'lantern', rot: 0 });
-    builds.push({ x: anchorX + 50, y: anchorY + 38, w: 10, h: 10, type: 'lantern', rot: 0 });
-    // Central mosaic
-    builds.push({ x: anchorX, y: anchorY + 40, w: 32, h: 32, type: 'mosaic', rot: 0 });
-  }
-  else if (type === 'housing_row') {
-    // 3 houses in a row with torches between + fence behind
-    for (let i = 0; i < 3; i++) {
-      builds.push({ x: anchorX + i * 52, y: anchorY, w: 44, h: 34, type: 'house', rot: 0 });
-      if (i < 2) builds.push({ x: anchorX + i * 52 + 26, y: anchorY + 18, w: 8, h: 16, type: 'torch', rot: 0 });
-    }
-    builds.push({ x: anchorX + 52, y: anchorY - 22, w: 140, h: 6, type: 'fence', rot: 0 });
-  }
-  else if (type === 'military_compound') {
-    // Castrum + wall segments + watchtower + torches
-    builds.push({ x: anchorX, y: anchorY, w: 64, h: 50, type: 'castrum', rot: 0 });
-    // Walls on 3 sides
-    builds.push({ x: anchorX - 40, y: anchorY, w: 8, h: 50, type: 'wall', rot: 0 });
-    builds.push({ x: anchorX + 40, y: anchorY, w: 8, h: 50, type: 'wall', rot: 0 });
-    builds.push({ x: anchorX, y: anchorY - 30, w: 80, h: 8, type: 'wall', rot: 0 });
-    // Watchtower
-    builds.push({ x: anchorX + 44, y: anchorY - 28, w: 20, h: 44, type: 'watchtower', rot: 0 });
-    // Flanking torches at gate
-    builds.push({ x: anchorX - 18, y: anchorY + 28, w: 8, h: 16, type: 'torch', rot: 0 });
-    builds.push({ x: anchorX + 18, y: anchorY + 28, w: 8, h: 16, type: 'torch', rot: 0 });
-  }
-  else if (type === 'bath_complex') {
-    // Bath + flower gardens + floor tiles + lanterns
-    builds.push({ x: anchorX, y: anchorY, w: 58, h: 44, type: 'bath', rot: 0 });
-    builds.push({ x: anchorX - 36, y: anchorY, w: 8, h: 8, type: 'flower', rot: 0 });
-    builds.push({ x: anchorX + 36, y: anchorY, w: 8, h: 8, type: 'flower', rot: 0 });
-    builds.push({ x: anchorX, y: anchorY + 28, w: 32, h: 32, type: 'floor', rot: 0 });
-    builds.push({ x: anchorX - 32, y: anchorY + 24, w: 10, h: 10, type: 'lantern', rot: 0 });
-  }
-  else if (type === 'library_quarter') {
-    // Library + mosaic floor + lanterns + shrine
-    builds.push({ x: anchorX, y: anchorY, w: 58, h: 44, type: 'library', rot: 0 });
-    builds.push({ x: anchorX, y: anchorY + 30, w: 32, h: 32, type: 'mosaic', rot: 0 });
-    builds.push({ x: anchorX - 34, y: anchorY + 10, w: 10, h: 10, type: 'lantern', rot: 0 });
-    builds.push({ x: anchorX + 34, y: anchorY + 10, w: 10, h: 10, type: 'lantern', rot: 0 });
-    builds.push({ x: anchorX + 36, y: anchorY - 14, w: 32, h: 28, type: 'shrine', rot: 0 });
-  }
-  else if (type === 'domus_pair') {
-    // 2 houses side by side with shared courtyard
-    builds.push({ x: anchorX - 26, y: anchorY, w: 44, h: 34, type: 'house', rot: 0 });
-    builds.push({ x: anchorX + 26, y: anchorY, w: 44, h: 34, type: 'house', rot: 0 });
-    builds.push({ x: anchorX, y: anchorY + 22, w: 24, h: 20, type: 'floor', rot: 0 });
-    builds.push({ x: anchorX, y: anchorY - 20, w: 8, h: 8, type: 'flower', rot: 0 });
-  }
-  else if (type === 'villa_estate') {
-    // Villa + garden + floor + 2 flowers + lantern
-    builds.push({ x: anchorX, y: anchorY, w: 72, h: 52, type: 'villa', rot: 0 });
-    builds.push({ x: anchorX - 42, y: anchorY + 10, w: 8, h: 8, type: 'flower', rot: 0 });
-    builds.push({ x: anchorX + 42, y: anchorY + 10, w: 8, h: 8, type: 'flower', rot: 0 });
-    builds.push({ x: anchorX - 42, y: anchorY - 10, w: 8, h: 8, type: 'flower', rot: 0 });
-    builds.push({ x: anchorX + 42, y: anchorY - 10, w: 8, h: 8, type: 'flower', rot: 0 });
-    builds.push({ x: anchorX, y: anchorY + 32, w: 32, h: 32, type: 'mosaic', rot: 0 });
-    builds.push({ x: anchorX + 40, y: anchorY + 28, w: 10, h: 10, type: 'lantern', rot: 0 });
-  }
-  else if (type === 'arena_complex') {
-    // Arena + seating walls + entrance torches + floor
-    builds.push({ x: anchorX, y: anchorY, w: 68, h: 54, type: 'arena', rot: 0 });
-    builds.push({ x: anchorX - 40, y: anchorY + 30, w: 8, h: 16, type: 'torch', rot: 0 });
-    builds.push({ x: anchorX + 40, y: anchorY + 30, w: 8, h: 16, type: 'torch', rot: 0 });
-    builds.push({ x: anchorX, y: anchorY + 34, w: 32, h: 32, type: 'floor', rot: 0 });
+    // Civic district entry lanterns
+    pb(cx + rx * 0.3, cy - ry * 0.15, 10, 20, 'lantern');
+    pb(cx + rx * 0.3, cy + ry * 0.05, 10, 20, 'lantern');
+    // East road paving tiles
+    pb(cx + rx * 0.4, cy - ry * 0.1, 32, 32, 'floor');
+    pb(cx + rx * 0.4, cy,            32, 32, 'floor');
+
+    _addProceduralPerimeter(lvl, cx, cy, rx, ry);
+    addFarmPlots(farmCX, farmCY, lvl);
+    addFloatingText(width / 2, height * 0.25, 'GOVERNOR — Temple & Market erected!', '#ffdd66');
+    triggerScreenShake(6, 15);
+    spawnParticles(tempX, tempY, 'build', 15);
   }
 
-  // Push all buildings, using overlap check
-  builds.forEach(b => {
-    if (typeof placeBuildingChecked === 'function') {
-      placeBuildingChecked(b);
-    } else {
-      state.buildings.push(b);
+  if (lvl === 11) {
+    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
+    // TEMPLE GARDENS — flower beds and mosaic lining Via Sacra
+    pb(cx + rx * 0.45, cy - ry * 0.15, 20, 16, 'flower');
+    pb(cx + rx * 0.55, cy - ry * 0.15, 20, 16, 'flower');
+    pb(cx + rx * 0.65, cy - ry * 0.15, 20, 16, 'flower');
+    pb(cx + rx * 0.55, cy - ry * 0.55, 28, 20, 'mosaic');
+    pb(cx + rx * 0.5,  cy - ry * 0.25, 10, 20, 'lantern');
+    _addProceduralPerimeter(lvl, cx, cy, rx, ry);
+    addFarmPlots(farmCX, farmCY, lvl);
+    addFloatingText(width / 2, height * 0.3, 'Gardens and mosaics adorn the temple!', '#ffaaff');
+    spawnParticles(cx + rx * 0.55, cy - ry * 0.15, 'build', 10);
+  }
+
+  if (lvl === 12) {
+    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
+    // RESIDENTIAL BLOCK 2 — two more domus north of first pair on Cardo
+    let houseStreetY2 = cy - ry * 0.35;
+    let houseStartX2  = cx - rx * 0.25;
+    pb(houseStartX2,      houseStreetY2, 44, 34, 'house');
+    pb(houseStartX2 + 50, houseStreetY2, 44, 34, 'house');
+    pb(houseStartX2 + 25, houseStreetY2 + 18, 8, 16, 'torch');
+    // Also a second pair on interior Cardo
+    pb(cx - rx * 0.15, cy - ry * 0.15, 44, 34, 'house');
+    pb(cx - rx * 0.15, cy - ry * 0.35, 44, 34, 'house');
+    // Second well SW
+    pb(cx - rx * 0.2, cy + ry * 0.4, 24, 24, 'well');
+    // Via Principalis lanterns (3 posts along east road)
+    pb(cx + rx * 0.15, cy, 10, 20, 'lantern');
+    pb(cx + rx * 0.3,  cy, 10, 20, 'lantern');
+    pb(cx + rx * 0.45, cy, 10, 20, 'lantern');
+    _addProceduralPerimeter(lvl, cx, cy, rx, ry);
+    addFarmPlots(farmCX, farmCY, lvl);
+    addFloatingText(width / 2, height * 0.3, 'Housing fills the Cardo — second well dug!', '#ffee88');
+    spawnParticles(houseStartX2, houseStreetY2, 'build', 10);
+  }
+
+  if (lvl === 13) {
+    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
+    // WATCHTOWER — east edge sentinel
+    pb(cx + rx * 0.7, cy, 20, 44, 'watchtower');
+    // WALLS — military perimeter near castrum
+    pb(cx + rx * 0.25, cy + ry * 0.35, 32, 8, 'wall');
+    pb(cx + rx * 0.45, cy + ry * 0.35, 32, 8, 'wall');
+    // WATCHTOWER — farm-facing southern tower
+    pb(cx - rx * 0.1, cy + ry * 0.35, 20, 44, 'watchtower');
+    _addProceduralPerimeter(lvl, cx, cy, rx, ry);
+    addFarmPlots(farmCX, farmCY, lvl);
+    addFloatingText(width / 2, height * 0.3, 'Watchtowers stand sentinel!', '#cc8844');
+    spawnParticles(cx + rx * 0.7, cy, 'build', 10);
+  }
+
+  if (lvl === 14) {
+    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
+    // EXTENDED AQUEDUCT — westward extension
+    pb(cx - rx * 0.3, cy - ry * 0.55, 20, 40, 'aqueduct');
+    pb(cx - rx * 0.5, cy - ry * 0.55, 20, 40, 'aqueduct');
+    // SECOND BATH HOUSE — NE civic, serves east district
+    let bath2X = cx + rx * 0.25;
+    let bath2Y = cy - ry * 0.2;
+    pb(bath2X,       bath2Y,      58, 44, 'bath');
+    pb(bath2X - 36,  bath2Y,      20, 16, 'flower');
+    pb(bath2X + 36,  bath2Y,      20, 16, 'flower');
+    pb(bath2X,       bath2Y + 28, 32, 32, 'floor');
+    pb(bath2X - 32,  bath2Y + 24, 10, 20, 'lantern');
+    // Bridge connecting market to residential
+    pb(cx + rx * 0.1, cy + ry * 0.1, 32, 32, 'bridge');
+    _addProceduralPerimeter(lvl, cx, cy, rx, ry);
+    addFarmPlots(farmCX, farmCY, lvl);
+    addFloatingText(width / 2, height * 0.3, 'Bath complex rises, aqueduct extended!', '#66ccff');
+    spawnParticles(bath2X, bath2Y, 'build', 10);
+  }
+
+  if (lvl === 15) {
+    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
+    // FORUM — at Decumanus/Cardo intersection (city heart)
+    let forumX = cx + rx * 0.05;
+    let forumY = cy + ry * 0.08;
+    pb(forumX, forumY, 80, 60, 'forum');
+    // Floor tiles surrounding forum (3x3 minus center)
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        if (dx === 0 && dy === 0) continue;
+        pb(forumX + dx * 50, forumY + dy * 35, 32, 32, 'floor');
+      }
     }
-  });
+    // Corner lanterns marking forum square
+    pb(forumX - 50, forumY - 38, 10, 20, 'lantern');
+    pb(forumX + 50, forumY - 38, 10, 20, 'lantern');
+    pb(forumX - 50, forumY + 38, 10, 20, 'lantern');
+    pb(forumX + 50, forumY + 38, 10, 20, 'lantern');
+    // Mosaic processional south of forum
+    pb(forumX - 28, forumY + 44, 32, 32, 'mosaic');
+    pb(forumX,      forumY + 44, 32, 32, 'mosaic');
+    pb(forumX + 28, forumY + 44, 32, 32, 'mosaic');
+    // TRIUMPHAL ARCH — east road landmark
+    pb(cx + rx * 0.65, cy, 48, 52, 'arch');
+    // WATCHTOWER — far east edge
+    pb(cx + rx * 0.8, cy - ry * 0.1, 20, 44, 'watchtower');
+    _addProceduralPerimeter(lvl, cx, cy, rx, ry);
+    addFarmPlots(farmCX, farmCY, lvl);
+    addFloatingText(width / 2, height * 0.25, 'SENATOR — Forum raised!', '#ff9944');
+    triggerScreenShake(8, 20);
+    spawnParticles(forumX, forumY, 'build', 15);
+  }
+
+  if (lvl === 16) {
+    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
+    // HOUSING ROW — NW residential street, 4 domus in a line
+    let streetX = cx - rx * 0.3;
+    let streetY1 = cy - ry * 0.35;
+    let streetY2 = cy - ry * 0.5;
+    // First row — 4 houses
+    for (let i = 0; i < 4; i++) {
+      pb(streetX + i * 50, streetY1, 44, 34, 'house');
+      if (i < 3) pb(streetX + i * 50 + 25, streetY1 + 18, 8, 16, 'torch');
+    }
+    // Fence along back of street (north side)
+    pb(streetX + 75, streetY1 - 22, 180, 6, 'fence');
+    // Second row behind first (deeper NW)
+    pb(streetX,       streetY2, 44, 34, 'house');
+    pb(streetX + 50,  streetY2, 44, 34, 'house');
+    pb(streetX + 100, streetY2, 44, 34, 'house');
+    pb(streetX + 25,  streetY2 + 18, 8, 16, 'torch');
+    pb(streetX + 75,  streetY2 + 18, 8, 16, 'torch');
+    _addProceduralPerimeter(lvl, cx, cy, rx, ry);
+    addFarmPlots(farmCX, farmCY, lvl);
+    addFloatingText(width / 2, height * 0.3, 'Housing district expands!', '#aaddff');
+    spawnParticles(streetX + 75, streetY1, 'build', 12);
+  }
+
+  if (lvl === 17) {
+    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
+    // GREAT LIBRARY — NE civic quarter corner
+    let libX = cx + rx * 0.35;
+    let libY = cy - ry * 0.35;
+    pb(libX, libY, 58, 44, 'library');
+    // Mosaic forecourt
+    pb(libX, libY + 30, 32, 32, 'mosaic');
+    // Lanterns flanking entrance
+    pb(libX - 34, libY + 10, 10, 20, 'lantern');
+    pb(libX + 34, libY + 10, 10, 20, 'lantern');
+    // Floor tiles approach
+    pb(libX - 20, libY + 48, 32, 32, 'floor');
+    pb(libX + 20, libY + 48, 32, 32, 'floor');
+    // Shrine in library courtyard
+    pb(libX + 36, libY - 14, 32, 28, 'shrine');
+    _addProceduralPerimeter(lvl, cx, cy, rx, ry);
+    addFarmPlots(farmCX, farmCY, lvl);
+    addFloatingText(width / 2, height * 0.3, 'Great Library of Rome rises!', '#ddaaff');
+    spawnParticles(libX, libY, 'build', 14);
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  // ERA 3: ATLANTIS  (Lv 18-25)
+  // Monuments. Dense. The whole island is covered.
+  // ─────────────────────────────────────────────────────────────────
+
+  if (lvl === 18) {
+    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
+    // ARENA — SE military district, massive landmark
+    let arenaX = cx + rx * 0.35;
+    let arenaY = cy + ry * 0.35;
+    pb(arenaX, arenaY, 68, 54, 'arena');
+    pb(arenaX - 40, arenaY + 30, 8, 16, 'torch');
+    pb(arenaX + 40, arenaY + 30, 8, 16, 'torch');
+    pb(arenaX,      arenaY + 34, 32, 32, 'floor');
+    _addProceduralPerimeter(lvl, cx, cy, rx, ry);
+    addFarmPlots(farmCX, farmCY, lvl);
+    addFloatingText(width / 2, height * 0.3, 'Arena rises — glory awaits!', '#ff8844');
+    spawnParticles(arenaX, arenaY, 'build', 14);
+  }
+
+  if (lvl === 19) {
+    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
+    let arenaX = cx + rx * 0.35;
+    let arenaY = cy + ry * 0.35;
+    // ARENA FORECOURT — mosaics and lanterns completing the arena complex
+    pb(arenaX - 20, arenaY + 52, 28, 20, 'mosaic');
+    pb(arenaX + 20, arenaY + 52, 28, 20, 'mosaic');
+    pb(arenaX - 50, arenaY + 30, 10, 20, 'lantern');
+    pb(arenaX + 50, arenaY + 30, 10, 20, 'lantern');
+    // Fill military perimeter: extra wall, domus near castrum approach
+    pb(cx + rx * 0.3, cy + ry * 0.15, 44, 34, 'house');
+    pb(cx + rx * 0.15, cy + ry * 0.25, 44, 34, 'house');
+    _addProceduralPerimeter(lvl, cx, cy, rx, ry);
+    addFarmPlots(farmCX, farmCY, lvl);
+    addFloatingText(width / 2, height * 0.3, 'Arena complete — let the games begin!', '#ff6622');
+    spawnParticles(arenaX, arenaY + 30, 'build', 16);
+  }
+
+  if (lvl === 20) {
+    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
+    // VILLA — NW north prominence, premium residential
+    let villaX = cx - rx * 0.3;
+    let villaY = cy - ry * 0.55;
+    pb(villaX, villaY, 72, 52, 'villa');
+    pb(villaX - 42, villaY + 10, 20, 16, 'flower');
+    pb(villaX + 42, villaY + 10, 20, 16, 'flower');
+    pb(villaX - 42, villaY - 10, 20, 16, 'flower');
+    pb(villaX + 42, villaY - 10, 20, 16, 'flower');
+    pb(villaX,      villaY + 32, 32, 32, 'mosaic');
+    pb(villaX + 40, villaY + 28, 10, 20, 'lantern');
+    // ARCH — port gate triumphal
+    let port = getPortPosition();
+    pb(port.x + 120, port.y - 15, 48, 52, 'arch');
+    _addProceduralPerimeter(lvl, cx, cy, rx, ry);
+    addFarmPlots(farmCX, farmCY, lvl);
+    addFloatingText(width / 2, height * 0.25, 'CONSUL — Villa Estate built!', '#ffaa00');
+    triggerScreenShake(12, 30);
+    spawnParticles(villaX, villaY, 'build', 20);
+  }
+
+  if (lvl === 21) {
+    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
+    // SENATE FORUM — second forum west of main forum
+    let senX = cx - rx * 0.15;
+    let senY = cy + ry * 0.15;
+    pb(senX, senY, 64, 48, 'forum');
+    pb(senX - 40, senY + 20, 8, 16, 'torch');
+    pb(senX + 72, senY + 20, 8, 16, 'torch');
+    pb(senX - 20, senY + 32, 24, 20, 'floor');
+    pb(senX,      senY + 32, 24, 20, 'floor');
+    pb(senX + 20, senY + 32, 24, 20, 'floor');
+    pb(senX + 40, senY + 32, 24, 20, 'floor');
+    _addProceduralPerimeter(lvl, cx, cy, rx, ry);
+    addFarmPlots(farmCX, farmCY, lvl);
+    addFloatingText(width / 2, height * 0.3, 'Senate convenes — Forum Magnum!', '#ffaa44');
+    spawnParticles(senX, senY, 'build', 14);
+  }
+
+  if (lvl === 22) {
+    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
+    // HARBOR ARCH GATE — far east road terminus
+    pb(cx + rx * 0.72, cy + ry * 0.1, 48, 52, 'arch');
+    // Harbor road lanterns
+    pb(cx + rx * 0.4, cy + ry * 0.1, 10, 20, 'lantern');
+    pb(cx + rx * 0.5, cy + ry * 0.1, 10, 20, 'lantern');
+    pb(cx + rx * 0.6, cy + ry * 0.1, 10, 20, 'lantern');
+    _addProceduralPerimeter(lvl, cx, cy, rx, ry);
+    addFarmPlots(farmCX, farmCY, lvl);
+    addFloatingText(width / 2, height * 0.3, 'Harbor gate — the arch stands!', '#ddcc88');
+    spawnParticles(cx + rx * 0.72, cy + ry * 0.1, 'build', 12);
+  }
+
+  if (lvl === 23) {
+    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
+    // GRAND AQUEDUCT — five segments spanning full island width
+    pb(cx - rx * 0.5,  cy - ry * 0.6, 20, 40, 'aqueduct');
+    pb(cx - rx * 0.25, cy - ry * 0.6, 20, 40, 'aqueduct');
+    pb(cx,             cy - ry * 0.6, 20, 40, 'aqueduct');
+    pb(cx + rx * 0.25, cy - ry * 0.6, 20, 40, 'aqueduct');
+    pb(cx + rx * 0.5,  cy - ry * 0.6, 20, 40, 'aqueduct');
+    // Grand bridges under aqueduct (pilgrimage route)
+    pb(cx - rx * 0.35, cy - ry * 0.45, 32, 32, 'bridge');
+    pb(cx + rx * 0.15, cy - ry * 0.45, 32, 32, 'bridge');
+    _addProceduralPerimeter(lvl, cx, cy, rx, ry);
+    addFarmPlots(farmCX, farmCY, lvl);
+    addFloatingText(width / 2, height * 0.3, 'Grand Aqueduct spans all of Mare Nostrum!', '#66ccff');
+    spawnParticles(cx, cy - ry * 0.6, 'build', 16);
+  }
+
+  if (lvl === 24) {
+    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
+    // IMPERIAL PALACE — sacred hill, between aqueduct and pyramid
+    let palX = cx, palY = cy - ry * 0.5;
+    pb(palX,      palY,       60, 44, 'villa');
+    pb(palX - 38, palY + 52,  28, 20, 'mosaic');
+    pb(palX + 18, palY + 52,  28, 20, 'mosaic');
+    pb(palX - 44, palY + 20,  20, 16, 'flower');
+    pb(palX + 44, palY + 20,  20, 16, 'flower');
+    pb(palX - 44, palY + 40,  20, 16, 'flower');
+    pb(palX + 44, palY + 40,  20, 16, 'flower');
+    pb(palX - 20, palY + 60,  10, 20, 'lantern');
+    pb(palX + 20, palY + 60,  10, 20, 'lantern');
+    _addProceduralPerimeter(lvl, cx, cy, rx, ry);
+    addFarmPlots(farmCX, farmCY, lvl);
+    addFloatingText(width / 2, height * 0.3, 'Imperial Palace rises — glory of Rome!', '#ffcc44');
+    spawnParticles(palX, palY, 'build', 18);
+  }
+
+  // Lvl 25 is handled in expandIsland() directly (imperator banner, particle burst, etc.)
+  // Only add buildings here not in that block:
+  if (lvl === 25) {
+    // GRAND TEMPLE — island peak, final monument
+    pb(cx, cy - ry * 0.7, 56, 40, 'temple');
+    pb(cx - 60, cy - ry * 0.7 + 20, 20, 16, 'flower');
+    pb(cx + 60, cy - ry * 0.7 + 20, 20, 16, 'flower');
+    // TRIUMPHAL ARCH — south
+    pb(cx + rx * 0.4, cy + ry * 0.3, 48, 52, 'arch');
+    // VILLA — SW counterpoint
+    pb(cx - rx * 0.4, cy + ry * 0.3, 60, 44, 'villa');
+    // MOSAIC PROCESSIONAL — grand approach to pyramid
+    pb(cx - 30, cy - ry * 0.1, 28, 20, 'mosaic');
+    pb(cx,      cy - ry * 0.1, 28, 20, 'mosaic');
+    pb(cx + 30, cy - ry * 0.1, 28, 20, 'mosaic');
+    pb(cx - 50, cy - ry * 0.1, 10, 20, 'lantern');
+    pb(cx + 50, cy - ry * 0.1, 10, 20, 'lantern');
+    addFloatingText(width / 2, height * 0.25, 'IMPERATOR — Mare Nostrum is yours!', '#ff4400');
+    triggerScreenShake(15, 40);
+  }
 }
 
 function expandIsland() {
@@ -17149,65 +17696,23 @@ function expandIsland() {
   state.pyramid.level = state.islandLevel;
   updatePortPositions(); // ports follow island edge
 
-  // Milestone unlocks — landmark buildings auto-spawn at key levels
+  // Place all buildings, resources, trees, crystals, ruins for this level
+  placeEraBuildings(state.islandLevel);
+
+  // Milestone journal unlocks and special effects
   let rx = getSurfaceRX(), ry = getSurfaceRY();
   let cx = WORLD.islandCX, cy = WORLD.islandCY;
-  if (state.islandLevel === 5) {
-    // Granary north of farm (well clear), Well to the south-east
-    let fc = { x: getFarmCenterX(), y: getFarmCenterY() };
-    state.buildings.push({ x: fc.x, y: fc.y - ry * 0.7, w: 48, h: 36, type: 'granary', rot: 0 });
-    state.buildings.push({ x: cx + rx * 0.35, y: cy + ry * 0.55, w: 24, h: 24, type: 'well', rot: 0 });
-    // Two torches flanking granary entrance
-    state.buildings.push({ x: fc.x - 28, y: fc.y - ry * 0.7 + 14, w: 8, h: 16, type: 'torch', rot: 0 });
-    state.buildings.push({ x: fc.x + 28, y: fc.y - ry * 0.7 + 14, w: 8, h: 16, type: 'torch', rot: 0 });
-    addFloatingText(width / 2, height * 0.25, 'CITIZEN — Granary & Well constructed!', '#88cc66');
-    spawnParticles(fc.x + rx * 0.15, fc.y - ry * 0.3, 'build', 12);
-  }
   if (state.islandLevel === 10) {
     unlockJournal('imperial_governor');
-    // Temple precinct cluster + second market on Decumanus
-    spawnCluster('temple_precinct', cx + rx * 0.5, cy - ry * 0.35);
-    spawnCluster('market_block', cx + rx * 0.6, cy - 8); // second market on Decumanus
-    addFloatingText(width / 2, height * 0.25, 'GOVERNOR — Temple & Market erected!', '#ffdd66');
-    triggerScreenShake(6, 15);
-    spawnParticles(cx + rx * 0.5, cy - ry * 0.35, 'build', 15);
   }
   if (state.islandLevel === 15) {
     unlockJournal('imperial_senator');
-    // Forum at the intersection
-    let cardoX = cx + rx * 0.05;
-    spawnCluster('forum_plaza', cardoX, cy + ry * 0.08); // just south of intersection
-    addFloatingText(width / 2, height * 0.25, 'SENATOR — Forum raised!', '#ff9944');
-    triggerScreenShake(8, 20);
-    spawnParticles(cx, cy + ry * 0.5, 'build', 15);
   }
   if (state.islandLevel === 20) {
     unlockJournal('imperial_consul');
-    // Villa estate in NW prominence
-    spawnCluster('villa_estate', cx - rx * 0.3, cy - ry * 0.5); // NW prominence
-    addFloatingText(width / 2, height * 0.25, 'CONSUL — Villa Estate built! Imperial Bridge Unlocked!', '#ffaa00');
-    triggerScreenShake(12, 30);
-    spawnParticles(cx - rx * 0.3, cy - ry * 0.5, 'build', 20);
   }
   if (state.islandLevel === 25) {
     unlockJournal('imperator');
-    // Grand Colosseum — triumphal arch + villa + surrounding decorations
-    state.buildings.push({ x: cx + rx * 0.4, y: cy + ry * 0.3, w: 48, h: 52, type: 'arch', rot: 0 });
-    state.buildings.push({ x: cx - rx * 0.4, y: cy + ry * 0.3, w: 60, h: 44, type: 'villa', rot: 0 });
-    // Grand temple at island peak
-    state.buildings.push({ x: cx, y: cy - ry * 0.7, w: 56, h: 40, type: 'temple', rot: 0 });
-    // Mosaic processional way
-    state.buildings.push({ x: cx - 30, y: cy - ry * 0.1, w: 28, h: 20, type: 'mosaic', rot: 0 });
-    state.buildings.push({ x: cx,      y: cy - ry * 0.1, w: 28, h: 20, type: 'mosaic', rot: 0 });
-    state.buildings.push({ x: cx + 30, y: cy - ry * 0.1, w: 28, h: 20, type: 'mosaic', rot: 0 });
-    // Lanterns lining the processional
-    state.buildings.push({ x: cx - 50, y: cy - ry * 0.1, w: 10, h: 20, type: 'lantern', rot: 0 });
-    state.buildings.push({ x: cx + 50, y: cy - ry * 0.1, w: 10, h: 20, type: 'lantern', rot: 0 });
-    // Flower gardens for the imperator
-    state.buildings.push({ x: cx - 60, y: cy - ry * 0.7 + 20, w: 20, h: 16, type: 'flower', rot: 0 });
-    state.buildings.push({ x: cx + 60, y: cy - ry * 0.7 + 20, w: 20, h: 16, type: 'flower', rot: 0 });
-    addFloatingText(width / 2, height * 0.25, 'IMPERATOR — Mare Nostrum is yours!', '#ff4400');
-    triggerScreenShake(15, 40);
     // Gold particle burst from pyramid
     let _pyrX = state.pyramid.x, _pyrY = state.pyramid.y;
     for (let i = 0; i < 40; i++) {
@@ -17263,334 +17768,6 @@ function expandIsland() {
     let distFromCenter = dx * dx / (rx * 0.3 * rx * 0.3) + dy * dy / (ry * 0.3 * ry * 0.3);
     return distFromCenter > 1;
   });
-
-  // ─── ZONE-BASED EXPANSION — each level adds elements at fixed positions ───
-  // Positions are relative to island center, scaled by current island size
-
-  // Level-specific zone additions
-  if (lvl === 2) {
-    // SOUTH QUARTER — resource quarry + crystal
-    let zoneResources = [
-      { x: cx - 120, y: cy + 70, type: 'stone' },
-      { x: cx - 60,  y: cy + 75, type: 'stone' },
-      { x: cx + 30,  y: cy + 70, type: 'vine' },
-      { x: cx + 100, y: cy + 65, type: 'leaf' },
-    ];
-    zoneResources.forEach(r => addClampedResource(r.x, r.y, r.type, cx, cy));
-    // Extra shrine crystal
-    let sh2 = state.crystalShrine;
-    state.crystalNodes.push({ x: sh2.x + 50, y: sh2.y + 30, size: 14, phase: random(TWO_PI), charge: 50, respawnTimer: 0 });
-    // Trees — right grove expansion
-    addClampedTree(cx + 180, cy + 40, cx, cy);
-    addClampedTree(cx + 230, cy + 30, cx, cy);
-    addClampedTree(cx + 300, cy - 10, cx, cy);
-    // Farm extension — row south of existing farm
-    addFarmPlots(farmCX, farmCY, lvl);
-    // Two fence segments near the farm
-    state.buildings.push({ x: farmCX + 60, y: farmCY - 30, w: 32, h: 8, type: 'fence', rot: 0 });
-    state.buildings.push({ x: farmCX + 60, y: farmCY + 10, w: 32, h: 8, type: 'fence', rot: 0 });
-    // Torch near campfire area (Town Center)
-    state.buildings.push({ x: cx + rx * 0.05, y: cy + ry * 0.05, w: 8, h: 16, type: 'torch', rot: 0 });
-    addFloatingText(width / 2, height * 0.3, 'Farm fenced — the homestead grows!', '#88cc66');
-    spawnParticles(farmCX + 60, farmCY - 10, 'build', 8);
-
-  } else if (lvl === 3) {
-    // NORTHEAST QUARTER — ruins + resources
-    let zoneResources = [
-      { x: cx + 200, y: cy - 70, type: 'vine' },
-      { x: cx + 250, y: cy - 45, type: 'stone' },
-      { x: cx + 160, y: cy - 80, type: 'vine' },
-      { x: cx + 300, y: cy - 30, type: 'leaf' },
-    ];
-    zoneResources.forEach(r => addClampedResource(r.x, r.y, r.type, cx, cy));
-    // Extra shrine crystal
-    let sh3 = state.crystalShrine;
-    state.crystalNodes.push({ x: sh3.x - 50, y: sh3.y + 30, size: 14, phase: random(TWO_PI), charge: 50, respawnTimer: 0 });
-    // Trees — right grove northeast extension
-    addClampedTree(cx + 280, cy - 55, cx, cy);
-    addClampedTree(cx + 320, cy - 25, cx, cy);
-    addClampedTree(cx + 150, cy - 60, cx, cy);
-    // Extra ruin — northeast edge
-    state.ruins.push({ x: cx + 260, y: cy - 70, w: 30, h: 20, rot: 0.05 });
-    // Farm extension
-    addFarmPlots(farmCX, farmCY, lvl);
-    // Pyramid plaza — three floor tiles + shrine
-    state.buildings.push({ x: cx + rx * 0.35 - 20, y: cy - ry * 0.3,      w: 24, h: 20, type: 'floor',  rot: 0 });
-    state.buildings.push({ x: cx + rx * 0.35,      y: cy - ry * 0.3,      w: 24, h: 20, type: 'floor',  rot: 0 });
-    state.buildings.push({ x: cx + rx * 0.35 + 20, y: cy - ry * 0.3,      w: 24, h: 20, type: 'floor',  rot: 0 });
-    state.buildings.push({ x: cx + rx * 0.4,       y: cy - ry * 0.35,     w: 32, h: 28, type: 'shrine', rot: 0 });
-    addFloatingText(width / 2, height * 0.3, 'Shrine consecrated — the gods watch!', '#ffaaff');
-    spawnParticles(cx + rx * 0.4, cy - ry * 0.35, 'build', 10);
-
-  } else if (lvl === 4) {
-    // NORTHWEST QUARTER — sacred grove + resources
-    let zoneResources = [
-      { x: cx - 250, y: cy - 50, type: 'vine' },
-      { x: cx - 300, y: cy - 20, type: 'leaf' },
-      { x: cx - 200, y: cy - 70, type: 'stone' },
-      { x: cx - 340, y: cy + 10, type: 'leaf' },
-    ];
-    zoneResources.forEach(r => addClampedResource(r.x, r.y, r.type, cx, cy));
-    // Extra shrine crystal
-    let sh4 = state.crystalShrine;
-    state.crystalNodes.push({ x: sh4.x, y: sh4.y - 45, size: 16, phase: random(TWO_PI), charge: 60, respawnTimer: 0 });
-    // Trees — right grove deeper expansion
-    addClampedTree(cx + 250, cy - 40, cx, cy);
-    addClampedTree(cx + 200, cy + 50, cx, cy);
-    addClampedTree(cx + 340, cy + 15, cx, cy);
-    // Farm extension
-    addFarmPlots(farmCX, farmCY, lvl);
-    // Well south of pyramid plaza
-    state.buildings.push({ x: cx + rx * 0.1, y: cy + ry * 0.3, w: 24, h: 24, type: 'well', rot: 0 });
-    // Fence near farm entrance (Farm W)
-    state.buildings.push({ x: cx - rx * 0.35, y: cy - ry * 0.1, w: 32, h: 8, type: 'fence', rot: 0 });
-    state.buildings.push({ x: cx - rx * 0.35, y: cy + ry * 0.05, w: 32, h: 8, type: 'fence', rot: 0 });
-    addFloatingText(width / 2, height * 0.3, 'Well dug — farm entrance fenced!', '#66aaff');
-    spawnParticles(cx + rx * 0.1, cy + ry * 0.3, 'build', 8);
-
-  } else if (lvl === 5) {
-    // GRAND RING — final expansion, elements all around edges
-    let zoneResources = [
-      { x: cx - 350, y: cy + 30, type: 'stone' },
-      { x: cx + 350, y: cy + 30, type: 'stone' },
-      { x: cx - 150, y: cy + 90, type: 'vine' },
-      { x: cx + 150, y: cy + 90, type: 'leaf' },
-      { x: cx,       y: cy + 85, type: 'stone' },
-    ];
-    zoneResources.forEach(r => addClampedResource(r.x, r.y, r.type, cx, cy));
-    // Grand shrine crystals — larger, flanking the shrine
-    let sh5 = state.crystalShrine;
-    state.crystalNodes.push({ x: sh5.x - 60, y: sh5.y - 10, size: 18, phase: random(TWO_PI), charge: 80, respawnTimer: 0 });
-    state.crystalNodes.push({ x: sh5.x + 60, y: sh5.y - 10, size: 18, phase: random(TWO_PI), charge: 80, respawnTimer: 0 });
-    // Trees — grand right grove perimeter
-    addClampedTree(cx + 360, cy, cx, cy);
-    addClampedTree(cx + 300, cy + 50, cx, cy);
-    addClampedTree(cx + 180, cy - 70, cx, cy);
-    addClampedTree(cx + 240, cy + 60, cx, cy);
-    addClampedTree(cx + 350, cy - 40, cx, cy);
-    // Extra ruin — south
-    state.ruins.push({ x: cx, y: cy + 80, w: 35, h: 22, rot: -0.03 });
-    // Farm extension
-    addFarmPlots(farmCX, farmCY, lvl);
-    // Torch near well (Town Center)
-    state.buildings.push({ x: cx + rx * 0.35 + 16, y: cy + ry * 0.55, w: 8, h: 16, type: 'torch', rot: 0 });
-    // Floor tiles along path from farm to granary
-    state.buildings.push({ x: cx - rx * 0.1, y: cy - ry * 0.3, w: 24, h: 20, type: 'floor', rot: 0 });
-    state.buildings.push({ x: cx - rx * 0.1, y: cy - ry * 0.15, w: 24, h: 20, type: 'floor', rot: 0 });
-    state.buildings.push({ x: cx - rx * 0.1, y: cy, w: 24, h: 20, type: 'floor', rot: 0 });
-  } else if (lvl >= 6 && lvl <= 25) {
-    // IMPERIAL EXPANSION — shared procedural content (resources, trees, crystals, ruins)
-    let angle0 = ((lvl - 6) / 20) * TWO_PI;
-    let numRes = 3 + floor(lvl / 5);
-    for (let i = 0; i < numRes; i++) {
-      let a = angle0 + (i / numRes) * TWO_PI * 0.3 + random(-0.2, 0.2);
-      let r = random(0.55, 0.85);
-      let _prx = cx + cos(a) * state.islandRX * r * 0.9;
-      let _pry = cy + sin(a) * state.islandRY * r * 0.9;
-      let types = ['stone', 'vine', 'leaf'];
-      addClampedResource(_prx, _pry, types[i % 3], cx, cy);
-    }
-    if (lvl % 2 === 0) {
-      let ca = angle0 + PI;
-      let crx = cx + cos(ca) * state.islandRX * 0.5;
-      let cry = cy + sin(ca) * state.islandRY * 0.4;
-      let cSize = 14 + floor(lvl / 5) * 2;
-      state.crystalNodes.push({ x: crx, y: cry, size: min(cSize, 24), phase: random(TWO_PI), charge: 50 + lvl * 5, respawnTimer: 0 });
-    }
-    let numTrees = 1 + floor(lvl / 6);
-    for (let i = 0; i < numTrees; i++) {
-      let ta = random(TWO_PI);
-      let tr = random(0.4, 0.85);
-      addClampedTree(cx + cos(ta) * state.islandRX * tr * 0.9, cy + sin(ta) * state.islandRY * tr * 0.9, cx, cy);
-    }
-    if (lvl % 3 === 0) {
-      let ra = angle0 + HALF_PI;
-      let rrx = cx + cos(ra) * state.islandRX * 0.6;
-      let rry = cy + sin(ra) * state.islandRY * 0.5;
-      state.ruins.push({ x: rrx, y: rry, w: 28 + floor(lvl / 3) * 3, h: 18 + floor(lvl / 4) * 2, rot: random(-0.05, 0.05) });
-    }
-    if (lvl % 2 === 0) {
-      addFarmPlots(farmCX, farmCY, lvl);
-    }
-
-    // ── Per-level landmark buildings ──
-    if (lvl === 6) {
-      // Housing district northwest — domus pair
-      spawnCluster('domus_pair', cx - rx * 0.25, cy - ry * 0.25); // NW residential
-      addFloatingText(width / 2, height * 0.3, 'Citizens settle — domus built!', '#aaddff');
-      spawnParticles(cx - rx * 0.25, cy - ry * 0.25, 'build', 10);
-    }
-    if (lvl === 7) {
-      // Market cluster on the Decumanus, east
-      spawnCluster('market_block', cx + rx * 0.5, cy - 8); // ON the Decumanus, east
-      addFloatingText(width / 2, height * 0.3, 'Market opens for trade!', '#ffcc66');
-      spawnParticles(cx + rx * 0.5, cy - 8, 'build', 10);
-    }
-    if (lvl === 8) {
-      // Bath house southwest (separate spawn)
-      placeBuildingChecked({ x: cx - rx * 0.3, y: cy + ry * 0.35, w: 58, h: 44, type: 'bath', rot: 0 });
-      if (state.legia && state.legia.castrumLevel < 1) {
-        // Military compound cluster
-        spawnCluster('military_compound', cx + rx * 0.45, cy + ry * 0.5);
-        // Set legia state
-        state.legia.castrumLevel = 1;
-        state.legia.castrumX = cx + rx * 0.45;
-        state.legia.castrumY = cy + ry * 0.5;
-        unlockJournal('legia_founded');
-        addFloatingText(width / 2, height * 0.3, 'Baths & Castrum — Rome grows strong!', '#cc4444');
-        spawnParticles(cx + rx * 0.45, cy + ry * 0.5, 'build', 12);
-      } else {
-        addFloatingText(width / 2, height * 0.3, 'Baths constructed — citizens rejoice!', '#88ccff');
-        spawnParticles(cx - rx * 0.3, cy + ry * 0.35, 'build', 10);
-      }
-      // Via militaris leading to castrum
-      state.buildings.push({ x: cx + rx * 0.35, y: cy + ry * 0.2, w: 24, h: 20, type: 'floor', rot: 0 });
-      state.buildings.push({ x: cx + rx * 0.35, y: cy + ry * 0.3, w: 24, h: 20, type: 'floor', rot: 0 });
-      state.buildings.push({ x: cx + rx * 0.35, y: cy + ry * 0.4, w: 24, h: 20, type: 'floor', rot: 0 });
-      // South road — port toward center (5 tiles)
-      { let _port = getPortPosition();
-        for (let i = 0; i < 5; i++) {
-          let t = (i + 1) / 6;
-          state.buildings.push({ x: lerp(_port.x, cx, t), y: lerp(_port.y, cy + 10, t), w: 24, h: 20, type: 'floor', rot: 0 });
-        }
-      }
-    }
-    if (lvl === 9) {
-      // Three aqueduct segments spanning north
-      state.buildings.push({ x: cx - rx * 0.1, y: cy - ry * 0.55, w: 20, h: 40, type: 'aqueduct', rot: 0 });
-      state.buildings.push({ x: cx + rx * 0.1, y: cy - ry * 0.55, w: 20, h: 40, type: 'aqueduct', rot: 0 });
-      state.buildings.push({ x: cx + rx * 0.3, y: cy - ry * 0.55, w: 20, h: 40, type: 'aqueduct', rot: 0 });
-      // Bridge connecting residential NW to civic NE
-      state.buildings.push({ x: cx, y: cy - ry * 0.3, w: 32, h: 32, type: 'bridge', rot: 0 });
-      addFloatingText(width / 2, height * 0.3, 'Aqueduct spans the island!', '#66ccff');
-      spawnParticles(cx + rx * 0.1, cy - ry * 0.55, 'build', 12);
-    }
-    if (lvl === 11) {
-      // Flower beds and mosaic near temple
-      state.buildings.push({ x: cx + rx * 0.45, y: cy - ry * 0.15, w: 20, h: 16, type: 'flower', rot: 0 });
-      state.buildings.push({ x: cx + rx * 0.55, y: cy - ry * 0.15, w: 20, h: 16, type: 'flower', rot: 0 });
-      state.buildings.push({ x: cx + rx * 0.65, y: cy - ry * 0.15, w: 20, h: 16, type: 'flower', rot: 0 });
-      state.buildings.push({ x: cx + rx * 0.55, y: cy - ry * 0.55, w: 28, h: 20, type: 'mosaic', rot: 0 });
-      // Lantern near temple garden (Civic NE)
-      state.buildings.push({ x: cx + rx * 0.5, y: cy - ry * 0.25, w: 10, h: 20, type: 'lantern', rot: 0 });
-      addFloatingText(width / 2, height * 0.3, 'Gardens and mosaics adorn the temple!', '#ffaaff');
-      spawnParticles(cx + rx * 0.55, cy - ry * 0.15, 'build', 10);
-    }
-    if (lvl === 12) {
-      // Fill NW residential along Cardo
-      spawnCluster('domus_pair', cx - rx * 0.15, cy - ry * 0.15);
-      spawnCluster('domus_pair', cx - rx * 0.15, cy - ry * 0.35);
-      // Second well
-      state.buildings.push({ x: cx - rx * 0.2,  y: cy + ry * 0.4, w: 24, h: 24, type: 'well',    rot: 0 });
-      addFloatingText(width / 2, height * 0.3, 'Housing fills the Cardo — a second well dug!', '#ffee88');
-      spawnParticles(cx - rx * 0.15, cy - ry * 0.15, 'build', 10);
-    }
-    if (lvl === 13) {
-      // Watchtower on east edge
-      state.buildings.push({ x: cx + rx * 0.7, y: cy, w: 20, h: 44, type: 'watchtower', rot: 0 });
-      // Wall segments near castrum (Military SE)
-      state.buildings.push({ x: cx + rx * 0.25, y: cy + ry * 0.35, w: 32, h: 8, type: 'wall', rot: 0 });
-      state.buildings.push({ x: cx + rx * 0.45, y: cy + ry * 0.35, w: 32, h: 8, type: 'wall', rot: 0 });
-      // Watchtower visible from farming zone
-      state.buildings.push({ x: cx - rx * 0.1, y: cy + ry * 0.35, w: 20, h: 44, type: 'watchtower', rot: 0 });
-      addFloatingText(width / 2, height * 0.3, 'Watchtower stands sentinel — walls fortified!', '#cc8844');
-      spawnParticles(cx + rx * 0.7, cy, 'build', 10);
-    }
-    if (lvl === 14) {
-      // Bath complex — NE civic, near library area
-      spawnCluster('bath_complex', cx + rx * 0.25, cy - ry * 0.2); // NE civic, near library area
-      // Bridge spanning market to residential district
-      state.buildings.push({ x: cx + rx * 0.1, y: cy + ry * 0.1, w: 32, h: 32, type: 'bridge', rot: 0 });
-      addFloatingText(width / 2, height * 0.3, 'Bath complex rises!', '#66ccff');
-      spawnParticles(cx + rx * 0.25, cy - ry * 0.2, 'build', 10);
-    }
-    if (lvl === 16) {
-      // NW residential block + more housing
-      spawnCluster('housing_row', cx - rx * 0.3, cy - ry * 0.35); // NW residential block
-      spawnCluster('housing_row', cx - rx * 0.3, cy - ry * 0.2); // More NW housing
-      addFloatingText(width / 2, height * 0.3, 'Housing district expands!', '#aaddff');
-      spawnParticles(cx - rx * 0.3, cy - ry * 0.35, 'build', 12);
-    }
-    if (lvl === 17) {
-      // Library quarter — NE civic
-      spawnCluster('library_quarter', cx + rx * 0.35, cy - ry * 0.35); // NE civic
-      addFloatingText(width / 2, height * 0.3, 'Great Library of Rome rises!', '#ddaaff');
-      spawnParticles(cx + rx * 0.35, cy - ry * 0.35, 'build', 14);
-    }
-    if (lvl === 18) {
-      // Arena complex — SE military district
-      spawnCluster('arena_complex', cx + rx * 0.35, cy + ry * 0.35); // SE military district
-      addFloatingText(width / 2, height * 0.3, 'Arena rises — glory awaits!', '#ff8844');
-      spawnParticles(cx + rx * 0.35, cy + ry * 0.35, 'build', 14);
-    }
-    if (lvl === 19) {
-      // Arena grounds — mosaics and decoration around arena (SE)
-      state.buildings.push({ x: cx + rx * 0.35 - 20, y: cy + ry * 0.35 + 52, w: 28, h: 20, type: 'mosaic', rot: 0 });
-      state.buildings.push({ x: cx + rx * 0.35 + 20, y: cy + ry * 0.35 + 52, w: 28, h: 20, type: 'mosaic', rot: 0 });
-      // Lanterns flanking arena approach
-      state.buildings.push({ x: cx + rx * 0.35 - 50, y: cy + ry * 0.35 + 30, w: 10, h: 20, type: 'lantern', rot: 0 });
-      state.buildings.push({ x: cx + rx * 0.35 + 50, y: cy + ry * 0.35 + 30, w: 10, h: 20, type: 'lantern', rot: 0 });
-      addFloatingText(width / 2, height * 0.3, 'Arena complete — let the games begin!', '#ff6622');
-      spawnParticles(cx + rx * 0.35, cy + ry * 0.35 + 30, 'build', 16);
-    }
-    if (lvl === 20) {
-      // Fill east side along Decumanus
-      spawnCluster('domus_pair', cx + rx * 0.3, cy + ry * 0.15);
-      spawnCluster('domus_pair', cx + rx * 0.15, cy + ry * 0.25);
-    }
-    if (lvl === 21) {
-      // Senate forum + flanking torches
-      placeBuildingChecked({ x: cx - rx * 0.15,      y: cy + ry * 0.15, w: 64, h: 48, type: 'forum', rot: 0 });
-      state.buildings.push({ x: cx - rx * 0.15 - 40, y: cy + ry * 0.15 + 20, w: 8, h: 16, type: 'torch', rot: 0 });
-      state.buildings.push({ x: cx - rx * 0.15 + 72, y: cy + ry * 0.15 + 20, w: 8, h: 16, type: 'torch', rot: 0 });
-      // Floor tiles in front of senate forum (Town Center)
-      state.buildings.push({ x: cx - rx * 0.15 - 20, y: cy + ry * 0.15 + 32, w: 24, h: 20, type: 'floor', rot: 0 });
-      state.buildings.push({ x: cx - rx * 0.15,      y: cy + ry * 0.15 + 32, w: 24, h: 20, type: 'floor', rot: 0 });
-      state.buildings.push({ x: cx - rx * 0.15 + 20, y: cy + ry * 0.15 + 32, w: 24, h: 20, type: 'floor', rot: 0 });
-      state.buildings.push({ x: cx - rx * 0.15 + 40, y: cy + ry * 0.15 + 32, w: 24, h: 20, type: 'floor', rot: 0 });
-      addFloatingText(width / 2, height * 0.3, 'Senate convenes — the Forum Magnum!', '#ffaa44');
-      spawnParticles(cx - rx * 0.15, cy + ry * 0.15, 'build', 14);
-    }
-    if (lvl === 22) {
-      // Harbor arch gate east
-      state.buildings.push({ x: cx + rx * 0.72, y: cy + ry * 0.1, w: 48, h: 52, type: 'arch', rot: 0 });
-      // Lanterns along harbor road (Market E)
-      state.buildings.push({ x: cx + rx * 0.4, y: cy + ry * 0.1, w: 10, h: 20, type: 'lantern', rot: 0 });
-      state.buildings.push({ x: cx + rx * 0.5, y: cy + ry * 0.1, w: 10, h: 20, type: 'lantern', rot: 0 });
-      state.buildings.push({ x: cx + rx * 0.6, y: cy + ry * 0.1, w: 10, h: 20, type: 'lantern', rot: 0 });
-      addFloatingText(width / 2, height * 0.3, 'Harbor gate — the arch stands!', '#ddcc88');
-      spawnParticles(cx + rx * 0.72, cy + ry * 0.1, 'build', 12);
-    }
-    if (lvl === 23) {
-      // Five aqueduct segments spanning the full island
-      state.buildings.push({ x: cx - rx * 0.5,  y: cy - ry * 0.6, w: 20, h: 40, type: 'aqueduct', rot: 0 });
-      state.buildings.push({ x: cx - rx * 0.25, y: cy - ry * 0.6, w: 20, h: 40, type: 'aqueduct', rot: 0 });
-      state.buildings.push({ x: cx,             y: cy - ry * 0.6, w: 20, h: 40, type: 'aqueduct', rot: 0 });
-      state.buildings.push({ x: cx + rx * 0.25, y: cy - ry * 0.6, w: 20, h: 40, type: 'aqueduct', rot: 0 });
-      state.buildings.push({ x: cx + rx * 0.5,  y: cy - ry * 0.6, w: 20, h: 40, type: 'aqueduct', rot: 0 });
-      // Bridge spans connecting districts under aqueduct
-      state.buildings.push({ x: cx - rx * 0.35, y: cy - ry * 0.45, w: 32, h: 32, type: 'bridge', rot: 0 });
-      state.buildings.push({ x: cx + rx * 0.15, y: cy - ry * 0.45, w: 32, h: 32, type: 'bridge', rot: 0 });
-      addFloatingText(width / 2, height * 0.3, 'Grand Aqueduct spans all of Mare Nostrum!', '#66ccff');
-      spawnParticles(cx, cy - ry * 0.6, 'build', 16);
-    }
-    if (lvl === 24) {
-      // Imperial palace villa + mosaics
-      placeBuildingChecked({ x: cx,      y: cy - ry * 0.5,      w: 60, h: 44, type: 'villa',   rot: 0 });
-      state.buildings.push({ x: cx - 38, y: cy - ry * 0.5 + 52, w: 28, h: 20, type: 'mosaic',  rot: 0 });
-      state.buildings.push({ x: cx + 18, y: cy - ry * 0.5 + 52, w: 28, h: 20, type: 'mosaic',  rot: 0 });
-      // Flower gardens flanking palace
-      state.buildings.push({ x: cx - 44, y: cy - ry * 0.5 + 20, w: 20, h: 16, type: 'flower', rot: 0 });
-      state.buildings.push({ x: cx + 44, y: cy - ry * 0.5 + 20, w: 20, h: 16, type: 'flower', rot: 0 });
-      state.buildings.push({ x: cx - 44, y: cy - ry * 0.5 + 40, w: 20, h: 16, type: 'flower', rot: 0 });
-      state.buildings.push({ x: cx + 44, y: cy - ry * 0.5 + 40, w: 20, h: 16, type: 'flower', rot: 0 });
-      // Lanterns along palace approach
-      state.buildings.push({ x: cx - 20, y: cy - ry * 0.5 + 60, w: 10, h: 20, type: 'lantern', rot: 0 });
-      state.buildings.push({ x: cx + 20, y: cy - ry * 0.5 + 60, w: 10, h: 20, type: 'lantern', rot: 0 });
-      addFloatingText(width / 2, height * 0.3, 'Imperial Palace rises — glory of Rome!', '#ffcc44');
-      spawnParticles(cx, cy - ry * 0.5, 'build', 18);
-    }
-  }
 
   // Add grass tufts to new island area — more at higher levels
   let grx = getSurfaceRX(), gry = getSurfaceRY();
