@@ -311,10 +311,10 @@ const CITY_SLOTS = [
 
   // ERA 2: CITY (Lv 9-17)
   // --- Sacred (N, x:400-780, y:180-280) ---
-  { id: 'aqueduct_1',      x: 480, y: 218, w: 20, h: 40, type: 'aqueduct',    level: 9,  district: 'sacred' },
-  { id: 'aqueduct_2',      x: 560, y: 218, w: 20, h: 40, type: 'aqueduct',    level: 9,  district: 'sacred' },
-  { id: 'aqueduct_3',      x: 640, y: 218, w: 20, h: 40, type: 'aqueduct',    level: 9,  district: 'sacred' },
-  { id: 'bridge_north',    x: 600, y: 288, w: 32, h: 32, type: 'bridge',      level: 9,  district: 'sacred' },
+  { id: 'aqueduct_1',      x: 480, y: 260, w: 20, h: 40, type: 'aqueduct',    level: 9,  district: 'sacred' },
+  { id: 'aqueduct_2',      x: 560, y: 260, w: 20, h: 40, type: 'aqueduct',    level: 9,  district: 'sacred' },
+  { id: 'aqueduct_3',      x: 640, y: 260, w: 20, h: 40, type: 'aqueduct',    level: 9,  district: 'sacred' },
+  { id: 'bridge_north',    x: 600, y: 300, w: 32, h: 32, type: 'bridge',      level: 9,  district: 'sacred' },
   // --- Civic temple (NE, moved to avoid shrine overlap) ---
   { id: 'temple_main',     x: 840, y: 310, w: 70, h: 50, type: 'temple',      level: 10, district: 'civic' },
   { id: 'torch_temp_l',    x: 800, y: 320, w:  8, h: 16, type: 'torch',       level: 10, district: 'civic' },
@@ -338,8 +338,8 @@ const CITY_SLOTS = [
   { id: 'market_3',        x: 870, y: 420, w: 44, h: 34, type: 'market',      level: 13, district: 'market' },
   // --- Bath 2 (civic, moved away from market_3) ---
   { id: 'bath_2',          x: 700, y: 440, w: 70, h: 52, type: 'bath',        level: 14, district: 'civic' },
-  { id: 'aqueduct_4',      x: 400, y: 218, w: 20, h: 40, type: 'aqueduct',    level: 14, district: 'sacred' },
-  { id: 'aqueduct_5',      x: 720, y: 218, w: 20, h: 40, type: 'aqueduct',    level: 14, district: 'sacred' },
+  { id: 'aqueduct_4',      x: 440, y: 260, w: 20, h: 40, type: 'aqueduct',    level: 14, district: 'sacred' },
+  { id: 'aqueduct_5',      x: 720, y: 260, w: 20, h: 40, type: 'aqueduct',    level: 14, district: 'sacred' },
   { id: 'bridge_mkt',      x: 660, y: 400, w: 32, h: 32, type: 'bridge',      level: 14, district: 'center' },
   // --- Forum (center south) ---
   { id: 'forum_main',      x: 600, y: 480, w: 80, h: 60, type: 'forum',       level: 15, district: 'center' },
@@ -382,8 +382,8 @@ const CITY_SLOTS = [
   { id: 'arch_harbor',     x: 980, y: 430, w: 48, h: 52, type: 'arch',        level: 22, district: 'market' },
   { id: 'lantern_h1',      x: 930, y: 430, w: 10, h: 20, type: 'lantern',     level: 22, district: 'market' },
   // --- Grand aqueduct expansion ---
-  { id: 'aqueduct_ga1',    x: 340, y: 210, w: 20, h: 40, type: 'aqueduct',    level: 23, district: 'sacred' },
-  { id: 'aqueduct_ga2',    x: 780, y: 210, w: 20, h: 40, type: 'aqueduct',    level: 23, district: 'sacred' },
+  { id: 'aqueduct_ga1',    x: 400, y: 240, w: 20, h: 40, type: 'aqueduct',    level: 23, district: 'sacred' },
+  { id: 'aqueduct_ga2',    x: 780, y: 240, w: 20, h: 40, type: 'aqueduct',    level: 23, district: 'sacred' },
   { id: 'bridge_grand_l',  x: 450, y: 260, w: 32, h: 32, type: 'bridge',      level: 23, district: 'sacred' },
   { id: 'bridge_grand_r',  x: 720, y: 260, w: 32, h: 32, type: 'bridge',      level: 23, district: 'sacred' },
   // --- Palace (sacred center) ---
@@ -5949,42 +5949,42 @@ function getAmbientHouses() {
   if (_ambientCache.level === lvl) return _ambientCache;
   let cx = WORLD.islandCX, cy = WORLD.islandCY;
 
-  // How many ambient houses based on level
-  let count = lvl < 5 ? 0 : lvl < 10 ? 8 : lvl < 15 ? 15 : lvl < 20 ? 25 : 35;
+  // How many ambient houses based on level (conservative — island is small)
+  let count = lvl < 5 ? 0 : lvl < 10 ? 4 : lvl < 15 ? 8 : lvl < 20 ? 12 : 16;
 
   // All candidate positions — gaps between CITY_SLOTS, denser near center
   let allCandidates = [
-    // W edge fill (farm periphery)
-    { x: 280, y: 370 }, { x: 310, y: 410 }, { x: 260, y: 430 },
-    { x: 290, y: 450 }, { x: 320, y: 380 },
     // NW residential fill
-    { x: 360, y: 390 }, { x: 400, y: 400 }, { x: 380, y: 350 },
-    { x: 350, y: 430 }, { x: 410, y: 440 },
+    { x: 400, y: 400 }, { x: 380, y: 380 },
+    { x: 410, y: 420 },
     // Center-west fill
-    { x: 460, y: 410 }, { x: 500, y: 420 }, { x: 520, y: 450 },
-    { x: 470, y: 460 }, { x: 440, y: 480 },
+    { x: 460, y: 410 }, { x: 500, y: 420 }, { x: 520, y: 440 },
+    { x: 470, y: 440 },
     // Center fill (densest)
-    { x: 560, y: 400 }, { x: 580, y: 460 }, { x: 620, y: 400 },
-    { x: 640, y: 460 }, { x: 570, y: 500 }, { x: 630, y: 500 },
-    { x: 560, y: 520 }, { x: 640, y: 520 },
+    { x: 560, y: 400 }, { x: 580, y: 430 }, { x: 620, y: 400 },
+    { x: 640, y: 430 },
     // East of center
-    { x: 700, y: 400 }, { x: 720, y: 420 }, { x: 740, y: 400 },
-    { x: 680, y: 460 }, { x: 660, y: 480 },
-    // South fill
-    { x: 500, y: 530 }, { x: 550, y: 550 }, { x: 620, y: 555 },
-    { x: 680, y: 540 }, { x: 720, y: 530 },
+    { x: 700, y: 400 }, { x: 720, y: 415 }, { x: 740, y: 400 },
+    { x: 680, y: 440 },
     // SE fill (between center and military)
-    { x: 760, y: 460 }, { x: 800, y: 470 },
-    // SW fill
-    { x: 420, y: 500 }, { x: 360, y: 470 },
+    { x: 760, y: 440 }, { x: 800, y: 430 },
   ];
 
-  // Filter: must be on island and far enough from CITY_SLOTS buildings
+  // Filter: must be inside 80% of walkable ellipse, away from buildings and ports
+  let srx = getSurfaceRX() * 0.80, sry = getSurfaceRY() * 0.80;
+  let portL = state.portLeft || { x: cx - srx, y: cy };
+  let portR = state.portRight || { x: cx + srx, y: cy };
   let activeSlots = CITY_SLOTS.filter(s => s.level <= lvl);
   let houses = [];
   for (let c of allCandidates) {
     if (houses.length >= count) break;
-    if (!isOnIsland(c.x, c.y)) continue;
+    // Must be inside 80% of walkable ellipse
+    let edx = (c.x - cx) / srx, edy = (c.y - cy) / sry;
+    if (edx * edx + edy * edy > 1.0) continue;
+    // Port exclusion zone (80px)
+    let dpL = (c.x - portL.x) * (c.x - portL.x) + (c.y - portL.y) * (c.y - portL.y);
+    let dpR = (c.x - portR.x) * (c.x - portR.x) + (c.y - portR.y) * (c.y - portR.y);
+    if (dpL < 80 * 80 || dpR < 80 * 80) continue;
     // Check min distance from any placed building
     let tooClose = false;
     for (let s of activeSlots) {
@@ -5999,37 +5999,29 @@ function getAmbientHouses() {
     houses.push({ x: c.x, y: c.y, w: w, h: h, variant: hash });
   }
 
-  // Market clutter (stalls, crates, barrels) — center area, level 10+
+  // Market clutter (stalls, crates, barrels) — center area only, level 10+
   let clutter = [];
   if (lvl >= 10) {
     let clutterCandidates = [
       // Market stalls near center plaza
-      { x: 580, y: 435, type: 'stall', color: 0 },
-      { x: 625, y: 435, type: 'stall', color: 1 },
-      { x: 650, y: 415, type: 'stall', color: 2 },
-      // Crates/barrels scattered
-      { x: 555, y: 445, type: 'crate' },
-      { x: 645, y: 445, type: 'barrel' },
-      { x: 590, y: 410, type: 'crate' },
-      { x: 670, y: 435, type: 'barrel' },
-      { x: 530, y: 460, type: 'crate' },
-      // More at higher levels
-      { x: 610, y: 455, type: 'barrel' },
-      { x: 700, y: 410, type: 'stall', color: 0 },
-      { x: 560, y: 480, type: 'crate' },
-      { x: 680, y: 420, type: 'barrel' },
-      // Near market district
-      { x: 850, y: 395, type: 'stall', color: 1 },
-      { x: 910, y: 395, type: 'crate' },
-      { x: 890, y: 405, type: 'barrel' },
-      // Near forum at high levels
-      { x: 575, y: 510, type: 'crate' },
-      { x: 625, y: 510, type: 'barrel' },
+      { x: 580, y: 420, type: 'stall', color: 0 },
+      { x: 625, y: 420, type: 'stall', color: 1 },
+      { x: 650, y: 410, type: 'stall', color: 2 },
+      // Crates/barrels in center
+      { x: 555, y: 425, type: 'crate' },
+      { x: 645, y: 425, type: 'barrel' },
+      { x: 590, y: 405, type: 'crate' },
+      { x: 670, y: 415, type: 'barrel' },
+      { x: 610, y: 435, type: 'barrel' },
     ];
-    let maxClutter = lvl < 13 ? 8 : lvl < 17 ? 12 : 17;
+    let maxClutter = 8;
     for (let c of clutterCandidates) {
       if (clutter.length >= maxClutter) break;
       if (!isOnIsland(c.x, c.y)) continue;
+      // Port exclusion zone
+      let dpL = (c.x - portL.x) * (c.x - portL.x) + (c.y - portL.y) * (c.y - portL.y);
+      let dpR = (c.x - portR.x) * (c.x - portR.x) + (c.y - portR.y) * (c.y - portR.y);
+      if (dpL < 80 * 80 || dpR < 80 * 80) continue;
       clutter.push(c);
     }
   }

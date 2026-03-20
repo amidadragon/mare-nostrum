@@ -1818,9 +1818,11 @@ function drawCityWall(ix, iy, iw, ih) {
   let bright = getSkyBrightness();
   let isNight = bright < 0.3;
 
-  // Wall boundary in world coords, converted to screen
-  let wx1 = w2sX(390), wy1 = w2sY(270);
-  let wx2 = w2sX(910), wy2 = w2sY(530);
+  // Wall boundary — 70% of walkable ellipse, capped to a reasonable city size
+  let wallRX = min(getSurfaceRX() * 0.70, 320);
+  let wallRY = min(getSurfaceRY() * 0.70, 140);
+  let wx1 = w2sX(WORLD.islandCX - wallRX), wy1 = w2sY(WORLD.islandCY - wallRY);
+  let wx2 = w2sX(WORLD.islandCX + wallRX), wy2 = w2sY(WORLD.islandCY + wallRY);
   let ww = wx2 - wx1, wh = wy2 - wy1;
 
   // Wall thickness and height by era
@@ -1965,6 +1967,16 @@ function drawDistrictGrounds(ix, iy) {
   let ih = state.islandRY * 2;
   noStroke();
 
+  // Clip district paving to the walkable island ellipse
+  push();
+  let _clipRX = getSurfaceRX() * 0.85;
+  let _clipRY = getSurfaceRY() * 0.85;
+  // drawDistrictGrounds is called within a translate context, so use ix/iy directly
+  drawingContext.save();
+  drawingContext.beginPath();
+  drawingContext.ellipse(ix, iy - 18, _clipRX, _clipRY, 0, 0, Math.PI * 2);
+  drawingContext.clip();
+
   // Era 1 (Lv 5-8): Small packed-earth plaza — rectangular, not elliptical
   if (ep.era === 1) {
     let pr = lerp(160, 175, dayMix), pg = lerp(140, 155, dayMix), pb = lerp(110, 125, dayMix);
@@ -2097,6 +2109,10 @@ function drawDistrictGrounds(ix, iy) {
     // Glow over the main paved area
     rect(ix - iw * 0.22, iy - 18 - ih * 0.14, iw * 0.50, ih * 0.26);
   }
+
+  // Restore ellipse clip
+  drawingContext.restore();
+  pop();
 }
 
 // ─── ROMAN ROAD ───────────────────────────────────────────────────────────
