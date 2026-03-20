@@ -1305,7 +1305,8 @@ function drawHotbar() {
   if (screenshotMode) return;
   let p = state.player;
   let slot = p.hotbarSlot;
-  let slotW = 36, slotH = 36, gap = 3;
+  let slotW = (typeof _isMobile !== 'undefined' && _isMobile) ? 44 : 36;
+  let slotH = slotW, gap = 3;
   let totalW = HOTBAR_ITEMS.length * (slotW + gap) - gap;
   let bx = floor((width - totalW) / 2);
   let by = height - slotH - 12;

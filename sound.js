@@ -21,9 +21,10 @@ class SoundManager {
     this._birdOsc = null;
     this._birdGain = null;
     this._birdTimer = 0;
-    // Cricket oscillator (reused)
-    this._cricketOsc = null;
-    this._cricketGain = null;
+    // Cricket oscillators (3 virtual crickets for organic sound)
+    this._crickets = []; // [{osc, gain, timer}]
+    // Dawn/dusk transition tracking
+    this._lastTimeSlot = null; // 'day', 'night', 'dawn', 'dusk'
     // SFX oscillator pool (4 reusable)
     this._sfxPool = [];
     this._sfxIdx = 0;
@@ -142,16 +143,19 @@ class SoundManager {
       this._birdOsc.start();
       this._birdOsc.amp(0);
 
-      // Cricket (sine, high freq gated)
-      this._cricketOsc = new p5.Oscillator('sine');
-      this._cricketGain = new p5.Gain();
-      this._cricketOsc.disconnect();
-      this._cricketOsc.connect(this._cricketGain);
-      this._cricketGain.connect();
-      this._cricketGain.amp(0);
-      this._cricketOsc.start();
-      this._cricketOsc.freq(4200);
-      this._cricketOsc.amp(0);
+      // Crickets (3 virtual crickets with independent timing)
+      for (let ci = 0; ci < 3; ci++) {
+        let osc = new p5.Oscillator('sine');
+        let gain = new p5.Gain();
+        osc.disconnect();
+        osc.connect(gain);
+        gain.connect();
+        gain.amp(0);
+        osc.start();
+        osc.freq(4000 + ci * 200); // slightly different base pitch each
+        osc.amp(0);
+        this._crickets.push({ osc, gain, timer: floor(random(30, 120)), baseFreq: 4000 + ci * 200 });
+      }
 
       // Lyre: 3 sine voices for polyphonic plucked strings
       for (let i = 0; i < 3; i++) {
@@ -485,12 +489,27 @@ class SoundManager {
       }
     }
 
-    // ─── Crickets ───
+    // ─── Crickets (3 virtual crickets, organic timing) ───
     let cricketVol = bright < 0.3 ? (0.3 - bright) * 0.08 * masterVol : 0;
     if (diving) cricketVol = 0;
-    let gate = sin(frameCount * 0.5) > 0.3 ? 1 : 0;
-    this._cricketGain.amp(cricketVol * gate, 0.02);
-    this._cricketOsc.freq(4200 + sin(frameCount * 0.07) * 200);
+    for (let ci = 0; ci < this._crickets.length; ci++) {
+      let c = this._crickets[ci];
+      c.timer--;
+      if (c.timer <= 0 && cricketVol > 0) {
+        // Chirp: quick on-off burst with slight pitch variation
+        let pitchVar = c.baseFreq + random(-150, 150);
+        c.osc.freq(pitchVar);
+        c.gain.amp(cricketVol * random(0.6, 1.0), 0.005);
+        // Chirp duration 30-60ms, then silence
+        let chirpMs = random(30, 60);
+        setTimeout(() => { if (c.gain) c.gain.amp(0, 0.01); }, chirpMs);
+        // Next chirp: random interval 0.5-2s (30-120 frames at 60fps)
+        c.timer = floor(random(30, 120));
+      } else if (cricketVol <= 0) {
+        c.gain.amp(0, 0.05);
+        c.timer = floor(random(30, 60)); // reset for when they come back
+      }
+    }
 
     // ─── Vulcan: sub-bass rumble ───
     if (this._rumbleGain) {
@@ -596,6 +615,21 @@ class SoundManager {
         this._fireGain.amp(0, 0.2);
         this._fireTimer = 0;
       }
+    }
+
+    // ─── Dawn/Dusk transition sounds (one-shot per transition) ───
+    if (typeof state !== 'undefined') {
+      let h = state.time / 60;
+      let slot;
+      if (h >= 5 && h < 7) slot = 'dawn';
+      else if (h >= 17 && h < 19) slot = 'dusk';
+      else if (h >= 7 && h < 17) slot = 'day';
+      else slot = 'night';
+      if (this._lastTimeSlot !== null && this._lastTimeSlot !== slot) {
+        if (slot === 'dawn') this.playSFX('dawn_transition');
+        else if (slot === 'dusk') this.playSFX('dusk_transition');
+      }
+      this._lastTimeSlot = slot;
     }
   }
 
@@ -1421,6 +1455,19 @@ class SoundManager {
       case 'season_change':
         playTwo('sine', 440, 660, 0.14, 500, 180);  // A4->E5 soft chime
         setTimeout(() => playTwo('sine', 523, 784, 0.12, 400, 150), 200);
+        break;
+      case 'dawn_transition':
+        // Rising birdsong-like chirp sequence: 4 ascending pips
+        play('sine', 880, 0.10, 1100, 150, { attack: 15 });
+        setTimeout(() => play('sine', 1047, 0.09, 1200, 140, { attack: 12 }), 180);
+        setTimeout(() => play('sine', 1175, 0.08, 1320, 130, { attack: 10 }), 350);
+        setTimeout(() => playTwo('sine', 1320, 1568, 0.07, 250, 100), 520);
+        break;
+      case 'dusk_transition':
+        // Soft descending tone: 3 falling notes, warm and quiet
+        play('sine', 660, 0.08, 550, 200, { attack: 20 });
+        setTimeout(() => play('sine', 523, 0.07, 440, 220, { attack: 18 }), 250);
+        setTimeout(() => play('sine', 392, 0.06, 330, 300, { attack: 25 }), 500);
         break;
       case 'festival_start':
         playTwo('sine', 523, 784, 0.20, 400, 150);  // C5->G5 bright

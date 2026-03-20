@@ -587,8 +587,8 @@ function _drawSectionDivider(cx, y, divW) {
 
 function drawSettingsPanel(fadeA) {
   let w = width, h = height;
-  let panW = 280, panH = 340;
-  let px = floor(w / 2 - panW / 2), py = floor(h * 0.26);
+  let panW = 280, panH = 480;
+  let px = floor(w / 2 - panW / 2), py = floor(h * 0.18);
 
   fill(0, 0, 0, 170); rect(0, 0, w, h);
 
@@ -653,8 +653,59 @@ function drawSettingsPanel(fadeA) {
 
   _drawSectionDivider(w / 2, py + 210, panW - 50);
 
+  // ─── ACCESSIBILITY ───
+  let accY = py + 228;
+
+  // Screen Shake toggle
+  let shakeOn = gameSettings.screenShake;
+  fill(190, 170, 130, 220); textSize(10);
+  textAlign(RIGHT, CENTER);
+  text('Screen Shake', w / 2 + 12, accY);
+  textAlign(CENTER, CENTER);
+  let stbx = floor(w / 2 + 40), stby = accY - 7;
+  fill(30, 25, 18); rect(stbx, stby, 28, 14, 2);
+  fill(shakeOn ? 75 : 40, shakeOn ? 120 : 50, shakeOn ? 45 : 35, 230);
+  rect(stbx + 1, stby + 1, 26, 12, 2);
+  fill(220, 210, 180); rect(stbx + (shakeOn ? 16 : 2), stby + 2, 10, 10, 1);
+  fill(240, 230, 200, 80); rect(stbx + (shakeOn ? 17 : 3), stby + 3, 8, 2);
+
+  // Font Size toggle (Normal / Large)
+  accY += 28;
+  let isLarge = gameSettings.fontScale > 1;
+  fill(190, 170, 130, 220); textSize(10);
+  textAlign(RIGHT, CENTER);
+  text('Font Size', w / 2 + 12, accY);
+  textAlign(CENTER, CENTER);
+  let fsbx = floor(w / 2 + 30);
+  let fsNormHov = mouseX > fsbx && mouseX < fsbx + 36 && mouseY > accY - 8 && mouseY < accY + 8;
+  let fsLrgHov = mouseX > fsbx + 40 && mouseX < fsbx + 76 && mouseY > accY - 8 && mouseY < accY + 8;
+  // Normal button
+  fill(isLarge ? 35 : 65, isLarge ? 30 : 55, isLarge ? 22 : 35); rect(fsbx, accY - 7, 36, 14, 2);
+  fill(isLarge ? 130 : 220, isLarge ? 115 : 200, isLarge ? 85 : 120); textSize(8);
+  text('Normal', fsbx + 18, accY);
+  // Large button
+  fill(isLarge ? 65 : 35, isLarge ? 55 : 30, isLarge ? 35 : 22); rect(fsbx + 40, accY - 7, 36, 14, 2);
+  fill(isLarge ? 220 : 130, isLarge ? 200 : 115, isLarge ? 120 : 85); textSize(8);
+  text('Large', fsbx + 58, accY);
+
+  // Auto-save info
+  accY += 28;
+  fill(130, 115, 85, 160); textSize(8);
+  if (gameSettings.lastSaveTime > 0) {
+    let ago = floor((Date.now() - gameSettings.lastSaveTime) / 1000);
+    let agoStr;
+    if (ago < 60) agoStr = 'just now';
+    else if (ago < 3600) agoStr = floor(ago / 60) + 'm ago';
+    else agoStr = floor(ago / 3600) + 'h ago';
+    text('Last saved: ' + agoStr, w / 2, accY);
+  } else {
+    text('No save data yet', w / 2, accY);
+  }
+
+  _drawSectionDivider(w / 2, accY + 16, panW - 50);
+
   // Delete save — red tinted with hover
-  let delY = py + 240;
+  let delY = accY + 36;
   let delHover = mouseX > w/2 - 60 && mouseX < w/2 + 60 && mouseY > delY - 10 && mouseY < delY + 12;
   if (delHover) {
     fill(100, 30, 20, 40); rect(w/2 - 65, delY - 10, 130, 22, 2);
@@ -842,7 +893,8 @@ function drawCreditsPanel(fadeA) {
 // ─── MENU CLICK HANDLER ─────────────────────────────────────────────────
 function handleMenuClick() {
   if (gameScreen === 'settings') {
-    let py = floor(height * 0.26);
+    let py = floor(height * 0.18);
+    let panH = 480;
     let fsY = py + 50;
     let tbx = floor(width / 2 + 40), tby = fsY - 7;
     if (mouseX > tbx && mouseX < tbx + 28 && mouseY > tby && mouseY < tby + 14) {
@@ -861,12 +913,31 @@ function handleMenuClick() {
         sliderY += 24;
       }
     }
-    let delY = py + 250;
+    // Screen Shake toggle
+    let accY = py + 228;
+    let stbx = floor(width / 2 + 40), stby = accY - 7;
+    if (mouseX > stbx && mouseX < stbx + 28 && mouseY > stby && mouseY < stby + 14) {
+      gameSettings.screenShake = !gameSettings.screenShake;
+      _saveSettings();
+      return;
+    }
+    // Font Size buttons
+    accY += 28;
+    let fsbx = floor(width / 2 + 30);
+    if (mouseX > fsbx && mouseX < fsbx + 36 && mouseY > accY - 8 && mouseY < accY + 8) {
+      gameSettings.fontScale = 1; _saveSettings(); return;
+    }
+    if (mouseX > fsbx + 40 && mouseX < fsbx + 76 && mouseY > accY - 8 && mouseY < accY + 8) {
+      gameSettings.fontScale = 1.25; _saveSettings(); return;
+    }
+    // Delete save
+    accY += 28;
+    let delY = accY + 8;
     if (mouseX > width/2 - 60 && mouseX < width/2 + 60 && mouseY > delY - 10 && mouseY < delY + 12) {
       if (localStorage.getItem('sunlitIsles_save')) localStorage.removeItem('sunlitIsles_save');
       return;
     }
-    let backY = py + 340 - 25;
+    let backY = py + panH - 25;
     if (mouseX > width/2 - 40 && mouseX < width/2 + 40 && mouseY > backY - 8 && mouseY < backY + 10) {
       gameScreen = 'menu'; return;
     }

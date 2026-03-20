@@ -198,6 +198,7 @@ function reelFish() {
     if (snd) snd.playSFX('fish_catch');
     state.dailyActivities.fished += amt;
     checkQuestProgress('fish', amt);
+    if (typeof grantXP === 'function') grantXP(fishType.weight * 5); // rare fish = more XP
     state.codex.fishCaught[fishType.name.toLowerCase()] = true;
     let _fk = fishType.name.toLowerCase();
     if (!state.codex.fish[_fk]) state.codex.fish[_fk] = { caught: true, count: 0, firstDay: state.day };

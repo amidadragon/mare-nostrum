@@ -1119,6 +1119,19 @@ function completeSailToHome() {
 
   state.wood += 5; state.stone += 3; state.seeds += 3;
 
+  // Transfer wreck beach cat to home island
+  if (state.wreck.cat && state.wreck.cat.introduced) {
+    let port = getPortPosition();
+    state.cats.push({
+      x: port.x + 60, y: port.y + 10,
+      vx: 0, vy: 0, facing: 1,
+      timer: random(100, 300), state: 'idle',
+      giftTimer: 600,
+      color: state.wreck.cat.color,
+    });
+    addFloatingText(width / 2, height * 0.42, 'The stray cat followed you!', '#ffaa66');
+  }
+
   addFloatingText(width / 2, height * 0.3, 'HOME ISLAND REACHED', C.solarGold);
   addFloatingText(width / 2, height * 0.36, 'Explore the ruins...', C.textDim);
 }

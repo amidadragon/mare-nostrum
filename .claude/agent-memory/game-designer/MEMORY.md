@@ -9,3 +9,4 @@
 - [Retention Systems Design](project_retention_systems.md) — 18 random events, Codex (6 categories), seasonal modifiers, 3-pillar endgame loop (Wonders/Endless Arena/NG+)
 - [Atlantis Transformation Spec](project_atlantis_spec.md) — Era system, concentric rings, ambient citizens, crystal effects, building palette for village→city→atlantis across 25 levels
 - [Combat & Expedition Overhaul](project_combat_overhaul.md) — New enemies (shield_bearer/archer/centurion), infinite arena waves, boss waves every 5, kill burst particles, arrow projectiles, expedition summary overlay, rare discoveries
+- [Balance & Progression Audit March 2026](project_balance_progression_audit.md) — Iron wall fix, colonize cost reduction, colony income bump, quest reward scaling, XP grants for farming/fishing/building

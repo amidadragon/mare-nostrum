@@ -108,9 +108,10 @@ function updateWreckBeach(dt) {
     spawnWreckSplash(p.x, p.y, 5, 6);
   }
 
-  // ── Update crabs + ambient ────────────────────────────────────────────────
+  // ── Update crabs + ambient + cat ─────────────────────────────────────────
   updateWreckCrabs(dt);
   updateWreckAmbient(dt);
+  updateWreckCat(dt);
 
   // ── Tutorial hints ────────────────────────────────────────────────────────
   if (state.progression.tutorialsSeen && !state.progression.tutorialsSeen.gather && state.wreck.scavNodes.some(n => !n.collected)) {
@@ -414,6 +415,299 @@ function updateWreckAmbient(dt) {
   }
   for (let g of w.glints) g.timer -= dt;
   w.glints = w.glints.filter(g => g.timer > 0);
+}
+
+// ─── WRECK BEACH CAT — early companion personality ──────────────────────
+const WRECK_CAT_MEOWS = [
+  'Mrrp?', 'Mew!', 'Prrrr...', 'Mrow!', 'Mrrrp.', '*purr*', 'Mew?',
+];
+const WRECK_CAT_GIFTS = [
+  { label: '+1 Stone (gift!)', res: 'stone', qty: 1 },
+  { label: '+1 Wood (gift!)', res: 'wood', qty: 1 },
+  { label: 'A pretty shell!', res: 'stone', qty: 1 },
+  { label: 'A smooth pebble!', res: 'stone', qty: 1 },
+];
+
+function updateWreckCat(dt) {
+  let cat = state.wreck.cat;
+  if (!cat) return;
+  let p = state.player;
+  let pd = dist(p.x, p.y, cat.x, cat.y);
+
+  cat.meowTimer -= dt;
+  cat.giftTimer -= dt;
+
+  switch (cat.state) {
+    case 'hidden':
+      cat.timer -= dt;
+      if (cat.timer <= 0) {
+        // Cat appears at edge of beach
+        cat.x = WRECK.cx + 180;
+        cat.y = WRECK.cy - 8;
+        cat.state = 'approaching';
+        cat.timer = 300;
+        addFloatingText(w2sX(cat.x), w2sY(cat.y) - 18, 'A stray cat approaches...', '#ffaa66');
+      }
+      return;
+
+    case 'approaching':
+      // Walk toward player
+      let adx = p.x - cat.x, ady = p.y - cat.y;
+      let adist = sqrt(adx * adx + ady * ady);
+      if (adist > 35) {
+        let spd = 0.8;
+        cat.vx = (adx / adist) * spd;
+        cat.vy = (ady / adist) * spd;
+        cat.facing = cat.vx > 0 ? 1 : -1;
+      } else {
+        // Arrived near player — introduction moment
+        cat.vx = 0; cat.vy = 0;
+        if (!cat.introduced) {
+          cat.introduced = true;
+          addFloatingText(w2sX(cat.x), w2sY(cat.y) - 20, 'Mrrp?', '#ffcc88');
+          addFloatingText(w2sX(p.x), w2sY(p.y) - 25, 'The cat rubs against your leg', '#ffaa66');
+          spawnParticles(cat.x, cat.y, 'collect', 4);
+          // Heart particle
+          particles.push({
+            x: cat.x, y: cat.y - 10,
+            vx: random(-0.2, 0.2), vy: -1.0,
+            life: 40, maxLife: 40,
+            type: 'heart', size: 4,
+            r: 255, g: 120, b: 140, world: true,
+          });
+        }
+        cat.state = 'idle';
+        cat.timer = random(80, 200);
+        cat.meowTimer = random(200, 400);
+        cat.giftTimer = random(1800, 3600); // first gift after 30-60s
+      }
+      break;
+
+    case 'idle':
+      // Drift slowly toward player if far
+      if (pd > 60) {
+        let idx = p.x - cat.x, idy = p.y - cat.y;
+        let id = sqrt(idx * idx + idy * idy);
+        cat.vx = (idx / id) * 0.3;
+        cat.vy = (idy / id) * 0.3;
+        cat.facing = cat.vx > 0 ? 1 : -1;
+      } else {
+        cat.vx *= 0.9; cat.vy *= 0.9;
+      }
+      cat.timer -= dt;
+      if (cat.timer <= 0) {
+        let roll = random();
+        if (roll < 0.25 && state.wreck.crabs.length > 0) {
+          // Chase a crab
+          let ci = floor(random(state.wreck.crabs.length));
+          cat.chaseTarget = ci;
+          cat.state = 'chasing';
+          cat.timer = random(80, 160);
+        } else if (roll < 0.5) {
+          // Sit near player
+          cat.state = 'sitting';
+          cat.timer = random(120, 300);
+          cat.vx = 0; cat.vy = 0;
+        } else {
+          // Wander
+          cat.state = 'walking';
+          cat.vx = random(-0.5, 0.5);
+          cat.vy = random(-0.25, 0.25);
+          cat.facing = cat.vx > 0 ? 1 : -1;
+          cat.timer = random(50, 120);
+        }
+      }
+      break;
+
+    case 'sitting':
+      cat.vx = 0; cat.vy = 0;
+      cat.timer -= dt;
+      // Sitting near player — occasional purr
+      if (pd < 40 && cat.meowTimer <= 0) {
+        cat.meowTimer = random(200, 500);
+        addFloatingText(w2sX(cat.x), w2sY(cat.y) - 15, '*purr*', '#ffddaa');
+      }
+      if (cat.timer <= 0) {
+        cat.state = 'idle';
+        cat.timer = random(60, 180);
+      }
+      break;
+
+    case 'walking':
+      cat.timer -= dt;
+      if (cat.timer <= 0) {
+        cat.state = 'idle';
+        cat.timer = random(80, 200);
+        cat.vx = 0; cat.vy = 0;
+      }
+      break;
+
+    case 'chasing':
+      cat.timer -= dt;
+      let crab = state.wreck.crabs[cat.chaseTarget];
+      if (!crab || cat.timer <= 0) {
+        cat.state = 'idle';
+        cat.timer = random(60, 150);
+        cat.vx = 0; cat.vy = 0;
+        break;
+      }
+      let cdx = crab.x - cat.x, cdy = crab.y - cat.y;
+      let cd = sqrt(cdx * cdx + cdy * cdy);
+      if (cd > 10) {
+        cat.vx = (cdx / cd) * 1.2;
+        cat.vy = (cdy / cd) * 1.2;
+        cat.facing = cat.vx > 0 ? 1 : -1;
+      }
+      // Scare the crab
+      if (cd < 20) {
+        crab.state = 'flee';
+        crab.timer = 50;
+        let fang = atan2(crab.y - cat.y, crab.x - cat.x);
+        crab.vx = cos(fang) * 1.5;
+        crab.vy = sin(fang) * 1.5;
+        cat.state = 'idle';
+        cat.timer = random(100, 200);
+        cat.vx = 0; cat.vy = 0;
+        if (random() < 0.5) {
+          addFloatingText(w2sX(cat.x), w2sY(cat.y) - 15, 'Mrow!', '#ffcc88');
+        }
+      }
+      break;
+
+    case 'gifting':
+      // Walk to player to deliver gift
+      if (pd > 20) {
+        let gdx = p.x - cat.x, gdy = p.y - cat.y;
+        let gd = sqrt(gdx * gdx + gdy * gdy);
+        cat.vx = (gdx / gd) * 1.0;
+        cat.vy = (gdy / gd) * 1.0;
+        cat.facing = cat.vx > 0 ? 1 : -1;
+      } else {
+        // Deliver
+        let gift = WRECK_CAT_GIFTS[floor(random(WRECK_CAT_GIFTS.length))];
+        state[gift.res] = (state[gift.res] || 0) + gift.qty;
+        addFloatingText(w2sX(cat.x), w2sY(cat.y) - 18, gift.label, '#ffcc44');
+        spawnParticles(cat.x, cat.y, 'collect', 3);
+        particles.push({
+          x: cat.x, y: cat.y - 10,
+          vx: random(-0.2, 0.2), vy: -1.0,
+          life: 30, maxLife: 30,
+          type: 'heart', size: 3,
+          r: 255, g: 120, b: 140, world: true,
+        });
+        cat.giftCount++;
+        cat.giftTimer = random(2400, 4800); // 40-80s between gifts
+        cat.state = 'idle';
+        cat.timer = random(100, 200);
+        cat.vx = 0; cat.vy = 0;
+      }
+      break;
+  }
+
+  // Movement
+  cat.x += cat.vx * dt;
+  cat.y += cat.vy * dt;
+
+  // Keep on beach
+  let bex = (cat.x - WRECK.cx) / (WRECK.rx * 0.75);
+  let bey = (cat.y - WRECK.cy) / (WRECK.ry * 0.28);
+  if (bex * bex + bey * bey > 1.0) {
+    let ang = atan2(cat.y - WRECK.cy, cat.x - WRECK.cx);
+    cat.x = WRECK.cx + cos(ang) * WRECK.rx * 0.73;
+    cat.y = WRECK.cy + sin(ang) * WRECK.ry * 0.27;
+    cat.vx = -cat.vx; cat.vy = -cat.vy;
+  }
+
+  // Random meow
+  if (cat.state !== 'hidden' && cat.state !== 'approaching' && cat.meowTimer <= 0) {
+    cat.meowTimer = random(300, 700);
+    let msg = WRECK_CAT_MEOWS[floor(random(WRECK_CAT_MEOWS.length))];
+    addFloatingText(w2sX(cat.x), w2sY(cat.y) - 15, msg, '#ffddaa');
+  }
+
+  // Gift trigger — cat wanders off, finds something, brings it back
+  if (cat.state === 'idle' && cat.giftTimer <= 0 && cat.introduced && pd < 120) {
+    cat.state = 'gifting';
+    cat.timer = 200;
+    addFloatingText(w2sX(cat.x), w2sY(cat.y) - 15, 'Mrrp!', '#ffcc88');
+  }
+}
+
+function drawWreckCat() {
+  let cat = state.wreck.cat;
+  if (!cat || cat.state === 'hidden') return;
+
+  let sx = floor(w2sX(cat.x)), sy = floor(w2sY(cat.y));
+  push();
+  translate(sx, sy);
+  scale(cat.facing, 1);
+  noStroke();
+
+  // Shadow
+  fill(0, 0, 0, 25);
+  rect(-6, 5, 12, 2);
+
+  let r = cat.color[0], g = cat.color[1], b = cat.color[2];
+
+  if (cat.state === 'sitting') {
+    // Sitting pose
+    fill(r, g, b);
+    rect(-4, -3, 8, 8);
+    fill(r + 10, g + 10, b + 10);
+    rect(-3, -8, 6, 5);
+    // Ears
+    rect(-4, -10, 2, 2);
+    rect(2, -10, 2, 2);
+    fill(200, 140, 130);
+    rect(-3, -9, 1, 1);
+    rect(2, -9, 1, 1);
+    // Tail curled
+    fill(r, g, b);
+    rect(4, -2, 4, 2);
+    rect(7, -4, 2, 2);
+    rect(5, -5, 2, 1);
+    // Eyes
+    fill(180, 200, 50);
+    rect(-2, -7, 2, 2);
+    rect(1, -7, 2, 2);
+    fill(20);
+    rect(-1, -6, 1, 1);
+    rect(2, -6, 1, 1);
+  } else {
+    // Walking/idle pose
+    fill(r, g, b);
+    rect(-6, -2, 12, 6);
+    fill(r + 10, g + 10, b + 10);
+    rect(3, -6, 6, 5);
+    // Ears
+    rect(3, -8, 2, 2);
+    rect(7, -8, 2, 2);
+    fill(200, 140, 130);
+    rect(4, -7, 1, 1);
+    rect(7, -7, 1, 1);
+    // Tail
+    fill(r, g, b);
+    let tailUp = floor(sin(frameCount * 0.08) * 2);
+    rect(-8, -1, 2, 2);
+    rect(-10, -3 + tailUp, 2, 2);
+    rect(-10, -5 + tailUp, 2, 2);
+    // Legs
+    fill(r - 10, g - 10, b - 10);
+    let walk = (cat.state === 'walking' || cat.state === 'chasing' || cat.state === 'gifting' || cat.state === 'approaching')
+      ? floor(sin(frameCount * 0.15) * 2) : 0;
+    rect(-3, 4, 2, 3 + walk);
+    rect(1, 4, 2, 3 - walk);
+    rect(4, 4, 2, 3 + walk);
+    // Eyes
+    fill(180, 200, 50);
+    rect(5, -4, 2, 2);
+    rect(8, -4, 2, 2);
+    fill(20);
+    rect(6, -3, 1, 1);
+    rect(9, -3, 1, 1);
+  }
+
+  pop();
 }
 
 // ─── DRAW WRECK ISLAND ──────────────────────────────────────────────────
@@ -1339,6 +1633,9 @@ function drawWreckEntities() {
       text('E: CATCH', sx, sy - 8);
     }
   }
+
+  // ─── STRAY CAT ───
+  drawWreckCat();
 
   // ─── FLYING BIRDS ───
   for (let b of w.birds) {

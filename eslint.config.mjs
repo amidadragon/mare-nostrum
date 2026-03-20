@@ -55,7 +55,7 @@ export default [
         startSailingCutscene: "readonly", startPreRepairCutscene: "readonly", completeSailToHome: "readonly",
         updateMainQuest: "readonly", updateNPCQuests: "readonly", advanceMainQuestCounter: "readonly",
         advanceNPCQuestCounter: "readonly", initNarrativeState: "readonly", checkLoreTabletPickup: "readonly",
-        updateNarrativeDialogue: "readonly", getExpandedDialogue: "readonly", tickPendingNudges: "readonly",
+        updateNarrativeDialogue: "readonly", getExpandedDialogue: "readonly", getMaxHeartsDialogue: "readonly", tickPendingNudges: "readonly",
         grantXP: "readonly", updateCombatSystem: "readonly", drawCombatOverlay: "readonly",
         handleCombatSkillKey: "readonly", tryDodgeRoll: "readonly", toggleSkillTree: "readonly",
         handleSkillTreeClick: "readonly", drawSkillTree: "readonly", skillTreeOpen: "writable",

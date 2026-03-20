@@ -3,11 +3,30 @@
 // p5.js sketch
 p5.disableFriendlyErrors = true;
 
+// ─── ACCESSIBILITY SETTINGS (localStorage-persisted) ─────────────────────
+const _SETTINGS_KEY = 'mare_nostrum_settings';
+let gameSettings = { screenShake: true, fontScale: 1, lastSaveTime: 0 };
+function _loadSettings() {
+  try {
+    let d = JSON.parse(localStorage.getItem(_SETTINGS_KEY));
+    if (d) {
+      if (d.screenShake !== undefined) gameSettings.screenShake = d.screenShake;
+      if (d.fontScale !== undefined) gameSettings.fontScale = d.fontScale;
+      if (d.lastSaveTime !== undefined) gameSettings.lastSaveTime = d.lastSaveTime;
+    }
+  } catch(e) {}
+}
+function _saveSettings() {
+  try { localStorage.setItem(_SETTINGS_KEY, JSON.stringify(gameSettings)); } catch(e) {}
+}
+_loadSettings();
+
 // ─── GLOBAL TEXT READABILITY — enforce minimum size + dark outlines ──────
 const _origTextSize = p5.prototype.textSize;
 const MIN_TEXT_SIZE = 10;
 p5.prototype.textSize = function(s) {
-  return _origTextSize.call(this, max(s, MIN_TEXT_SIZE));
+  let scaled = s * (gameSettings.fontScale || 1);
+  return _origTextSize.call(this, max(scaled, MIN_TEXT_SIZE));
 };
 
 // Outlined text helper — use for important labels
@@ -694,6 +713,7 @@ function initState() {
     islandName: null,         // set by player at level 10
     islandNamingOpen: false,  // UI overlay flag
     islandNamingInput: '',    // typing buffer
+    islandMilestone: null,    // { level, rank, unlocks[], timer }
 
     // Temple blessing — random buff for 1 day
     blessing: { type: null, timer: 0, cooldown: 0 },
@@ -1402,6 +1422,20 @@ function startNewGame() {
     { x: wcx + 140, y: wcy + 28, type: 'seaweed' },
   ];
 
+  // Stray cat — appears after ~60s, walks toward player
+  state.wreck.cat = {
+    x: wcx + 200, y: wcy - 10,
+    vx: 0, vy: 0, facing: -1,
+    state: 'hidden',    // hidden, approaching, idle, walking, sitting, chasing, gifting
+    timer: 3600,        // ~60s at 60fps before appearing
+    meowTimer: 0,
+    giftTimer: 0,
+    giftCount: 0,
+    chaseTarget: null,  // crab index
+    introduced: false,
+    color: [200, 130, 50], // ginger tabby
+  };
+
   // Flying birds (ambient)
   state.wreck.birds = [];
   state.wreck.glints = [];
@@ -1441,6 +1475,7 @@ function returnToMenu() {
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
   starPositions = null; // regenerate for new size
+  if (typeof _initTouchButtons === 'function') _initTouchButtons();
 }
 
 // ─── CAMERA ───────────────────────────────────────────────────────────────
@@ -2264,6 +2299,7 @@ function drawInner() {
       if (!photoMode) drawTutorialHintUI();
       drawScreenFlash();
       drawImperatorBanner();
+      drawIslandMilestone();
       drawDailySummary();
       drawModifierSelectUI();
       drawNotifications();
@@ -2281,6 +2317,8 @@ function drawInner() {
       drawScreenTransition();
       drawImperatorCeremony();
       drawIslandNamingOverlay();
+      if (typeof drawMobileControls === 'function') drawMobileControls();
+      if (typeof _processTouchActions === 'function') _processTouchActions();
       // Photo mode hint — always visible at low alpha
       if (!photoMode) {
         push(); noStroke();
@@ -3580,9 +3618,9 @@ function drawWeatherEffects() {
     noStroke();
     fill(15, 20, 35, 40 * w.intensity);
     rect(0, 0, width, height);
-    // Spawn raindrops — more intense, angled
+    // Spawn raindrops — more intense, angled (soft cap: stop spawning, let existing fall)
     let spawnRate = floor(w.intensity * 12);
-    for (let i = 0; i < spawnRate; i++) {
+    if (raindrops.length < 300) for (let i = 0; i < spawnRate; i++) {
       raindrops.push({
         x: random(-50, width + 50), y: random(-30, -5),
         speed: random(7, 14) * w.intensity,
@@ -3667,8 +3705,6 @@ function drawWeatherEffects() {
     fill(180, 190, 200, floor(20 * w.intensity));
     rect(0, 0, width, height);
   }
-  // Cap raindrop array
-  if (raindrops.length > 300) raindrops.splice(0, 100);
 }
 
 // ─── DRIFT STORM RAIN ──────────────────────────────────────────────────
@@ -3686,8 +3722,8 @@ function _drawStormRain() {
   // Subtle wind wobble — horizontal offset that oscillates
   _stormWindOffset = sin(frameCount * 0.015) * 2.5 + cos(frameCount * 0.037) * 1.2;
 
-  // Spawn heavy raindrops — 2x normal rain rate
-  for (let i = 0; i < 18; i++) {
+  // Spawn heavy raindrops — 2x normal rain rate (soft cap: stop spawning, let existing fall)
+  if (raindrops.length < 500) for (let i = 0; i < 18; i++) {
     raindrops.push({
       x: random(-80, width + 80), y: random(-40, -5),
       speed: random(10, 18),
@@ -3732,8 +3768,6 @@ function _drawStormRain() {
   fill(35, 40, 55, 18);
   rect(0, 0, width, height);
 
-  // Cap raindrop array (higher cap for storms)
-  if (raindrops.length > 500) raindrops.splice(0, 150);
 }
 
 // ─── HEART MILESTONES ────────────────────────────────────────────────────
@@ -4324,6 +4358,9 @@ function drawTempleInterior(dt) {
   if (keyIsDown(RIGHT_ARROW) || keyIsDown(68)) tp += spd;
   if (keyIsDown(UP_ARROW) || keyIsDown(87)) tpy -= spd;
   if (keyIsDown(DOWN_ARROW) || keyIsDown(83)) tpy += spd;
+  if (typeof _touchJoystick !== 'undefined' && _touchJoystick.active) {
+    tp += _touchJoystick.dx * spd; tpy += _touchJoystick.dy * spd;
+  }
   tp = constrain(tp, 60, width - 60);
   tpy = constrain(tpy, height * 0.2, height * 0.92);
   state.templePlayerX = tp;
@@ -4487,7 +4524,8 @@ function drawTempleInterior(dt) {
   text('Temple of Sol Invictus', width / 2, 14);
   fill(160, 150, 120);
   textSize(8);
-  text('Island Level ' + (state.islandLevel || 1) + '  |  Day ' + state.day, width / 2, 28);
+  let _hudRank = ISLAND_RANKS[state.islandLevel];
+  text('Island Level ' + (state.islandLevel || 1) + (_hudRank ? ' — ' + _hudRank : '') + '  |  Day ' + state.day, width / 2, 28);
 
   // Crystal and solar counts
   fill(100, 220, 180);
@@ -7318,6 +7356,7 @@ function placeBuilding(wx, wy) {
   state.dailyActivities.built++;
   checkQuestProgress('build', 1);
   if (typeof advanceMainQuestCounter === 'function') advanceMainQuestCounter('mq_built', 1);
+  if (typeof grantXP === 'function') grantXP(bp.minLevel ? bp.minLevel * 5 : 10); // bigger buildings = more XP
   trackMilestone('first_build');
 }
 
@@ -7504,6 +7543,9 @@ function updateRowing(dt) {
   if (keyIsDown(68) || keyIsDown(RIGHT_ARROW)) dx += 1;
   if (keyIsDown(87) || keyIsDown(UP_ARROW))    dy -= 1;
   if (keyIsDown(83) || keyIsDown(DOWN_ARROW))  dy += 1;
+  if (dx === 0 && dy === 0 && typeof _touchJoystick !== 'undefined' && _touchJoystick.active) {
+    dx = _touchJoystick.dx; dy = _touchJoystick.dy;
+  }
 
   let rowSpeed = 3.5;
   if (dx !== 0 || dy !== 0) {
@@ -8622,8 +8664,9 @@ function updateQuarrier(dt) {
           state.stone += 2;
           checkQuestProgress('stone', 2);
           addFloatingText(w2sX(tx), w2sY(ty) - 15, '+2 Stone', '#aaaaaa');
-          // Iron ore chance at level 7+
-          if (state.islandLevel >= 7 && random() < 0.15) {
+          // Iron ore chance: level 5+ at 20%, level 7+ at 35%
+          let _ironChance = state.islandLevel >= 7 ? 0.35 : (state.islandLevel >= 5 ? 0.20 : 0);
+          if (_ironChance > 0 && random() < _ironChance) {
             state.ironOre = (state.ironOre || 0) + 1;
             addFloatingText(w2sX(tx), w2sY(ty) - 28, '+1 Iron Ore!', '#aabbcc');
           }
@@ -9526,6 +9569,89 @@ function spawnIslandLevelUp() {
   }
   // Prolonged screen shake — earthquake rumble
   triggerScreenShake(8, 25);
+}
+
+// ─── ISLAND LEVEL MILESTONE CELEBRATION ─────────────────────────────────
+const ISLAND_RANKS = { 5: 'Colonist', 10: 'Citizen', 15: 'Senator', 20: 'Consul', 25: 'Imperator' };
+
+function triggerIslandMilestone(lvl) {
+  let rank = ISLAND_RANKS[lvl] || null;
+  // Find buildings newly unlocked at this level
+  let unlocks = [];
+  for (let key in BLUEPRINTS) {
+    if (BLUEPRINTS[key].minLevel === lvl) unlocks.push(BLUEPRINTS[key].name);
+  }
+  state.islandMilestone = { level: lvl, rank: rank, unlocks: unlocks, timer: 300 };
+  if (snd) snd.playSFX('level_up');
+  // Golden particle burst from island center
+  for (let i = 0; i < 30; i++) {
+    let a = random(TWO_PI), spd = random(1.5, 5);
+    particles.push({
+      x: WORLD.islandCX + random(-10, 10), y: WORLD.islandCY + random(-10, 10),
+      vx: cos(a) * spd, vy: sin(a) * spd * 0.6 - random(1, 3),
+      life: random(50, 90), maxLife: 90,
+      type: 'harvest_burst', size: random(3, 7),
+      r: 255, g: 210 + floor(random(-20, 20)), b: 30,
+      gravity: 0.06, world: true,
+    });
+  }
+}
+
+function drawIslandMilestone() {
+  if (!state.islandMilestone || state.islandMilestone.timer <= 0) { state.islandMilestone = null; return; }
+  let m = state.islandMilestone;
+  m.timer--;
+  let fadeIn = min(1, (300 - m.timer) / 25);
+  let fadeOut = min(1, m.timer / 40);
+  let al = min(fadeIn, fadeOut);
+  push(); noStroke();
+  // Full-screen dim
+  fill(10, 5, 2, 140 * al);
+  rect(0, 0, width, height);
+  // Main title
+  let centerY = height * 0.38;
+  let pulse = sin(frameCount * 0.08) * 0.15 + 0.85;
+  fill(255, 210, 50, 255 * al * pulse);
+  textSize(28); textAlign(CENTER, CENTER);
+  text('ISLAND LEVEL ' + m.level + '!', width / 2, centerY);
+  // Rank subtitle
+  if (m.rank) {
+    fill(255, 240, 180, 230 * al);
+    textSize(14);
+    text('Rank: ' + m.rank, width / 2, centerY + 32);
+  }
+  // Unlocked buildings
+  if (m.unlocks.length > 0) {
+    let startY = centerY + (m.rank ? 60 : 48);
+    fill(200, 190, 150, 180 * al);
+    textSize(9);
+    text('NEW BUILDINGS UNLOCKED', width / 2, startY);
+    fill(255, 230, 140, 220 * al);
+    textSize(11);
+    for (let i = 0; i < m.unlocks.length; i++) {
+      text(m.unlocks[i], width / 2, startY + 16 + i * 16);
+    }
+  }
+  // Decorative lines
+  let shimmer = sin(frameCount * 0.06) * 0.3 + 0.7;
+  stroke(255, 210, 60, 70 * al * shimmer); strokeWeight(1);
+  line(width * 0.2, centerY - 20, width * 0.8, centerY - 20);
+  line(width * 0.2, centerY + (m.rank ? 46 : 20), width * 0.8, centerY + (m.rank ? 46 : 20));
+  // Dismiss hint
+  if (m.timer < 260) {
+    fill(160, 140, 100, 100 * al);
+    textSize(7); noStroke();
+    text('click or press any key to dismiss', width / 2, height * 0.72);
+  }
+  pop();
+}
+
+function dismissIslandMilestone() {
+  if (state.islandMilestone && state.islandMilestone.timer > 40) {
+    state.islandMilestone.timer = 40; // start fade-out
+    return true;
+  }
+  return false;
 }
 
 // ─── JUICE: BUILDING COMPLETE — dust cloud + sparkles settling ──────────
@@ -10649,6 +10775,7 @@ function drawShip() {
 
 // ─── SCREEN SHAKE ─────────────────────────────────────────────────────────
 function triggerScreenShake(intensity, duration) {
+  if (!gameSettings.screenShake) return;
   shakeTimer = duration;
   shakeX = random(-intensity, intensity);
   shakeY = random(-intensity, intensity);
@@ -13029,7 +13156,7 @@ function canColonize() {
 }
 
 function getColonizeCost() {
-  return { gold: 200, wood: 80, stone: 50, ironOre: 20, ancientRelic: 5 };
+  return { gold: 150, wood: 60, stone: 40, ironOre: 10, ancientRelic: 3 };
 }
 
 function colonizeTerraNovaAction() {
@@ -13051,7 +13178,7 @@ function colonizeTerraNovaAction() {
   c.colonyLevel = 1;
   c.phase = 'colonized';
   c.colonyWorkers = 3;
-  c.colonyIncome = 5; // gold per game-day
+  c.colonyIncome = 15; // gold per game-day
 
   // Initialize colony farms — 3x2 grid near center
   c.colonyPlots = [];
@@ -14996,6 +15123,9 @@ function mousePressed() {
   if (gameScreen !== 'game') { handleMenuClick(); return; }
   if (state.introPhase !== 'done') { skipIntro(); return; }
   if (state.cutscene) { skipCutscene(); return; }
+  if (dismissIslandMilestone()) return;
+  // Hotbar tap detection (mobile + desktop click)
+  if (typeof _handleHotbarTap === 'function' && _handleHotbarTap(mouseX, mouseY)) return;
   // Wardrobe click handling
   if (wardrobeOpen) {
     let pw = 220, ph = 280;
@@ -15242,6 +15372,7 @@ function mousePressed() {
         state.codex.crops[_ck].harvested = true;
         checkQuestProgress('harvest', harvestAmt);
         if (typeof advanceMainQuestCounter === 'function') advanceMainQuestCounter('mq_harvested', harvestAmt);
+        if (typeof grantXP === 'function') grantXP(5 * harvestAmt);
         trackMilestone('first_harvest');
         // Auto-seeds: each harvest gives 1-2 seeds back
         let seedBack = 1 + (random() < 0.5 ? 1 : 0);
@@ -15389,7 +15520,7 @@ function mousePressed() {
 function mouseDragged() {
   // Drag volume sliders in settings
   if (gameScreen === 'settings' && snd) {
-    let py = floor(height * 0.26);
+    let py = floor(height * 0.18);
     let sliderY = py + 80;
     let sliderW = 120;
     let slX = floor(width / 2 + 10);
@@ -15407,10 +15538,14 @@ function mouseDragged() {
 function touchStarted() {
   if (snd) snd.resume();
   // Delegate to mousePressed for touch handling
+  // Return false to prevent default browser behavior (zoom, scroll)
+  return false;
 }
 
 function keyPressed() {
   if (snd) snd.resume();
+  // Island milestone overlay — dismiss on any key
+  if (dismissIslandMilestone()) return;
   // Island naming overlay intercepts all keys when open
   if (typeof handleIslandNamingKey === 'function' && handleIslandNamingKey(key, keyCode)) return;
   // Debug console intercepts all keys when open
@@ -15466,6 +15601,7 @@ function keyPressed() {
 
   // ESC — close overlays first, then menu as last resort
   if (keyCode === 27) {
+    if (state.buildMode) { state.buildMode = false; return; }
     if (state.insideTemple) { state.insideTemple = false; return; }
     if (wardrobeOpen) { wardrobeOpen = false; return; }
     if (dialogState.active) { dialogState.active = false; return; }
@@ -16714,8 +16850,9 @@ function handleIslandNamingKey(k, kc) {
 }
 
 function saveGame() {
+  gameSettings.lastSaveTime = Date.now(); _saveSettings();
   let saveData = {
-    version: 7,
+    version: SAVE_VERSION,
     day: state.day, time: state.time,
     seeds: state.seeds, harvest: state.harvest, wood: state.wood,
     stone: state.stone, crystals: state.crystals, gold: state.gold, fish: state.fish,
@@ -16876,6 +17013,142 @@ function saveGame() {
   }
 }
 
+// ─── SAVE FORMAT VERSION ─────────────────────────────────────────────────
+// Current version: 7
+// Migration history:
+//   v1 — Base save: day, time, resources, plots, buildings, trees
+//   v2 — Added NPC hearts, companion/woodcutter positions, crystals, solar
+//   v3 — Added island expansion (islandLevel, islandRX/RY), pyramid, player XP/skills
+//   v4 — Added expedition system (ironOre, rareHide, etc.), conquest persistence
+//   v5 — Added colony system, imperial bridge, bounty board, cook/fisherman NPCs
+//   v6 — Added island exploration phases, loot states, legia military, random events
+//   v7 — Added narrative engine (mainQuest, npcFavor, npcQuests, loreTablets,
+//         narrativeFlags), diving, wreck beach, wardrobe, progression, islandName,
+//         codex.lore, codex.relics, won flag
+// ─────────────────────────────────────────────────────────────────────────
+
+const SAVE_VERSION = 7;
+
+function migrateSave(d) {
+  let v = d.version || 1;
+
+  // v1 -> v2: NPC hearts, companion positions, crystal system, solar energy
+  if (v < 2) {
+    d.marcusHearts = d.marcusHearts || 0;
+    d.vestaHearts = d.vestaHearts || 0;
+    d.felixHearts = d.felixHearts || 0;
+    d.npcHearts = d.npcHearts || 0;
+    d.crystals = d.crystals || 0;
+    d.solar = d.solar || 80;
+    d.maxSolar = d.maxSolar || 100;
+    d.heartRewards = d.heartRewards || [];
+    v = 2;
+  }
+
+  // v2 -> v3: Island expansion, pyramid, player XP/skills, harvest combo
+  if (v < 3) {
+    d.islandLevel = d.islandLevel || 1;
+    d.islandRX = d.islandRX || WORLD.islandRX;
+    d.islandRY = d.islandRY || WORLD.islandRY;
+    d.pyramidLevel = d.pyramidLevel || 0;
+    d.playerXp = d.playerXp || 0;
+    d.playerTotalXp = d.playerTotalXp || 0;
+    d.playerLevel = d.playerLevel || 1;
+    d.playerSkillPoints = d.playerSkillPoints || 0;
+    d.playerSkills = d.playerSkills || {};
+    d.playerMaxHp = d.playerMaxHp || 100;
+    d.harvestComboBestEver = d.harvestComboBestEver || 0;
+    v = 3;
+  }
+
+  // v3 -> v4: Expedition system, conquest persistence
+  if (v < 4) {
+    d.ironOre = d.ironOre || 0;
+    d.rareHide = d.rareHide || 0;
+    d.ancientRelic = d.ancientRelic || 0;
+    d.titanBone = d.titanBone || 0;
+    d.obsidian = d.obsidian || 0;
+    d.frostCrystal = d.frostCrystal || 0;
+    d.exoticSpices = d.exoticSpices || 0;
+    d.soulEssence = d.soulEssence || 0;
+    d.expeditionUpgrades = d.expeditionUpgrades || {};
+    d.expeditionLog = d.expeditionLog || [];
+    d.conquestPhase = d.conquestPhase || 'locked';
+    d.conquestWoodPile = d.conquestWoodPile || 0;
+    d.conquestExpeditionNum = d.conquestExpeditionNum || 0;
+    d.conquestBuildings = d.conquestBuildings || [];
+    d.conquestBlueprintQueue = d.conquestBlueprintQueue || [];
+    d.conquestSoldiers = d.conquestSoldiers || [];
+    d.conquestWorkers = d.conquestWorkers || [];
+    d.conquestTrees = d.conquestTrees || [];
+    v = 4;
+  }
+
+  // v4 -> v5: Colony system, imperial bridge, bounty board, cook/fisherman
+  if (v < 5) {
+    d.conquestColonized = d.conquestColonized || false;
+    d.conquestColonyLevel = d.conquestColonyLevel || 1;
+    d.conquestColonyWorkers = d.conquestColonyWorkers || 3;
+    d.conquestColonyIncome = d.conquestColonyIncome || 5;
+    d.conquestColonyPlots = d.conquestColonyPlots || [];
+    d.conquestColonyBuildings = d.conquestColonyBuildings || [];
+    d.conquestColonyGrassTufts = d.conquestColonyGrassTufts || [];
+    d.imperialBridge = d.imperialBridge || null;
+    d.bountyBoard = d.bountyBoard || null;
+    d.cook = d.cook || null;
+    d.fisherman = d.fisherman || null;
+    d.colonySpec = d.colonySpec || {};
+    v = 5;
+  }
+
+  // v5 -> v6: Island exploration phases, loot states, legia, random events
+  if (v < 6) {
+    d.vulcanPhase = d.vulcanPhase || 'unexplored';
+    d.hyperboreaPhase = d.hyperboreaPhase || 'unexplored';
+    d.plentyPhase = d.plentyPhase || 'unexplored';
+    d.necropolisPhase = d.necropolisPhase || 'unexplored';
+    d.vulcanLoot = d.vulcanLoot || null;
+    d.hyperboreaLoot = d.hyperboreaLoot || null;
+    d.plentyLoot = d.plentyLoot || null;
+    d.necropolisLoot = d.necropolisLoot || null;
+    d.legia = d.legia || null;
+    d.arenaHighWave = d.arenaHighWave || 0;
+    d.activeEvent = d.activeEvent || null;
+    d.eventCooldown = d.eventCooldown || {};
+    d.eventHistory = d.eventHistory || [];
+    v = 6;
+  }
+
+  // v6 -> v7: Narrative engine, diving, wreck, wardrobe, progression, islandName
+  if (v < 7) {
+    d.mainQuest = d.mainQuest || null;
+    d.npcFavor = d.npcFavor || { livia: 0, marcus: 0, vesta: 0, felix: 0 };
+    d.lastWantDate = d.lastWantDate || '';
+    d.todayWantsSatisfied = d.todayWantsSatisfied || [];
+    d.zonesVisitedToday = d.zonesVisitedToday || [];
+    d.npcQuests = d.npcQuests || null;
+    d.loreTablets = d.loreTablets || null;
+    d.narrativeFlags = d.narrativeFlags || null;
+    d.diving = d.diving || null;
+    d.wreck = d.wreck || null;
+    d.wardrobe = d.wardrobe || { tunicColor: 0, headwear: 0 };
+    d.won = d.won || false;
+    d.progression = d.progression || null;
+    d.islandName = d.islandName || null;
+    d.playerXpBoost = d.playerXpBoost || 0;
+    d.playerXpBoostTimer = d.playerXpBoostTimer || 0;
+    if (d.codex) {
+      d.codex.lore = d.codex.lore || {};
+      d.codex.relics = d.codex.relics || {};
+    }
+    v = 7;
+  }
+
+  d.version = v;
+  return d;
+}
+
+
 function loadGame() {
   let raw = localStorage.getItem('sunlitIsles_save');
   if (!raw) {
@@ -16883,7 +17156,7 @@ function loadGame() {
     return;
   }
   try {
-    let d = JSON.parse(raw);
+    let d = migrateSave(JSON.parse(raw));
     state.day = d.day || 1; state.time = d.time || 360;
     state.seeds = d.seeds || 0; state.harvest = d.harvest || 0; state.wood = d.wood || 0;
     state.stone = d.stone || 0; state.crystals = d.crystals || 0; state.gold = d.gold || 0;
@@ -17684,13 +17957,16 @@ function updateBlessing(dt) {
 
 // ─── NPC QUESTS ────────────────────────────────────────────────────
 function generateQuest() {
+  // Scale quest rewards with island level — earlier levels get base, later levels get more
+  let lvl = state.islandLevel || 1;
+  let goldMult = 1 + floor(lvl / 5) * 0.5; // +50% gold every 5 levels
   let quests = [
-    { type: 'harvest', desc: 'Harvest 5 crops', target: 5, reward: { gold: 10, seeds: 5 } },
-    { type: 'fish', desc: 'Catch 3 fish', target: 3, reward: { gold: 8, crystals: 2 } },
-    { type: 'chop', desc: 'Chop 4 trees', target: 4, reward: { gold: 6, stone: 5 } },
-    { type: 'stone', desc: 'Gather 8 stone', target: 8, reward: { gold: 12, seeds: 3 } },
-    { type: 'build', desc: 'Place 3 buildings', target: 3, reward: { gold: 15, crystals: 3 } },
-    { type: 'crystal', desc: 'Collect 4 crystals', target: 4, reward: { gold: 20 } },
+    { type: 'harvest', desc: 'Harvest 5 crops', target: 5, reward: { gold: floor(15 * goldMult), seeds: 5 } },
+    { type: 'fish', desc: 'Catch 3 fish', target: 3, reward: { gold: floor(12 * goldMult), crystals: 2 } },
+    { type: 'chop', desc: 'Chop 4 trees', target: 4, reward: { gold: floor(10 * goldMult), stone: 5 } },
+    { type: 'stone', desc: 'Gather 8 stone', target: 8, reward: { gold: floor(18 * goldMult), seeds: 3 } },
+    { type: 'build', desc: 'Place 3 buildings', target: 3, reward: { gold: floor(22 * goldMult), crystals: 3 } },
+    { type: 'crystal', desc: 'Collect 4 crystals', target: 4, reward: { gold: floor(28 * goldMult) } },
   ];
   let q = quests[floor(random(quests.length))];
   return { type: q.type, desc: q.desc, target: q.target, progress: 0, reward: q.reward };
@@ -18213,7 +18489,7 @@ function expandIsland() {
   if (cost.ancientRelic) state.ancientRelic -= cost.ancientRelic;
   if (cost.titanBone) state.titanBone -= cost.titanBone;
   state.islandLevel++;
-  showAchievement('Island Level ' + state.islandLevel + ' Reached!');
+  triggerIslandMilestone(state.islandLevel);
   addNotification('Island expanded to Level ' + state.islandLevel, '#ffdd66');
   // Island grows less per level at higher tiers
   let rxGrowth = state.islandLevel <= 5 ? 35 : state.islandLevel <= 10 ? 28 : state.islandLevel <= 15 ? 22 : state.islandLevel <= 20 ? 16 : 12;

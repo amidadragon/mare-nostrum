@@ -48,6 +48,11 @@ function updatePlayer(dt) {
   if (keyIsDown(68) || keyIsDown(RIGHT_ARROW)) dx += 1;
   if (keyIsDown(87) || keyIsDown(UP_ARROW))    dy -= 1;
   if (keyIsDown(83) || keyIsDown(DOWN_ARROW))  dy += 1;
+  // Virtual joystick input (mobile)
+  if (dx === 0 && dy === 0 && typeof _touchJoystick !== 'undefined' && _touchJoystick.active) {
+    dx = _touchJoystick.dx;
+    dy = _touchJoystick.dy;
+  }
 
   if (dx !== 0 || dy !== 0) {
     if (state.fishing.active) { state.fishing.active = false; state.fishing.bite = false; state.fishing.phase = null; }
@@ -1047,6 +1052,9 @@ function updatePlayerCombat(dt) {
   if (keyIsDown(68) || keyIsDown(RIGHT_ARROW)) dx += 1;
   if (keyIsDown(87) || keyIsDown(UP_ARROW))    dy -= 1;
   if (keyIsDown(83) || keyIsDown(DOWN_ARROW))  dy += 1;
+  if (dx === 0 && dy === 0 && typeof _touchJoystick !== 'undefined' && _touchJoystick.active) {
+    dx = _touchJoystick.dx; dy = _touchJoystick.dy;
+  }
 
   if (dx !== 0 || dy !== 0) {
     let len = sqrt(dx * dx + dy * dy);

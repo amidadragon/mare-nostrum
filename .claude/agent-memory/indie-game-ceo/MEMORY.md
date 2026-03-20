@@ -15,3 +15,4 @@
 - [design_atlantis_vision.md](design_atlantis_vision.md) — Three-era island evolution (Village/City/Megalopolis), Atlantis ring system, emotional arc, implementation notes
 - [design_temple_vision.md](design_temple_vision.md) — Five-tier temple progression system: exterior evolution, interior rooms, crystal beacon, dominance system, implementation order
 - [project_island_map.md](project_island_map.md) — Master building placement map (ISLAND_MAP.md): all zones, level schedule, roads, coordinate constants
+- [design_city_alive.md](design_city_alive.md) — Landmark size upgrades (castrum/library/arena/bath/watchtower), rendering overhauls, 6 new life signal functions
