@@ -589,6 +589,94 @@ function drawNPC() {
 }
 
 // ─── CITIZEN SYSTEM ───────────────────────────────────────────────────────
+
+// Urban waypoints — road intersections and gathering spots (world coords)
+function getCitizenWaypoints() {
+  let cx = WORLD.islandCX, cy = WORLD.islandCY;
+  let rx = getSurfaceRX(), ry = getSurfaceRY();
+  let avenueY = cy - 8;          // Decumanus Y
+  let cardoX = cx + rx * 0.05;   // Cardo X
+  return [
+    // Decumanus (E-W road) points
+    { x: cx - rx * 0.60, y: avenueY, tag: 'road' },     // west decumanus
+    { x: cx - rx * 0.35, y: avenueY, tag: 'road' },     // mid-west
+    { x: cx,             y: avenueY, tag: 'road' },      // center decumanus
+    { x: cardoX,         y: avenueY, tag: 'forum' },     // forum intersection
+    { x: cx + rx * 0.30, y: avenueY, tag: 'market' },    // east market area
+    { x: cx + rx * 0.55, y: avenueY, tag: 'market' },    // far east market
+    // Cardo (N-S road) points
+    { x: cardoX, y: cy - ry * 0.45, tag: 'road' },      // north cardo
+    { x: cardoX, y: cy - ry * 0.15, tag: 'road' },      // upper cardo
+    { x: cardoX, y: cy + ry * 0.25, tag: 'road' },      // lower cardo
+    { x: cardoX, y: cy + ry * 0.45, tag: 'road' },      // south cardo
+    // Via Sacra (NE diagonal) midpoint
+    { x: (cardoX + cx + rx * 0.5) * 0.5, y: (avenueY + cy - ry * 0.35) * 0.5, tag: 'road' },
+    // Via Militaris (SE diagonal) midpoint
+    { x: (cardoX + cx + rx * 0.45) * 0.5, y: (avenueY + cy + ry * 0.5) * 0.5, tag: 'road' },
+    // Port area
+    { x: cx + rx * 0.70, y: avenueY + 10, tag: 'port' },
+    // Residential cluster (north of decumanus)
+    { x: cx - rx * 0.15, y: cy - ry * 0.30, tag: 'home' },
+    { x: cx + rx * 0.15, y: cy - ry * 0.25, tag: 'home' },
+  ];
+}
+
+// Road Y values for snap-to-road behavior
+function getNearestRoadY(x, y) {
+  let cx = WORLD.islandCX, cy = WORLD.islandCY;
+  let rx = getSurfaceRX(), ry = getSurfaceRY();
+  let avenueY = cy - 8;
+  let cardoX = cx + rx * 0.05;
+  // Decumanus — always available
+  let bestY = avenueY;
+  let bestDist = abs(y - avenueY);
+  // Cardo — only snap if near the cardo X
+  if (abs(x - cardoX) < 30) return y; // on cardo, don't force Y
+  // Via Sacra line: from (cardoX, avenueY) to (cx+rx*0.5, cy-ry*0.35)
+  let vsEndX = cx + rx * 0.5, vsEndY = cy - ry * 0.35;
+  if (x > cardoX && x < vsEndX) {
+    let t = (x - cardoX) / (vsEndX - cardoX);
+    let roadY = lerp(avenueY, vsEndY, t);
+    if (abs(y - roadY) < bestDist) { bestY = roadY; bestDist = abs(y - roadY); }
+  }
+  // Via Militaris line: from (cardoX, avenueY) to (cx+rx*0.45, cy+ry*0.5)
+  let vmEndX = cx + rx * 0.45, vmEndY = cy + ry * 0.5;
+  if (x > cardoX && x < vmEndX) {
+    let t = (x - cardoX) / (vmEndX - cardoX);
+    let roadY = lerp(avenueY, vmEndY, t);
+    if (abs(y - roadY) < bestDist) { bestY = roadY; bestDist = abs(y - roadY); }
+  }
+  return bestDist < 30 ? bestY : y;
+}
+
+function pickCitizenTarget(c) {
+  let waypoints = getCitizenWaypoints();
+  let hour = (state.time || 0) / 60;
+  // Filter by time of day
+  let preferred;
+  if (hour >= 6 && hour < 10) {
+    // Morning — market area
+    preferred = waypoints.filter(w => w.tag === 'market' || w.tag === 'road');
+  } else if (hour >= 10 && hour < 16) {
+    // Midday — forum / center
+    preferred = waypoints.filter(w => w.tag === 'forum' || w.tag === 'road' || w.tag === 'market');
+  } else if (hour >= 16 && hour < 20) {
+    // Afternoon — port, roads
+    preferred = waypoints.filter(w => w.tag === 'port' || w.tag === 'road' || w.tag === 'forum');
+  } else {
+    // Night — head home
+    preferred = waypoints.filter(w => w.tag === 'home' || w.tag === 'road');
+  }
+  if (preferred.length === 0) preferred = waypoints;
+  let wp = preferred[floor(random(preferred.length))];
+  // Add small random offset so citizens don't stack exactly
+  let tx = wp.x + random(-15, 15);
+  let ty = wp.y + random(-10, 10);
+  // Snap Y to nearest road if close
+  ty = getNearestRoadY(tx, ty);
+  return { x: tx, y: ty };
+}
+
 function updateCitizens(dt) {
   if (!state.citizens) return;
   let srx = getSurfaceRX(), sry = getSurfaceRY();
@@ -598,19 +686,18 @@ function updateCitizens(dt) {
     c.timer -= dt;
     if (c.state === 'idle') {
       if (c.timer <= 0) {
-        let a = random(TWO_PI);
-        let r = random(0.15, 0.65);
-        c.targetX = cx + cos(a) * srx * r;
-        c.targetY = cy + sin(a) * sry * r;
+        let target = pickCitizenTarget(c);
+        c.targetX = target.x;
+        c.targetY = target.y;
         c.state = 'walking';
-        c.timer = floor(random(120, 400));
+        c.timer = floor(random(180, 500));
       }
     } else if (c.state === 'walking') {
       let dx = c.targetX - c.x, dy = c.targetY - c.y;
       let d = sqrt(dx * dx + dy * dy);
       if (d < 5 || c.timer <= 0) {
         c.state = 'idle';
-        c.timer = floor(random(60, 300));
+        c.timer = floor(random(60, 180));  // pause at destination
         c.vx = 0; c.vy = 0;
       } else {
         c.vx = (dx / d) * c.speed;
@@ -638,31 +725,26 @@ function initCitizens() {
 }
 
 function spawnCitizen() {
-  let cx = WORLD.islandCX, cy = WORLD.islandCY;
-  let srx = getSurfaceRX(), sry = getSurfaceRY();
-  for (let att = 0; att < 20; att++) {
-    let a = random(TWO_PI);
-    let r = random(0.2, 0.7);
-    let x = cx + cos(a) * srx * r;
-    let y = cy + sin(a) * sry * r;
-    if (!isOnIsland(x, y)) continue;
-    let variants = ['farmer', 'merchant', 'soldier', 'priest'];
-    let weights = state.islandLevel <= 8 ? [4,2,1,1] : state.islandLevel <= 17 ? [2,3,2,1] : [1,2,3,2];
-    let totalW = weights.reduce((a,b) => a+b, 0);
-    let roll = floor(random(totalW));
-    let vi = 0, acc = 0;
-    for (let i = 0; i < weights.length; i++) { acc += weights[i]; if (roll < acc) { vi = i; break; } }
-    state.citizens.push({
-      x: x, y: y, vx: 0, vy: 0,
-      variant: variants[vi],
-      facing: random() > 0.5 ? 1 : -1,
-      state: 'idle',
-      timer: floor(random(60, 300)),
-      speed: 0.4 + random(0.3),
-      targetX: x, targetY: y,
-    });
-    return;
-  }
+  let waypoints = getCitizenWaypoints();
+  let wp = waypoints[floor(random(waypoints.length))];
+  let x = wp.x + random(-12, 12);
+  let y = wp.y + random(-8, 8);
+  if (!isOnIsland(x, y)) { x = wp.x; y = wp.y; }
+  let variants = ['farmer', 'merchant', 'soldier', 'priest'];
+  let weights = state.islandLevel <= 8 ? [4,2,1,1] : state.islandLevel <= 17 ? [2,3,2,1] : [1,2,3,2];
+  let totalW = weights.reduce((a,b) => a+b, 0);
+  let roll = floor(random(totalW));
+  let vi = 0, acc = 0;
+  for (let i = 0; i < weights.length; i++) { acc += weights[i]; if (roll < acc) { vi = i; break; } }
+  state.citizens.push({
+    x: x, y: y, vx: 0, vy: 0,
+    variant: variants[vi],
+    facing: random() > 0.5 ? 1 : -1,
+    state: 'idle',
+    timer: floor(random(60, 300)),
+    speed: 0.4 + random(0.3),
+    targetX: x, targetY: y,
+  });
 }
 
 function drawOneCitizen(c) {

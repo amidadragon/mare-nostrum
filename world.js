@@ -1083,6 +1083,9 @@ function drawIsland() {
   // Farm zone background — tilled soil area (on top of road)
   drawFarmZoneBG();
 
+  // City wall / pomerium (Era 2+, drawn after roads but before buildings)
+  drawCityWall(ix, iy, iw, ih);
+
   // Harbor port (player ship — left side)
   drawPort();
   // Merchant port (Mercator — right side)
@@ -1761,59 +1764,338 @@ function drawShoreline(ix, iy, iw, ih) {
 }
 
 // ─── DISTRICT GROUND FILLS — paved stone under city districts ──────────────
+
+// Draw a single rectangular insula with flagstone texture
+function _drawInsula(x, y, w, h, baseR, baseG, baseB, alpha) {
+  noStroke();
+  // Solid base fill
+  fill(baseR, baseG, baseB, alpha);
+  rect(x, y, w, h);
+
+  // Flagstone grid — 10px intervals, 2-3 alternating stone tones
+  let toneOffsets = [0, 6, -4]; // lighter, darker variations
+  let idx = 0;
+  for (let gy = y; gy < y + h; gy += 10) {
+    for (let gx = x; gx < x + w; gx += 10) {
+      let ti = toneOffsets[idx % 3];
+      idx++;
+      let bw = min(10, x + w - gx);
+      let bh = min(10, y + h - gy);
+      // Stone block fill with slight variation
+      fill(baseR + ti, baseG + ti - 1, baseB + ti - 2, alpha);
+      rect(gx + 1, gy + 1, bw - 1, bh - 1);
+    }
+    // Shift pattern each row for less uniform look
+    idx += 1;
+  }
+
+  // Mortar lines (horizontal)
+  stroke(baseR - 20, baseG - 22, baseB - 25, alpha * 0.3);
+  strokeWeight(1);
+  for (let gy = y; gy <= y + h; gy += 10) {
+    line(x, gy, x + w, gy);
+  }
+  // Mortar lines (vertical)
+  for (let gx = x; gx <= x + w; gx += 10) {
+    line(gx, y, gx, y + h);
+  }
+  noStroke();
+}
+
+// Draw a side street (narrow gap between insulae)
+function _drawSideStreet(x, y, w, h, ep) {
+  noStroke();
+  fill(ep.roadLine[0], ep.roadLine[1], ep.roadLine[2], 140);
+  rect(x, y, w, h);
+}
+
+// ─── CITY WALL / POMERIUM ─────────────────────────────────────────────────
+function drawCityWall(ix, iy, iw, ih) {
+  let lvl = state.islandLevel || 1;
+  if (lvl < 9) return; // Era 2+ only
+
+  let ep = getEraPalette();
+  let bright = getSkyBrightness();
+  let isNight = bright < 0.3;
+
+  // Wall boundary in world coords, converted to screen
+  let wx1 = w2sX(390), wy1 = w2sY(270);
+  let wx2 = w2sX(910), wy2 = w2sY(530);
+  let ww = wx2 - wx1, wh = wy2 - wy1;
+
+  // Wall thickness and height by era
+  let wallH = lvl >= 18 ? 8 : 5;
+  let wallThick = 4;
+
+  // Stone colors — darker than building stone
+  let sr = 90, sg = 82, sb = 72;
+  if (lvl >= 18) { sr = 105; sg = 98; sb = 88; } // Era 3: lighter, grander stone
+
+  // Gate openings: Decumanus (E-W) passes through left and right walls
+  // Cardo (N-S) passes through top and bottom walls
+  let decY = w2sY(392); // Decumanus centerline (WORLD.islandCY - 8)
+  let cardoX = w2sX(612); // Cardo centerline
+  let gateW = 28; // gate opening width
+  let gateH = 28;
+
+  noStroke();
+
+  // --- Wall shadow (subtle drop shadow) ---
+  fill(0, 0, 0, 20);
+  // Top wall shadow
+  rect(wx1, wy1 + wallH, ww, 3);
+  // Bottom wall shadow
+  rect(wx1, wy2 + wallH, ww, 3);
+  // Left wall shadow
+  rect(wx1 + wallThick, wy1, 3, wh);
+  // Right wall shadow
+  rect(wx2 + wallThick, wy1, 3, wh);
+
+  // --- Draw 4 wall segments with gate openings (Era 3) ---
+  fill(sr, sg, sb);
+
+  if (lvl >= 18) {
+    // TOP WALL — gate opening for Cardo
+    rect(wx1, wy1 - wallH, cardoX - wx1 - gateW / 2, wallH);
+    rect(cardoX + gateW / 2, wy1 - wallH, wx2 - (cardoX + gateW / 2), wallH);
+    // BOTTOM WALL — gate opening for Cardo
+    rect(wx1, wy2, cardoX - wx1 - gateW / 2, wallH);
+    rect(cardoX + gateW / 2, wy2, wx2 - (cardoX + gateW / 2), wallH);
+    // LEFT WALL — gate opening for Decumanus
+    rect(wx1 - wallThick, wy1 - wallH, wallThick, (decY - wy1 + wallH) - gateH / 2);
+    rect(wx1 - wallThick, decY + gateH / 2, wallThick, wy2 + wallH - (decY + gateH / 2));
+    // RIGHT WALL — gate opening for Decumanus
+    rect(wx2, wy1 - wallH, wallThick, (decY - wy1 + wallH) - gateH / 2);
+    rect(wx2, decY + gateH / 2, wallThick, wy2 + wallH - (decY + gateH / 2));
+
+    // --- Crenellations (top wall only, every 16px) ---
+    let crenH = 3;
+    let crenW = 6;
+    fill(sr + 10, sg + 10, sb + 8);
+    for (let cx = wx1; cx < wx2; cx += 16) {
+      // Skip crenellations over gate openings
+      if (abs(cx - cardoX) < gateW / 2 + 4) continue;
+      // Top wall crenellations
+      rect(cx, wy1 - wallH - crenH, crenW, crenH);
+      // Bottom wall crenellations
+      rect(cx, wy2 + wallH, crenW, crenH);
+    }
+    for (let cy = wy1; cy < wy2; cy += 16) {
+      if (abs(cy - decY) < gateH / 2 + 4) continue;
+      // Left wall crenellations
+      rect(wx1 - wallThick - crenH, cy, crenH, crenW);
+      // Right wall crenellations
+      rect(wx2 + wallThick, cy, crenH, crenW);
+    }
+
+    // --- Gate torch glow at night ---
+    if (isNight) {
+      let nightGlow = map(bright, 0, 0.3, 1, 0);
+      let ga = 45 * nightGlow;
+      // North gate (Cardo top)
+      fill(255, 180, 80, ga);
+      ellipse(cardoX, wy1 - wallH / 2, 20, 14);
+      fill(255, 220, 120, ga * 0.5);
+      ellipse(cardoX, wy1 - wallH / 2, 32, 22);
+      // South gate (Cardo bottom)
+      fill(255, 180, 80, ga);
+      ellipse(cardoX, wy2 + wallH / 2, 20, 14);
+      fill(255, 220, 120, ga * 0.5);
+      ellipse(cardoX, wy2 + wallH / 2, 32, 22);
+      // West gate (Decumanus left)
+      fill(255, 180, 80, ga);
+      ellipse(wx1 - wallThick / 2, decY, 14, 20);
+      fill(255, 220, 120, ga * 0.5);
+      ellipse(wx1 - wallThick / 2, decY, 22, 32);
+      // East gate (Decumanus right)
+      fill(255, 180, 80, ga);
+      ellipse(wx2 + wallThick / 2, decY, 14, 20);
+      fill(255, 220, 120, ga * 0.5);
+      ellipse(wx2 + wallThick / 2, decY, 22, 32);
+    }
+  } else {
+    // Era 2 (level 9-17): simple low wall, no gates or crenellations
+    // TOP WALL
+    rect(wx1, wy1 - wallH, ww, wallH);
+    // BOTTOM WALL
+    rect(wx1, wy2, ww, wallH);
+    // LEFT WALL
+    rect(wx1 - wallThick, wy1 - wallH, wallThick, wh + wallH * 2);
+    // RIGHT WALL
+    rect(wx2, wy1 - wallH, wallThick, wh + wallH * 2);
+  }
+
+  // --- Wall top highlight (lighter stone edge) ---
+  fill(sr + 20, sg + 18, sb + 15, 100);
+  if (lvl >= 18) {
+    // Top wall highlight (with gate gap)
+    rect(wx1, wy1 - wallH, cardoX - wx1 - gateW / 2, 1);
+    rect(cardoX + gateW / 2, wy1 - wallH, wx2 - (cardoX + gateW / 2), 1);
+  } else {
+    rect(wx1, wy1 - wallH, ww, 1);
+  }
+
+  // --- Corner watchtowers (4 decorative 8x12 towers) ---
+  let twW = 8, twH = 12;
+  let twColor = lvl >= 18 ? [sr + 8, sg + 6, sb + 5] : [sr - 5, sg - 5, sb - 5];
+  fill(twColor[0], twColor[1], twColor[2]);
+  // NW tower
+  rect(wx1 - wallThick - twW / 2 + 2, wy1 - wallH - twH, twW, twH);
+  // NE tower
+  rect(wx2 + wallThick - twW / 2 - 2, wy1 - wallH - twH, twW, twH);
+  // SW tower
+  rect(wx1 - wallThick - twW / 2 + 2, wy2 + wallH, twW, twH);
+  // SE tower
+  rect(wx2 + wallThick - twW / 2 - 2, wy2 + wallH, twW, twH);
+  // Tower top caps (lighter)
+  fill(twColor[0] + 15, twColor[1] + 12, twColor[2] + 10, 140);
+  rect(wx1 - wallThick - twW / 2 + 2, wy1 - wallH - twH, twW, 2);
+  rect(wx2 + wallThick - twW / 2 - 2, wy1 - wallH - twH, twW, 2);
+  rect(wx1 - wallThick - twW / 2 + 2, wy2 + wallH, twW, 2);
+  rect(wx2 + wallThick - twW / 2 - 2, wy2 + wallH, twW, 2);
+}
+
 function drawDistrictGrounds(ix, iy) {
-  if (state.islandLevel < 5) return; // village has no paving
+  if (state.islandLevel < 5) return;
   let ep = getEraPalette();
   let bright = getSkyBrightness();
   let dayMix = max(0.15, bright);
 
-  // Scale: use screen-space island dimensions
   let iw = state.islandRX * 2;
   let ih = state.islandRY * 2;
   noStroke();
 
-  // Era 1 (Lv 5-8): Just a small dirt plaza around the center
+  // Era 1 (Lv 5-8): Small packed-earth plaza — rectangular, not elliptical
   if (ep.era === 1) {
-    // Packed earth around the town center — subtle
-    fill(lerp(160, 175, dayMix), lerp(140, 155, dayMix), lerp(110, 125, dayMix), 100);
-    ellipse(ix + iw * 0.02, iy - 18, iw * 0.20, ih * 0.14);
+    let pr = lerp(160, 175, dayMix), pg = lerp(140, 155, dayMix), pb = lerp(110, 125, dayMix);
+    let pw = iw * 0.18, ph = ih * 0.10;
+    _drawInsula(ix + iw * 0.02 - pw / 2, iy - 20 - ph / 2, pw, ph, pr, pg, pb, 100);
     return;
   }
 
-  // Era 2+ (Lv 9+): Full district paving
+  // Era 2+ (Lv 9+): Rectangular insulae blocks with side streets
 
-  // CIVIC CORE — largest zone, cream-stone, covers forum + temple approach + center
   let coreAlpha = ep.era >= 3 ? 210 : 190;
-  fill(ep.stoneBase[0] - 5, ep.stoneBase[1] - 5, ep.stoneBase[2] - 8, coreAlpha);
-  ellipse(ix + iw * 0.02, iy - 20, iw * 0.32, ih * 0.16);
+  let streetW = 4; // side street width
 
-  // MARKET EAST — darker stone, commercial floor
-  fill(ep.roadBase[0] - 8, ep.roadBase[1] - 10, ep.roadBase[2] - 15, 160);
-  ellipse(ix + iw * 0.18, iy - 14, iw * 0.16, ih * 0.10);
+  // ── DECUMANUS CORRIDOR — wide E-W paved strip ──
+  let decY = iy - 18;
+  let decH = ih * 0.03;
+  fill(ep.roadBase[0], ep.roadBase[1], ep.roadBase[2], 130);
+  rect(ix - iw * 0.35, decY - decH / 2, iw * 0.70, decH);
 
-  // MILITARY SE — gravel/sand tone
-  fill(ep.roadBase[0] - 2, ep.roadBase[1] - 5, ep.roadBase[2] - 2, 140);
-  ellipse(ix + iw * 0.16, iy + ih * 0.02, iw * 0.16, ih * 0.10);
-
-  // RESIDENTIAL NW — packed clay
-  fill(ep.floorBase[0] - 12, ep.floorBase[1] - 15, ep.floorBase[2] - 18, 130);
-  ellipse(ix - iw * 0.10, iy - 20, iw * 0.18, ih * 0.11);
-
-  // DECUMANUS CORRIDOR — a wide paved strip E-W through the whole city
-  let roadY = iy - 18;
-  fill(ep.roadBase[0], ep.roadBase[1], ep.roadBase[2], 120);
-  rect(ix - iw * 0.35, roadY - ih * 0.015, iw * 0.70, ih * 0.03);
-
-  // CARDO CORRIDOR — N-S paved strip
+  // ── CARDO CORRIDOR — N-S paved strip ──
   let cardoX = ix + iw * 0.02;
-  fill(ep.roadBase[0], ep.roadBase[1], ep.roadBase[2], 100);
-  rect(cardoX - iw * 0.012, iy - 18 - ih * 0.12, iw * 0.024, ih * 0.22);
+  let cardoW = iw * 0.024;
+  fill(ep.roadBase[0], ep.roadBase[1], ep.roadBase[2], 110);
+  rect(cardoX - cardoW / 2, iy - 18 - ih * 0.12, cardoW, ih * 0.22);
 
-  // Era 3: teal glow on paving at night
+  // ── CIVIC CORE (NE of cardo/decumanus intersection) ──
+  // Two insulae blocks separated by a N-S side street
+  let coreX = cardoX + cardoW / 2 + 2;
+  let coreY = decY - decH / 2 - ih * 0.09;
+  let coreW1 = iw * 0.10;
+  let coreW2 = iw * 0.08;
+  let coreH = ih * 0.08;
+  _drawInsula(coreX, coreY, coreW1, coreH,
+    ep.stoneBase[0] - 5, ep.stoneBase[1] - 5, ep.stoneBase[2] - 8, coreAlpha);
+  _drawSideStreet(coreX + coreW1, coreY, streetW, coreH, ep);
+  _drawInsula(coreX + coreW1 + streetW, coreY, coreW2, coreH,
+    ep.stoneBase[0], ep.stoneBase[1] - 2, ep.stoneBase[2] - 5, coreAlpha - 10);
+
+  // ── CIVIC CORE SOUTH (SE of intersection) — forum ground ──
+  let forumX = cardoX + cardoW / 2 + 2;
+  let forumY = decY + decH / 2 + 2;
+  let forumW = iw * 0.14;
+  let forumH = ih * 0.06;
+  _drawInsula(forumX, forumY, forumW, forumH,
+    ep.stoneBase[0] - 2, ep.stoneBase[1] - 3, ep.stoneBase[2] - 6, coreAlpha - 5);
+
+  // E-W side street below forum
+  _drawSideStreet(forumX, forumY + forumH, forumW, streetW, ep);
+
+  // ── MARKET EAST — two blocks stacked vertically ──
+  let mktX = coreX + coreW1 + streetW + coreW2 + streetW;
+  let mktY = coreY + 2;
+  let mktW = iw * 0.09;
+  let mktH1 = ih * 0.05;
+  let mktH2 = ih * 0.04;
+  _drawInsula(mktX, mktY, mktW, mktH1,
+    ep.roadBase[0] - 8, ep.roadBase[1] - 10, ep.roadBase[2] - 15, 170);
+  _drawSideStreet(mktX, mktY + mktH1, mktW, streetW, ep);
+  _drawInsula(mktX, mktY + mktH1 + streetW, mktW, mktH2,
+    ep.roadBase[0] - 5, ep.roadBase[1] - 8, ep.roadBase[2] - 12, 155);
+
+  // N-S side street connecting market to decumanus
+  _drawSideStreet(mktX - streetW, decY - decH / 2 - ih * 0.09, streetW, ih * 0.09, ep);
+
+  // ── RESIDENTIAL NW — two blocks west of cardo ──
+  let resX = cardoX - cardoW / 2 - 2 - iw * 0.12;
+  let resY = decY - decH / 2 - ih * 0.08;
+  let resW1 = iw * 0.06;
+  let resW2 = iw * 0.05;
+  let resH = ih * 0.07;
+  _drawInsula(resX, resY, resW1, resH,
+    ep.floorBase[0] - 12, ep.floorBase[1] - 15, ep.floorBase[2] - 18, 140);
+  _drawSideStreet(resX + resW1, resY, streetW, resH, ep);
+  _drawInsula(resX + resW1 + streetW, resY, resW2, resH,
+    ep.floorBase[0] - 8, ep.floorBase[1] - 10, ep.floorBase[2] - 14, 135);
+
+  // E-W side street connecting residential to cardo
+  _drawSideStreet(resX, resY + resH, iw * 0.12, streetW, ep);
+
+  // ── MILITARY SE — two blocks south of decumanus, east side ──
+  let milX = cardoX + cardoW / 2 + iw * 0.08;
+  let milY = decY + decH / 2 + ih * 0.04;
+  let milW1 = iw * 0.08;
+  let milW2 = iw * 0.06;
+  let milH = ih * 0.055;
+  _drawInsula(milX, milY, milW1, milH,
+    ep.roadBase[0] - 2, ep.roadBase[1] - 5, ep.roadBase[2] - 2, 150);
+  _drawSideStreet(milX + milW1, milY, streetW, milH, ep);
+  _drawInsula(milX + milW1 + streetW, milY, milW2, milH,
+    ep.roadBase[0], ep.roadBase[1] - 3, ep.roadBase[2], 140);
+
+  // N-S side street from military to decumanus
+  _drawSideStreet(milX + milW1 / 2 - streetW / 2, decY + decH / 2, streetW, milY - decY - decH / 2, ep);
+
+  // ── CITY BOUNDARY / POMERIUM (Era 2+) ──
+  // Low stone wall — rectangles around the built area
+  if (ep.era >= 2) {
+    let bx = ix - iw * 0.22;
+    let by = iy - 18 - ih * 0.14;
+    let bw = iw * 0.50;
+    let bh = ih * 0.26;
+    let wallC = ep.era >= 3
+      ? [ep.wallAccent[0], ep.wallAccent[1], ep.wallAccent[2]]
+      : [ep.roadLine[0] - 10, ep.roadLine[1] - 10, ep.roadLine[2] - 8];
+    let wallAlpha = ep.era >= 3 ? 130 : 100;
+    // Draw boundary as spaced stone blocks (not solid line)
+    noStroke();
+    for (let wx = bx; wx < bx + bw; wx += 8) {
+      // Top wall
+      fill(wallC[0], wallC[1], wallC[2], wallAlpha);
+      rect(wx, by, 6, 3);
+      // Bottom wall
+      fill(wallC[0] - 5, wallC[1] - 5, wallC[2] - 3, wallAlpha - 15);
+      rect(wx, by + bh, 6, 3);
+    }
+    for (let wy = by; wy < by + bh; wy += 8) {
+      // Left wall
+      fill(wallC[0] - 3, wallC[1] - 3, wallC[2] - 2, wallAlpha - 10);
+      rect(bx, wy, 3, 6);
+      // Right wall
+      fill(wallC[0] - 3, wallC[1] - 3, wallC[2] - 2, wallAlpha - 10);
+      rect(bx + bw, wy, 3, 6);
+    }
+  }
+
+  // ── Era 3: teal glow on paving at night ──
   if (ep.era >= 3 && bright < 0.3) {
     let nightGlow = map(bright, 0, 0.3, 1, 0);
     fill(60, 200, 180, 12 * nightGlow);
-    ellipse(ix + iw * 0.02, iy - 20, iw * 0.34, ih * 0.18);
+    // Glow over the main paved area
+    rect(ix - iw * 0.22, iy - 18 - ih * 0.14, iw * 0.50, ih * 0.26);
   }
 }
 

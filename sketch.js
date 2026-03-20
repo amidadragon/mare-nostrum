@@ -1151,13 +1151,13 @@ function buildIsland() {
   let avenueY = cy - 8; // road centerline
   // Seed RNG for consistent placement
   randomSeed(42);
-  // Grove on far right edge only — keep city center clear
+  // Grove on far east perimeter only — well past civic/market zone
   let treeSlots = [];
-  for (let tx = cx + 240; tx <= cx + 360; tx += 64 + random(-8, 8)) {
+  for (let tx = cx + 380; tx <= cx + 460; tx += 48 + random(-6, 6)) {
     // Upper row — offset varies naturally
-    treeSlots.push({ x: tx + random(-6, 6), y: avenueY - 26 - random(0, 12) });
+    treeSlots.push({ x: tx + random(-6, 6), y: avenueY - 30 - random(0, 16) });
     // Lower row
-    treeSlots.push({ x: tx + random(-6, 6), y: avenueY + 26 + random(0, 12) });
+    treeSlots.push({ x: tx + random(-6, 6), y: avenueY + 30 + random(0, 16) });
   }
   randomSeed(millis()); // restore random
   for (let slot of treeSlots) {
@@ -5940,47 +5940,231 @@ function drawWindowGlow() {
   });
 }
 
-// ─── AMBIENT BACKGROUND HOUSES ──────────────────────────────────────────
-function drawAmbientHouses() {
-  if (state.islandLevel < 9) return; // only Era 2+
-  let bright = getSkyBrightness();
+// ─── AMBIENT BACKGROUND HOUSES + MARKET CLUTTER ─────────────────────────
+// Cached ambient house/clutter positions — regenerated on level change
+let _ambientCache = { level: -1, houses: [], clutter: [] };
+
+function getAmbientHouses() {
+  let lvl = state.islandLevel;
+  if (_ambientCache.level === lvl) return _ambientCache;
   let cx = WORLD.islandCX, cy = WORLD.islandCY;
 
-  // Fixed positions for ambient houses — sparse fill in gaps, avoid CITY_SLOTS zones
-  let ambientSlots = [
-    // W edge fill (away from farm buildings)
-    { x: 300, y: 380 }, { x: 300, y: 420 },
-    // NW fill (below residential row)
-    { x: 350, y: 400 },
-    // S edge fill (below forum area)
-    { x: 550, y: 540 }, { x: 620, y: 545 },
+  // How many ambient houses based on level
+  let count = lvl < 5 ? 0 : lvl < 10 ? 8 : lvl < 15 ? 15 : lvl < 20 ? 25 : 35;
+
+  // All candidate positions — gaps between CITY_SLOTS, denser near center
+  let allCandidates = [
+    // W edge fill (farm periphery)
+    { x: 280, y: 370 }, { x: 310, y: 410 }, { x: 260, y: 430 },
+    { x: 290, y: 450 }, { x: 320, y: 380 },
+    // NW residential fill
+    { x: 360, y: 390 }, { x: 400, y: 400 }, { x: 380, y: 350 },
+    { x: 350, y: 430 }, { x: 410, y: 440 },
+    // Center-west fill
+    { x: 460, y: 410 }, { x: 500, y: 420 }, { x: 520, y: 450 },
+    { x: 470, y: 460 }, { x: 440, y: 480 },
+    // Center fill (densest)
+    { x: 560, y: 400 }, { x: 580, y: 460 }, { x: 620, y: 400 },
+    { x: 640, y: 460 }, { x: 570, y: 500 }, { x: 630, y: 500 },
+    { x: 560, y: 520 }, { x: 640, y: 520 },
+    // East of center
+    { x: 700, y: 400 }, { x: 720, y: 420 }, { x: 740, y: 400 },
+    { x: 680, y: 460 }, { x: 660, y: 480 },
+    // South fill
+    { x: 500, y: 530 }, { x: 550, y: 550 }, { x: 620, y: 555 },
+    { x: 680, y: 540 }, { x: 720, y: 530 },
     // SE fill (between center and military)
-    { x: 680, y: 530 },
+    { x: 760, y: 460 }, { x: 800, y: 470 },
+    // SW fill
+    { x: 420, y: 500 }, { x: 360, y: 470 },
   ];
 
-  // Only draw slots that are on the island
-  ambientSlots.forEach(s => {
-    if (!isOnIsland(s.x, s.y)) return;
-    let sx = w2sX(s.x), sy = w2sY(s.y);
-    if (sx < -50 || sx > width + 50 || sy < -50 || sy > height + 50) return;
+  // Filter: must be on island and far enough from CITY_SLOTS buildings
+  let activeSlots = CITY_SLOTS.filter(s => s.level <= lvl);
+  let houses = [];
+  for (let c of allCandidates) {
+    if (houses.length >= count) break;
+    if (!isOnIsland(c.x, c.y)) continue;
+    // Check min distance from any placed building
+    let tooClose = false;
+    for (let s of activeSlots) {
+      let dx = c.x - s.x, dy = c.y - s.y;
+      if (dx * dx + dy * dy < 30 * 30) { tooClose = true; break; }
+    }
+    if (tooClose) continue;
+    // Assign visual variant based on position hash
+    let hash = (floor(c.x * 7 + c.y * 13)) % 4;
+    let w = 20 + (hash % 3) * 3;  // 20-26px wide
+    let h = 16 + (hash % 3) * 2;  // 16-20px tall
+    houses.push({ x: c.x, y: c.y, w: w, h: h, variant: hash });
+  }
 
-    noStroke();
-    // Small background house — semi-transparent
-    let alpha = 140;
-    // Roof
-    fill(175, 95, 65, alpha);
-    rect(sx - 12, sy - 14, 24, 6);
-    // Walls
-    fill(200, 185, 160, alpha);
-    rect(sx - 10, sy - 8, 20, 14);
-    // Door
-    fill(120, 95, 65, alpha);
-    rect(sx - 3, sy - 2, 6, 8);
-    // Window
-    fill(160, 175, 190, alpha * 0.8);
-    rect(sx + 5, sy - 5, 4, 4);
-  });
+  // Market clutter (stalls, crates, barrels) — center area, level 10+
+  let clutter = [];
+  if (lvl >= 10) {
+    let clutterCandidates = [
+      // Market stalls near center plaza
+      { x: 580, y: 435, type: 'stall', color: 0 },
+      { x: 625, y: 435, type: 'stall', color: 1 },
+      { x: 650, y: 415, type: 'stall', color: 2 },
+      // Crates/barrels scattered
+      { x: 555, y: 445, type: 'crate' },
+      { x: 645, y: 445, type: 'barrel' },
+      { x: 590, y: 410, type: 'crate' },
+      { x: 670, y: 435, type: 'barrel' },
+      { x: 530, y: 460, type: 'crate' },
+      // More at higher levels
+      { x: 610, y: 455, type: 'barrel' },
+      { x: 700, y: 410, type: 'stall', color: 0 },
+      { x: 560, y: 480, type: 'crate' },
+      { x: 680, y: 420, type: 'barrel' },
+      // Near market district
+      { x: 850, y: 395, type: 'stall', color: 1 },
+      { x: 910, y: 395, type: 'crate' },
+      { x: 890, y: 405, type: 'barrel' },
+      // Near forum at high levels
+      { x: 575, y: 510, type: 'crate' },
+      { x: 625, y: 510, type: 'barrel' },
+    ];
+    let maxClutter = lvl < 13 ? 8 : lvl < 17 ? 12 : 17;
+    for (let c of clutterCandidates) {
+      if (clutter.length >= maxClutter) break;
+      if (!isOnIsland(c.x, c.y)) continue;
+      clutter.push(c);
+    }
+  }
+
+  _ambientCache = { level: lvl, houses: houses, clutter: clutter };
+  return _ambientCache;
 }
+
+function drawOneAmbientHouse(h) {
+  let sx = w2sX(h.x), sy = w2sY(h.y);
+  if (sx < -50 || sx > width + 50 || sy < -50 || sy > height + 50) return;
+  let hw = h.w / 2, hh = h.h;
+  let v = h.variant;
+  noStroke();
+
+  // Shadow
+  fill(0, 0, 0, 20);
+  rect(sx - hw + 2, sy + 1, h.w, 4);
+
+  // Walls — variant determines color
+  if (v === 0 || v === 2) {
+    fill(210, 195, 170); // cream/plaster walls
+  } else {
+    fill(180, 170, 150); // stone walls
+  }
+  rect(sx - hw, sy - hh, h.w, hh);
+
+  // Wall line detail (horizontal mortar line)
+  fill(0, 0, 0, 18);
+  rect(sx - hw, sy - hh * 0.5, h.w, 1);
+
+  // Roof — variant determines color
+  let roofOverhang = 3;
+  if (v === 0 || v === 1) {
+    fill(175, 85, 55); // terracotta red roof
+  } else if (v === 2) {
+    fill(145, 110, 70); // brown tile roof
+  } else {
+    fill(160, 95, 60); // dark terracotta
+  }
+  // Roof body
+  rect(sx - hw - roofOverhang, sy - hh - 5, h.w + roofOverhang * 2, 6);
+  // Roof ridge (darker top line)
+  fill(0, 0, 0, 30);
+  rect(sx - hw - roofOverhang, sy - hh - 5, h.w + roofOverhang * 2, 1);
+  // Tile lines on roof
+  fill(0, 0, 0, 15);
+  for (let rx = sx - hw - roofOverhang + 4; rx < sx + hw + roofOverhang; rx += 5) {
+    rect(rx, sy - hh - 4, 1, 4);
+  }
+
+  // Door
+  fill(95, 70, 45);
+  let doorW = 5, doorH = min(9, hh - 3);
+  rect(sx - doorW / 2, sy - doorH, doorW, doorH);
+  // Door frame highlight
+  fill(75, 55, 35);
+  rect(sx - doorW / 2, sy - doorH, doorW, 1);
+  rect(sx - doorW / 2, sy - doorH, 1, doorH);
+  rect(sx + doorW / 2 - 1, sy - doorH, 1, doorH);
+
+  // Window(s)
+  fill(140, 160, 180);
+  let winY = sy - hh * 0.6;
+  rect(sx - hw + 3, winY, 4, 4);
+  if (h.w >= 24) {
+    rect(sx + hw - 7, winY, 4, 4);
+  }
+  // Window frame
+  fill(0, 0, 0, 25);
+  // Cross mullion on left window
+  rect(sx - hw + 4.5, winY, 1, 4);
+  rect(sx - hw + 3, winY + 1.5, 4, 1);
+}
+
+function drawOneClutter(c) {
+  let sx = w2sX(c.x), sy = w2sY(c.y);
+  if (sx < -60 || sx > width + 60 || sy < -60 || sy > height + 60) return;
+  noStroke();
+
+  if (c.type === 'stall') {
+    // Market stall — small awning
+    let colors = [
+      [180, 45, 35],  // red
+      [220, 200, 170], // white/cream
+      [200, 170, 50],  // yellow
+    ];
+    let col = colors[c.color || 0];
+    // Posts
+    fill(120, 90, 55);
+    rect(sx - 6, sy - 10, 2, 12);
+    rect(sx + 4, sy - 10, 2, 12);
+    // Counter
+    fill(140, 110, 70);
+    rect(sx - 7, sy - 2, 14, 4);
+    // Awning
+    fill(col[0], col[1], col[2]);
+    rect(sx - 8, sy - 12, 16, 4);
+    // Awning stripe
+    fill(col[0] * 0.8, col[1] * 0.8, col[2] * 0.8);
+    rect(sx - 8, sy - 11, 16, 1);
+    // Wares on counter
+    fill(180, 140, 80, 180);
+    rect(sx - 4, sy - 4, 3, 2);
+    rect(sx + 1, sy - 4, 3, 2);
+  } else if (c.type === 'crate') {
+    // Wooden crate
+    fill(150, 115, 70);
+    rect(sx - 4, sy - 6, 8, 6);
+    // Plank lines
+    fill(0, 0, 0, 20);
+    rect(sx - 4, sy - 4, 8, 1);
+    rect(sx, sy - 6, 1, 6);
+    // Shadow
+    fill(0, 0, 0, 15);
+    rect(sx - 3, sy + 1, 7, 2);
+  } else if (c.type === 'barrel') {
+    // Barrel
+    fill(130, 100, 60);
+    rect(sx - 3, sy - 7, 6, 7);
+    // Bands
+    fill(90, 70, 40);
+    rect(sx - 3, sy - 6, 6, 1);
+    rect(sx - 3, sy - 3, 6, 1);
+    // Highlight
+    fill(255, 255, 255, 20);
+    rect(sx - 1, sy - 6, 2, 5);
+    // Shadow
+    fill(0, 0, 0, 15);
+    rect(sx - 2, sy + 1, 5, 2);
+  }
+}
+
+// Legacy wrapper — now a no-op since ambient houses are Y-sorted
+function drawAmbientHouses() {}
 
 // ─── Y-SORTED WORLD RENDERING ────────────────────────────────────────────
 function drawWorldObjectsSorted() {
@@ -6009,6 +6193,10 @@ function drawWorldObjectsSorted() {
   });
   // Trees
   state.trees.forEach(t => items.push({ y: t.y, draw: () => drawOneTree(t) }));
+  // Ambient houses + market clutter (Y-sorted with everything else)
+  let amb = getAmbientHouses();
+  amb.houses.forEach(h => items.push({ y: h.y, draw: () => drawOneAmbientHouse(h) }));
+  amb.clutter.forEach(c => items.push({ y: c.y, draw: () => drawOneClutter(c) }));
   // Crystal shrine
   if (state.crystalShrine) items.push({ y: state.crystalShrine.y, draw: drawCrystalShrine });
   // Fountain
