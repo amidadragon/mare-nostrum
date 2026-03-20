@@ -875,6 +875,9 @@ function drawIsland() {
     rect(floor(gx) - 2 + sin(gi * 2.1) * 3, floor(gy) + 1, 2, 1);
   }
 
+  // District ground fills — paved stone under the city (Era 2+)
+  drawDistrictGrounds(ix, iy);
+
   // Roman road (drawn first so farm zone covers the end)
   drawRomanRoad(ix, iy);
 
@@ -1555,6 +1558,63 @@ function drawShoreline(ix, iy, iw, ih) {
     let py = (iy - 18) + sin(pa) * (ry + 5 + cos(p * 2.3) * 2);
     fill(120, 110, 90, 50);
     rect(floor(px), floor(py), 2, 1);
+  }
+}
+
+// ─── DISTRICT GROUND FILLS — paved stone under city districts ──────────────
+function drawDistrictGrounds(ix, iy) {
+  if (state.islandLevel < 5) return; // village has no paving
+  let ep = getEraPalette();
+  let bright = getSkyBrightness();
+  let dayMix = max(0.15, bright);
+
+  // Scale: use screen-space island dimensions
+  let iw = state.islandRX * 2;
+  let ih = state.islandRY * 2;
+  noStroke();
+
+  // Era 1 (Lv 5-8): Just a small dirt plaza around the center
+  if (ep.era === 1) {
+    // Packed earth around the town center — subtle
+    fill(lerp(160, 175, dayMix), lerp(140, 155, dayMix), lerp(110, 125, dayMix), 100);
+    ellipse(ix + iw * 0.02, iy - 18, iw * 0.20, ih * 0.14);
+    return;
+  }
+
+  // Era 2+ (Lv 9+): Full district paving
+
+  // CIVIC CORE — largest zone, cream-stone, covers forum + temple approach + center
+  let coreAlpha = ep.era >= 3 ? 210 : 190;
+  fill(ep.stoneBase[0] - 5, ep.stoneBase[1] - 5, ep.stoneBase[2] - 8, coreAlpha);
+  ellipse(ix + iw * 0.02, iy - 20, iw * 0.32, ih * 0.16);
+
+  // MARKET EAST — darker stone, commercial floor
+  fill(ep.roadBase[0] - 8, ep.roadBase[1] - 10, ep.roadBase[2] - 15, 160);
+  ellipse(ix + iw * 0.18, iy - 14, iw * 0.16, ih * 0.10);
+
+  // MILITARY SE — gravel/sand tone
+  fill(ep.roadBase[0] - 2, ep.roadBase[1] - 5, ep.roadBase[2] - 2, 140);
+  ellipse(ix + iw * 0.16, iy + ih * 0.02, iw * 0.16, ih * 0.10);
+
+  // RESIDENTIAL NW — packed clay
+  fill(ep.floorBase[0] - 12, ep.floorBase[1] - 15, ep.floorBase[2] - 18, 130);
+  ellipse(ix - iw * 0.10, iy - 20, iw * 0.18, ih * 0.11);
+
+  // DECUMANUS CORRIDOR — a wide paved strip E-W through the whole city
+  let roadY = iy - 18;
+  fill(ep.roadBase[0], ep.roadBase[1], ep.roadBase[2], 120);
+  rect(ix - iw * 0.35, roadY - ih * 0.015, iw * 0.70, ih * 0.03);
+
+  // CARDO CORRIDOR — N-S paved strip
+  let cardoX = ix + iw * 0.02;
+  fill(ep.roadBase[0], ep.roadBase[1], ep.roadBase[2], 100);
+  rect(cardoX - iw * 0.012, iy - 18 - ih * 0.12, iw * 0.024, ih * 0.22);
+
+  // Era 3: teal glow on paving at night
+  if (ep.era >= 3 && bright < 0.3) {
+    let nightGlow = map(bright, 0, 0.3, 1, 0);
+    fill(60, 200, 180, 12 * nightGlow);
+    ellipse(ix + iw * 0.02, iy - 20, iw * 0.34, ih * 0.18);
   }
 }
 
