@@ -301,6 +301,118 @@ function drawCodexUI() {
   textAlign(LEFT, TOP);
 }
 
+// ─── RECIPE BOOK UI ──────────────────────────────────────────────────────
+
+let recipeBookOpen = false;
+
+// Ingredient display names
+const _INGREDIENT_NAMES = {
+  harvest: 'Harvest', fish: 'Fish', wood: 'Wood', grapeSeeds: 'Grape',
+  oliveSeeds: 'Olive', exoticSpices: 'Spice', soulEssence: 'Essence',
+  wine: 'Wine', crystals: 'Crystal',
+};
+
+// Recipe effect descriptions
+const _RECIPE_EFFECTS = {
+  'Meal': 'Gift (+2 hearts) or eat for energy',
+  'Wine': 'Gift (+3 hearts), feast ingredient',
+  'Olive Oil': 'Gift (+3 hearts), trade value',
+  'Feast': 'Grand feast — 3 meals at once',
+  'Stew': 'Heals 30 HP in combat',
+  'Garum': 'Trade to merchants for 25g',
+  'Honeyed Figs': '+15% XP gain for 1 day',
+  'Ambrosia': 'Full heal + brief invulnerability',
+};
+
+function drawRecipeBookUI() {
+  if (!recipeBookOpen) return;
+  push();
+
+  let pw = 340, ph = 340;
+  let panX = width / 2 - pw / 2;
+  let panY = height / 2 - ph / 2;
+
+  rectMode(CORNER);
+  noStroke();
+  fill(0, 0, 0, 160);
+  rect(0, 0, width, height);
+
+  drawParchmentPanel(panX, panY, pw, ph);
+
+  // Title
+  fill(200, 170, 90);
+  textAlign(CENTER, TOP);
+  textSize(14);
+  text('RECIPE BOOK', width / 2, panY + 12);
+
+  fill(160, 140, 100);
+  textSize(8);
+  text('Cook at the Cookpot near your villa', width / 2, panY + 29);
+
+  // Recipe list
+  let startY = panY + 46;
+  let rowH = 34;
+  textAlign(LEFT, TOP);
+
+  for (let i = 0; i < RECIPES.length; i++) {
+    let r = RECIPES[i];
+    let ry = startY + i * rowH;
+    if (ry + rowH > panY + ph - 20) break;
+    let affordable = canCook(r);
+
+    // Row background
+    fill(i % 2 === 0 ? color(55, 45, 30, 100) : color(50, 40, 28, 60));
+    rect(panX + 10, ry, pw - 20, rowH - 2, 3);
+
+    // Affordable indicator dot
+    fill(affordable ? color(80, 200, 80) : color(80, 60, 50));
+    ellipse(panX + 20, ry + rowH / 2 - 2, 6, 6);
+
+    // Recipe name
+    fill(affordable ? color(220, 200, 150) : color(150, 135, 110));
+    textSize(10);
+    text(r.name, panX + 28, ry + 2);
+
+    // Qty indicator
+    let owned = state[r.item] || 0;
+    if (owned > 0) {
+      fill(180, 170, 120);
+      textSize(7);
+      text('x' + owned, panX + 28 + textWidth(r.name) + 6, ry + 4);
+    }
+
+    // Ingredients line
+    let ingParts = [];
+    for (let [res, amt] of Object.entries(r.needs)) {
+      let resName = _INGREDIENT_NAMES[res] || res;
+      let have = state[res] || 0;
+      ingParts.push(amt + ' ' + resName + (have < amt ? ' (' + have + ')' : ''));
+    }
+    fill(affordable ? color(160, 150, 120) : color(120, 105, 85));
+    textSize(7);
+    text(ingParts.join('  +  '), panX + 28, ry + 15);
+
+    // Effect text
+    let eff = _RECIPE_EFFECTS[r.name] || '';
+    if (eff) {
+      fill(140, 160, 120);
+      textSize(6);
+      textAlign(RIGHT, TOP);
+      text(eff, panX + pw - 16, ry + 4);
+      textAlign(LEFT, TOP);
+    }
+  }
+
+  // Close hint
+  fill(120, 100, 70);
+  textAlign(CENTER, TOP);
+  textSize(8);
+  text('[G] Close    Cook at Cookpot with [E]', width / 2, panY + ph - 16);
+  textAlign(LEFT, TOP);
+
+  pop();
+}
+
 // ─── NATURALIST'S CODEX UI ────────────────────────────────────────────────
 const NAT_TAB_NAMES = ['Fish', 'Crops', 'Bestiary', 'Relics', 'Buildings', 'Lore'];
 const NAT_RARITY_COLORS = { Common: '#aabbcc', Uncommon: '#88cc88', Rare: '#ddaa33', Legendary: '#ff8844' };
@@ -1132,7 +1244,8 @@ function drawEmpireDashboard() {
   fill(212, 175, 80); textAlign(CENTER, TOP); textSize(14);
   text('IMPERIUM ROMANUM', width/2, py+14);
   let rkT = state.islandLevel>=25?'IMPERATOR':state.islandLevel>=20?'CONSUL':state.islandLevel>=15?'SENATOR':state.islandLevel>=10?'GOVERNOR':'CITIZEN';
-  fill(160,140,100); textSize(8); text(rkT+' \u2014 Island Level '+state.islandLevel, width/2, py+32);
+  let _iName = state.islandName ? '"' + state.islandName + '" — ' : '';
+  fill(160,140,100); textSize(8); text(rkT+' \u2014 ' + _iName + 'Island Level '+state.islandLevel, width/2, py+32);
   stroke(120,95,55,80); strokeWeight(0.5); line(px+20,py+46,px+pw-20,py+46); noStroke();
   let mX=px+14,mY=py+54,mW=pw*0.45,mH=ph*0.5;
   fill(20,25,35,200); rect(mX,mY,mW,mH,4);
@@ -1530,6 +1643,43 @@ function drawHUD() {
     fill(color(C.stormFlash));textSize(9);textAlign(CENTER,TOP);text('DRIFT STORM ACTIVE',width/2,40);textAlign(LEFT,TOP);
   }
 
+  // Island name label (top center, subtle)
+  if (state.islandName && !stormActive) {
+    fill(180, 160, 120, 140);
+    textSize(8);
+    textAlign(CENTER, TOP);
+    text(state.islandName + ' — Day ' + state.day, width / 2, 6);
+    textAlign(LEFT, TOP);
+  }
+
+  // Harvest combo counter — visible near player when active
+  if (state.harvestCombo && state.harvestCombo.count >= 2 && state.harvestCombo.timer > 0) {
+    let hc = state.harvestCombo;
+    let psx = w2sX(state.player.x), psy = w2sY(state.player.y);
+    let tier = Math.min(Math.floor(hc.count / 2), 6);
+    let bonusPct = [0, 10, 20, 30, 40, 50, 60][tier];
+    let comboColors = ['#ffffff', '#ffffff', '#ffeeaa', '#ffdd66', '#ffcc33', '#ffaa00', '#ff8800'];
+    let col = color(comboColors[tier]);
+    let pulse = 1 + Math.sin(frameCount * 0.15) * 0.08;
+    let barFrac = hc.timer / ((state.prophecy && state.prophecy.type === 'combo') ? 180 : 90);
+    // Combo badge
+    push();
+    textAlign(CENTER, CENTER);
+    textSize(10 * pulse);
+    fill(red(col), green(col), blue(col), 220);
+    text('COMBO x' + hc.count, psx + 50, psy - 40);
+    textSize(7);
+    fill(red(col), green(col), blue(col), 160);
+    text('+' + bonusPct + '% yield', psx + 50, psy - 28);
+    // Timer bar
+    noStroke();
+    fill(40, 35, 25, 150);
+    rect(psx + 25, psy - 22, 50, 3, 1);
+    fill(red(col), green(col), blue(col), 180);
+    rect(psx + 25, psy - 22, 50 * barFrac, 3, 1);
+    pop();
+  }
+
   // ─── QUEST TRACKER (right side) ───
   if(state.quest){let qtX=width-170,qtY=100;noStroke();fill(25,20,14,180);rect(qtX,qtY,156,32,4);
     stroke(180,145,70,100);strokeWeight(0.5);noFill();rect(qtX,qtY,156,32,4);noStroke();
@@ -1549,7 +1699,7 @@ function drawHUD() {
   } else if (state.wreck && state.wreck.active) {
     controlLines = ['WASD move  |  E gather  |  TAB raft'];
   } else {
-    controlLines = ['WASD move  |  1-5 tools  |  6-0 items  |  E interact', 'SPACE attack  |  B build  |  K skills  |  N codex  |  ESC menu'];
+    controlLines = ['WASD move  |  1-5 tools  |  6-0 items  |  E interact', 'SPACE attack  |  B build  |  K skills  |  N codex  |  G recipes  |  ESC menu'];
   }
   let controlH = 10 + controlLines.length * 12;
   drawHUDPanel(cr - 200, cb - controlH, 200, controlH);

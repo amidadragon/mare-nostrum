@@ -123,9 +123,13 @@ function updateTradeRoutes(dt) {
         let goldGain = TRADE_GOODS[route.good].goldPerTrip;
         // Trading spec doubles gold
         if (state.colonySpec['conquest'] === 'trading') goldGain *= 2;
+        // Demand bonus: +50% if this good is in demand
+        let demandMult = getDemandBonus(route.good);
+        goldGain = floor(goldGain * demandMult);
         state.gold += goldGain;
         route.goldEarned += goldGain;
-        addFloatingText(width / 2, height * 0.35, '+' + goldGain + 'g from ' + TRADE_GOODS[route.good].name + ' trade', '#ddcc44');
+        let demandTag = demandMult > 1 ? ' (DEMAND!)' : '';
+        addFloatingText(width / 2, height * 0.35, '+' + goldGain + 'g from ' + TRADE_GOODS[route.good].name + ' trade' + demandTag, demandMult > 1 ? '#ffdd44' : '#ddcc44');
       }
     }
   }
@@ -210,6 +214,7 @@ function calculateDailyTradeIncome() {
     if (!route.active) continue;
     let base = TRADE_GOODS[route.good].goldPerTrip;
     if (state.colonySpec['conquest'] === 'trading') base *= 2;
+    base = floor(base * getDemandBonus(route.good));
     income += base;
   }
   // Upkeep: 2 gold per route
@@ -276,6 +281,15 @@ function drawTradeRouteUI() {
   text('Daily trade income: +' + trade.income + 'g  Upkeep: -' + trade.upkeep + 'g  Net: ' +
     (trade.net >= 0 ? '+' : '') + trade.net + 'g', width / 2, py + 30);
 
+  // Demand indicator
+  let demandGoods = getCurrentDemandGoods();
+  if (demandGoods.length > 0) {
+    let dNames = demandGoods.map(k => TRADE_GOODS[k] ? TRADE_GOODS[k].name : k);
+    fill(255, 220, 80);
+    textSize(8);
+    text('IN DEMAND: ' + dNames.join(', ') + ' (+50% gold)', width / 2, py + 42);
+  }
+
   // Active routes
   textAlign(LEFT, TOP);
   let ry = py + 52;
@@ -324,16 +338,26 @@ function drawTradeRouteUI() {
     let g = TRADE_GOODS[gk];
     let bw = 46, bh = 22;
     let canAfford = state.gold >= 50 && state.wood >= 20 && state.tradeRoutes.length < MAX_TRADE_ROUTES;
-    fill(canAfford ? color(40, 50, 35, 200) : color(40, 35, 35, 150));
+    let inDemand = isGoodInDemand(gk);
+    fill(canAfford ? (inDemand ? color(50, 55, 30, 220) : color(40, 50, 35, 200)) : color(40, 35, 35, 150));
     rect(gx, ry, bw, bh, 3);
+    // Demand glow border
+    if (inDemand) {
+      stroke(255, 220, 80, 120 + sin(frameCount * 0.08) * 40);
+      strokeWeight(1);
+      noFill();
+      rect(gx, ry, bw, bh, 3);
+      noStroke();
+    }
     fill(g.icon);
     ellipse(gx + 8, ry + bh / 2, 6, 6);
     fill(canAfford ? 220 : 120);
     textSize(7);
     text(g.name, gx + 14, ry + 4);
     textSize(6);
-    fill(canAfford ? color(180, 170, 120) : color(100, 90, 80));
-    text(g.goldPerTrip + 'g', gx + 14, ry + 13);
+    let effectiveGold = inDemand ? floor(g.goldPerTrip * 1.5) : g.goldPerTrip;
+    fill(inDemand ? color(255, 220, 80) : (canAfford ? color(180, 170, 120) : color(100, 90, 80)));
+    text(effectiveGold + 'g' + (inDemand ? ' +50%' : ''), gx + 14, ry + 13);
     gx += bw + 3;
     if (i === 2) { gx = px + 15; ry += bh + 4; }
   }
@@ -466,9 +490,46 @@ function handleEconomyClick(mx, my) {
   return false;
 }
 
+// ─── MARKET DEMAND SYSTEM ───────────────────────────────────────────────────
+
+// 2 goods are "in demand" each day — selling them via trade routes gives +50% gold
+let _currentDemand = [];
+let _demandDay = -1;
+
+function updateMarketDemand() {
+  let day = state.day || 0;
+  if (day === _demandDay) return;
+  _demandDay = day;
+  let goodKeys = Object.keys(TRADE_GOODS);
+  // Pick 2 demand goods, seeded by day
+  let seed = day * 7 + 31;
+  let i1 = Math.floor(_hannoSeededRandom(seed) * goodKeys.length);
+  let i2 = Math.floor(_hannoSeededRandom(seed + 99) * (goodKeys.length - 1));
+  if (i2 >= i1) i2++;
+  _currentDemand = [goodKeys[i1], goodKeys[i2]];
+  // Notify on day transition if player has trade routes
+  if (state.tradeRoutes.length > 0 || state.conquest.colonized) {
+    let names = _currentDemand.map(k => TRADE_GOODS[k].name);
+    addNotification('Market demand: ' + names.join(' & ') + ' (+50% gold)', '#ddaa44');
+  }
+}
+
+function isGoodInDemand(goodKey) {
+  return _currentDemand.includes(goodKey);
+}
+
+function getDemandBonus(goodKey) {
+  return isGoodInDemand(goodKey) ? 1.5 : 1.0;
+}
+
+function getCurrentDemandGoods() {
+  return _currentDemand;
+}
+
 // ─── MAIN UPDATE (called from sketch.js hook) ──────────────────────────────
 
 function updateEconomySystem(dt) {
+  updateMarketDemand();
   updateTradeRoutes(dt);
 }
 
@@ -492,10 +553,19 @@ function drawEconomyUIOverlay() {
     let d = dist(state.player.x, state.player.y, port.x, port.y);
     if (d < 80) {
       push();
-      fill(200, 190, 140, 180);
       noStroke();
+      let portSX = w2sX(port.x), portSY = w2sY(port.y);
+      fill(200, 190, 140, 180);
       textSize(9); textAlign(CENTER, CENTER);
-      text('[R] Trade Routes', w2sX(port.x), w2sY(port.y) - 25);
+      text('[R] Trade Routes', portSX, portSY - 25);
+      // Show demand goods as a hint near port
+      let dg = getCurrentDemandGoods();
+      if (dg.length > 0) {
+        let dNames = dg.map(k => TRADE_GOODS[k] ? TRADE_GOODS[k].name : k);
+        fill(255, 220, 80, 160 + sin(frameCount * 0.06) * 40);
+        textSize(7);
+        text('Demand: ' + dNames.join(', ') + ' (+50%)', portSX, portSY - 13);
+      }
       pop();
     }
   }

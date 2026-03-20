@@ -6,27 +6,14 @@ DIST_DIR="$(cd "$(dirname "$0")" && pwd)/dist"
 ZIP_NAME="mare-nostrum-v${VERSION}.zip"
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-FILES=(
+# Step 1: Run esbuild bundler to create minified dist/
+echo "=== Bundling with esbuild ==="
+node "$PROJECT_DIR/build.mjs"
+
+# Step 2: Zip from dist/ (minified single-bundle version)
+DIST_FILES=(
   index.html
-  engine.js
-  sound.js
-  narrative.js
-  cinematics.js
-  fishing.js
-  farming.js
-  npc.js
-  events.js
-  world.js
-  player.js
-  ui.js
-  sketch.js
-  wreck.js
-  menu.js
-  islands.js
-  diving.js
-  combat.js
-  economy.js
-  debug.js
+  game.min.js
   libs/p5.min.js
   libs/p5.sound.min.js
   libs/cinzel-latin.woff2
@@ -37,23 +24,21 @@ FILES=(
   sw.js
 )
 
-# Verify all files exist
-for f in "${FILES[@]}"; do
-  if [ ! -f "$PROJECT_DIR/$f" ]; then
-    echo "ERROR: Missing file: $f" >&2
+# Verify all dist files exist
+for f in "${DIST_FILES[@]}"; do
+  if [ ! -f "$DIST_DIR/$f" ]; then
+    echo "ERROR: Missing dist file: $f" >&2
     exit 1
   fi
 done
 
-# Create dist directory
-mkdir -p "$DIST_DIR"
 rm -f "$DIST_DIR/$ZIP_NAME"
 
-# Create zip (preserving libs/ subdirectory)
-cd "$PROJECT_DIR"
-zip "$DIST_DIR/$ZIP_NAME" "${FILES[@]}"
+# Create zip from dist directory
+cd "$DIST_DIR"
+zip "$ZIP_NAME" "${DIST_FILES[@]}"
 
 echo ""
 echo "Built: dist/$ZIP_NAME"
-echo "Files: ${#FILES[@]}"
-zip -sf "$DIST_DIR/$ZIP_NAME"
+echo "Files: ${#DIST_FILES[@]}"
+zip -sf "$ZIP_NAME"

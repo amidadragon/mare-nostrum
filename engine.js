@@ -137,4 +137,50 @@ const Engine = {
 // 'level_up'         — island expanded, data: { level }
 // 'trade_complete'   — trade route delivered, data: { route, gold }
 
+// ─── ERROR TRACKING — catch runtime errors, show toast, log to localStorage ──
+(function() {
+  var ERROR_KEY = 'mare_nostrum_errors';
+  var MAX_ERRORS = 50;
+
+  function logError(msg, source, line, col) {
+    try {
+      var errors = JSON.parse(localStorage.getItem(ERROR_KEY) || '[]');
+      errors.push({
+        msg: msg,
+        source: source || '',
+        line: line || 0,
+        col: col || 0,
+        time: new Date().toISOString()
+      });
+      if (errors.length > MAX_ERRORS) errors = errors.slice(-MAX_ERRORS);
+      localStorage.setItem(ERROR_KEY, JSON.stringify(errors));
+    } catch(e) { /* storage full or unavailable */ }
+  }
+
+  function showToast(msg) {
+    var el = document.createElement('div');
+    el.textContent = '[Error] ' + msg;
+    el.style.cssText = 'position:fixed;bottom:12px;left:12px;z-index:9999;' +
+      'background:rgba(120,30,30,0.85);color:#ffa;padding:8px 14px;' +
+      'font:12px/1.4 monospace;border-radius:4px;max-width:80vw;' +
+      'pointer-events:none;opacity:1;transition:opacity 0.6s ease;';
+    document.body.appendChild(el);
+    setTimeout(function() { el.style.opacity = '0'; }, 4000);
+    setTimeout(function() { el.remove(); }, 4800);
+  }
+
+  window.onerror = function(msg, source, line, col, err) {
+    var short = String(msg).slice(0, 200);
+    logError(short, source, line, col);
+    showToast(short);
+    return false; // don't suppress default console error
+  };
+
+  window.addEventListener('unhandledrejection', function(e) {
+    var msg = e.reason ? String(e.reason).slice(0, 200) : 'Unhandled promise rejection';
+    logError(msg, '', 0, 0);
+    showToast(msg);
+  });
+})();
+
 console.log('[Engine] Mare Nostrum Engine v0.9 loaded');

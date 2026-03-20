@@ -177,6 +177,18 @@ function drawVulcanEntities() {
   for (let n of v.obsidianNodes) { if (n.collected) continue; let nx = w2sX(n.x), ny = w2sY(n.y); fill(15, 12, 20); rect(floor(nx) - 5, floor(ny) - 8, 10, 12); fill(30, 25, 40); rect(floor(nx) - 3, floor(ny) - 6, 6, 8); fill(80, 70, 120, 150); rect(floor(nx) - 1, floor(ny) - 5, 2, 3); if (dist(p.x, p.y, n.x, n.y) < 30) { fill(255, 200, 150, 180); textAlign(CENTER); textSize(7); text('[E] Mine Obsidian', nx, ny - 14); } }
   for (let sv of v.smokeVents) { let sx = w2sX(sv.x), sy = w2sY(sv.y); for (let s = 0; s < 4; s++) { let t = (frameCount * 0.5 + sv.phase * 60 + s * 15) % 60, al = max(0, 40 - t); fill(100, 90, 80, al); ellipse(sx + sin(t * 0.1 + sv.phase) * 4, sy - t * 0.6, 8 + t * 0.3, 5 + t * 0.2); } }
   for (let a of v.ambientAsh) { let al = min(100, a.life); fill(120, 100, 80, al); rect(floor(w2sX(a.x)), floor(w2sY(a.y)), floor(a.size), floor(a.size)); }
+  // Volcano Heart — subtle glowing crack in the ground (no label)
+  let vhX = w2sX(v.isleX - v.isleRX * 0.28), vhY = w2sY(v.isleY - v.isleRY * 0.35);
+  let vhFound = state.narrativeFlags && state.narrativeFlags['secret_volcano_heart'];
+  let vhPulse = sin(frameCount * 0.03) * 0.4 + 0.6;
+  if (vhFound) {
+    fill(255, 140, 40, floor(30 * vhPulse)); ellipse(vhX, vhY, 16, 10);
+    fill(255, 200, 80, floor(15 * vhPulse)); ellipse(vhX, vhY, 8, 5);
+  } else {
+    // Very subtle crack — easy to walk past
+    fill(180, 50, 10, floor(18 * vhPulse)); rect(floor(vhX) - 3, floor(vhY), 6, 1);
+    fill(200, 70, 15, floor(12 * vhPulse)); rect(floor(vhX) - 1, floor(vhY) - 1, 2, 3);
+  }
   drawPlayer();
   let dockX = w2sX(v.isleX), dockY = w2sY(v.isleY + v.isleRY * 0.82); fill(120, 80, 40); rect(floor(dockX) - 15, floor(dockY), 30, 6); fill(100, 65, 30); rect(floor(dockX) - 12, floor(dockY) + 1, 24, 4);
 }
@@ -371,6 +383,16 @@ function drawHyperboreEntities() {
       textAlign(LEFT);
     }
   }
+  // Ice Mirror — subtle frozen pool behind glacier (no label, no prompt)
+  let mirrorX = w2sX(h.isleX - h.isleRX * 0.55), mirrorY = w2sY(h.isleY - h.isleRY * 0.45);
+  let mirrorFound = state.narrativeFlags && state.narrativeFlags['secret_ice_mirror'];
+  let mirrorShimmer = sin(frameCount * 0.04) * 0.3 + 0.7;
+  fill(mirrorFound ? 100 : 140, mirrorFound ? 160 : 210, 240, floor(40 * mirrorShimmer));
+  ellipse(mirrorX, mirrorY, 18, 12);
+  fill(200, 230, 255, floor(20 * mirrorShimmer));
+  ellipse(mirrorX, mirrorY, 10, 6);
+  // Barely visible ice reflection flicker
+  if (frameCount % 90 < 8) { fill(255, 255, 255, 15); ellipse(mirrorX, mirrorY, 22, 14); }
   drawPlayer(); let dockX = w2sX(h.isleX), dockY = w2sY(h.isleY + h.isleRY * 0.82); fill(160, 175, 190); rect(floor(dockX) - 15, floor(dockY), 30, 6);
 }
 function drawHyperboreDistantLabel() {
@@ -677,6 +699,21 @@ function drawNecropolisEntities() {
   for (let g of n.ghostNPCs) { let gx = w2sX(g.x), gy = w2sY(g.y); let hover = sin(frameCount * 0.04 + g.x * 0.1) * 3; fill(140, 120, 200, 60 + sin(frameCount * 0.05 + g.x) * 20); ellipse(gx, gy + hover - 4, 14, 18); fill(180, 160, 230, 80); ellipse(gx, gy + hover - 10, 10, 10); fill(200, 200, 255, 100); rect(floor(gx) - 2, floor(gy + hover) - 11, 1, 1); rect(floor(gx) + 1, floor(gy + hover) - 11, 1, 1); fill(180, 160, 220, 120); textAlign(CENTER); textSize(6); text(g.name, gx, gy + hover - 18); if (dist(p.x, p.y, g.x, g.y) < 35) { fill(200, 180, 240, 180); textSize(7); text('[E] Speak', gx, gy + hover - 24); } }
   for (let sn of n.soulNodes) { if (sn.collected) continue; let sx = w2sX(sn.x), sy = w2sY(sn.y); let pulse = sin(frameCount * 0.06 + sn.x * 0.1) * 0.3 + 0.7; fill(140, 60, 200, 80 * pulse); ellipse(sx, sy, 16, 16); fill(180, 100, 255, 120 * pulse); ellipse(sx, sy, 8, 8); fill(220, 180, 255, 60 * pulse); ellipse(sx, sy, 4, 4); if (dist(p.x, p.y, sn.x, sn.y) < 25) { fill(200, 160, 255, 180); textAlign(CENTER); textSize(7); text('[E] Absorb Soul Essence', sx, sy - 14); } }
   for (let w of n.wisps) { let al = min(80, w.life * 0.5); fill(140, 100, 200, al); ellipse(w2sX(w.x), w2sY(w.y), w.size, w.size); fill(180, 140, 240, al * 0.5); ellipse(w2sX(w.x), w2sY(w.y), w.size * 1.5, w.size * 1.5); }
+  // Room 13 — faint XIII scratched into the mausoleum floor (barely visible)
+  let r13X = w2sX(n.isleX), r13Y = w2sY(n.isleY - 5);
+  let r13Found = state.narrativeFlags && state.narrativeFlags['secret_room_13'];
+  let r13Pulse = sin(frameCount * 0.025 + 2.0) * 0.3 + 0.4;
+  if (!r13Found) {
+    // Tiny XIII scratched near mausoleum entrance — only visible up close
+    if (dist(p.x, p.y, n.isleX, n.isleY - 5) < 60) {
+      fill(120, 80, 160, floor(25 * r13Pulse));
+      textAlign(CENTER); textSize(5);
+      text('XIII', r13X, r13Y + 8);
+      textAlign(LEFT);
+    }
+  } else {
+    fill(160, 100, 220, floor(20 * r13Pulse)); ellipse(r13X, r13Y, 14, 10);
+  }
   drawPlayer(); let dockX = w2sX(n.isleX), dockY = w2sY(n.isleY + n.isleRY * 0.82); fill(60, 50, 55); rect(floor(dockX) - 15, floor(dockY), 30, 6);
 }
 function drawNecropolisDistantLabel() {
@@ -747,6 +784,38 @@ function handleVulcanInteract() {
       return;
     }
   }
+  // Volcano Heart — hidden chamber inside the crater (northwest of center, near a lava vein)
+  let heartX = v.isleX - v.isleRX * 0.28, heartY = v.isleY - v.isleRY * 0.35;
+  if (dist(p.x, p.y, heartX, heartY) < 20) {
+    if (state.narrativeFlags && state.narrativeFlags['secret_volcano_heart']) {
+      addFloatingText(w2sX(heartX), w2sY(heartY) - 14, 'The Heart of Vulcan pulses faintly.', '#ff8844');
+      return;
+    }
+    let hasObs = (state.obsidian || 0) >= 3;
+    let hasFrost = (state.frostCrystal || 0) >= 2;
+    if (hasObs && hasFrost) {
+      state.obsidian -= 3;
+      state.frostCrystal -= 2;
+      state.narrativeFlags['secret_volcano_heart'] = true;
+      state._volcanoHeartOverlay = true;
+      state._volcanoHeartTimer = 0;
+      state.crystals = (state.crystals || 0) + 3;
+      state.player.maxHp += 10;
+      state.player.hp = state.player.maxHp;
+      trackMilestone('secret_volcano_heart');
+      if (snd) snd.playSFX('upgrade');
+      spawnParticles(heartX, heartY, 'divine', 30);
+      spawnParticles(heartX, heartY, 'crystal', 15);
+      shakeTimer = 20;
+      return;
+    } else {
+      // Subtle hint — only if standing right on it
+      addFloatingText(w2sX(heartX), w2sY(heartY) - 14, 'The rock trembles... something is sealed within.', '#ff6633');
+      if (!hasObs) addFloatingText(w2sX(heartX), w2sY(heartY) - 28, 'You feel it craves dark stone...', '#aa6644');
+      if (!hasFrost) addFloatingText(w2sX(heartX), w2sY(heartY) - 42, '...and frozen light.', '#88bbdd');
+      return;
+    }
+  }
   addFloatingText(w2sX(p.x), w2sY(p.y) - 18, '...', '#886655');
 }
 
@@ -808,6 +877,22 @@ function handleHyperboreInteract() {
       let looted = h.frozenRuins.filter(r => r.looted).length;
       addFloatingText(w2sX(h.frozenObelisk.x), w2sY(h.frozenObelisk.y) - 40, 'Search all frozen ruins first (' + looted + '/4)', '#88ddff');
     }
+    return;
+  }
+  // Ice Mirror — hidden reflective pool behind the glacier (northwest corner)
+  let mirrorX = h.isleX - h.isleRX * 0.55, mirrorY = h.isleY - h.isleRY * 0.45;
+  if (dist(p.x, p.y, mirrorX, mirrorY) < 22) {
+    if (state.narrativeFlags && state.narrativeFlags['secret_ice_mirror']) {
+      addFloatingText(w2sX(mirrorX), w2sY(mirrorY) - 14, 'The mirror remembers you.', '#aaddff');
+      return;
+    }
+    state.narrativeFlags['secret_ice_mirror'] = true;
+    state._iceMirrorOverlay = true;
+    state._iceMirrorTimer = 0;
+    trackMilestone('secret_ice_mirror');
+    if (snd) snd.playSFX('crystal');
+    spawnParticles(mirrorX, mirrorY, 'divine', 20);
+    shakeTimer = 8;
     return;
   }
   addFloatingText(w2sX(p.x), w2sY(p.y) - 18, '...', '#778899');
@@ -902,5 +987,306 @@ function handleNecropolisInteract() {
     addFloatingText(w2sX(bestGhost.x), w2sY(bestGhost.y) - 28, bestGhost.name + ': ' + bestGhost.line, '#ddccff');
     return;
   }
+  // Room 13 — secret tomb hidden behind the mausoleum (walk into its dark entrance)
+  let mausX = n.isleX, mausY = n.isleY - 5;
+  if (dist(p.x, p.y, mausX, mausY) < 18) {
+    if (state.narrativeFlags && state.narrativeFlags['secret_room_13']) {
+      addFloatingText(w2sX(mausX), w2sY(mausY) - 30, 'Room XIII is empty now. Its secret is yours.', '#cc88ff');
+      return;
+    }
+    state.narrativeFlags['secret_room_13'] = true;
+    state._room13Overlay = true;
+    state._room13Timer = 0;
+    trackMilestone('secret_room_13');
+    // Reward: death shroud cosmetic
+    state.wardrobe = state.wardrobe || { tunicColor: 0, headwear: 0 };
+    state.wardrobe.deathShroud = true;
+    state.soulEssence = (state.soulEssence || 0) + 5;
+    if (snd) snd.playSFX('crystal');
+    spawnParticles(mausX, mausY, 'combat', 25);
+    shakeTimer = 12;
+    return;
+  }
   addFloatingText(w2sX(p.x), w2sY(p.y) - 18, '...', '#665577');
+}
+
+// ======================================================================
+// === SECRET AREA OVERLAYS — Shareable Moment Screens ==================
+// ======================================================================
+
+function updateSecretOverlays(dt) {
+  if (state._iceMirrorOverlay) {
+    state._iceMirrorTimer = (state._iceMirrorTimer || 0) + dt;
+    if (state._iceMirrorTimer > 600) state._iceMirrorOverlay = false;
+  }
+  if (state._room13Overlay) {
+    state._room13Timer = (state._room13Timer || 0) + dt;
+    if (state._room13Timer > 480) state._room13Overlay = false;
+  }
+  if (state._volcanoHeartOverlay) {
+    state._volcanoHeartTimer = (state._volcanoHeartTimer || 0) + dt;
+    if (state._volcanoHeartTimer > 480) state._volcanoHeartOverlay = false;
+  }
+}
+
+function drawSecretOverlays() {
+  if (state._iceMirrorOverlay) drawIceMirrorOverlay();
+  if (state._room13Overlay) drawRoom13Overlay();
+  if (state._volcanoHeartOverlay) drawVolcanoHeartOverlay();
+}
+
+function drawIceMirrorOverlay() {
+  let t = state._iceMirrorTimer || 0;
+  let fadeIn = min(1, t / 60);
+  let fadeOut = t > 520 ? max(0, 1 - (t - 520) / 80) : 1;
+  let alpha = fadeIn * fadeOut;
+  if (alpha <= 0) return;
+
+  push();
+  // Dark overlay
+  fill(5, 15, 30, floor(200 * alpha));
+  rect(0, 0, width, height);
+
+  // Reflective pool border
+  let cx = width / 2, cy = height / 2;
+  let poolW = 280, poolH = 340;
+
+  // Shimmering border
+  let shimmer = sin(frameCount * 0.03) * 10;
+  fill(100, 180, 240, floor(30 * alpha));
+  ellipse(cx, cy, poolW + 20 + shimmer, poolH + 20 + shimmer);
+  fill(140, 210, 250, floor(20 * alpha));
+  ellipse(cx, cy, poolW + 10, poolH + 10);
+
+  // Dark mirror surface
+  fill(8, 20, 40, floor(230 * alpha));
+  rect(cx - poolW / 2, cy - poolH / 2, poolW, poolH, 8);
+
+  // Ice crystal frame
+  fill(120, 200, 255, floor(40 * alpha));
+  for (let i = 0; i < 12; i++) {
+    let a = (i / 12) * TWO_PI;
+    let fx = cx + cos(a) * (poolW / 2 + 3);
+    let fy = cy + sin(a) * (poolH / 2 + 3);
+    rect(floor(fx) - 2, floor(fy) - 2, 4, 4);
+  }
+
+  // Title
+  fill(180, 230, 255, floor(220 * alpha));
+  textAlign(CENTER); textSize(14); textStyle(ITALIC);
+  text('THE ICE MIRROR', cx, cy - poolH / 2 + 30);
+  textStyle(NORMAL);
+
+  // Subtitle
+  fill(120, 180, 220, floor(160 * alpha));
+  textSize(7);
+  text('Your reflection speaks truths frozen in time', cx, cy - poolH / 2 + 44);
+
+  // Journey stats — poetic format
+  let p = state.player, s = state;
+  let days = s.day || 1;
+  let buildings = s.buildings ? s.buildings.length : 0;
+  let fish = s.codex ? Object.keys(s.codex.fishCaught || {}).length : 0;
+  let crops = s.codex ? Object.keys(s.codex.cropsGrown || {}).length : 0;
+  let enemies = s.codex ? Object.keys(s.codex.enemies || {}).length : 0;
+  let hearts = s.npc ? s.npc.hearts : 0;
+  let islands = 0;
+  if (s.narrativeFlags) {
+    if (s.narrativeFlags['discover_vulcan']) islands++;
+    if (s.narrativeFlags['discover_hyperborea']) islands++;
+    if (s.narrativeFlags['discover_plenty']) islands++;
+    if (s.narrativeFlags['discover_necropolis']) islands++;
+  }
+
+  let lineY = cy - 70;
+  let lineH = 24;
+  textSize(9);
+
+  // Animated reveal — each line fades in sequentially
+  let lines = [
+    { col: [200, 230, 255], txt: days + ' suns have risen since the shipwreck' },
+    { col: [200, 180, 140], txt: buildings + ' stones laid upon the earth' },
+    { col: [140, 200, 255], txt: fish + ' creatures drawn from the deep' },
+    { col: [140, 200, 100], txt: crops + ' seeds coaxed into bloom' },
+    { col: [200, 100, 100], txt: enemies + ' foes faced in the dark' },
+    { col: [255, 180, 200], txt: hearts > 0 ? 'A bond of ' + hearts + ' hearts with Livia' : 'No bonds yet forged' },
+    { col: [200, 180, 255], txt: islands + ' distant shores touched by your feet' },
+  ];
+
+  for (let i = 0; i < lines.length; i++) {
+    let lineAlpha = max(0, min(1, (t - 40 - i * 30) / 40)) * alpha;
+    if (lineAlpha <= 0) continue;
+    let l = lines[i];
+    fill(l.col[0], l.col[1], l.col[2], floor(200 * lineAlpha));
+    text(l.txt, cx, lineY + i * lineH);
+  }
+
+  // Bottom inscription
+  let endAlpha = max(0, min(1, (t - 320) / 60)) * alpha;
+  if (endAlpha > 0) {
+    fill(160, 210, 240, floor(120 * endAlpha));
+    textSize(7); textStyle(ITALIC);
+    text('The ice remembers what the living forget.', cx, cy + poolH / 2 - 40);
+    textStyle(NORMAL);
+    fill(100, 160, 200, floor(80 * endAlpha));
+    textSize(6);
+    text('SECRET FOUND: Ice Mirror of Hyperborea', cx, cy + poolH / 2 - 22);
+  }
+
+  textAlign(LEFT);
+  pop();
+}
+
+function drawRoom13Overlay() {
+  let t = state._room13Timer || 0;
+  let fadeIn = min(1, t / 50);
+  let fadeOut = t > 400 ? max(0, 1 - (t - 400) / 80) : 1;
+  let alpha = fadeIn * fadeOut;
+  if (alpha <= 0) return;
+
+  push();
+  // Deep purple-black overlay
+  fill(10, 5, 20, floor(220 * alpha));
+  rect(0, 0, width, height);
+
+  let cx = width / 2, cy = height / 2;
+
+  // Stone tablet frame
+  fill(35, 28, 42, floor(240 * alpha));
+  rect(cx - 130, cy - 150, 260, 300, 4);
+  fill(48, 40, 58, floor(200 * alpha));
+  rect(cx - 125, cy - 145, 250, 290, 3);
+
+  // Glowing border runes
+  let runePulse = sin(frameCount * 0.04) * 0.3 + 0.7;
+  fill(160, 80, 220, floor(40 * runePulse * alpha));
+  for (let i = 0; i < 16; i++) {
+    let rx, ry;
+    if (i < 4) { rx = cx - 128 + i * 85; ry = cy - 148; }
+    else if (i < 8) { rx = cx + 122; ry = cy - 148 + (i - 4) * 98; }
+    else if (i < 12) { rx = cx + 122 - (i - 8) * 85; ry = cy + 142; }
+    else { rx = cx - 128; ry = cy + 142 - (i - 12) * 98; }
+    rect(floor(rx), floor(ry), 4, 4);
+  }
+
+  // Title
+  fill(200, 140, 255, floor(230 * alpha));
+  textAlign(CENTER); textSize(16); textStyle(BOLD);
+  text('ROOM XIII', cx, cy - 110);
+  textStyle(NORMAL);
+
+  // Lore tablet text — revealed line by line
+  textSize(8);
+  let lore = [
+    'Here lies the secret of the Thirteenth',
+    'Tomb of the Necropolis — a chamber',
+    'sealed by the priests of old.',
+    '',
+    'Those who feared death most',
+    'built this room to hide from it.',
+    'They failed, but left behind',
+    'a shroud woven from shadow.',
+    '',
+    'Wear it, and the dead',
+    'shall mistake you for their own.',
+  ];
+
+  for (let i = 0; i < lore.length; i++) {
+    let lineAlpha = max(0, min(1, (t - 30 - i * 18) / 30)) * alpha;
+    if (lineAlpha <= 0) continue;
+    fill(180, 160, 210, floor(200 * lineAlpha));
+    text(lore[i], cx, cy - 70 + i * 18);
+  }
+
+  // Reward notification
+  let rewardAlpha = max(0, min(1, (t - 280) / 50)) * alpha;
+  if (rewardAlpha > 0) {
+    fill(255, 200, 100, floor(200 * rewardAlpha));
+    textSize(9);
+    text('Obtained: Death Shroud', cx, cy + 110);
+    fill(180, 120, 255, floor(160 * rewardAlpha));
+    textSize(7);
+    text('+5 Soul Essence', cx, cy + 126);
+    fill(120, 100, 160, floor(100 * rewardAlpha));
+    textSize(6);
+    text('SECRET FOUND: Room XIII of the Necropolis', cx, cy + 142);
+  }
+
+  textAlign(LEFT);
+  pop();
+}
+
+function drawVolcanoHeartOverlay() {
+  let t = state._volcanoHeartTimer || 0;
+  let fadeIn = min(1, t / 50);
+  let fadeOut = t > 400 ? max(0, 1 - (t - 400) / 80) : 1;
+  let alpha = fadeIn * fadeOut;
+  if (alpha <= 0) return;
+
+  push();
+  // Deep red-black overlay
+  fill(15, 3, 2, floor(210 * alpha));
+  rect(0, 0, width, height);
+
+  let cx = width / 2, cy = height / 2;
+
+  // Volcanic chamber — rough hewn rock frame
+  fill(40, 18, 8, floor(240 * alpha));
+  rect(cx - 140, cy - 130, 280, 260, 6);
+  fill(55, 28, 12, floor(200 * alpha));
+  rect(cx - 135, cy - 125, 270, 250, 4);
+
+  // Lava cracks in the frame
+  let lavaPulse = sin(frameCount * 0.05) * 0.4 + 0.6;
+  fill(255, 80, 15, floor(40 * lavaPulse * alpha));
+  rect(cx - 133, cy - 60, 266, 1);
+  rect(cx - 133, cy + 20, 266, 1);
+  rect(cx - 80, cy - 123, 1, 246);
+  rect(cx + 80, cy - 123, 1, 246);
+
+  // Crystal in the center — pulsing
+  let crystalGlow = sin(frameCount * 0.06) * 0.3 + 0.7;
+  fill(255, 100, 30, floor(50 * crystalGlow * alpha)); ellipse(cx, cy - 30, 60, 60);
+  fill(255, 160, 50, floor(80 * crystalGlow * alpha)); ellipse(cx, cy - 30, 36, 36);
+  fill(255, 220, 100, floor(100 * crystalGlow * alpha)); ellipse(cx, cy - 30, 18, 18);
+  fill(255, 250, 200, floor(60 * crystalGlow * alpha)); ellipse(cx, cy - 30, 8, 8);
+
+  // Title
+  fill(255, 180, 80, floor(230 * alpha));
+  textAlign(CENTER); textSize(14); textStyle(BOLD);
+  text('HEART OF VULCAN', cx, cy - 90);
+  textStyle(NORMAL);
+
+  // Description
+  textSize(8);
+  let desc = [
+    'Deep beneath the crater,',
+    'where obsidian meets frost,',
+    'the mountain yields its secret:',
+    'a crystal forged in the world\'s first fire.',
+    '',
+    'Its warmth enters your veins.',
+    'You feel... stronger.',
+  ];
+
+  for (let i = 0; i < desc.length; i++) {
+    let lineAlpha = max(0, min(1, (t - 40 - i * 22) / 30)) * alpha;
+    if (lineAlpha <= 0) continue;
+    fill(255, 200, 150, floor(200 * lineAlpha));
+    text(desc[i], cx, cy + 10 + i * 18);
+  }
+
+  // Reward
+  let rewardAlpha = max(0, min(1, (t - 260) / 50)) * alpha;
+  if (rewardAlpha > 0) {
+    fill(255, 220, 100, floor(200 * rewardAlpha));
+    textSize(9);
+    text('+10 Max HP  |  +3 Crystals', cx, cy + 100);
+    fill(200, 120, 60, floor(100 * rewardAlpha));
+    textSize(6);
+    text('SECRET FOUND: Heart of Vulcan', cx, cy + 118);
+  }
+
+  textAlign(LEFT);
+  pop();
 }

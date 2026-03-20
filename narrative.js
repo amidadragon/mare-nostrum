@@ -546,7 +546,69 @@ const FELIX_DIALOGUE_POOL = [
   { text: "Rain day. Perfect for research. The scrolls disagree but they'll dry.", minH: 2, maxH: 11, weather: 'rain' },
 ];
 
+// ─── MAX HEARTS ENDGAME DIALOGUE — keeps NPCs alive at full friendship ──
+const LIVIA_MAX_DIALOGUE = [
+  "I found wild thyme by the cliff today. Smelled like the garden in Rome. I kept some for you.",
+  "Do you ever think about what we'd be doing if none of this happened? I don't. Not anymore.",
+  "The olive tree by the villa is bearing fruit. Our first harvest together. I saved the biggest one.",
+  "I wrote your name in the margin of my father's scroll. He would have approved.",
+  "Sometimes I stand at the dock and watch the horizon. Not waiting for rescue. Just... watching. With you.",
+  "The cats have claimed the sunny spot by the amphora again. I've given up fighting them.",
+  "I made extra bread today. Take some. No, take it. I insist.",
+  "The wind changed direction today. It smells like cinnamon from somewhere far away.",
+];
+const MARCUS_MAX_DIALOGUE = [
+  "Polished my gladius this morning. Force of habit. The peace here makes me restless... in a good way.",
+  "Caught three mackerel before dawn. Take one. Consider it a standing order from your centurion.",
+  "I've been teaching the young ones sword forms. They're terrible. Reminds me of myself.",
+  "Found an old legionary coin in the sand. Keep it. For luck. Not that you need it.",
+  "The walls are holding well. I check them every morning. Old soldiers never stop patrolling.",
+  "I carved a chess set from driftwood. You're the only one here worth playing against.",
+  "Dreamed of marching with the Ninth again last night. Woke up glad to be here instead.",
+  "Storm's coming. I stocked extra firewood by your door. Don't read into it.",
+];
+const VESTA_MAX_DIALOGUE = [
+  "The crystals hummed your name this morning. They do that now. I think they're fond of you.",
+  "I pressed a flower into resin for you. It will glow faintly at night. A small blessing.",
+  "The stars rearranged last night. A new constellation. I'm naming it after you.",
+  "I saw tomorrow in the flames. It was warm. You were smiling. That's all I needed to see.",
+  "Take this crystal shard. I've been singing to it for a week. It carries a prayer for you.",
+  "The temple walls are warm today. The island is content. It knows we are here.",
+  "I dreamed of a city of light beneath the waves. Perhaps one day we'll find it together.",
+  "Every flame I tend is a word in a letter to the gods. Today's letter is about gratitude.",
+];
+const FELIX_MAX_DIALOGUE = [
+  "Chapter sixty-three: 'On Friendship in Exile.' It's the best chapter. Don't tell the cats.",
+  "Minerva brought me a live crab this morning. I think she's trying to expand my research.",
+  "I found a passage in the old texts about laughter curing stone rot. Testing it on the columns.",
+  "Take this scroll copy. My notes on local tides. Useless to most. Invaluable to you.",
+  "The cats and I took a vote. You're an honorary member of the research team. Unanimous.",
+  "I've started a second manuscript. Working title: 'Why I Stopped Missing Rome.' Short book.",
+  "A bird landed on my scroll and left a footprint in the wet ink. I'm keeping it. Art.",
+  "Drew a map of every path you've walked on this island. The lines make a shape. I think it's a heart.",
+];
+
+function getMaxHeartsDialogue(npcName) {
+  let pool = npcName === 'livia' ? LIVIA_MAX_DIALOGUE :
+             npcName === 'marcus' ? MARCUS_MAX_DIALOGUE :
+             npcName === 'vesta' ? VESTA_MAX_DIALOGUE :
+             npcName === 'felix' ? FELIX_MAX_DIALOGUE : null;
+  if (!pool) return null;
+  let npcState = npcName === 'livia' ? state.npc :
+                 npcName === 'marcus' ? state.marcus :
+                 npcName === 'vesta' ? state.vesta : state.felix;
+  if (!npcState || npcState.hearts < 10) return null;
+  let daySeed = Math.floor(Date.now() / 86400000);
+  let npcOffset = { livia: 0, marcus: 3, vesta: 5, felix: 7 }[npcName] || 0;
+  let idx = (daySeed + npcOffset + Math.floor(frameCount / 3600)) % pool.length;
+  return pool[idx];
+}
+
 function getExpandedDialogue(npcName) {
+  // At max hearts, 50% chance to pull from endgame pool for variety
+  let maxLine = (typeof getMaxHeartsDialogue === 'function') ? getMaxHeartsDialogue(npcName) : null;
+  if (maxLine && random() < 0.5) return maxLine;
+
   let pool = npcName === 'livia' ? LIVIA_DIALOGUE_POOL :
              npcName === 'marcus' ? MARCUS_DIALOGUE_POOL :
              npcName === 'vesta' ? VESTA_DIALOGUE_POOL :
@@ -722,6 +784,47 @@ function initNarrativeState() {
   if (!state.npcReactionQueue) state.npcReactionQueue = [];
   if (!state.mainQuest.counters) state.mainQuest.counters = {};
   if (!state.npcQuests.counters) state.npcQuests.counters = {};
+}
+
+// ─── EARLY GAME TUTORIAL NUDGES — guide new players through gather→build→reward ───
+function tickEarlyGameNudges(dt) {
+  if (!state.mainQuest || !state.progression || !state.progression.homeIslandReached) return;
+  let ch = state.mainQuest.chapter;
+  if (ch > 1) return; // only active during chapters 0 and 1
+  if (!state._earlyNudges) state._earlyNudges = { timer: 0, shown: {} };
+  let en = state._earlyNudges;
+  en.timer += dt;
+
+  // Chapter 1: gather→build→reward micro-loop nudges
+  if (ch === 1) {
+    let counters = state.mainQuest.counters || {};
+    let planted = state.plots ? state.plots.filter(p => p.planted).length : 0;
+    let harvested = counters['mq_harvested'] || 0;
+    let built = counters['mq_built'] || 0;
+
+    // Nudge 1: plant crops (after ~10 seconds on chapter 1)
+    if (!en.shown['plant'] && planted < 3 && en.timer > 600) {
+      en.shown['plant'] = true;
+      addFloatingText(width / 2, height * 0.18, 'Walk to the farm plots and press [E] to plant crops!', '#ddc880');
+      addFloatingText(width / 2, height * 0.23, 'You need seeds — check your inventory.', '#bbaa70');
+    }
+    // Nudge 2: harvest when crops grow
+    if (!en.shown['harvest'] && planted >= 3 && harvested < 3 && en.timer > 1800) {
+      en.shown['harvest'] = true;
+      addFloatingText(width / 2, height * 0.18, 'Your crops are growing! Harvest them when they glow.', '#88cc44');
+    }
+    // Nudge 3: build after some harvesting
+    if (!en.shown['build'] && harvested >= 3 && built < 1 && en.timer > 2400) {
+      en.shown['build'] = true;
+      addFloatingText(width / 2, height * 0.18, 'Press [B] to open the build menu. Place your first structure!', '#aaddff');
+    }
+    // Nudge 4: encouragement after first build
+    if (!en.shown['reward'] && built >= 1 && harvested >= 1) {
+      en.shown['reward'] = true;
+      addFloatingText(width / 2, height * 0.15, 'Your island is taking shape! Keep building to grow.', '#ffd700');
+      if (typeof snd !== 'undefined' && snd) snd.playSFX('fanfare');
+    }
+  }
 }
 
 function updateMainQuest() {

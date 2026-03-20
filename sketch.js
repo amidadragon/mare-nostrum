@@ -691,6 +691,9 @@ function initState() {
     islandLevel: 1,
     islandRX: WORLD.islandRX,
     islandRY: WORLD.islandRY,
+    islandName: null,         // set by player at level 10
+    islandNamingOpen: false,  // UI overlay flag
+    islandNamingInput: '',    // typing buffer
 
     // Temple blessing — random buff for 1 day
     blessing: { type: null, timer: 0, cooldown: 0 },
@@ -1755,6 +1758,7 @@ function drawInner() {
   if (state.vulcan.active) {
     updatePlayerAnim(dt);
     updateVulcanIsland(dt);
+    if (typeof updateSecretOverlays === 'function') updateSecretOverlays(dt);
     updateParticles(dt);
     updateFloatingText(dt);
     updateShake(dt);
@@ -1766,12 +1770,14 @@ function drawInner() {
     drawVulcanEntities();
     drawParticles(); drawFloatingText(); pop();
     drawVulcanHUD();
+    if (typeof drawSecretOverlays === 'function') drawSecretOverlays();
     drawGameVignette(); drawScreenFlash(); drawCursor();
     return;
   }
   if (state.hyperborea.active) {
     updatePlayerAnim(dt);
     updateHyperboreIsland(dt);
+    if (typeof updateSecretOverlays === 'function') updateSecretOverlays(dt);
     updateParticles(dt);
     updateFloatingText(dt);
     updateShake(dt);
@@ -1783,12 +1789,14 @@ function drawInner() {
     drawHyperboreEntities();
     drawParticles(); drawFloatingText(); pop();
     drawHyperboreHUD();
+    if (typeof drawSecretOverlays === 'function') drawSecretOverlays();
     drawGameVignette(); drawScreenFlash(); drawCursor();
     return;
   }
   if (state.plenty.active) {
     updatePlayerAnim(dt);
     updatePlentyIsland(dt);
+    if (typeof updateSecretOverlays === 'function') updateSecretOverlays(dt);
     updateParticles(dt);
     updateFloatingText(dt);
     updateShake(dt);
@@ -1800,6 +1808,7 @@ function drawInner() {
     drawPlentyEntities();
     drawParticles(); drawFloatingText(); pop();
     drawPlentyHUD();
+    if (typeof drawSecretOverlays === 'function') drawSecretOverlays();
     drawGameVignette(); drawScreenFlash(); drawCursor();
     return;
   }
@@ -1807,6 +1816,7 @@ function drawInner() {
     updatePlayerCombat(dt);
     updatePlayerAnim(dt);
     updateNecropolisIsland(dt);
+    if (typeof updateSecretOverlays === 'function') updateSecretOverlays(dt);
     updateParticles(dt);
     updateFloatingText(dt);
     updateShake(dt);
@@ -1818,6 +1828,7 @@ function drawInner() {
     drawNecropolisEntities();
     drawParticles(); drawFloatingText(); pop();
     drawNecropolisHUD();
+    if (typeof drawSecretOverlays === 'function') drawSecretOverlays();
     drawGameVignette(); drawScreenFlash(); drawCursor();
     return;
   }
@@ -1953,6 +1964,7 @@ function drawInner() {
     // Narrative engine updates
     if (typeof updateMainQuest === 'function') { updateMainQuest(); updateNPCQuests(); updateNarrativeDialogue(); checkLoreTabletPickup(); }
     if (typeof tickPendingNudges === 'function') tickPendingNudges(dt);
+    if (typeof tickEarlyGameNudges === 'function') tickEarlyGameNudges(dt);
     updateDialog(dt);
     updateAchievementPopup(dt);
     updateScreenTransition(dt);
@@ -2230,6 +2242,7 @@ function drawInner() {
     if (!state.conquest.active && !state.adventure.active) {
       drawNightOverlay();
       drawColorGrading();
+      drawGameVignette();
     }
 
     if (!screenshotMode) {
@@ -2258,6 +2271,7 @@ function drawInner() {
       drawEmpireDashboard();
       drawInventoryScreen();
       if (typeof drawSkillTree === 'function') drawSkillTree();
+      if (typeof drawRecipeBookUI === 'function') drawRecipeBookUI();
       drawLegiaUI();
       drawExpeditionSummaryOverlay();
       if (typeof drawArenaSummaryOverlay === 'function') drawArenaSummaryOverlay();
@@ -2266,6 +2280,7 @@ function drawInner() {
       if (typeof drawEconomyUIOverlay === 'function') drawEconomyUIOverlay();
       drawScreenTransition();
       drawImperatorCeremony();
+      drawIslandNamingOverlay();
       // Photo mode hint — always visible at low alpha
       if (!photoMode) {
         push(); noStroke();
@@ -2614,32 +2629,28 @@ function drawOcean() {
     rect(0, y0, width, oceanH / 12 + 2);
   }
 
-  // Animated sine wave scan-lines — stepped pixel art
+  // Animated sine wave scan-lines — stepped pixel art (larger step, fewer rects)
   let waveStep = floor(t * 0.8);
-  for (let wy = oceanTop + 4; wy < height; wy += 7) {
+  for (let wy = oceanTop + 4; wy < height; wy += 14) {
     let depthFade = 1 - (wy - oceanTop) / (height - oceanTop) * 0.6;
     let waveAlpha = (25 + 22 * dayMix) * depthFade;
     let offsetX = floor(sin(t * 0.5 + wy * 0.03) * 12);
-    // Primary wave highlight
+    // Primary wave highlight — wider segments, bigger spacing
     fill(120 + 70 * dayMix, 175 + 50 * dayMix, 210 + 30 * dayMix, waveAlpha);
-    for (let wx = offsetX % 28; wx < width; wx += 28) {
-      let segW = 12 + floor(sin(wy * 0.07 + wx * 0.04 + waveStep * 0.1) * 4);
-      rect(wx, wy, segW, 2);
+    for (let wx = offsetX % 56; wx < width; wx += 56) {
+      let segW = 24 + floor(sin(wy * 0.07 + wx * 0.04 + waveStep * 0.1) * 8);
+      rect(wx, wy, segW, 3);
     }
-    // Secondary sine wave (counter-phase for depth)
-    if (floor(wy / 7) % 2 === 0) {
-      let off2 = floor(sin(t * 0.35 + wy * 0.05 + 2) * 8);
-      fill(90 + 50 * dayMix, 150 + 40 * dayMix, 195 + 25 * dayMix, waveAlpha * 0.5);
-      for (let wx = off2 % 35; wx < width; wx += 35) {
-        rect(wx, wy + 3, 8 + floor(sin(wy * 0.05 + wx * 0.03) * 3), 1);
-      }
+    // Secondary sine wave (counter-phase for depth) — every other row
+    let off2 = floor(sin(t * 0.35 + wy * 0.05 + 2) * 8);
+    fill(90 + 50 * dayMix, 150 + 40 * dayMix, 195 + 25 * dayMix, waveAlpha * 0.5);
+    for (let wx = off2 % 70; wx < width; wx += 70) {
+      rect(wx, wy + 5, 16 + floor(sin(wy * 0.05 + wx * 0.03) * 6), 2);
     }
     // Dark dither trough
-    if (floor(wy / 7) % 3 === 0) {
-      fill(10 + 20 * dayMix, 25 + 50 * dayMix, 50 + 70 * dayMix, waveAlpha * 0.6);
-      for (let wx = (offsetX + 14) % 28; wx < width; wx += 36) {
-        rect(wx, wy + 3, 8, 1);
-      }
+    fill(10 + 20 * dayMix, 25 + 50 * dayMix, 50 + 70 * dayMix, waveAlpha * 0.6);
+    for (let wx = (offsetX + 14) % 56; wx < width; wx += 72) {
+      rect(wx, wy + 7, 16, 2);
     }
   }
 
@@ -2914,8 +2925,13 @@ function openNightMarket() {
   state.nightMarket.active = true;
   state.nightMarket.shopOpen = false;
   unlockJournal('night_market');
-  addFloatingText(width / 2, height * 0.25, 'The Night Market has arrived!', '#ffaa44');
-  spawnParticles(state.player.x, state.player.y, 'build', 15);
+  addFloatingText(width / 2, height * 0.20, 'The Night Market has arrived!', '#ffaa44');
+  addFloatingText(width / 2, height * 0.26, 'Find the merchant to browse rare wares.', '#cc8833');
+  addNotification('Night Market open until midnight!', '#ffaa44');
+  if (typeof snd !== 'undefined' && snd) snd.playSFX('fanfare');
+  let mp = getMarketPosition();
+  spawnParticles(mp.x, mp.y, 'divine', 20);
+  state.screenFlash = { r: 255, g: 180, b: 50, alpha: 40, timer: 30 };
 }
 
 function canAffordMarketItem(item) {
@@ -3612,13 +3628,13 @@ function drawWeatherEffects() {
     rect(0, 0, width, height);
 
   } else if (w.type === 'heatwave') {
-    // Heat shimmer — enhanced wavy distortion
+    // Heat shimmer — fewer, larger distortion bands
     noStroke();
-    for (let y = height * 0.45; y < height; y += 8) {
+    for (let y = height * 0.45; y < height; y += 28) {
       let wave = sin(y * 0.04 + frameCount * 0.06) * 3;
       let wave2 = cos(y * 0.07 + frameCount * 0.04) * 1.5;
       fill(255, 210, 120, 6 * w.intensity);
-      rect(wave + wave2, y, width, 5);
+      rect(wave + wave2, y, width, 18);
     }
     // Sun intensifier with rays
     let heatPulse = sin(frameCount * 0.03) * 0.2 + 0.8;
@@ -5726,6 +5742,26 @@ function drawOneBuilding(b) {
 
     push();
     translate(sx, sy);
+
+    // Directional cast shadow for tall buildings
+    if (!['floor', 'mosaic', 'bridge'].includes(b.type)) {
+      let _sh = state.time / 60;
+      if (_sh >= 6 && _sh <= 19) {
+        // Sun from east (morning) to west (afternoon) — shadow falls opposite
+        let sunAngle = map(_sh, 6, 19, -1, 1); // -1=east sun, +1=west sun
+        let shadowLen = map(abs(_sh - 12.5), 0, 6.5, 0.3, 1.2); // longer at dawn/dusk
+        let shadowOffX = sunAngle * bw * shadowLen;
+        let shadowH = (bh || 20) * 0.3;
+        noStroke();
+        fill(0, 0, 0, 18);
+        quad(
+          -bw / 2, 0,
+          bw / 2, 0,
+          bw / 2 + shadowOffX, shadowH,
+          -bw / 2 + shadowOffX, shadowH
+        );
+      }
+    }
 
     switch (b.type) {
       case 'wall':
@@ -9088,8 +9124,12 @@ function updateParticles(dt) {
     }
   }
 
-  // Butterflies — daytime, near farm
-  if (bright > 0.4 && frameCount % 45 === 0 && particles.filter(p => p.type === 'butterfly').length < 4) {
+  // Butterflies — daytime, near farm (count with early exit instead of full scan)
+  let _bflyCount = 0;
+  if (bright > 0.4 && frameCount % 45 === 0) {
+    for (let i = 0; i < particles.length && _bflyCount < 4; i++) { if (particles[i].type === 'butterfly') _bflyCount++; }
+  }
+  if (_bflyCount < 4 && bright > 0.4 && frameCount % 45 === 0) {
     let bx = WORLD.islandCX - 220 + random(-100, 100);
     let by = WORLD.islandCY + random(-40, 30);
     particles.push({
@@ -9692,10 +9732,10 @@ function drawColorGrading() {
     r = lerp(50, 255, t * 0.3); g = lerp(20, 180, t * 0.2); b = lerp(70, 100, t * 0.1);
     a = lerp(35, 15, t);
   } else if (h >= 6.5 && h < 8) {
-    // Early morning: fading warm mist
+    // Sunrise golden hour: warm amber glow
     let t = map(h, 6.5, 8, 0, 1);
-    r = 255; g = 210; b = 140;
-    a = lerp(12, 0, t);
+    r = 255; g = 195; b = 100;
+    a = lerp(22, 4, t);
   } else if (h >= 11.5 && h < 14) {
     // Noon: warm bleached highlight
     let t = map(h, 11.5, 14, 0, 1);
@@ -9708,14 +9748,14 @@ function drawColorGrading() {
     let intensity = sin(t * PI);
     r = 255; g = 175; b = 55;
     a = 35 * intensity;
-  } else if (h >= 17 && h < 18.5) {
-    // Sunset: orange-red intensifying
-    let t = map(h, 17, 18.5, 0, 1);
-    r = lerp(255, 200, t); g = lerp(140, 60, t); b = lerp(50, 80, t);
-    a = lerp(28, 38, t);
-  } else if (h >= 18.5 && h < 20.5) {
+  } else if (h >= 17 && h < 19) {
+    // Sunset golden hour: deep amber to orange-red
+    let t = map(h, 17, 19, 0, 1);
+    r = lerp(255, 200, t); g = lerp(160, 60, t); b = lerp(55, 80, t);
+    a = lerp(32, 40, t);
+  } else if (h >= 19 && h < 20.5) {
     // Dusk: deep purple settling
-    let t = map(h, 18.5, 20.5, 0, 1);
+    let t = map(h, 19, 20.5, 0, 1);
     r = lerp(120, 15, t); g = lerp(50, 12, t); b = lerp(100, 50, t);
     a = lerp(30, 45, t);
   } else if (h >= 20.5 || h < 5) {
@@ -15371,6 +15411,8 @@ function touchStarted() {
 
 function keyPressed() {
   if (snd) snd.resume();
+  // Island naming overlay intercepts all keys when open
+  if (typeof handleIslandNamingKey === 'function' && handleIslandNamingKey(key, keyCode)) return;
   // Debug console intercepts all keys when open
   if (typeof Debug !== 'undefined' && Debug.handleKey(key, keyCode)) return;
   if (gameScreen !== 'game') {
@@ -15435,6 +15477,7 @@ function keyPressed() {
     if (state.legia && state.legia.legiaUIOpen) { state.legia.legiaUIOpen = false; return; }
     if (state.activeEvent && state.activeEvent.data && state.activeEvent.data.shopOpen) { state.activeEvent.data.shopOpen = false; return; }
     if (state.naturalistOpen) { state.naturalistOpen = false; return; }
+    if (typeof recipeBookOpen !== 'undefined' && recipeBookOpen) { recipeBookOpen = false; return; }
     if (empireDashOpen) { empireDashOpen = false; return; }
     if (inventoryOpen) { inventoryOpen = false; return; }
     if (typeof skillTreeOpen !== 'undefined' && skillTreeOpen) { skillTreeOpen = false; return; }
@@ -15871,11 +15914,13 @@ function keyPressed() {
         let heartText = giftHearts > 1 ? '♥ +' + giftHearts + ' Hearts (' + giftName + ')' : '♥ +Heart';
         addFloatingText(w2sX(n.x), w2sY(n.y) - 30, heartText, '#ff6688');
         npcHeartPop(n);
+        if (snd) snd.playSFX('gift_accepted');
         state.dailyActivities.gifted++;
         unlockJournal('npc_friend');
         if (n.hearts >= 5) unlockJournal('five_hearts');
         checkHeartMilestones(n.hearts);
       } else {
+        if (snd) snd.playSFX('dialogue_open');
         // Check for Livia personal quest first
         let _liviaQ = (typeof getAvailableNPCQuest === 'function' && state.npcQuests) ? getAvailableNPCQuest('livia') : null;
         if (_liviaQ && !state.npcQuests.livia.active) {
@@ -15934,11 +15979,12 @@ function keyPressed() {
           nn.currentLine = getNPCDialogue(nn, lines, mid, high);
           nn.dialogTimer = 180;
           npcHeartPop(nn);
-          if (snd) snd.playSFX('heart');
+          if (snd) snd.playSFX('gift_accepted');
           state.dailyActivities.gifted++;
           let ht = giftH > 1 ? '+' + giftH + ' Hearts (' + giftN + ')' : '+Heart';
           addFloatingText(w2sX(nn.x), w2sY(nn.y) - 30, ht, '#ff6688');
         } else {
+          if (snd) snd.playSFX('dialogue_open');
           // Offer NPC personal quest or use expanded dialogue
           let _nk = name.toLowerCase();
           let _aq = (typeof getAvailableNPCQuest === 'function' && state.npcQuests) ? getAvailableNPCQuest(_nk) : null;
@@ -16087,8 +16133,16 @@ function keyPressed() {
     if (key === '6') { state.naturalistTab = 5; return; }
   }
 
+  // Recipe Book toggle (G key)
+  if (key === 'g' || key === 'G') {
+    if (typeof recipeBookOpen !== 'undefined') {
+      recipeBookOpen = !recipeBookOpen;
+      return;
+    }
+  }
+
   // Block input when overlays are open
-  if (empireDashOpen || inventoryOpen || state.naturalistOpen || wardrobeOpen) return;
+  if (empireDashOpen || inventoryOpen || state.naturalistOpen || wardrobeOpen || (typeof recipeBookOpen !== 'undefined' && recipeBookOpen)) return;
 
   // Villa Codex toggle (C key)
   if (key === 'c' || key === 'C') {
@@ -16577,6 +16631,88 @@ function drawImperatorCeremony() {
   pop();
 }
 
+// ─── ISLAND NAMING OVERLAY — triggered at level 10 ──────────────────────
+function drawIslandNamingOverlay() {
+  if (!state.islandNamingOpen) return;
+  push();
+  rectMode(CORNER);
+  noStroke();
+  fill(0, 0, 0, 180);
+  rect(0, 0, width, height);
+  let pw = 320,
+    ph = 140;
+  let px = (width - pw) / 2,
+    py = (height - ph) / 2;
+  fill(35, 28, 18, 245);
+  rect(px, py, pw, ph, 6);
+  stroke(180, 145, 70, 220);
+  strokeWeight(2);
+  noFill();
+  rect(px, py, pw, ph, 6);
+  noStroke();
+  fill(212, 175, 80);
+  textAlign(CENTER, TOP);
+  textSize(12);
+  text('NAME YOUR ISLAND', width / 2, py + 14);
+  fill(180, 160, 120);
+  textSize(8);
+  text('You have earned the title of Governor.', width / 2, py + 34);
+  text('Give your island a name worthy of Rome.', width / 2, py + 46);
+  fill(25, 20, 15);
+  rect(px + 30, py + 66, pw - 60, 24, 3);
+  stroke(140, 115, 60, 120);
+  strokeWeight(1);
+  noFill();
+  rect(px + 30, py + 66, pw - 60, 24, 3);
+  noStroke();
+  fill(220, 200, 160);
+  textSize(11);
+  textAlign(CENTER, CENTER);
+  let displayText = state.islandNamingInput || '';
+  let blink = frameCount % 60 < 30 ? '|' : '';
+  text(displayText + blink, width / 2, py + 78);
+  fill(140, 120, 80, 180);
+  textSize(8);
+  textAlign(CENTER, TOP);
+  let canConfirm = displayText.trim().length >= 1;
+  text(canConfirm ? '[Enter] to confirm' : 'Type a name...', width / 2, py + 100);
+  fill(100, 90, 70, 140);
+  text(canConfirm ? '[Escape] to skip' : '[Escape] to skip — default: "Insula Nova"', width / 2, py + 114);
+  pop();
+}
+
+function handleIslandNamingKey(k, kc) {
+  if (!state.islandNamingOpen) return false;
+  if (kc === 13) {
+    let name = (state.islandNamingInput || '').trim();
+    if (name.length < 1) name = 'Insula Nova';
+    state.islandName = name;
+    state.islandNamingOpen = false;
+    state.islandNamingInput = '';
+    addFloatingText(width / 2, height * 0.2, 'Your island: ' + state.islandName, '#ffd700');
+    if (typeof snd !== 'undefined' && snd) snd.playSFX('fanfare');
+    if (typeof saveGame === 'function') saveGame();
+    return true;
+  }
+  if (kc === 27) {
+    state.islandName = (state.islandNamingInput || '').trim() || 'Insula Nova';
+    state.islandNamingOpen = false;
+    state.islandNamingInput = '';
+    addFloatingText(width / 2, height * 0.2, 'Your island: ' + state.islandName, '#ffd700');
+    if (typeof saveGame === 'function') saveGame();
+    return true;
+  }
+  if (kc === 8) {
+    state.islandNamingInput = (state.islandNamingInput || '').slice(0, -1);
+    return true;
+  }
+  if (k.length === 1 && (state.islandNamingInput || '').length < 24) {
+    state.islandNamingInput = (state.islandNamingInput || '') + k;
+    return true;
+  }
+  return true;
+}
+
 function saveGame() {
   let saveData = {
     version: 7,
@@ -16592,7 +16728,7 @@ function saveGame() {
     felixHearts: state.felix ? state.felix.hearts : 0,
     harvestComboBestEver: state.harvestCombo.bestEver || 0,
     solar: state.solar, maxSolar: state.maxSolar,
-    islandLevel: state.islandLevel, islandRX: state.islandRX, islandRY: state.islandRY,
+    islandLevel: state.islandLevel, islandRX: state.islandRX, islandRY: state.islandRY, islandName: state.islandName || null,
     pyramidLevel: state.pyramid.level,
     insideTemple: false,
     playerX: state.player.x, playerY: state.player.y, playerFacing: state.player.facing,
@@ -16950,6 +17086,7 @@ function loadGame() {
     }
     state.solar = d.solar || 80; state.maxSolar = d.maxSolar || 100;
     state.islandLevel = d.islandLevel || 1; state.islandRX = d.islandRX || WORLD.islandRX; state.islandRY = d.islandRY || WORLD.islandRY;
+    state.islandName = d.islandName || null;
     updatePortPositions(); // recompute from restored island size (must be after islandRX/RY load)
     if (d.pyramidLevel) state.pyramid.level = d.pyramidLevel;
     state.player.x = d.playerX || WORLD.islandCX; state.player.y = d.playerY || WORLD.islandCY;
@@ -18094,6 +18231,11 @@ function expandIsland() {
   let cx = WORLD.islandCX, cy = WORLD.islandCY;
   if (state.islandLevel === 10) {
     unlockJournal('imperial_governor');
+    // Island naming prompt at level 10
+    if (!state.islandName) {
+      state.islandNamingOpen = true;
+      state.islandNamingInput = '';
+    }
   }
   if (state.islandLevel === 15) {
     unlockJournal('imperial_senator');

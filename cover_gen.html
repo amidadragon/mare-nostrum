@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Mare Nostrum Cover</title>
+<style>
+  body { margin: 0; background: #222; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }
+  canvas { border: none; }
+  button { margin-top: 16px; padding: 10px 24px; font-size: 16px; cursor: pointer; background: #c8956e; color: #fff; border: none; border-radius: 4px; }
+  button:hover { background: #b07a55; }
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<canvas id="cover" width="630" height="500"></canvas>
+<button onclick="downloadCover()">Download as PNG</button>
+
+<script>
+const canvas = document.getElementById('cover');
+const ctx = canvas.getContext('2d');
+const W = 630, H = 500;
+
+// --- Sky gradient ---
+const sky = ctx.createLinearGradient(0, 0, 0, H * 0.7);
+sky.addColorStop(0, '#1a1a3e');
+sky.addColorStop(0.25, '#2d2460');
+sky.addColorStop(0.45, '#6b3a6e');
+sky.addColorStop(0.65, '#c46a3a');
+sky.addColorStop(0.85, '#e8a84c');
+sky.addColorStop(1, '#f0c86e');
+ctx.fillStyle = sky;
+ctx.fillRect(0, 0, W, H);
+
+// --- Stars ---
+function drawStar(x, y, size, alpha) {
+  ctx.fillStyle = `rgba(255, 255, 230, ${alpha})`;
+  ctx.fillRect(Math.floor(x), Math.floor(y), size, size);
+}
+// Seed some stars in the dark upper sky
+const stars = [
+  [80, 30, 2, 0.9], [150, 55, 1, 0.7], [200, 20, 2, 0.8], [310, 40, 1, 0.6],
+  [400, 25, 2, 0.9], [450, 60, 1, 0.5], [520, 35, 2, 0.7], [570, 15, 1, 0.8],
+  [60, 70, 1, 0.5], [250, 10, 1, 0.6], [350, 70, 1, 0.4], [490, 50, 1, 0.6],
+  [130, 90, 1, 0.3], [380, 85, 2, 0.4], [550, 80, 1, 0.3], [30, 50, 1, 0.5],
+  [270, 65, 2, 0.35], [470, 15, 1, 0.7], [100, 15, 1, 0.6], [590, 55, 1, 0.5],
+];
+stars.forEach(s => drawStar(s[0], s[1], s[2], s[3]));
+
+// --- Sun glow (low on horizon) ---
+const sunY = H * 0.62;
+const sunGlow = ctx.createRadialGradient(W / 2, sunY, 10, W / 2, sunY, 180);
+sunGlow.addColorStop(0, 'rgba(255, 220, 140, 0.7)');
+sunGlow.addColorStop(0.3, 'rgba(240, 180, 80, 0.3)');
+sunGlow.addColorStop(1, 'rgba(240, 180, 80, 0)');
+ctx.fillStyle = sunGlow;
+ctx.fillRect(0, H * 0.3, W, H * 0.5);
+
+// Sun disc
+ctx.fillStyle = '#ffe0a0';
+ctx.beginPath();
+ctx.arc(W / 2, sunY, 28, 0, Math.PI * 2);
+ctx.fill();
+ctx.fillStyle = '#fff4d6';
+ctx.beginPath();
+ctx.arc(W / 2, sunY, 18, 0, Math.PI * 2);
+ctx.fill();
+
+// --- Water ---
+const waterTop = H * 0.66;
+const water = ctx.createLinearGradient(0, waterTop, 0, H);
+water.addColorStop(0, '#c47a30');
+water.addColorStop(0.15, '#8a5a3a');
+water.addColorStop(0.4, '#3a4a6e');
+water.addColorStop(1, '#1a2a4e');
+ctx.fillStyle = water;
+ctx.fillRect(0, waterTop, W, H - waterTop);
+
+// Sun reflection on water
+const ref = ctx.createLinearGradient(0, waterTop, 0, waterTop + 100);
+ref.addColorStop(0, 'rgba(255, 210, 120, 0.5)');
+ref.addColorStop(1, 'rgba(255, 210, 120, 0)');
+ctx.fillStyle = ref;
+ctx.fillRect(W / 2 - 40, waterTop, 80, 100);
+
+// Wave lines (pixel style)
+ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+ctx.lineWidth = 1;
+for (let wy = waterTop + 12; wy < H - 10; wy += 14) {
+  ctx.beginPath();
+  for (let wx = 0; wx < W; wx += 4) {
+    const offset = Math.sin(wx * 0.03 + wy * 0.5) * 3;
+    if (wx === 0) ctx.moveTo(wx, wy + offset);
+    else ctx.lineTo(wx, wy + offset);
+  }
+  ctx.stroke();
+}
+
+// --- Island silhouette (right side) ---
+ctx.fillStyle = '#2a1a10';
+ctx.beginPath();
+ctx.moveTo(380, waterTop);
+ctx.quadraticCurveTo(400, waterTop - 50, 440, waterTop - 35);
+ctx.quadraticCurveTo(460, waterTop - 55, 490, waterTop - 30);
+ctx.quadraticCurveTo(520, waterTop - 45, 540, waterTop - 20);
+ctx.quadraticCurveTo(560, waterTop - 5, 570, waterTop);
+ctx.closePath();
+ctx.fill();
+
+// Buildings on island (blocky/pixel style)
+function drawBuilding(x, y, w, h) {
+  ctx.fillRect(Math.floor(x), Math.floor(y), w, h);
+}
+ctx.fillStyle = '#1a0e06';
+// Temple with columns
+drawBuilding(430, waterTop - 55, 30, 20);
+drawBuilding(432, waterTop - 60, 26, 6);
+// Triangular roof
+ctx.beginPath();
+ctx.moveTo(428, waterTop - 60);
+ctx.lineTo(445, waterTop - 72);
+ctx.lineTo(462, waterTop - 60);
+ctx.closePath();
+ctx.fill();
+
+// Column details
+ctx.fillStyle = '#3a2a18';
+drawBuilding(434, waterTop - 55, 3, 18);
+drawBuilding(441, waterTop - 55, 3, 18);
+drawBuilding(448, waterTop - 55, 3, 18);
+drawBuilding(455, waterTop - 55, 3, 18);
+
+// Small house
+ctx.fillStyle = '#1a0e06';
+drawBuilding(475, waterTop - 42, 18, 12);
+drawBuilding(473, waterTop - 46, 22, 5);
+
+// Tower/column
+drawBuilding(505, waterTop - 48, 8, 28);
+drawBuilding(503, waterTop - 52, 12, 5);
+
+// Cypress trees (pixel)
+ctx.fillStyle = '#1a2a0a';
+function drawCypress(x, y, h) {
+  ctx.fillRect(x, y - h, 4, h);
+  ctx.fillRect(x - 1, y - h + 2, 6, h - 8);
+}
+drawCypress(418, waterTop - 30, 22);
+drawCypress(525, waterTop - 22, 18);
+drawCypress(545, waterTop - 15, 14);
+
+// --- Small island (left) ---
+ctx.fillStyle = '#2a1a10';
+ctx.beginPath();
+ctx.moveTo(50, waterTop + 5);
+ctx.quadraticCurveTo(70, waterTop - 15, 100, waterTop - 8);
+ctx.quadraticCurveTo(120, waterTop, 130, waterTop + 5);
+ctx.closePath();
+ctx.fill();
+
+// Small tree on left island
+ctx.fillStyle = '#1a2a0a';
+drawCypress(85, waterTop - 6, 16);
+
+// --- Sailing ship ---
+ctx.fillStyle = '#1a0e06';
+// Hull
+ctx.beginPath();
+ctx.moveTo(180, waterTop + 8);
+ctx.lineTo(190, waterTop + 18);
+ctx.lineTo(240, waterTop + 18);
+ctx.lineTo(248, waterTop + 8);
+ctx.closePath();
+ctx.fill();
+
+// Mast
+ctx.fillRect(212, waterTop - 28, 2, 38);
+
+// Sail
+ctx.fillStyle = '#e8c89a';
+ctx.globalAlpha = 0.7;
+ctx.beginPath();
+ctx.moveTo(214, waterTop - 24);
+ctx.lineTo(214, waterTop + 4);
+ctx.quadraticCurveTo(234, waterTop - 8, 214, waterTop - 24);
+ctx.fill();
+
+// Second smaller sail
+ctx.beginPath();
+ctx.moveTo(212, waterTop - 20);
+ctx.lineTo(212, waterTop);
+ctx.quadraticCurveTo(196, waterTop - 8, 212, waterTop - 20);
+ctx.fill();
+ctx.globalAlpha = 1;
+
+// --- Small birds ---
+ctx.strokeStyle = '#1a0e06';
+ctx.lineWidth = 1.5;
+function drawBird(x, y, span) {
+  ctx.beginPath();
+  ctx.moveTo(x - span, y + 2);
+  ctx.quadraticCurveTo(x - span / 3, y - 2, x, y);
+  ctx.quadraticCurveTo(x + span / 3, y - 2, x + span, y + 2);
+  ctx.stroke();
+}
+drawBird(160, 160, 8);
+drawBird(190, 145, 6);
+drawBird(220, 155, 7);
+drawBird(340, 170, 5);
+drawBird(370, 158, 7);
+
+// --- Floating particles (warm) ---
+ctx.globalAlpha = 0.4;
+const particles = [
+  [120, 200, 2], [300, 180, 1.5], [450, 150, 2], [500, 200, 1],
+  [80, 250, 1.5], [350, 230, 1], [560, 170, 1.5], [200, 220, 1],
+];
+particles.forEach(p => {
+  ctx.fillStyle = '#ffe8a0';
+  ctx.beginPath();
+  ctx.arc(p[0], p[1], p[2], 0, Math.PI * 2);
+  ctx.fill();
+});
+ctx.globalAlpha = 1;
+
+// --- Title text ---
+function drawTitle() {
+  // Shadow
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  // Main title
+  const titleFont = '900 56px Cinzel, "Times New Roman", serif';
+  ctx.font = titleFont;
+
+  // Outer glow
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+  ctx.shadowBlur = 20;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 4;
+
+  // Gold gradient for title
+  const gold = ctx.createLinearGradient(0, H * 0.2 - 20, 0, H * 0.2 + 30);
+  gold.addColorStop(0, '#fff4d6');
+  gold.addColorStop(0.3, '#f0d090');
+  gold.addColorStop(0.5, '#ffe8b0');
+  gold.addColorStop(0.7, '#d4a050');
+  gold.addColorStop(1, '#c89048');
+
+  ctx.fillStyle = gold;
+  ctx.fillText('MARE NOSTRUM', W / 2, H * 0.22);
+
+  // Reset shadow for subtitle
+  ctx.shadowBlur = 12;
+  ctx.shadowOffsetY = 2;
+
+  // Subtitle
+  ctx.font = '700 20px Cinzel, "Times New Roman", serif';
+  ctx.fillStyle = '#ffe8c8';
+  ctx.fillText('A Cozy Roman Life-Sim', W / 2, H * 0.32);
+
+  // Decorative line under subtitle
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+  ctx.strokeStyle = 'rgba(255, 220, 160, 0.5)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  const lineY = H * 0.36;
+  ctx.moveTo(W / 2 - 100, lineY);
+  ctx.lineTo(W / 2 - 10, lineY);
+  ctx.moveTo(W / 2 + 10, lineY);
+  ctx.lineTo(W / 2 + 100, lineY);
+  ctx.stroke();
+
+  // Small diamond in center of line
+  ctx.fillStyle = 'rgba(255, 220, 160, 0.5)';
+  ctx.beginPath();
+  ctx.moveTo(W / 2, lineY - 4);
+  ctx.lineTo(W / 2 + 4, lineY);
+  ctx.lineTo(W / 2, lineY + 4);
+  ctx.lineTo(W / 2 - 4, lineY);
+  ctx.closePath();
+  ctx.fill();
+}
+
+// Wait for font to load, then draw title
+document.fonts.ready.then(() => {
+  drawTitle();
+});
+// Also draw immediately in case font is cached
+drawTitle();
+
+function downloadCover() {
+  const link = document.createElement('a');
+  link.download = 'mare-nostrum-cover.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+</script>
+</body>
+</html>

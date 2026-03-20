@@ -336,6 +336,69 @@ var _combatLastEnemyCount = 0;
 function drawCombatOverlay() {
   push();
 
+  // ─── FORTIFY VISUAL: blue shield shimmer around player ─────────────────
+  if (_fortifyTimer > 0 && (state.conquest.active || state.adventure.active)) {
+    let p = state.player;
+    let psx = w2sX(p.x), psy = w2sY(p.y);
+    let fortAlpha = min(1, _fortifyTimer / 30) * (0.5 + sin(frameCount * 0.12) * 0.2);
+    noFill();
+    // Outer shield ring
+    stroke(100, 140, 255, 100 * fortAlpha);
+    strokeWeight(2);
+    let shieldSize = 22 + sin(frameCount * 0.08) * 3;
+    ellipse(psx, psy - 6, shieldSize * 2, shieldSize * 1.6);
+    // Inner shimmer
+    stroke(160, 200, 255, 160 * fortAlpha);
+    strokeWeight(1);
+    ellipse(psx, psy - 6, shieldSize * 1.4, shieldSize * 1.1);
+    noStroke();
+    // Shield icon above player
+    fill(120, 170, 255, 180 * fortAlpha);
+    textSize(8); textAlign(CENTER, CENTER);
+    text('FORTIFIED', psx, psy - 30);
+    // Corner sparkle pixels
+    for (let i = 0; i < 4; i++) {
+      let a = (frameCount * 0.05 + i * HALF_PI) % TWO_PI;
+      let sx = psx + cos(a) * shieldSize;
+      let sy = psy - 6 + sin(a) * shieldSize * 0.65;
+      fill(180, 210, 255, 200 * fortAlpha);
+      rect(floor(sx), floor(sy), 2, 2);
+    }
+  }
+
+  // ─── BATTLE CRY VISUAL: expanding red ring/pulse from player ──────────
+  if (_battleCryTimer > 0 && (state.conquest.active || state.adventure.active)) {
+    let p = state.player;
+    let psx = w2sX(p.x), psy = w2sY(p.y);
+    let cryAlpha = min(1, _battleCryTimer / 60);
+    // Pulsing red ring
+    noFill();
+    let pulsePhase = (frameCount * 0.06) % TWO_PI;
+    let ringR = 30 + sin(pulsePhase) * 8;
+    stroke(255, 60, 40, 80 * cryAlpha);
+    strokeWeight(2);
+    ellipse(psx, psy - 4, ringR * 2, ringR * 1.4);
+    // Second expanding ring (slower)
+    let ringR2 = 40 + sin(pulsePhase * 0.7) * 10;
+    stroke(255, 100, 60, 40 * cryAlpha);
+    strokeWeight(1);
+    ellipse(psx, psy - 4, ringR2 * 2, ringR2 * 1.4);
+    noStroke();
+    // "BATTLE CRY" label
+    fill(255, 80, 60, 160 * cryAlpha);
+    textSize(8); textAlign(CENTER, CENTER);
+    text('BATTLE CRY', psx, psy - 32);
+    // Red ember pixels radiating outward
+    for (let i = 0; i < 6; i++) {
+      let a = (frameCount * 0.03 + i * (TWO_PI / 6)) % TWO_PI;
+      let d = ringR + sin(frameCount * 0.1 + i) * 5;
+      let ex = psx + cos(a) * d;
+      let ey = psy - 4 + sin(a) * d * 0.65;
+      fill(255, 50 + i * 20, 30, 180 * cryAlpha);
+      rect(floor(ex), floor(ey), 2, 2);
+    }
+  }
+
   // Enemy HP bars
   let enemies = state.conquest.active ? state.conquest.enemies : (state.adventure.enemies || []);
   for (let e of enemies) {

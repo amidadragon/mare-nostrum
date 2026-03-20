@@ -376,23 +376,24 @@ function drawDriftClouds(bright) {
     let cx = floor(cl.x), cy = floor(cl.y);
     let cw = floor(cl.w), ch = floor(cl.h);
 
-    // Main cloud body — soft ellipses
+    // Chunky pixel-art cloud — overlapping rects
+    // Main body block
     fill(cloudR, cloudG, cloudB, alpha);
-    ellipse(cx, cy, cw * 0.8, ch * 0.6);
-    // Upper bumps
+    rect(cx - cw * 0.3, cy - ch * 0.15, cw * 0.6, ch * 0.4);
+    // Top bumps — offset blocks
     fill(highlightR, highlightG, highlightB, alpha * 0.75);
-    ellipse(cx - cw * 0.15, cy - ch * 0.2, cw * 0.5, ch * 0.4);
-    ellipse(cx + cw * 0.2, cy - ch * 0.15, cw * 0.35, ch * 0.3);
-    // Side puffs
-    fill(cloudR, cloudG, cloudB, alpha * 0.6);
-    ellipse(cx - cw * 0.35, cy + ch * 0.05, cw * 0.3, ch * 0.35);
-    ellipse(cx + cw * 0.35, cy + ch * 0.05, cw * 0.25, ch * 0.3);
-    // Bottom shadow
+    rect(cx - cw * 0.2, cy - ch * 0.35, cw * 0.3, ch * 0.25);
+    rect(cx + cw * 0.05, cy - ch * 0.3, cw * 0.22, ch * 0.2);
+    // Side chunks
+    fill(cloudR, cloudG, cloudB, alpha * 0.7);
+    rect(cx - cw * 0.45, cy - ch * 0.05, cw * 0.2, ch * 0.25);
+    rect(cx + cw * 0.28, cy - ch * 0.05, cw * 0.18, ch * 0.22);
+    // Bottom shadow strip
     fill(shadowR, shadowG, shadowB, alpha * 0.5);
-    ellipse(cx, cy + ch * 0.2, cw * 0.7, ch * 0.25);
-    // Bright highlight on top
+    rect(cx - cw * 0.25, cy + ch * 0.2, cw * 0.5, ch * 0.12);
+    // Highlight block on top
     fill(highlightR, highlightG, highlightB, alpha * 0.35);
-    ellipse(cx - cw * 0.05, cy - ch * 0.25, cw * 0.3, ch * 0.15);
+    rect(cx - cw * 0.15, cy - ch * 0.38, cw * 0.2, ch * 0.1);
   });
 }
 
@@ -618,6 +619,27 @@ function drawIsland() {
     ellipse(ffx, ffy, 8 + sin(fa * 2.7) * 3, 3);
   }
 
+  // ─── WATER REFLECTIONS — shimmer band at coastline ───
+  let reflPhase = frameCount * 0.015;
+  for (let ra = 0; ra < TWO_PI; ra += 0.18) {
+    let wave = sin(reflPhase + ra * 4) * 0.5 + 0.5;
+    let wave2 = sin(reflPhase * 1.3 + ra * 6) * 0.5 + 0.5;
+    // Outer shimmer ring — light bouncing off shallow water
+    let refRX = iw * (0.49 + sin(reflPhase + ra * 2) * 0.005);
+    let refRY = ih * (0.205 + sin(reflPhase + ra * 2) * 0.002);
+    let rx2 = ix + cos(ra) * refRX;
+    let ry2 = (iy - 12) + sin(ra) * refRY;
+    fill(200, 230, 255, 18 * wave * dayMix);
+    rect(floor(rx2) - 3, floor(ry2), 6 + floor(wave2 * 4), 2);
+    // Inner shimmer — closer to shore, brighter
+    let refRX2 = iw * (0.475 + sin(reflPhase * 0.8 + ra * 3) * 0.004);
+    let refRY2 = ih * (0.198 + sin(reflPhase * 0.8 + ra * 3) * 0.002);
+    let rx3 = ix + cos(ra) * refRX2;
+    let ry3 = (iy - 13) + sin(ra) * refRY2;
+    fill(220, 240, 255, 22 * wave2 * dayMix);
+    rect(floor(rx3) - 2, floor(ry3), 4 + floor(wave * 3), 1);
+  }
+
   // Sandy beach ring — warm golden sand (organic coastline)
   fill(210, 190, 145);
   drawCoastlineShape(ix, iy, iw * 0.465, ih * 0.195, -14);
@@ -653,6 +675,20 @@ function drawIsland() {
       ellipse(tx, ty, 7 + sin(ta * 7) * 2, 3);
     }
   }
+
+  // ─── CLIFF EDGE — layered bands below grass surface ───
+  // Dark earth band (topmost cliff layer, just below grass)
+  fill(82, 62, 42);
+  drawCoastlineShape(ix, iy, iw * 0.455, ih * 0.185, -13);
+  // Mid brown dirt
+  fill(95, 72, 48);
+  drawCoastlineShape(ix, iy, iw * 0.458, ih * 0.188, -11);
+  // Lighter rock/sandstone
+  fill(120, 100, 72);
+  drawCoastlineShape(ix, iy, iw * 0.46, ih * 0.19, -9);
+  // Bottom rock band — darkest, blends toward sand/water
+  fill(70, 58, 40);
+  drawCoastlineShape(ix, iy, iw * 0.462, ih * 0.192, -7);
 
   // Grass top — seasonal colors with terrain variation
   let sg = getSeasonGrass();

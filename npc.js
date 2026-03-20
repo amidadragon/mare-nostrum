@@ -141,8 +141,22 @@ function checkNPCWantSatisfied(npcName) {
 
   if (satisfied) {
     state.todayWantsSatisfied.push(npcName);
-    state.npcFavor[npcName] = Math.min(30, (state.npcFavor[npcName] || 0) + 1);
-    addFloatingText(width / 2, height * 0.3, npcName.charAt(0).toUpperCase() + npcName.slice(1) + ' is pleased! +1 Favor', '#ffdd44');
+    let currentFavor = state.npcFavor[npcName] || 0;
+    let atMax = currentFavor >= 30;
+    if (!atMax) {
+      state.npcFavor[npcName] = Math.min(30, currentFavor + 1);
+      if (typeof snd !== 'undefined' && snd) snd.playSFX('favor_up');
+      addFloatingText(width / 2, height * 0.3, npcName.charAt(0).toUpperCase() + npcName.slice(1) + ' is pleased! +1 Favor', '#ffdd44');
+    } else {
+      // Max favor — still accept gifts, give endgame reward
+      let reward = getMaxFavorReward(npcName);
+      if (reward) {
+        state[reward.resource] = (state[reward.resource] || 0) + reward.amount;
+        addFloatingText(width / 2, height * 0.3, npcName.charAt(0).toUpperCase() + npcName.slice(1) + ' gives you ' + reward.amount + ' ' + reward.label + '!', '#88ddff');
+      } else {
+        addFloatingText(width / 2, height * 0.3, npcName.charAt(0).toUpperCase() + npcName.slice(1) + ' is grateful!', '#ffdd44');
+      }
+    }
     spawnParticles(state.player.x, state.player.y - 10, 'harvest', 8);
 
     let favor = state.npcFavor[npcName];
@@ -157,7 +171,6 @@ function checkNPCWantSatisfied(npcName) {
 function drawNPCWantBubble(npcScreenX, npcScreenY, npcName) {
   resetDailyWantsIfNeeded();
   if (state.todayWantsSatisfied.includes(npcName)) return;
-  if ((state.npcFavor[npcName] || 0) >= 30) return;
 
   let want = getNPCDailyWant(npcName);
   if (!want) return;
@@ -216,6 +229,37 @@ function drawFavorStars(x, y, npcName) {
     vertex(sx - 3, y);
     endShape(CLOSE);
   }
+}
+
+// ─── MAX FAVOR ENDGAME REWARDS ───────────────────────────────────────────
+function getMaxFavorReward(npcName) {
+  let daySeed = Math.floor(Date.now() / 86400000);
+  let npcOffset = { livia: 0, marcus: 3, vesta: 5, felix: 7 }[npcName] || 0;
+  let rewards = {
+    livia: [
+      { resource: 'seeds', amount: 3, label: 'seeds' },
+      { resource: 'harvest', amount: 2, label: 'harvest' },
+      { resource: 'wine', amount: 1, label: 'wine' },
+    ],
+    marcus: [
+      { resource: 'ironOre', amount: 2, label: 'iron' },
+      { resource: 'gold', amount: 5, label: 'gold' },
+      { resource: 'fish', amount: 3, label: 'fish' },
+    ],
+    vesta: [
+      { resource: 'crystals', amount: 2, label: 'crystals' },
+      { resource: 'gold', amount: 3, label: 'gold' },
+      { resource: 'seeds', amount: 4, label: 'seeds' },
+    ],
+    felix: [
+      { resource: 'gold', amount: 4, label: 'gold' },
+      { resource: 'crystals', amount: 1, label: 'crystal' },
+      { resource: 'wood', amount: 3, label: 'wood' },
+    ],
+  };
+  let pool = rewards[npcName];
+  if (!pool) return null;
+  return pool[(daySeed + npcOffset) % pool.length];
 }
 
 function updateZoneVisits() {
@@ -632,48 +676,107 @@ function drawOneCitizen(c) {
 
   let lvl = state.islandLevel;
   let colors = getCitizenColors(c.variant, lvl);
+  let walking = c.state === 'walking';
+  let step = sin(frameCount * 0.15 + c.x) * 2;
+  let bob = walking ? abs(sin(frameCount * 0.15 + c.x)) * 0.5 : 0;
 
   // Shadow
   fill(0, 0, 0, 30);
-  ellipse(0, 2, 10, 4);
+  ellipse(0, 4, 10, 4);
 
-  // Body (tunic)
+  // Sandals — dark brown
+  fill(90, 65, 40);
+  if (walking) {
+    rect(-3, 2 - bob, 2, 2);
+    rect(1 + step * 0.3, 2 + bob, 2, 2);
+  } else {
+    rect(-3, 2, 2, 2);
+    rect(1, 2, 2, 2);
+  }
+
+  // Legs — skin tone
+  fill(colors.skin[0], colors.skin[1], colors.skin[2]);
+  if (walking) {
+    rect(-2, -1 - bob, 2, 4);
+    rect(1 + step * 0.2, -1 + bob, 2, 4);
+  } else {
+    rect(-2, -1, 2, 4);
+    rect(1, -1, 2, 4);
+  }
+
+  // Tunic body
   fill(colors.tunic[0], colors.tunic[1], colors.tunic[2]);
-  rect(-3, -8, 6, 10);
+  rect(-4, -8, 8, 8);
+  // Tunic hem — slightly darker
+  fill(colors.tunic[0] - 15, colors.tunic[1] - 15, colors.tunic[2] - 10);
+  rect(-4, -1, 8, 1);
+
+  // Belt
+  fill(colors.tunic[0] - 35, colors.tunic[1] - 30, colors.tunic[2] - 20);
+  rect(-4, -4, 8, 1);
+
+  // Arms — skin, with simple swing when walking
+  fill(colors.skin[0], colors.skin[1], colors.skin[2]);
+  let armSwing = walking ? floor(sin(frameCount * 0.15 + c.x) * 1.5) : 0;
+  rect(-5, -7 + armSwing, 1, 4);
+  rect(4, -7 - armSwing, 1, 4);
+
+  // Neck
+  fill(colors.skin[0], colors.skin[1], colors.skin[2]);
+  rect(-1, -10, 2, 2);
 
   // Head
   fill(colors.skin[0], colors.skin[1], colors.skin[2]);
-  rect(-2, -12, 4, 4);
+  rect(-3, -14, 6, 5);
 
-  // Hair/headgear
+  // Hair
   fill(colors.hair[0], colors.hair[1], colors.hair[2]);
-  rect(-2, -13, 4, 2);
+  rect(-3, -15, 6, 3);
+  // Side hair
+  rect(-3, -13, 1, 2);
+  rect(2, -13, 1, 2);
 
-  // Legs
-  fill(colors.tunic[0] - 20, colors.tunic[1] - 20, colors.tunic[2] - 20);
-  if (c.state === 'walking') {
-    let step = sin(frameCount * 0.15 + c.x) * 2;
-    rect(-2, 2, 2, 3);
-    rect(0 + step * 0.3, 2, 2, 3);
-  } else {
-    rect(-2, 2, 2, 3);
-    rect(1, 2, 2, 3);
-  }
+  // Eyes — tiny dark dots
+  fill(40, 30, 25);
+  rect(-1, -12, 1, 1);
+  rect(1, -12, 1, 1);
 
   // Variant-specific detail
   if (c.variant === 'soldier') {
+    // Spear
     stroke(100, 80, 60);
     strokeWeight(1);
-    line(3, -14, 3, 4);
+    line(5, -16, 5, 3);
     noStroke();
-    fill(140, 60, 40);
-    rect(-4, -7, 2, 5);
+    // Spear tip
+    fill(180, 175, 165);
+    rect(4, -17, 2, 2);
+    // Red cape snippet
+    fill(140, 40, 35);
+    rect(3, -7, 2, 4);
+    // Helmet crest
+    fill(140, 40, 35);
+    rect(-2, -16, 4, 1);
   } else if (c.variant === 'merchant') {
-    fill(colors.tunic[0] + 30, colors.tunic[1] + 20, colors.tunic[2]);
-    rect(3, -6, 3, 4);
+    // Sack/bundle carried
+    fill(colors.tunic[0] + 25, colors.tunic[1] + 15, colors.tunic[2] - 5);
+    rect(4, -7, 3, 3);
+    rect(4, -8, 2, 1);
+    // Slightly richer tunic trim
+    fill(200, 170, 60);
+    rect(-4, -4, 8, 1);
   } else if (c.variant === 'priest') {
+    // White stole over tunic
     fill(240, 235, 225);
-    rect(-1, -8, 2, 8);
+    rect(-1, -8, 2, 7);
+    // Laurel/headband
+    fill(90, 130, 50);
+    rect(-3, -15, 6, 1);
+  } else {
+    // Farmer — straw hat
+    fill(200, 180, 120);
+    rect(-4, -16, 8, 2);
+    rect(-3, -17, 6, 1);
   }
 
   pop();

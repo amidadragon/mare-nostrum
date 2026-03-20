@@ -88,6 +88,18 @@ class SoundManager {
     this._rainGain = null;
     // Context tempo multiplier
     this._tempoMult = 1.0;
+    // Campfire crackle (filtered noise bursts)
+    this._fireNoise = null;
+    this._fireFilter = null;
+    this._fireGain = null;
+    this._fireTimer = 0;
+    // Extra wave oscillators for organic ocean
+    this._wave2Noise = null;
+    this._wave2Filter = null;
+    this._wave2Gain = null;
+    this._wave3Noise = null;
+    this._wave3Filter = null;
+    this._wave3Gain = null;
   }
 
   init() {
@@ -177,8 +189,8 @@ class SoundManager {
       this._pulseOsc.freq(146.8);
       this._pulseOsc.amp(1.0);
 
-      // SFX pool: 4 oscillators (osc at full amp, volume via gain node only)
-      for (let i = 0; i < 4; i++) {
+      // SFX pool: 6 oscillators (osc at full amp, volume via gain node only)
+      for (let i = 0; i < 6; i++) {
         let osc = new p5.Oscillator('sine');
         let gain = new p5.Gain();
         osc.disconnect();
@@ -284,8 +296,49 @@ class SoundManager {
       this._rainNoise.start();
       this._rainNoise.amp(0.12);
 
+      // Campfire: filtered noise bursts for crackle
+      this._fireNoise = new p5.Noise('white');
+      this._fireFilter = new p5.BandPass();
+      this._fireFilter.freq(1800);
+      this._fireFilter.res(3);
+      this._fireNoise.disconnect();
+      this._fireNoise.connect(this._fireFilter);
+      this._fireGain = new p5.Gain();
+      this._fireFilter.connect(this._fireGain);
+      this._fireGain.connect();
+      this._fireGain.amp(0);
+      this._fireNoise.start();
+      this._fireNoise.amp(0.15);
+
+      // Extra wave oscillators for organic ocean (detuned layers)
+      this._wave2Noise = new p5.Noise('white');
+      this._wave2Filter = new p5.BandPass();
+      this._wave2Filter.freq(340);
+      this._wave2Filter.res(1.2);
+      this._wave2Noise.disconnect();
+      this._wave2Noise.connect(this._wave2Filter);
+      this._wave2Gain = new p5.Gain();
+      this._wave2Filter.connect(this._wave2Gain);
+      this._wave2Gain.connect();
+      this._wave2Gain.amp(0);
+      this._wave2Noise.start();
+      this._wave2Noise.amp(0.12);
+
+      this._wave3Noise = new p5.Noise('pink');
+      this._wave3Filter = new p5.BandPass();
+      this._wave3Filter.freq(260);
+      this._wave3Filter.res(1.8);
+      this._wave3Noise.disconnect();
+      this._wave3Noise.connect(this._wave3Filter);
+      this._wave3Gain = new p5.Gain();
+      this._wave3Filter.connect(this._wave3Gain);
+      this._wave3Gain.connect();
+      this._wave3Gain.amp(0);
+      this._wave3Noise.start();
+      this._wave3Noise.amp(0.10);
+
       this.ready = true;
-      console.log('[SoundManager] init OK — 3 lyre voices + harmony, 4 sfx slots, ambient layers ready');
+      console.log('[SoundManager] init OK — 3 lyre voices + harmony, 6 sfx slots, campfire + layered ocean ready');
     } catch (e) {
       console.warn('SoundManager init failed:', e.message);
     }
@@ -316,16 +369,26 @@ class SoundManager {
       && state.imperialBridge && state.imperialBridge.built
       && isOnImperialBridge(state.player.x, state.player.y);
 
-    // ─── Waves ───
+    // ─── Waves (3 detuned layers for organic sound) ───
     let waveMute = (island === 'hyperborea' || island === 'necropolis');
     let waveVol = waveMute ? 0 : (0.06 + (1 - bright) * 0.04) * masterVol;
-    if (diving) waveVol = 0.12 * masterVol; // louder underwater
-    if (onBridge) waveVol = 0.10 * masterVol; // water close below
+    if (diving) waveVol = 0.12 * masterVol;
+    if (onBridge) waveVol = 0.10 * masterVol;
     this._waveGain.amp(waveVol, 0.3);
     let waveFreq = 300 + sin(frameCount * 0.003) * 80;
     if (diving) waveFreq = 180 + sin(frameCount * 0.002) * 40;
-    if (onBridge) waveFreq = 220 + sin(frameCount * 0.004) * 60; // deeper, closer water
+    if (onBridge) waveFreq = 220 + sin(frameCount * 0.004) * 60;
     this._waveFilter.freq(waveFreq);
+    // Layer 2: slightly higher freq, different LFO rate
+    if (this._wave2Gain) {
+      this._wave2Gain.amp(waveVol * 0.7, 0.4);
+      this._wave2Filter.freq(waveFreq * 1.15 + sin(frameCount * 0.0047) * 60);
+    }
+    // Layer 3: lower freq, slowest LFO for deep swells
+    if (this._wave3Gain) {
+      this._wave3Gain.amp(waveVol * 0.5, 0.5);
+      this._wave3Filter.freq(waveFreq * 0.78 + sin(frameCount * 0.0019) * 45);
+    }
 
     // ─── Wind ───
     let windVol = (0.03 + sin(frameCount * 0.001) * 0.015) * masterVol;
@@ -495,6 +558,43 @@ class SoundManager {
       }
       if (state.cats && state.cats.length > 0 && frameCount % 600 < 1 && random() < 0.4) {
         this.playSFX('cat_meow');
+      }
+    }
+
+    // ─── Campfire crackle (warm noise bursts near campfire/hearth) ───
+    if (this._fireGain && typeof state !== 'undefined' && !diving) {
+      let nearFire = false;
+      let px = state.player ? state.player.x : 0;
+      let py = state.player ? state.player.y : 0;
+      if (state.buildings) {
+        for (let i = 0; i < state.buildings.length; i++) {
+          let b = state.buildings[i];
+          if ((b.type === 'campfire' || b.type === 'hearth' || b.type === 'firepit') && dist(px, py, b.x, b.y) < 120) {
+            nearFire = true; break;
+          }
+        }
+      }
+      if (nearFire) {
+        this._fireTimer--;
+        if (this._fireTimer <= 0) {
+          // Random crackle burst: short pop of filtered noise
+          let intensity = random(0.04, 0.10) * masterVol;
+          let popDur = random(20, 60); // ms
+          this._fireFilter.freq(random(1200, 3000));
+          this._fireFilter.res(random(2, 5));
+          this._fireGain.amp(intensity, 0.005);
+          setTimeout(() => {
+            if (this._fireGain) this._fireGain.amp(intensity * 0.3, popDur / 2000);
+          }, popDur * 0.4);
+          setTimeout(() => {
+            if (this._fireGain) this._fireGain.amp(0, 0.03);
+          }, popDur);
+          // Random interval between crackles: 3-12 frames (cozy, not sparse)
+          this._fireTimer = floor(random(3, 12));
+        }
+      } else {
+        this._fireGain.amp(0, 0.2);
+        this._fireTimer = 0;
       }
     }
   }
@@ -904,6 +1004,20 @@ class SoundManager {
     let note = phrase[this._lyreNoteIdx % phrase.length];
     let [ni, dur, vel, voice] = note;
 
+    // Era detection: Era 1 (lv 1-8) monophonic, Era 2 (9-16) two voices + harmony, Era 3 (17-25) full + reverb echo
+    let lyreEra = 1;
+    if (typeof state !== 'undefined' && state.islandLevel) {
+      if (state.islandLevel >= 17) lyreEra = 3;
+      else if (state.islandLevel >= 9) lyreEra = 2;
+    }
+    // Menu mode always uses full voicing for beauty
+    if (this._lyreMode === 'menu') lyreEra = 3;
+
+    // Era 1: only voice 0 (monophonic). Redirect voice 1/2 notes to voice 0.
+    // Era 2: voices 0 and 1. Redirect voice 2 to voice 0.
+    if (lyreEra === 1 && voice > 0) voice = 0;
+    else if (lyreEra === 2 && voice > 1) voice = 0;
+
     let volMult = this._lyreVolMult;
     // Context-based dynamic adjustments
     if (this._lyreContext === 'rain') volMult *= 0.7;
@@ -930,8 +1044,8 @@ class SoundManager {
       let pluckDur = dur * 16;
       this._pluckLyre(voice, freq, amp, pluckDur);
 
-      // Harmony layer: play a 5th above (or 3rd) at reduced volume
-      if (this._harmOsc && this._harmGain && amp > 0.005) {
+      // Harmony layer: play a 5th above (or 3rd) — Era 2+ only
+      if (lyreEra >= 2 && this._harmOsc && this._harmGain && amp > 0.005) {
         let harmInterval = (this._lyreMode === 'night' || this._lyreMode === 'eerie') ? 1.2 : 1.5; // minor 3rd vs perfect 5th
         if (this._lyreContext === 'farming') harmInterval = 1.25; // major 3rd for warmth
         let harmFreq = freq * harmInterval;
@@ -950,19 +1064,35 @@ class SoundManager {
         }
       }
 
-      // Grace note: quick ornamental note before main note (10% chance, not in eerie/menu)
-      if (this._lyreMode !== 'eerie' && this._lyreMode !== 'menu' && random() < 0.10) {
+      // Grace note: quick ornamental note before main note (10% chance, not in eerie/menu, Era 2+)
+      if (lyreEra >= 2 && this._lyreMode !== 'eerie' && this._lyreMode !== 'menu' && random() < 0.10) {
         let graceIdx = ni > 0 ? ni - 1 : ni + 1;
         if (graceIdx >= 0 && graceIdx < scale.length) {
           let graceFreq = scale[graceIdx];
           let graceAmp = amp * 0.4;
-          // Grace note on a different voice if available
-          let graceVoice = (voice + 1) % this._lyreVoices.length;
+          let graceVoice = lyreEra >= 3 ? ((voice + 1) % this._lyreVoices.length) : voice;
           this._pluckLyre(graceVoice, graceFreq, graceAmp, 40);
         }
       }
 
-      // Rain echo: delayed quiet repeat for reverb-like depth
+      // Era 3 reverb echo: delayed quiet repeat for grand depth
+      if (lyreEra >= 3 && random() < 0.35) {
+        let echoDelay = floor(random(8, 16));
+        let echoAmp = amp * 0.22;
+        let echoVoice = (voice + 2) % this._lyreVoices.length;
+        setTimeout(() => {
+          this._pluckLyre(echoVoice, freq * 0.998, echoAmp, pluckDur * 0.6);
+        }, echoDelay * 16);
+        // Second fainter echo for reverb tail (Era 3 only)
+        if (random() < 0.5) {
+          let echo2Delay = echoDelay * 2 + floor(random(4, 10));
+          setTimeout(() => {
+            this._pluckLyre(echoVoice, freq * 1.001, echoAmp * 0.4, pluckDur * 0.4);
+          }, echo2Delay * 16);
+        }
+      }
+
+      // Rain echo: additional reverb-like depth (any era, additive to era echo)
       if (this._lyreContext === 'rain' && random() < 0.4) {
         let echoDelay = floor(random(8, 16));
         let echoAmp = amp * 0.25;
@@ -1003,6 +1133,15 @@ class SoundManager {
     else if (mode === 'celebration') { droneVol = 0.04; droneFreq = 146.8; }
     else if (mode === 'sailing') { droneVol = 0.045; droneFreq = 146.8; }
     else if (mode === 'menu') { droneVol = 0.02; droneFreq = 146.8; }
+    // Era-based drone scaling: Era 1 minimal, Era 2 moderate, Era 3 full
+    let lyreEra = 1;
+    if (typeof state !== 'undefined' && state.islandLevel) {
+      if (state.islandLevel >= 17) lyreEra = 3;
+      else if (state.islandLevel >= 9) lyreEra = 2;
+    }
+    if (mode === 'menu') lyreEra = 3;
+    if (lyreEra === 1) droneVol *= 0.3;
+    else if (lyreEra === 2) droneVol *= 0.7;
     // Context modifiers on drone
     if (this._lyreContext === 'combat') { droneVol *= 1.4; }
     else if (this._lyreContext === 'rain') { droneFreq *= 0.97; droneVol *= 0.8; }
@@ -1141,8 +1280,8 @@ class SoundManager {
       case 'click':     play('sine', 660, 0.12, 440, 60, { attack: 3 }); break;  // tiny pip
       case 'ding':      play('sine', 1047, 0.18, 880, 400, { attack: 20 }); break;  // bell tone, long ring
       // Movement — subtle whooshes
-      case 'step_sand': play('triangle', 140, 0.06, 80, 70, { attack: 5 }); break;  // soft puff
-      case 'step_stone':play('triangle', 320, 0.07, 200, 60, { attack: 3 }); break;  // light tap
+      case 'step_sand': { let p20 = 1 + (random() - 0.5) * 0.4; play('triangle', 140 * p20, 0.06, 80 * p20, 70, { attack: 5 }); break; }  // soft puff +/- 20%
+      case 'step_stone':{ let p20 = 1 + (random() - 0.5) * 0.4; play('triangle', 320 * p20, 0.07, 200 * p20, 60, { attack: 3 }); break; }  // light tap +/- 20%
       case 'dash':      play('triangle', 500, 0.18, 150, 200, { attack: 8 }); break;  // breeze sweep
       // Fishing — watery plops
       case 'fish_cast': play('sine', 400, 0.16, 200, 250, { attack: 15 }); break;  // descending plop
@@ -1305,9 +1444,9 @@ class SoundManager {
       case 'hover':
         play('sine', 880, 0.06, 660, 40, { attack: 3 }); break;  // subtle high pip
       case 'step_grass':
-        play('triangle', 180, 0.05, 100, 65, { attack: 5 }); break;  // soft rustle
+        { let p20 = 1 + (random() - 0.5) * 0.4; play('triangle', 180 * p20, 0.05, 100 * p20, 65, { attack: 5 }); break; }  // soft rustle +/- 20%
       case 'step_water':
-        play('sine', 200, 0.08, 120, 90, { attack: 8 }); break;  // light splash
+        { let p20 = 1 + (random() - 0.5) * 0.4; play('sine', 200 * p20, 0.08, 120 * p20, 90, { attack: 8 }); break; }  // light splash +/- 20%
       // New SFX: level up fanfare — triumphant 4-note ascending D major arpeggio
       case 'level_up':
         play('sine', 293.7, 0.22, 293.7, 200, { attack: 15 });  // D4
@@ -1414,6 +1553,30 @@ class SoundManager {
             sc.gain.amp(0,0); sc.gain.amp(sc._vol, 0.03); this._sfxEnvSmooth(sc, 885, 1325, 400, { attack: 30 }); }
         }, 5);
         break;
+      // NPC interaction sounds
+      case 'dialogue_open':
+        play('sine', 440, 0.10, 494, 180, { attack: 20 }); break;  // gentle rising tone (A4->B4)
+      case 'gift_accepted':
+        playTwo('sine', 440, 554, 0.16, 280, 100);  // warm ascending A4->C#5
+        setTimeout(() => {
+          let sg = this._getSfxSlot();
+          if (sg) { sg.osc.setType('sine'); sg.osc.freq(659); sg._vol = 0.14 * vol; sg._peak = sg._vol;
+            sg.gain.amp(0,0); sg.gain.amp(sg._vol, 0.01); this._sfxEnvSmooth(sg, 659, 659, 300, { attack: 10 }); }
+        }, 200);
+        break;  // A4->C#5->E5 warm major triad
+      case 'favor_up':
+        play('sine', 784, 0.14, 784, 100, { attack: 8 });  // satisfying chime G5
+        setTimeout(() => {
+          let sf = this._getSfxSlot();
+          if (sf) { sf.osc.setType('sine'); sf.osc.freq(988); sf._vol = 0.14 * vol; sf._peak = sf._vol;
+            sf.gain.amp(0,0); sf.gain.amp(sf._vol, 0.008); this._sfxEnvSmooth(sf, 988, 988, 120, { attack: 5 }); }
+        }, 80);
+        setTimeout(() => {
+          let sf2 = this._getSfxSlot();
+          if (sf2) { sf2.osc.setType('sine'); sf2.osc.freq(1175); sf2._vol = 0.12 * vol; sf2._peak = sf2._vol;
+            sf2.gain.amp(0,0); sf2.gain.amp(sf2._vol, 0.008); this._sfxEnvSmooth(sf2, 1175, 1175, 300, { attack: 8 }); }
+        }, 160);
+        break;  // G5->B5->D6 bright ascending chime
     }
   }
 
