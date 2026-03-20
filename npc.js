@@ -714,6 +714,33 @@ function updateNPCAnim(npc) {
   if (a.blinkFrame > 0) a.blinkFrame--;
 }
 
+// Vesta auto-collects crystals from nearby nodes every ~10 seconds
+function updateVestaCrystalGathering(dt) {
+  if (!state.vesta || !state.crystalNodes) return;
+  let v = state.vesta;
+  if (!v._crystalTimer) v._crystalTimer = 0;
+  v._crystalTimer -= dt;
+  if (v._crystalTimer > 0) return;
+  v._crystalTimer = 600; // ~10 seconds at 60fps
+
+  // Find nearest charged crystal node
+  let best = null, bestD = 120; // 120px range
+  state.crystalNodes.forEach(cn => {
+    if (cn.charge <= 0 || cn.respawnTimer > 0) return;
+    let d = dist(v.x, v.y, cn.x, cn.y);
+    if (d < bestD) { bestD = d; best = cn; }
+  });
+
+  if (best) {
+    let amount = min(best.charge, 3);
+    best.charge -= amount;
+    state.crystals += amount;
+    addFloatingText(w2sX(v.x), w2sY(v.y) - 25, '+' + amount + ' Crystal', '#88ddff');
+    spawnParticles(v.x, v.y - 10, 'harvest', 4);
+    if (best.charge <= 0) best.respawnTimer = 1800; // 30 second respawn
+  }
+}
+
 function npcHeartPop(npc) {
   // Burst of heart particles on gift receive
   for (let i = 0; i < 5; i++) {
@@ -877,93 +904,102 @@ function drawNewNPC(npc, type) {
     rect(-2, -8, 4, 1);
 
   } else if (type === 'vesta') {
-    // ─── VESTA — Sacred Priestess ───
-    // Gold sandals
-    fill(200, 170, 70);
+    // ─── VESTA — Beautiful Priestess in White ───
+    // Elegant gold sandals
+    fill(210, 180, 80);
     rect(-4, 10, 3, 2);
     rect(1, 10, 3, 2);
-    // Purple robes — flowing priestess vestments
-    fill(95, 50, 120);
-    rect(-7, -3, 14, 16);
-    // Robe shadow fold
-    fill(75, 38, 100);
-    rect(-7, -3, 5, 16);
-    // Gold trim at hem
-    fill(200, 170, 80);
-    rect(-7, 11, 14, 1);
-    // Lighter overlay — inner robe
-    fill(115, 65, 140, 120);
-    rect(2, -2, 5, 14);
-    // Gold sacred sash
-    fill(210, 180, 60);
-    rect(-7, 0, 14, 2);
-    // Sash medallion — Vesta's flame symbol
-    fill(230, 200, 70);
+    fill(190, 160, 60);
+    rect(-4, 11, 3, 1);
+    rect(1, 11, 3, 1);
+    // Flowing white dress — elegant, form-fitting
+    fill(245, 240, 232);
+    rect(-6, -4, 12, 17);
+    // Dress shadow fold — left side deeper
+    fill(225, 218, 208);
+    rect(-6, -4, 4, 17);
+    // Dress highlight — right side catches light
+    fill(252, 248, 242);
+    rect(2, -3, 4, 15);
+    // Cinched waist — gold belt
+    fill(215, 185, 70);
+    rect(-6, 1, 12, 2);
+    // Belt medallion — sacred flame
+    fill(235, 205, 80);
     rect(-2, 0, 4, 3);
-    fill(255, 160, 40, 140);
+    fill(255, 180, 50, 160);
     rect(-1, 0, 2, 2);
-    // Arms — graceful, extended slightly
-    fill(220, 190, 160);
-    rect(-9, -1, 2, 5);
-    rect(7, -1, 2, 5);
-    // Gold bracelets
-    fill(210, 180, 60);
-    rect(-9, 2, 2, 1);
-    rect(7, 2, 2, 1);
-    // Crystal staff in right hand — glowing amethyst
-    // Staff shaft
-    fill(120, 100, 65);
-    rect(8, -16, 2, 18);
-    fill(140, 118, 78);
-    rect(8, -16, 1, 18);
+    // Dress draping — flowing hem
+    fill(238, 232, 222);
+    rect(-7, 9, 3, 4);
+    rect(4, 9, 3, 4);
+    // Bare shoulders + arms — graceful
+    fill(225, 195, 165);
+    rect(-8, -3, 2, 6);
+    rect(6, -3, 2, 6);
+    // Delicate hands
+    fill(220, 190, 158);
+    rect(-8, 3, 2, 2);
+    rect(6, 3, 2, 2);
+    // Gold armlets
+    fill(215, 185, 70);
+    rect(-8, -2, 2, 1);
+    rect(6, -2, 2, 1);
+    // Neckline — draped white with gold clasp
+    fill(248, 244, 236);
+    rect(-4, -5, 8, 2);
+    fill(220, 190, 80);
+    rect(-1, -5, 2, 2);
+    // Crystal staff in right hand
+    fill(130, 110, 72);
+    rect(7, -18, 2, 20);
+    fill(145, 125, 85);
+    rect(7, -18, 1, 20);
     // Crystal at top — amethyst, pulsing
     let crystPulse = sin(frameCount * 0.06) * 0.3 + 0.7;
     fill(160, 80, 200, 220);
-    rect(7, -20, 4, 4);
-    fill(180, 100, 220, 180);
-    rect(8, -21, 2, 2);
-    // Crystal glow aura
-    let gA = floor(15 * crystPulse);
-    fill(180, 120, 240, gA);
-    rect(5, -22, 8, 2);
-    rect(8, -24, 2, 8);
-    // Crystal inner light
-    fill(220, 180, 255, floor(80 * crystPulse));
-    rect(8, -20, 1, 2);
-    // Radiant glow around crystal
-    fill(160, 100, 220, floor(8 * crystPulse));
-    ellipse(9, -19, 16, 16);
-    // Veil over head — flowing
-    fill(235, 230, 225);
-    rect(-5, -14, 10, 5);
-    rect(-6, -10, 2, 8);
-    rect(4, -10, 2, 8);
-    // Head beneath veil
-    fill(220, 195, 170);
-    rect(-4, -12, 8, 8);
-    // Dark hair peeking under veil
-    fill(40, 28, 20);
-    rect(-5, -10, 2, 5);
-    rect(3, -10, 2, 5);
-    // Hair sheen
-    fill(60, 42, 32, 100);
-    rect(-5, -10, 1, 2);
-    rect(4, -10, 1, 2);
-    // Crescent moon on forehead
-    fill(220, 210, 255);
-    rect(-1, -14, 2, 2);
-    rect(-2, -13, 1, 1);
-    // Eyes — deep violet, serene
+    rect(6, -22, 4, 4);
+    fill(190, 120, 235, 180);
+    rect(7, -23, 2, 2);
+    // Crystal glow
+    fill(170, 110, 230, floor(12 * crystPulse));
+    ellipse(8, -20, 14, 14);
+    // Long flowing hair — dark with highlights
+    fill(45, 30, 22);
+    rect(-5, -12, 10, 8);
+    // Hair falls past shoulders
+    rect(-6, -8, 2, 8);
+    rect(4, -8, 2, 8);
+    // Hair sheen highlights
+    fill(70, 48, 35, 120);
+    rect(-4, -12, 2, 6);
+    rect(2, -11, 2, 5);
+    // Face — beautiful, warm skin
+    fill(225, 198, 172);
+    rect(-4, -12, 8, 7);
+    // Delicate features
+    fill(210, 180, 155);
+    rect(-3, -8, 6, 1); // jaw line
+    // Lips — soft rose
+    fill(200, 120, 110);
+    rect(-1, -7, 2, 1);
+    // Gold circlet on forehead
+    fill(220, 195, 80);
+    rect(-4, -13, 8, 1);
+    // Circlet gem
+    fill(160, 90, 210);
+    rect(-1, -13, 2, 1);
+    // Eyes — deep green, serene
     if (blinking) {
-      fill(200, 175, 155);
+      fill(210, 185, 162);
       rect(-3, -9, 2, 1);
       rect(1, -9, 2, 1);
     } else {
-      fill(100, 70, 130);
+      fill(55, 110, 75);
       rect(-3, -10, 2, 2);
       rect(1, -10, 2, 2);
       // Eye highlights
-      fill(180, 160, 220, 180);
+      fill(120, 180, 140, 180);
       rect(-3, -10, 1, 1);
       rect(1, -10, 1, 1);
     }

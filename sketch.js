@@ -1796,6 +1796,7 @@ function drawInner() {
     updateBlessing(dt);
     updateCats(dt);
     updateCitizens(dt);
+    if (typeof updateVestaCrystalGathering === 'function') updateVestaCrystalGathering(dt);
     updateCooking(dt);
     updateWeather(dt);
     // Storm fishing message (first storm per session)
