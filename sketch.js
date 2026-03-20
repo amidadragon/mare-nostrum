@@ -5953,7 +5953,7 @@ function drawOneBuilding(b) {
         let awningColors = [[200,55,40],[220,180,50],[45,90,170],[190,90,35]];
         let stripeW = floor(bw / 4);
         for (let s = 0; s < 4; s++) {
-          let ac = awningColors[(floor(b.x * 0.1) + s) % 4];
+          let ac = awningColors[((floor(abs(b.x) * 0.1) + s) % 4 + 4) % 4];
           fill(ac[0], ac[1], ac[2], 200);
           beginShape();
           vertex(-bw/2 + s * stripeW, -bh/2 - 2);
