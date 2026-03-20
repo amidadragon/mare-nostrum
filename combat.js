@@ -242,6 +242,12 @@ function getComboMultiplier() {
   return 1.0;
 }
 
+// ─── KILL COMBO (kills without taking damage) ───────────────────────────────
+
+var _killCombo = 0;
+var _killComboDisplay = 0; // for display animation (holds value briefly after reset)
+var _killComboDisplayTimer = 0;
+
 // ─── DAMAGE NUMBERS ─────────────────────────────────────────────────────────
 
 let _damageNumbers = [];
@@ -290,6 +296,9 @@ function updateCombatSystem(dt) {
     _comboTimer -= dt;
     if (_comboTimer <= 0) _comboCount = 0;
   }
+
+  // Kill combo display timer
+  if (_killComboDisplayTimer > 0) _killComboDisplayTimer -= dt;
 
   // Fortify active timer
   if (_fortifyTimer > 0) _fortifyTimer -= dt;
@@ -443,7 +452,7 @@ function drawCombatOverlay() {
     text(dn.text, sx, sy);
   }
 
-  // Combo counter
+  // Combo counter (hit combo)
   if (_comboCount >= 2) {
     let comboAlpha = min(255, _comboTimer * 6);
     let sz = 16 + _comboCount * 1.5;
@@ -457,6 +466,35 @@ function drawCombatOverlay() {
     let label = _comboCount + ' HIT';
     if (mult > 1) label += '  x' + mult.toFixed(1);
     text(label, width / 2, height * 0.15);
+  }
+
+  // Kill combo counter (kills without taking damage)
+  if (_killComboDisplay >= 2 && _killComboDisplayTimer > 0) {
+    let kcAlpha = min(255, _killComboDisplayTimer * 4);
+    let kcSz = 14 + min(_killComboDisplay, 10) * 2;
+    let kcPulse = 1 + sin(frameCount * 0.2) * 0.05 * min(_killComboDisplay, 8);
+    // Warm color ramp: white -> yellow -> orange -> red
+    let kcR = 255;
+    let kcG = _killComboDisplay >= 8 ? 80 : _killComboDisplay >= 5 ? 140 : _killComboDisplay >= 3 ? 200 : 220;
+    let kcB = _killComboDisplay >= 5 ? 40 : _killComboDisplay >= 3 ? 60 : 100;
+    fill(kcR, kcG, kcB, kcAlpha);
+    noStroke();
+    textSize(kcSz * kcPulse); textAlign(CENTER, CENTER);
+    let kcLabel = 'x' + _killComboDisplay + '!';
+    // Brief scale pop on new kill
+    let popScale = _killComboDisplayTimer > 80 ? 1 + (_killComboDisplayTimer - 80) * 0.03 : 1;
+    push();
+    translate(width / 2, height * 0.21);
+    scale(popScale);
+    text(kcLabel, 0, 0);
+    // Outline for readability
+    fill(0, 0, 0, kcAlpha * 0.4);
+    textSize(kcSz * kcPulse + 1);
+    text(kcLabel, 1, 1);
+    fill(kcR, kcG, kcB, kcAlpha);
+    textSize(kcSz * kcPulse);
+    text(kcLabel, 0, 0);
+    pop();
   }
 
   // XP bar (below danger bar in conquest HUD area)
@@ -867,19 +905,31 @@ function drawSkillTree() {
 // ─── KILL BURST PARTICLES ────────────────────────────────────────────────
 
 function spawnKillBurst(x, y, col) {
-  for (let i = 0; i < 12; i++) {
-    let a = random(TWO_PI), spd = random(1.5, 4);
+  // 10-12 radiating particles with gravity
+  let count = floor(random(10, 13));
+  for (let i = 0; i < count; i++) {
+    let a = (TWO_PI / count) * i + random(-0.3, 0.3);
+    let spd = random(1.8, 4.5);
     particles.push({
       x: x, y: y,
-      vx: cos(a) * spd, vy: sin(a) * spd - 1,
-      life: random(20, 45), maxLife: 45,
+      vx: cos(a) * spd, vy: sin(a) * spd - 1.2,
+      life: random(25, 50), maxLife: 50,
       type: 'burst', size: random(2, 5),
-      r: col[0] + random(-20, 20),
-      g: col[1] + random(-20, 20),
-      b: col[2] + random(-20, 20),
-      gravity: 0.08, world: true,
+      r: col[0] + random(-25, 25),
+      g: col[1] + random(-25, 25),
+      b: col[2] + random(-25, 25),
+      gravity: 0.1, world: true,
     });
   }
+  // Expanding ring in enemy's color
+  particles.push({
+    x: x, y: y, vx: 0, vy: 0,
+    life: 25, maxLife: 25,
+    type: 'golden_wave', size: 3,
+    maxRing: 50,
+    r: min(255, col[0] + 60), g: min(255, col[1] + 60), b: min(255, col[2] + 60),
+    world: true,
+  });
 }
 
 // ─── ARENA PROJECTILES (archer arrows) ──────────────────────────────────
@@ -904,8 +954,9 @@ function updateArenaProjectiles(dt, p) {
       p.hp -= dmg;
       p.invincTimer = 20;
       addFloatingText(w2sX(p.x), w2sY(p.y) - 25, '-' + dmg, '#ff6644');
-      triggerScreenShake(3, 6);
+      { let _hda = atan2(p.y - pr.y, p.x - pr.x); triggerScreenShake(3, 6, cos(_hda), sin(_hda), 'directional'); }
       if (typeof snd !== 'undefined' && snd) snd.playSFX('player_hurt');
+      _killCombo = 0;
       _arenaProjectiles.splice(i, 1);
     }
   }

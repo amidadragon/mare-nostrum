@@ -35,12 +35,38 @@ function updatePlayer(dt) {
     p.dashTimer -= dt;
   }
   if (p.dashCooldown > 0) p.dashCooldown -= dt;
-  if (p.toolSwing > 0) p.toolSwing -= dt;
+  // Tool swing hitlag: freeze animation for 2 frames on impact
+  if (p._hitlagFrames > 0) {
+    p._hitlagFrames -= dt;
+  } else if (p.toolSwing > 0) {
+    p.toolSwing -= dt;
+  }
 
   // Slow down in shallow water / diving
   let inShallows = isInShallows(p.x, p.y);
-  if (inShallows && !p._wasInShallows) { if (snd) snd.playSFX('water'); }
+  if (inShallows && !p._wasInShallows) {
+    if (snd) snd.playSFX('water');
+    // Water entry splash — burst of droplets arcing upward
+    for (let si = 0; si < 7; si++) {
+      let angle = -PI * 0.15 - random(0, PI * 0.7);
+      particles.push({
+        x: p.x + random(-6, 6), y: p.y + random(2, 6),
+        vx: cos(angle) * random(1.2, 2.5), vy: sin(angle) * random(1.5, 3.0),
+        life: random(18, 30), maxLife: 30,
+        type: 'burst', size: random(2, 5),
+        r: 160, g: 210, b: 245, gravity: 0.12, world: true,
+      });
+    }
+    // Tiny vertical camera bob (2px down then back over 10 frames)
+    p._waterBobTimer = 10;
+  }
   p._wasInShallows = inShallows;
+  // Water entry camera bob update
+  if (p._waterBobTimer > 0) {
+    p._waterBobTimer -= dt;
+    let prog = p._waterBobTimer / 10;
+    shakeY += sin(prog * PI) * 2;
+  }
   if (inShallows) spd *= (state.diving && state.diving.active) ? 0.7 : 0.55;
 
   let dx = 0, dy = 0;
@@ -83,6 +109,9 @@ function updatePlayer(dt) {
     p.vy *= 0.7;
     p.moving = false;
   }
+
+  // Idle frames counter for breathing animation
+  if (p.moving) { p._idleFrames = 0; } else { p._idleFrames = (p._idleFrames || 0) + dt; }
 
   // Footstep dust
   if (p.moving && frameCount % 8 === 0) {
@@ -438,6 +467,10 @@ function drawPlayer() {
 
   // Idle breathing bob + bounce
   let bobY = p.moving ? sin(frameCount * 0.25) * 2 : sin(frameCount * 0.04) * 0.8;
+  // Deep idle breathing — subtle weight-shift after standing still 120+ frames
+  if (!p.moving && (p._idleFrames || 0) > 120) {
+    bobY += sin(frameCount * 0.03) * 0.5;
+  }
   // Weary slump at night
   if (a.emotion === 'weary' && !p.moving) bobY += 1;
 
@@ -1157,7 +1190,7 @@ function playerAttack() {
     e.y += sin(kbAngle) * kb;
     addFloatingText(w2sX(e.x), w2sY(e.y) - 20, '-' + dmg, '#ff4444');
     spawnParticles(e.x, e.y, 'combat', 4);
-    triggerScreenShake(2, 4);
+    { let _hta = atan2(e.y - p.y, e.x - p.x); triggerScreenShake(2, 4, cos(_hta), sin(_hta), 'directional'); }
     if (snd) snd.playSFX('hit');
   }
 }

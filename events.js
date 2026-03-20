@@ -28,6 +28,68 @@ function startFestival() {
   if (f.effect.forceRain) {
     state.weather = { type: 'rain', timer: 1440, intensity: 0.7 };
   }
+  // Trigger cinematic announcement overlay
+  _festivalAnnouncement = { timer: 0, duration: 120, season: season };
+  _spawnFestivalParticles(season);
+}
+
+// ─── FESTIVAL ANNOUNCEMENT CINEMATIC ──────────────────────────────────────
+let _festivalAnnouncement = null;
+
+function _spawnFestivalParticles(season) {
+  let px = state.player.x, py = state.player.y;
+  let count = 30;
+  for (let i = 0; i < count; i++) {
+    let angle = (TWO_PI / count) * i + random(-0.2, 0.2);
+    let speed = random(1.5, 4);
+    let p = {
+      x: px + random(-30, 30), y: py + random(-30, 30),
+      vx: cos(angle) * speed, vy: sin(angle) * speed * 0.6 - random(0.5, 1.5),
+      life: random(50, 90), maxLife: 90,
+      type: 'burst', size: random(2, 5),
+      r: 0, g: 0, b: 0, world: true,
+    };
+    if (season === 0) { p.r = 255; p.g = floor(random(120, 200)); p.b = floor(random(160, 220)); } // Floralia pink petals
+    else if (season === 1) { p.r = floor(random(60, 120)); p.g = floor(random(160, 220)); p.b = 255; } // Neptunalia water drops
+    else if (season === 2) { p.r = floor(random(140, 200)); p.g = floor(random(60, 120)); p.b = 255; } // Vinalia grape orbs
+    else { p.r = 255; p.g = floor(random(180, 220)); p.b = floor(random(40, 80)); } // Saturnalia golden sparks
+    particles.push(p);
+  }
+}
+
+function drawFestivalAnnouncement() {
+  if (!_festivalAnnouncement) return;
+  let a = _festivalAnnouncement;
+  a.timer++;
+  let progress = a.timer / a.duration;
+  if (progress >= 1) { _festivalAnnouncement = null; return; }
+
+  let f = FESTIVALS[a.season];
+
+  // Screen dim overlay
+  let dimAlpha;
+  if (progress < 0.15) dimAlpha = (progress / 0.15) * 80;
+  else if (progress < 0.75) dimAlpha = 80;
+  else dimAlpha = 80 * (1 - (progress - 0.75) / 0.25);
+  fill(0, 0, 0, floor(dimAlpha));
+  rect(0, 0, width, height);
+
+  // Festival name in large ornate text
+  let textAlpha;
+  if (progress < 0.15) textAlpha = progress / 0.15;
+  else if (progress < 0.7) textAlpha = 1;
+  else textAlpha = 1 - (progress - 0.7) / 0.3;
+
+  if (textAlpha > 0.01) {
+    let col = color(f.color);
+    let pulse = sin(a.timer * 0.12) * 0.15 + 0.85;
+    _drawCinematicText(width / 2, height * 0.4, f.name, 28,
+      red(col), green(col), blue(col), floor(textAlpha * pulse * 255));
+    // Subtitle
+    let subDesc = f.desc.split('\u2014')[1] ? f.desc.split('\u2014')[1].trim() : f.desc;
+    _drawCinematicText(width / 2, height * 0.4 + 36, subDesc, 12,
+      220, 210, 190, floor(textAlpha * 0.7 * 255));
+  }
 }
 
 function drawFestivalBanner() {
@@ -48,6 +110,8 @@ function drawFestivalBanner() {
 function drawFestivalDecorations() {
   let f = getFestival();
   if (!f) return;
+  let season = state.festival.season;
+
   // Floating lanterns near buildings during festivals
   state.buildings.forEach((b, i) => {
     let lx = w2sX(b.x) + sin(frameCount * 0.02 + i * 1.7) * 8;
@@ -63,6 +127,116 @@ function drawFestivalDecorations() {
     line(lx, ly + 6, lx, ly + 14);
     noStroke();
   });
+
+  // === Season-specific visual transformations ===
+  if (season === 0) {
+    // FLORALIA — pink/white flower petals drifting across screen
+    for (let i = 0; i < 18; i++) {
+      let seed = i * 137.5;
+      let px = ((frameCount * 0.4 + seed * 7) % (width + 40)) - 20;
+      let py = ((frameCount * 0.25 + seed * 11) % (height + 40)) - 20;
+      let wobble = sin(frameCount * 0.03 + seed) * 12;
+      let spin = sin(frameCount * 0.05 + seed * 0.3) * 3;
+      let a = 100 + sin(frameCount * 0.04 + i) * 40;
+      fill(i % 3 === 0 ? color(255, 220, 230, a) : (i % 3 === 1 ? color(255, 200, 210, a) : color(255, 245, 248, a)));
+      ellipse(floor(px + wobble), floor(py), 3 + spin, 2 + spin * 0.5);
+    }
+  } else if (season === 1) {
+    // NEPTUNALIA — water sparkle particles along coast edges
+    let cx = w2sX(WORLD.islandCX), cy = w2sY(WORLD.islandCY);
+    for (let i = 0; i < 24; i++) {
+      let ang = (i / 24) * TWO_PI + frameCount * 0.003;
+      let rx = WORLD.islandRX * 0.48 + sin(frameCount * 0.02 + i * 2.3) * 20;
+      let ry = WORLD.islandRY * 0.48 + cos(frameCount * 0.025 + i * 1.7) * 15;
+      let sx = cx + cos(ang) * rx;
+      let sy = cy + sin(ang) * ry;
+      if (sx < -10 || sx > width + 10 || sy < -10 || sy > height + 10) continue;
+      let sparkle = sin(frameCount * 0.12 + i * 3.1) * 0.5 + 0.5;
+      fill(180, 230, 255, floor(sparkle * 180));
+      noStroke();
+      let sz = 1 + sparkle * 2.5;
+      rect(floor(sx), floor(sy), sz, sz);
+      if (sparkle > 0.7) {
+        fill(220, 245, 255, floor(sparkle * 100));
+        rect(floor(sx) - 1, floor(sy), sz + 2, 1);
+        rect(floor(sx), floor(sy) - 1, 1, sz + 2);
+      }
+    }
+  } else if (season === 2) {
+    // VINALIA — purple/amber grape-colored orbs drifting near buildings
+    state.buildings.forEach((b, i) => {
+      for (let j = 0; j < 2; j++) {
+        let seed = i * 47 + j * 113;
+        let ox = sin(frameCount * 0.015 + seed) * 30;
+        let oy = cos(frameCount * 0.02 + seed * 0.7) * 20 - 30;
+        let bsx = w2sX(b.x) + ox;
+        let bsy = w2sY(b.y) + oy;
+        if (bsx < -10 || bsx > width + 10) continue;
+        let pulse = sin(frameCount * 0.04 + seed) * 0.4 + 0.6;
+        let c = j % 2 === 0 ? color(140, 50, 180, floor(pulse * 90)) : color(200, 140, 40, floor(pulse * 70));
+        fill(c);
+        noStroke();
+        ellipse(floor(bsx), floor(bsy), 5, 5);
+        fill(j % 2 === 0 ? color(170, 80, 220, floor(pulse * 40)) : color(230, 180, 60, floor(pulse * 30)));
+        ellipse(floor(bsx), floor(bsy), 9, 9);
+      }
+    });
+  } else if (season === 3) {
+    // SATURNALIA — golden sparkle particles scattered across screen
+    for (let i = 0; i < 20; i++) {
+      let seed = i * 97.3;
+      let px = (sin(frameCount * 0.008 + seed) * 0.5 + 0.5) * width;
+      let py = (cos(frameCount * 0.006 + seed * 1.3) * 0.5 + 0.5) * height;
+      let twinkle = sin(frameCount * 0.1 + seed * 2.7) * 0.5 + 0.5;
+      if (twinkle < 0.3) continue;
+      fill(255, 210, 80, floor(twinkle * 160));
+      noStroke();
+      let sz = 1 + twinkle * 2;
+      rect(floor(px), floor(py), sz, sz);
+      if (twinkle > 0.6) {
+        fill(255, 230, 140, floor(twinkle * 80));
+        rect(floor(px) - 1, floor(py), sz + 2, 1);
+        rect(floor(px), floor(py) - 1, 1, sz + 2);
+      }
+    }
+    // Extra torch glow on buildings
+    state.buildings.forEach((b, i) => {
+      let bx = w2sX(b.x), by = w2sY(b.y);
+      if (bx < -40 || bx > width + 40) return;
+      let flicker = sin(frameCount * 0.08 + i * 2.5) * 0.2 + 0.8;
+      fill(255, 180, 50, floor(flicker * 30));
+      noStroke();
+      ellipse(floor(bx), floor(by) - 20, 40 * flicker, 30 * flicker);
+    });
+  }
+}
+
+function drawFestivalOverlay() {
+  let f = getFestival();
+  if (!f) return;
+  let season = state.festival.season;
+  push();
+  noStroke();
+  if (season === 0) {
+    // Floralia — warm pink tint
+    fill(255, 140, 180, 8);
+    rect(0, 0, width, height);
+  } else if (season === 1) {
+    // Neptunalia — deeper blue overlay
+    fill(20, 60, 140, 10);
+    rect(0, 0, width, height);
+  } else if (season === 2) {
+    // Vinalia — purple/amber tint
+    fill(120, 40, 160, 7);
+    rect(0, 0, width, height);
+    fill(180, 130, 30, 5);
+    rect(0, 0, width, height);
+  } else if (season === 3) {
+    // Saturnalia — warm golden light
+    fill(255, 200, 80, 12);
+    rect(0, 0, width, height);
+  }
+  pop();
 }
 
 function updateFestival(dt) {

@@ -1256,3 +1256,71 @@ function drawNewNPC(npc, type) {
 
   pop();
 }
+
+// ─── NPC DAILY SCHEDULES ──────────────────────────────────────────────────
+// Returns target world position for a named NPC based on time of day.
+const NPC_SCHEDULES = {
+  livia: [
+    { start: 6, end: 11, x: 280, y: 380 },       // morning: farm plots
+    { start: 11, end: 15, x: 600, y: 400 },       // midday: well/center
+    { start: 15, end: 20, x: 600, y: 480 },       // evening: forum area
+    { start: 20, end: 24, x: 540, y: 420 },       // night: home
+    { start: 0, end: 6, x: 540, y: 420 },
+  ],
+  marcus: [
+    { start: 6, end: 11, x: 1000, y: 430 },       // morning: port
+    { start: 11, end: 15, x: 870, y: 370 },       // midday: market/center
+    { start: 15, end: 20, x: 700, y: 450 },       // evening: tavern area
+    { start: 20, end: 24, x: 1040, y: 440 },      // night: home
+    { start: 0, end: 6, x: 1040, y: 440 },
+  ],
+  vesta: [
+    { start: 6, end: 11, x: 840, y: 310 },        // morning: temple area
+    { start: 11, end: 15, x: 400, y: 350 },       // midday: garden
+    { start: 15, end: 20, x: 600, y: 400 },       // evening: center
+    { start: 20, end: 24, x: 180, y: 395 },       // night: home
+    { start: 0, end: 6, x: 180, y: 395 },
+  ],
+  felix: [
+    { start: 6, end: 11, x: 350, y: 300 },        // morning: roaming/ruins
+    { start: 11, end: 15, x: 600, y: 400 },       // midday: center
+    { start: 15, end: 20, x: 950, y: 420 },       // evening: port
+    { start: 20, end: 24, x: 400, y: 390 },       // night: home
+    { start: 0, end: 6, x: 400, y: 390 },
+  ],
+};
+
+function getNPCSchedulePos(npcName, hour) {
+  let schedule = NPC_SCHEDULES[npcName];
+  if (!schedule) return null;
+  for (let i = 0; i < schedule.length; i++) {
+    let s = schedule[i];
+    if (hour >= s.start && hour < s.end) return { x: s.x, y: s.y };
+  }
+  let last = schedule[schedule.length - 1];
+  return { x: last.x, y: last.y };
+}
+
+function updateNPCSchedule(npc, npcName, dt) {
+  let hour = (typeof state !== 'undefined' && state.time != null) ? state.time / 60 : 12;
+  let target = getNPCSchedulePos(npcName, hour);
+  if (!target) return;
+  let dx = target.x - npc.x;
+  let dy = target.y - npc.y;
+  let d = Math.sqrt(dx * dx + dy * dy);
+  if (d < 3) return;
+  let speed = 0.5;
+  let step = speed * dt;
+  if (step > d) step = d;
+  npc.x += (dx / d) * step;
+  npc.y += (dy / d) * step;
+  if (Math.abs(dx) > 1) npc._schedFacing = dx > 0 ? 1 : -1;
+}
+
+function updateAllNPCSchedules(dt) {
+  if (typeof state === 'undefined') return;
+  if (state.npc) updateNPCSchedule(state.npc, 'livia', dt);
+  if (state.marcus && state.marcus.present !== false) updateNPCSchedule(state.marcus, 'marcus', dt);
+  if (state.vesta) updateNPCSchedule(state.vesta, 'vesta', dt);
+  if (state.felix) updateNPCSchedule(state.felix, 'felix', dt);
+}

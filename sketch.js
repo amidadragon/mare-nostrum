@@ -96,6 +96,9 @@ let inventoryOpen = false;    // I key
 let screenTransition = { active: false, alpha: 0, dir: 1, callback: null };
 let achievementPopup = null;  // { text, timer, slideX }
 let photoMode = false;
+let photoModeWatermarkAlpha = 0;
+let photoModeTipTimer = 0;
+let photoModeFlash = 0;
 let screenshotMode = false;
 let screenshotFilter = 0; // 0=none, 1=warm, 2=cool, 3=sepia
 
@@ -1479,12 +1482,51 @@ function windowResized() {
 }
 
 // ─── CAMERA ───────────────────────────────────────────────────────────────
+let _camIdleFrames = 0;
 function updateCamera() {
   // Smooth follow player — bias upward so horizon stays visible
   cam.x = state.player.x;
   cam.y = state.player.y - height * 0.12; // player sits in lower 60% of screen
   camSmooth.x = lerp(camSmooth.x, cam.x, 0.08);
   camSmooth.y = lerp(camSmooth.y, cam.y, 0.08);
+
+  // Island expansion visual lerp (Feature 2)
+  if (state._expandFrames > 0) {
+    state._expandFrames--;
+    let t = 1 - state._expandFrames / 120;
+    let eased = t * (2 - t);
+    state.islandRX = lerp(state._expandVisualRX, state._expandTargetRX, eased);
+    state.islandRY = lerp(state._expandVisualRY, state._expandTargetRY, eased);
+    if (state._expandFrames <= 0) {
+      state.islandRX = state._expandTargetRX;
+      state.islandRY = state._expandTargetRY;
+      delete state._expandVisualRX;
+      delete state._expandVisualRY;
+      delete state._expandTargetRX;
+      delete state._expandTargetRY;
+    }
+  }
+
+  // Expansion camera zoom-out effect (Feature 2)
+  if (state._expandCamZoom > 0) {
+    state._expandCamZoom--;
+    let t = state._expandCamZoom / 180;
+    let zoomOut = sin(t * PI) * 0.15;
+    camSmooth.x = lerp(camSmooth.x, WORLD.islandCX, zoomOut);
+    camSmooth.y = lerp(camSmooth.y, WORLD.islandCY - height * 0.1, zoomOut);
+  }
+
+  // Camera idle breathe (Feature 4)
+  let p = state.player;
+  if (!p.moving && abs(p.vx || 0) < 0.1 && abs(p.vy || 0) < 0.1) {
+    _camIdleFrames++;
+  } else {
+    _camIdleFrames = 0;
+  }
+  if (_camIdleFrames > 60) {
+    camSmooth.x += sin(frameCount * 0.015) * 0.3;
+    camSmooth.y += sin(frameCount * 0.011) * 0.2;
+  }
 }
 
 function w2sX(wx) {
@@ -1735,6 +1777,10 @@ function drawInner() {
     drawSailingCutscene(dt);
     return;
   }
+  if (state.cutscene === 'home_sunrise') {
+    drawHomeSunriseCinematic(dt);
+    return;
+  }
 
   // === TEMPLE INTERIOR ===
   if (state.insideTemple) {
@@ -1745,6 +1791,7 @@ function drawInner() {
     drawVignette();
     drawScreenshotFilter();
     drawScreenshotIndicator();
+    drawPhotoModeOverlay();
     return;
   }
 
@@ -1963,6 +2010,7 @@ function drawInner() {
       if (_full || _pg.companionsAwakened.centurion) updateCenturion(dt);
     }
     updateParticles(dt);
+    updateAmbientWildlife(dt);
     updateStorm(dt);
     updateFloatingText(dt);
     updateShake(dt);
@@ -1978,6 +2026,7 @@ function drawInner() {
     updateCats(dt);
     updateCitizens(dt);
     if (typeof updateVestaCrystalGathering === 'function') updateVestaCrystalGathering(dt);
+    if (typeof updateAllNPCSchedules === 'function') updateAllNPCSchedules(dt);
     updateCooking(dt);
     updateWeather(dt);
     // Storm fishing message (first storm per session)
@@ -2002,6 +2051,8 @@ function drawInner() {
     if (typeof tickEarlyGameNudges === 'function') tickEarlyGameNudges(dt);
     updateDialog(dt);
     updateAchievementPopup(dt);
+    if (typeof updateHarvestArcs === 'function') updateHarvestArcs(dt);
+    if (typeof updateCatchCard === 'function') updateCatchCard(dt);
     updateScreenTransition(dt);
     updateImperatorCeremony(dt);
     updateCamera();
@@ -2091,6 +2142,7 @@ function drawInner() {
     drawFishing();
     drawParticles();
     drawSeasonalEffects();
+    drawAmbientWildlife();
     drawWeatherEffects();
     drawLightning();
     drawEnergyArcs();
@@ -2277,14 +2329,16 @@ function drawInner() {
     if (!state.conquest.active && !state.adventure.active) {
       drawNightOverlay();
       drawColorGrading();
+      if (typeof drawFestivalOverlay === 'function') drawFestivalOverlay();
       drawGameVignette();
     }
 
-    if (!screenshotMode) {
+    if (!screenshotMode && !photoMode) {
       drawHUD();
-      if (!photoMode && typeof drawQuestTracker === 'function') drawQuestTracker();
+      if (typeof drawQuestTracker === 'function') drawQuestTracker();
       drawHotbar();
       drawFestivalBanner();
+      drawFestivalAnnouncement();
       drawEventBanner();
       drawWanderingMerchantUI();
       drawBuildUI();
@@ -2296,7 +2350,7 @@ function drawInner() {
       if (typeof drawLoreTabletPopup === 'function') drawLoreTabletPopup();
       if (typeof drawNarrativeDialogue === 'function') drawNarrativeDialogue();
       drawDiscoveryEvent();
-      if (!photoMode) drawTutorialHintUI();
+      drawTutorialHintUI();
       drawScreenFlash();
       drawImperatorBanner();
       drawIslandMilestone();
@@ -2313,26 +2367,27 @@ function drawInner() {
       if (typeof drawArenaSummaryOverlay === 'function') drawArenaSummaryOverlay();
       drawWardrobe();
       drawAchievementPopup();
+      if (typeof drawHarvestArcs === 'function') drawHarvestArcs();
+      if (typeof drawCatchCard === 'function') drawCatchCard();
       if (typeof drawEconomyUIOverlay === 'function') drawEconomyUIOverlay();
       drawScreenTransition();
       drawImperatorCeremony();
       drawIslandNamingOverlay();
       if (typeof drawMobileControls === 'function') drawMobileControls();
       if (typeof _processTouchActions === 'function') _processTouchActions();
-      // Photo mode hint — always visible at low alpha
-      if (!photoMode) {
-        push(); noStroke();
-        fill(160, 140, 100, 102);
-        textSize(7); textAlign(RIGHT, BOTTOM);
-        text('[ P ] PHOTO  [ F9 ] SCREENSHOT', width - 18, height - 6);
-        pop();
-      }
-      if (!photoMode) drawCursor();
+      push(); noStroke();
+      fill(160, 140, 100, 102);
+      textSize(7); textAlign(RIGHT, BOTTOM);
+      text('[ P ] PHOTO  [ F9 ] SCREENSHOT', width - 18, height - 6);
+      pop();
+      drawCursor();
     }
     // Screenshot mode overlays — always on top of world
     drawVignette();
     drawScreenshotFilter();
     drawScreenshotIndicator();
+    // Photo mode overlays (watermark, vignette, tip, flash)
+    drawPhotoModeOverlay();
   }
 
   // Debug perf overlay
@@ -2590,6 +2645,16 @@ let skyBirds = null;
 function drawSkyBirds() {
   let bright = getSkyBrightness();
   if (bright < 0.2) return;
+  // Hide birds during storms, fade them back in during storm_out transition
+  if (stormActive) return;
+  let birdAlpha = 1;
+  if (typeof weatherTransition !== 'undefined' && weatherTransition.active && weatherTransition.type === 'storm_out') {
+    birdAlpha = weatherTransition.progress; // birds gradually reappear
+  }
+  if (typeof weatherTransition !== 'undefined' && weatherTransition.active && weatherTransition.type === 'storm_in') {
+    birdAlpha = 1 - weatherTransition.progress; // birds flee
+    if (birdAlpha < 0.05) return;
+  }
   if (!skyBirds) {
     skyBirds = [];
     for (let i = 0; i < 5; i++) {
@@ -2601,7 +2666,7 @@ function drawSkyBirds() {
     }
   }
   noFill();
-  stroke(40, 35, 30, 120 * bright);
+  stroke(40, 35, 30, 120 * bright * birdAlpha);
   strokeWeight(1.2);
   skyBirds.forEach(b => {
     b.x += b.speed;
@@ -3198,7 +3263,9 @@ function digTreasure() {
     let _relicMap = { ancientRelic: 'bronze_eagle', crystals: 'crystal_shard', gold: 'ancient_coin', ironOre: 'roman_helm' };
     let _rid = _relicMap[t.type] || 'sea_amphora';
     if (!state.codex.relics) state.codex.relics = {};
+    let _isNewRelic = !state.codex.relics[_rid];
     if (!state.codex.relics[_rid]) state.codex.relics[_rid] = { found: true, firstDay: state.day };
+    if (_isNewRelic && typeof markCodexDiscovery === 'function') markCodexDiscovery('relics', _rid);
     unlockJournal('relic_found');
     addFloatingText(w2sX(t.x), w2sY(t.y) - 30, 'TREASURE! +' + t.qty + ' ' + t.type, '#ffcc00');
     spawnParticles(state.player.x, state.player.y, 'harvest', 20);
@@ -3605,6 +3672,36 @@ let _stormWindOffset = 0; // subtle horizontal drift during storms
 function drawWeatherEffects() {
   let w = state.weather;
 
+  // Update and draw weather transitions
+  if (typeof updateWeatherTransition === 'function') updateWeatherTransition();
+  if (typeof drawWeatherTransitionEffects === 'function') drawWeatherTransitionEffects();
+
+  // Storm clearing: thin out remaining raindrops (reduce spawn, let existing fall)
+  if (typeof weatherTransition !== 'undefined' && weatherTransition.active && weatherTransition.type === 'storm_out') {
+    let fadeT = weatherTransition.progress;
+    // Draw remaining raindrops fading out
+    if (raindrops.length > 0) {
+      let fadedAlpha = 130 * (1 - fadeT);
+      stroke(130, 170, 210, fadedAlpha);
+      strokeWeight(1.2);
+      for (let i = raindrops.length - 1; i >= 0; i--) {
+        let r = raindrops[i];
+        line(r.x, r.y, r.x + (r.wind || -1) * 3, r.y + r.len);
+        r.y += r.speed;
+        r.x += r.wind || -1;
+        if (r.y > height) raindrops.splice(i, 1);
+      }
+      noStroke();
+    }
+    // Spawn a few stragglers early in the transition
+    if (fadeT < 0.5 && raindrops.length < floor(100 * (1 - fadeT * 2)) && random() < (1 - fadeT * 2) * 0.5) {
+      raindrops.push({
+        x: random(-30, width + 30), y: random(-20, -5),
+        speed: random(6, 11), len: random(6, 12), wind: random(-1.5, -0.5),
+      });
+    }
+  }
+
   // Drift storms get full rain + dark overlay even when weather.type isn't 'rain'
   if (stormActive && w.type !== 'rain') {
     _drawStormRain();
@@ -3709,21 +3806,27 @@ function drawWeatherEffects() {
 
 // ─── DRIFT STORM RAIN ──────────────────────────────────────────────────
 function _drawStormRain() {
-  let intensity = 0.95;
+  let stormRamp = 1;
+  if (typeof weatherTransition !== 'undefined' && weatherTransition.active && weatherTransition.type === 'storm_in') {
+    stormRamp = weatherTransition.progress;
+  }
+  let intensity = 0.95 * stormRamp;
   noStroke();
 
   // Dark gray-blue sky overlay — heavier than normal rain
-  fill(12, 16, 28, 70);
+  fill(12, 16, 28, 70 * stormRamp);
   rect(0, 0, width, height);
   // Extra sky darkening
-  fill(10, 18, 35, 50);
+  fill(10, 18, 35, 50 * stormRamp);
   rect(0, 0, width, height * 0.55);
 
   // Subtle wind wobble — horizontal offset that oscillates
-  _stormWindOffset = sin(frameCount * 0.015) * 2.5 + cos(frameCount * 0.037) * 1.2;
+  _stormWindOffset = sin(frameCount * 0.015) * 2.5 * stormRamp + cos(frameCount * 0.037) * 1.2 * stormRamp;
 
-  // Spawn heavy raindrops — 2x normal rain rate (soft cap: stop spawning, let existing fall)
-  if (raindrops.length < 500) for (let i = 0; i < 18; i++) {
+  // Spawn heavy raindrops — ramp up during transition
+  let spawnCount = floor(18 * max(0.05, stormRamp));
+  let dropCap = floor(500 * max(0.1, stormRamp));
+  if (raindrops.length < dropCap) for (let i = 0; i < spawnCount; i++) {
     raindrops.push({
       x: random(-80, width + 80), y: random(-40, -5),
       speed: random(10, 18),
@@ -4315,6 +4418,180 @@ function drawSeasonalEffects() {
   }
 }
 
+
+// ─── AMBIENT WILDLIFE ─────────────────────────────────────────────────────
+// Birds perch on buildings, butterflies near farm, fireflies at night
+let _wildlifeBirds = null;
+let _wildlifeFireflies = null;
+let _wildlifeFarmButterflies = null;
+
+function _initWildlifeBirds() {
+  if (_wildlifeBirds) return;
+  _wildlifeBirds = [];
+  for (let i = 0; i < 4; i++) {
+    _wildlifeBirds.push({
+      x: 0, y: 0, targetX: 0, targetY: 0,
+      state: 'perched', wingPhase: random(TWO_PI),
+      circleAngle: random(TWO_PI), circleTimer: 0,
+      flySpeed: random(1.2, 2.0), needsPerch: true,
+    });
+  }
+}
+
+function _pickBirdPerch(bird) {
+  let tall = state.buildings.filter(b => {
+    let bp = BLUEPRINTS[b.type];
+    return bp && bp.blocks && b.type !== 'fence' && b.type !== 'wall';
+  });
+  if (tall.length === 0) {
+    bird.targetX = WORLD.islandCX + random(-200, 200);
+    bird.targetY = WORLD.islandCY + random(-80, -30);
+  } else {
+    let b = tall[floor(random(tall.length))];
+    let bp = BLUEPRINTS[b.type];
+    bird.targetX = b.x + random(-8, 8);
+    bird.targetY = b.y - (bp ? bp.h * 0.6 : 16) - random(2, 6);
+  }
+  bird.x = bird.targetX; bird.y = bird.targetY;
+  bird.state = 'perched'; bird.needsPerch = false;
+}
+
+function updateAmbientWildlife(dt) {
+  if (!state || !state.buildings) return;
+  let hour = state.time / 60;
+
+  // ── Birds ──
+  _initWildlifeBirds();
+  let px = state.player.x, py = state.player.y;
+  for (let bird of _wildlifeBirds) {
+    if (bird.needsPerch) _pickBirdPerch(bird);
+    if (bird.state === 'perched') {
+      if (dist(px, py, bird.x, bird.y) < 40) {
+        bird.state = 'flying';
+        bird.circleAngle = atan2(bird.y - py, bird.x - px);
+        bird.targetX = bird.x + cos(bird.circleAngle) * random(60, 100);
+        bird.targetY = bird.y - random(30, 60);
+      }
+    } else if (bird.state === 'flying') {
+      let dx = bird.targetX - bird.x, dy = bird.targetY - bird.y;
+      let d = sqrt(dx * dx + dy * dy);
+      if (d < 3) {
+        bird.state = 'circling'; bird.circleTimer = random(60, 120);
+        bird.circleAngle = random(TWO_PI);
+      } else {
+        let spd = bird.flySpeed * dt;
+        bird.x += (dx / d) * spd; bird.y += (dy / d) * spd;
+      }
+    } else if (bird.state === 'circling') {
+      bird.circleTimer -= dt;
+      bird.circleAngle += 0.03 * dt;
+      bird.x += cos(bird.circleAngle) * 0.5 * dt;
+      bird.y += sin(bird.circleAngle) * 0.3 * dt;
+      if (bird.circleTimer <= 0) { _pickBirdPerch(bird); bird.state = 'flying'; }
+    }
+  }
+
+  // ── Farm butterflies ──
+  if (!_wildlifeFarmButterflies) {
+    let fCX = WORLD.islandCX - 220, fCY = WORLD.islandCY - 5;
+    _wildlifeFarmButterflies = [];
+    let wc = [[220,140,60],[200,80,120],[180,120,200]];
+    for (let i = 0; i < 3; i++) {
+      _wildlifeFarmButterflies.push({
+        x: fCX, y: fCY, homeX: fCX, homeY: fCY,
+        phase: random(TWO_PI), wingPhase: random(TWO_PI),
+        r: wc[i][0], g: wc[i][1], b: wc[i][2],
+      });
+    }
+  }
+  let bright = getSkyBrightness();
+  if (bright > 0.3) {
+    for (let bf of _wildlifeFarmButterflies) {
+      bf.phase += 0.015 * dt;
+      bf.x = bf.homeX + sin(bf.phase) * 55 + sin(bf.phase * 1.7) * 20;
+      bf.y = bf.homeY + cos(bf.phase * 0.8) * 25 + sin(bf.phase * 2.3) * 8;
+    }
+  }
+
+  // ── Fireflies (hours 21-5) ──
+  let isNight = hour >= 21 || hour < 5;
+  if (isNight) {
+    if (!_wildlifeFireflies) {
+      _wildlifeFireflies = [];
+      for (let i = 0; i < 10; i++) {
+        _wildlifeFireflies.push({
+          x: WORLD.islandCX + random(-300, 300),
+          y: WORLD.islandCY + random(-100, 80),
+          phase: random(TWO_PI), driftPhase: random(TWO_PI),
+          speed: random(0.1, 0.3), pulseFreq: random(0.04, 0.08),
+        });
+      }
+    }
+    for (let ff of _wildlifeFireflies) {
+      ff.phase += ff.speed * 0.01 * dt;
+      ff.driftPhase += 0.005 * dt;
+      ff.x += sin(ff.phase) * 0.15 * dt;
+      ff.y += cos(ff.phase * 0.7) * 0.1 * dt;
+      let dx = WORLD.islandCX - ff.x, dy = WORLD.islandCY - ff.y;
+      if (sqrt(dx * dx + dy * dy) > 280) { ff.x += dx * 0.001 * dt; ff.y += dy * 0.001 * dt; }
+    }
+  } else { _wildlifeFireflies = null; }
+}
+
+function drawAmbientWildlife() {
+  if (!state || !state.buildings) return;
+  noStroke();
+  let hour = state.time / 60;
+  let bright = getSkyBrightness();
+
+  // ── Birds ──
+  if (_wildlifeBirds) {
+    for (let bird of _wildlifeBirds) {
+      let bx = w2sX(bird.x), by = w2sY(bird.y);
+      if (bx < -20 || bx > width + 20 || by < -20 || by > height + 20) continue;
+      let fpx = floor(bx), fpy = floor(by);
+      fill(35, 30, 25, 200);
+      if (bird.state === 'perched') {
+        rect(fpx - 1, fpy, 3, 2);
+        rect(fpx - 2, fpy + 1, 1, 1);
+      } else {
+        rect(fpx - 1, fpy, 3, 2);
+        let wU = sin(frameCount * 0.3 + bird.wingPhase) * 3;
+        rect(fpx - 3, fpy - floor(wU), 2, 1);
+        rect(fpx + 3, fpy - floor(wU * 0.8), 2, 1);
+      }
+    }
+  }
+
+  // ── Farm butterflies (daytime) ──
+  if (_wildlifeFarmButterflies && bright > 0.3) {
+    for (let bf of _wildlifeFarmButterflies) {
+      let bx = w2sX(bf.x), by = w2sY(bf.y);
+      if (bx < -20 || bx > width + 20) continue;
+      let fpx = floor(bx), fpy = floor(by);
+      let wf = floor(sin(frameCount * 0.25 + bf.wingPhase) * 2);
+      fill(bf.r, bf.g, bf.b, 190);
+      rect(fpx - 3 - wf, fpy - 1, 2, 2);
+      rect(fpx + 1 + wf, fpy - 1, 2, 2);
+      fill(40, 30, 20, 180);
+      rect(fpx, fpy - 1, 1, 3);
+    }
+  }
+
+  // ── Fireflies (hours 21-5) ──
+  if (_wildlifeFireflies && (hour >= 21 || hour < 5)) {
+    for (let ff of _wildlifeFireflies) {
+      let fx = w2sX(ff.x), fy = w2sY(ff.y);
+      if (fx < -20 || fx > width + 20) continue;
+      let fpx = floor(fx), fpy = floor(fy);
+      let pulse = (sin(frameCount * ff.pulseFreq + ff.driftPhase) + 1) * 0.5;
+      fill(255, 255, 180, floor(25 * pulse));
+      rect(fpx - 2, fpy - 2, 5, 5);
+      fill(255, 255, 200, floor(200 * pulse));
+      rect(fpx, fpy, 2, 2);
+    }
+  }
+}
 function getMerchantPortPosition() {
   if (!state.portRight) updatePortPositions();
   return state.portRight;
@@ -5643,6 +5920,24 @@ function drawWindowGlow() {
       ellipse(sx5, sy5 - b.h * 0.1, b.w * 0.5, b.h * 0.3);
     }
   });
+
+  // Night building glow pools — warm orange circles on ground beneath lit buildings
+  state.buildings.forEach(b => {
+    if (b.type === 'torch' || b.type === 'lantern' || b.type === 'campfire' ||
+        b.type === 'villa' || b.type === 'temple' || b.type === 'forum' ||
+        b.type === 'shrine' || b.type === 'granary' || b.type === 'market') {
+      let gx = w2sX(b.x);
+      let gy = w2sY(b.y);
+      if (gx < -30 || gx > width + 30 || gy < -30 || gy > height + 30) return;
+      noStroke();
+      // Outer soft falloff
+      fill(255, 160, 50, 12 * nightStr);
+      ellipse(gx, gy + 2, 20, 10);
+      // Inner warm core
+      fill(255, 180, 70, 25 * nightStr);
+      ellipse(gx, gy + 2, 10, 5);
+    }
+  });
 }
 
 // ─── AMBIENT BACKGROUND HOUSES ──────────────────────────────────────────
@@ -5778,8 +6073,31 @@ function drawOneBuilding(b) {
     let bh = b.h;
     let ep = getEraPalette();
 
+    // Construction rise animation for newly placed buildings
+    let _building = (b.buildProgress !== undefined && b.buildProgress < 1);
+    let _buildEased = 1;
+    if (_building) {
+      b.buildProgress = min(1, b.buildProgress + 0.025);
+      let t = b.buildProgress;
+      _buildEased = t * (2 - t); // ease-out quad
+      // Dust cloud particles during construction
+      if (t < 0.6 && frameCount % 3 === 0) {
+        particles.push({
+          x: b.x + random(-bw * 0.4, bw * 0.4), y: b.y + random(-2, 4),
+          vx: random(-0.5, 0.5), vy: random(-0.8, -0.2),
+          life: 18, maxLife: 18, type: 'burst',
+          r: 160, g: 140, b: 100, size: random(2, 5), world: true,
+        });
+      }
+    }
+
     push();
     translate(sx, sy);
+    if (_building) {
+      // Scale Y from ground (base of building), fade alpha
+      scale(1, _buildEased);
+      drawingContext.globalAlpha = lerp(0.4, 1, _buildEased);
+    }
 
     // Directional cast shadow for tall buildings
     if (!['floor', 'mosaic', 'bridge'].includes(b.type)) {
@@ -7137,9 +7455,8 @@ function drawOneBuilding(b) {
         // Gate archway (south) — iron portcullis feel
         fill(45, 35, 22);
         rect(-10, bh / 2 - 14, 20, 14, 1);
-        // Portcullis bars
         stroke(30, 24, 14, 200);
-        strokeWeight(1.2);
+    if (_building) drawingContext.globalAlpha = 1;        strokeWeight(1.2);
         for (let gi2 = -8; gi2 <= 8; gi2 += 4) {
           line(gi2, bh / 2 - 13, gi2, bh / 2 - 2);
         }
@@ -7190,6 +7507,7 @@ function drawOneBuilding(b) {
         }
         break;
     }
+    if (_building) drawingContext.globalAlpha = 1;
     pop();
 }
 
@@ -7346,6 +7664,7 @@ function placeBuilding(wx, wy) {
     x: wx, y: wy,
     type: state.buildType,
     w: bw, h: bh,
+    buildProgress: 0,
   });
   if (snd) snd.playSFX('build');
   state.codex.buildingsBuilt[state.buildType] = true;
@@ -9714,7 +10033,7 @@ function spawnBossDefeated(wx, wy) {
       r: 255, g: 180 - i * 30, b: 40 + i * 20, world: true,
     });
   }
-  triggerScreenShake(10, 25);
+  triggerScreenShake(12, 30, 0, 0, 'circular');
   state.screenFlash = { r: 255, g: 200, b: 60, alpha: 100, timer: 40 };
 }
 
@@ -9927,12 +10246,23 @@ function updateStorm(dt) {
   stormTimer += dt;
 
   if (!stormActive && stormTimer > 2400 + random(-400, 400) && state.blessing.type !== 'storm' && !(state.prophecy && state.prophecy.type === 'peace')) {
+    if (typeof weatherTransition !== 'undefined') {
+      weatherTransition.active = true;
+      weatherTransition.type = 'storm_in';
+      weatherTransition.progress = 0;
+      weatherTransition.earlyDrops = [];
+    }
     stormActive = true;
     stormTimer = 0;
     addFloatingText(width / 2, height * 0.3, '⚡ DRIFT STORM', C.stormFlash);
     triggerScreenShake(8, 20);
   }
   if (stormActive && stormTimer > 800) {
+    if (typeof weatherTransition !== 'undefined') {
+      weatherTransition.active = true;
+      weatherTransition.type = 'storm_out';
+      weatherTransition.progress = 0;
+    }
     stormActive = false;
     stormTimer = 0;
   }
@@ -10049,11 +10379,18 @@ function advanceDialog() {
   dialogState.active = false;
   if (dialogState.onComplete) dialogState.onComplete();
 }
-
 function updateDialog(dt) {
   if (!dialogState.active) return;
   if (dialogState.displayLen < dialogState.text.length) {
+    let prevLen = floor(dialogState.displayLen);
     dialogState.displayLen += dt * 0.8;
+    let newLen = floor(dialogState.displayLen);
+    if (newLen > prevLen && snd && typeof snd.playDialogBlip === 'function') {
+      let ch = dialogState.text.charAt(newLen - 1);
+      if (ch && ch !== ' ' && ch !== '.' && ch !== ',' && ch !== '!' && ch !== '?' && ch !== '-' && ch !== '\'' && ch !== '"') {
+        snd.playDialogBlip(dialogState.portrait || 'livia');
+      }
+    }
   }
 }
 
@@ -10605,6 +10942,7 @@ function doTrade(offerIdx) {
     if (state.gold >= offer.price) {
       state.gold -= offer.price;
       state.tools[offer.tool] = 1;
+      if (snd) snd.playSFX('coin_clink');
       addFloatingText(width / 2, height * 0.5, 'Got ' + offer.tool + '!', C.solarBright);
       spawnParticles(state.player.x, state.player.y, 'build', 8);
       // Refresh offers to remove purchased tool
@@ -10616,6 +10954,7 @@ function doTrade(offerIdx) {
     if (state[offer.item] >= offer.qty) {
       state[offer.item] -= offer.qty;
       state.gold += offer.price;
+      if (snd) snd.playSFX('coin_clink');
       addFloatingText(width / 2, height * 0.5, '+' + offer.price + ' Gold!', C.solarBright);
     } else {
       addFloatingText(width / 2, height * 0.5, 'Not enough ' + offer.item + '!', C.buildInvalid);
@@ -10624,6 +10963,7 @@ function doTrade(offerIdx) {
     if (state.gold >= offer.price) {
       state.gold -= offer.price;
       state[offer.item] += offer.qty;
+      if (snd) snd.playSFX('coin_clink');
       addFloatingText(width / 2, height * 0.5, '+' + offer.qty + ' ' + offer.item + '!', C.crystalGlow);
     } else {
       addFloatingText(width / 2, height * 0.5, 'Need ' + offer.price + ' gold!', C.buildInvalid);
@@ -10774,20 +11114,52 @@ function drawShip() {
 
 
 // ─── SCREEN SHAKE ─────────────────────────────────────────────────────────
-function triggerScreenShake(intensity, duration) {
+// dirX/dirY: optional direction vector for biased shake
+// mode: 'random' (default), 'directional' (biased along dir), 'circular' (decaying orbit for boss kills)
+let _shakeMode = 'random';
+let _shakeDirX = 0, _shakeDirY = 0;
+let _shakeIntensity = 0;
+let _shakeMaxTimer = 0;
+
+function triggerScreenShake(intensity, duration, dirX, dirY, mode) {
   if (!gameSettings.screenShake) return;
   shakeTimer = duration;
-  shakeX = random(-intensity, intensity);
-  shakeY = random(-intensity, intensity);
+  _shakeMaxTimer = duration;
+  _shakeIntensity = intensity;
+  _shakeDirX = dirX || 0;
+  _shakeDirY = dirY || 0;
+  _shakeMode = mode || 'random';
+  if (_shakeMode === 'directional' && (dirX || dirY)) {
+    let m = sqrt(dirX * dirX + dirY * dirY) || 1;
+    _shakeDirX = dirX / m;
+    _shakeDirY = dirY / m;
+    shakeX = _shakeDirX * intensity;
+    shakeY = _shakeDirY * intensity;
+  } else {
+    shakeX = random(-intensity, intensity);
+    shakeY = random(-intensity, intensity);
+  }
 }
 
 function updateShake(dt) {
   if (shakeTimer > 0) {
     shakeTimer -= dt;
-    shakeX = random(-3, 3) * (shakeTimer / 20);
-    shakeY = random(-3, 3) * (shakeTimer / 20);
+    let t = max(0, shakeTimer / (_shakeMaxTimer || 20));
+    if (_shakeMode === 'directional') {
+      let perp = random(-1, 1) * _shakeIntensity * 0.3 * t;
+      shakeX = _shakeDirX * _shakeIntensity * t + (-_shakeDirY) * perp;
+      shakeY = _shakeDirY * _shakeIntensity * t + (_shakeDirX) * perp;
+    } else if (_shakeMode === 'circular') {
+      let angle = shakeTimer * 0.8;
+      shakeX = cos(angle) * _shakeIntensity * t;
+      shakeY = sin(angle) * _shakeIntensity * 0.7 * t;
+    } else {
+      shakeX = random(-3, 3) * t;
+      shakeY = random(-3, 3) * t;
+    }
   } else {
     shakeX = 0; shakeY = 0;
+    _shakeMode = 'random';
   }
   // Subtle wind sway during drift storms
   if (stormActive) {
@@ -10900,6 +11272,7 @@ function spawnWave(n) {
 function enterAdventure() {
   let a = state.adventure;
   let p = state.player;
+  if (typeof _killCombo !== 'undefined') { _killCombo = 0; _killComboDisplay = 0; _killComboDisplayTimer = 0; }
   a.returnX = WORLD.islandCX;
   a.returnY = WORLD.islandCY;
   a.active = true;
@@ -11152,8 +11525,9 @@ function updateEnemyAI(e, dt, p, a) {
         p.hp -= dmg;
         p.invincTimer = 45;
         addFloatingText(w2sX(p.x), w2sY(p.y) - 25, '-' + dmg, '#ff6644');
-        triggerScreenShake(6, 10);
+        { let _hda = atan2(p.y - e.y, p.x - e.x); triggerScreenShake(6, 10, cos(_hda), sin(_hda), 'directional'); }
         if (snd) snd.playSFX('player_hurt');
+        if (typeof _killCombo !== 'undefined') _killCombo = 0;
       }
       // Arena boundary
       let bx = (e.x - a.isleX) / (a.isleRX - 10);
@@ -11183,9 +11557,10 @@ function updateEnemyAI(e, dt, p, a) {
           p.hp -= eDmg;
           p.invincTimer = 30;
           addFloatingText(w2sX(p.x), w2sY(p.y) - 25, '-' + eDmg, '#ff6644');
-          triggerScreenShake(4, 8);
+          { let _hda = atan2(p.y - e.y, p.x - e.x); triggerScreenShake(4, 8, cos(_hda), sin(_hda), 'directional'); }
           spawnParticles(p.x, p.y, 'combat', 3);
           if (snd) snd.playSFX('player_hurt');
+          if (typeof _killCombo !== 'undefined') _killCombo = 0;
         }
         e.state = 'chase';
         e.attackCooldown = e.type === 'wolf' ? 40 : 60;
@@ -11231,6 +11606,11 @@ function updateEnemyAI(e, dt, p, a) {
 
 function enemyDeath(e, a) {
   a.killCount++;
+  if (typeof _killCombo !== 'undefined') {
+    _killCombo++;
+    _killComboDisplay = _killCombo;
+    _killComboDisplayTimer = 90;
+  }
   if (e.type && state && state.codex) {
     if (!state.codex.enemies[e.type]) state.codex.enemies[e.type] = { defeated: true, count: 0, firstDay: state.day };
     state.codex.enemies[e.type].count++;
@@ -13620,6 +14000,12 @@ function updateConquest(dt) {
     if (e.state === 'dying' && e.stateTimer < -100) e.state = 'dead';
     if (e.state === 'dead') {
       spawnParticles(e.x, e.y, 'combat', 6);
+      if (typeof spawnKillBurst === 'function') {
+        let _bc = { wolf: [130, 95, 55], bandit: [105, 80, 55], harpy: [85, 125, 75], secutor: [145, 135, 115],
+          minotaur: [110, 70, 45], shield_bearer: [140, 130, 115], archer: [120, 100, 70], centurion: [180, 50, 40] }[e.type] || [150, 150, 150];
+        spawnKillBurst(e.x, e.y, _bc);
+      }
+      if (typeof _killCombo !== 'undefined') { _killCombo++; _killComboDisplay = _killCombo; _killComboDisplayTimer = 90; }
       c.totalKills++;
       if (typeof advanceNPCQuestCounter === 'function') advanceNPCQuestCounter('nq_marcus_kills', 1);
       updateBountyProgress('kills', 1, e.type);
@@ -13801,8 +14187,9 @@ function updateConquestEnemy(e, dt, p, c) {
             p.hp -= dmg;
             p.invincTimer = 30;
             addFloatingText(w2sX(p.x), w2sY(p.y) - 25, '-' + dmg, '#ff6644');
-            triggerScreenShake(3, 6);
+            { let _hda = atan2(p.y - e.y, p.x - e.x); triggerScreenShake(3, 6, cos(_hda), sin(_hda), 'directional'); }
             if (snd) snd.playSFX('player_hurt');
+            if (typeof _killCombo !== 'undefined') _killCombo = 0;
           } else {
             for (let s of c.soldiers) {
               if (s.hp <= 0) continue;
@@ -14236,7 +14623,7 @@ function conquestPlayerAttack() {
     e.y += sin(kba) * 5;
     addFloatingText(w2sX(e.x), w2sY(e.y) - 20, '-' + dmg, '#ff4444');
     spawnParticles(e.x, e.y, 'combat', 4);
-    triggerScreenShake(2, 4);
+    triggerScreenShake(2, 4, cos(kba), sin(kba), 'directional');
   }
 }
 
@@ -15124,6 +15511,13 @@ function mousePressed() {
   if (state.introPhase !== 'done') { skipIntro(); return; }
   if (state.cutscene) { skipCutscene(); return; }
   if (dismissIslandMilestone()) return;
+  // Screenshot capture on click
+  if (screenshotMode) {
+    photoModeFlash = 6; // ~100ms at 60fps
+    if (snd) snd.playSFX('shutter_click');
+    saveCanvas('mare-nostrum-' + nf(month(), 2) + nf(day(), 2) + '-' + nf(hour(), 2) + nf(minute(), 2), 'png');
+    return;
+  }
   // Hotbar tap detection (mobile + desktop click)
   if (typeof _handleHotbarTap === 'function' && _handleHotbarTap(mouseX, mouseY)) return;
   // Wardrobe click handling
@@ -15339,6 +15733,7 @@ function mousePressed() {
         let toolBonus = hs === 0;
         if (hs !== 0) { state.player.hotbarSlot = 0; addFloatingText(width / 2, height - 110, 'Switched to Sickle', '#aaddaa'); }
         state.player.toolSwing = 12;
+        state.player._hitlagFrames = 2;
         let wasBlessed = p.blessed;
         p.planted = false; p.ripe = false; p.glowing = false;
         p.timer = 0; p.stage = 0; p.blessed = false;
@@ -15390,6 +15785,9 @@ function mousePressed() {
         let label = wasBlessed ? '+' + harvestAmt + ' BLESSED!' : (harvestAmt > 1 ? '+' + harvestAmt + ' Harvest!' : '+Harvest');
         let labelColor = scData ? scData.color : (wasBlessed ? '#ffdd00' : C.cropGlow);
         addFloatingText(px, py - 20, label, labelColor);
+        if (typeof spawnHarvestArc === 'function') spawnHarvestArc(px, py - 20, label, labelColor, 'harvest');
+        // Codex discovery for crops
+        if (typeof markCodexDiscovery === 'function' && state.codex.crops[_ck] && state.codex.crops[_ck].count === harvestAmt) markCodexDiscovery('crops', _ck);
         spawnHarvestBurst(p.x, p.y, p.cropType || 'grain');
         triggerScreenShake(wasBlessed ? 4 : 1.5, wasBlessed ? 8 : 4);
       } else if (!p.planted) {
@@ -15425,6 +15823,7 @@ function mousePressed() {
       let pickBonus = state.player.hotbarSlot === 2;
       if (!pickBonus) { state.player.hotbarSlot = 2; addFloatingText(width / 2, height - 110, 'Switched to Pick', '#aaddaa'); }
       state.player.toolSwing = 12;
+      state.player._hitlagFrames = 2;
       nearRes.active = false; nearRes.respawnTimer = 600;
       let amt = pickBonus ? 2 : 1;
       if (nearRes.type === 'stone') { state.stone += amt; checkQuestProgress('stone', amt); addFloatingText(w2sX(nearRes.x), w2sY(nearRes.y) - 15, '+' + amt + ' Stone', '#aaaaaa'); }
@@ -15450,6 +15849,7 @@ function mousePressed() {
       let pickBonus = state.player.hotbarSlot === 2;
       if (!pickBonus) { state.player.hotbarSlot = 2; addFloatingText(width / 2, height - 110, 'Switched to Pick', '#aaddaa'); }
       state.player.toolSwing = 12;
+      state.player._hitlagFrames = 2;
       let amt = nearCrystal.charge >= 30 ? 2 : 1;
       if (pickBonus) amt += 1;
       state.crystals += amt;
@@ -15484,6 +15884,7 @@ function mousePressed() {
       if (state.player.hotbarSlot === 1) nearTree.health -= 1; // axe bonus hit
       if (state.player.hotbarSlot !== 1) { state.player.hotbarSlot = 1; addFloatingText(width / 2, height - 110, 'Switched to Axe', '#aaddaa'); }
       state.player.toolSwing = 12;
+      state.player._hitlagFrames = 2;
       chopTree(nearTree);
       clicked = true;
     }
@@ -15585,7 +15986,9 @@ function keyPressed() {
     screenshotMode = !screenshotMode;
     screenshotFilter = 0;
     if (screenshotMode) {
-      addFloatingText(width / 2, height * 0.1, 'SCREENSHOT MODE - F to cycle filters, F9 to exit', '#ffffff');
+      photoModeWatermarkAlpha = 0;
+      photoModeTipTimer = 120;
+      addFloatingText(width / 2, height * 0.1, 'SCREENSHOT MODE - Click to capture, F to cycle filters, F9 to exit', '#ffffff');
     } else {
       addFloatingText(width / 2, height * 0.1, 'HUD RESTORED', '#ffdc50');
     }
@@ -15975,6 +16378,7 @@ function keyPressed() {
       let mp = getMarketPosition();
       if (dist(state.player.x, state.player.y, mp.x, mp.y) < 60) {
         state.nightMarket.shopOpen = !state.nightMarket.shopOpen;
+        if (state.nightMarket.shopOpen && snd) snd.playSFX('door_creak');
         return;
       }
     }
@@ -16391,6 +16795,10 @@ function keyPressed() {
   // Photo mode toggle
   if (key === 'p' || key === 'P') {
     photoMode = !photoMode;
+    if (photoMode) {
+      photoModeWatermarkAlpha = 0;
+      photoModeTipTimer = 120; // ~2 seconds at 60fps
+    }
     addFloatingText(width / 2, height * 0.3, photoMode ? 'PHOTO MODE' : 'HUD RESTORED', '#ffdc50');
   }
   // Save / Load
@@ -18494,10 +18902,26 @@ function expandIsland() {
   // Island grows less per level at higher tiers
   let rxGrowth = state.islandLevel <= 5 ? 35 : state.islandLevel <= 10 ? 28 : state.islandLevel <= 15 ? 22 : state.islandLevel <= 20 ? 16 : 12;
   let ryGrowth = state.islandLevel <= 5 ? 24 : state.islandLevel <= 10 ? 18 : state.islandLevel <= 15 ? 14 : state.islandLevel <= 20 ? 10 : 8;
+  // Lerp island size over 120 frames instead of snapping
+  state._expandVisualRX = state.islandRX;
+  state._expandVisualRY = state.islandRY;
+  state._expandTargetRX = state.islandRX + rxGrowth;
+  state._expandTargetRY = state.islandRY + ryGrowth;
   state.islandRX += rxGrowth;
   state.islandRY += ryGrowth;
+  state._expandFrames = 120;
   state.pyramid.level = state.islandLevel;
   updatePortPositions(); // ports follow island edge
+  // Expansion ceremony effects
+  if (snd) snd.playSFX('expand_rumble');
+  // Expanding ring particle from island center
+  particles.push({
+    x: WORLD.islandCX, y: WORLD.islandCY, vx: 0, vy: 0,
+    life: 90, maxLife: 90, type: 'golden_wave', size: 10,
+    maxRing: 350, r: 220, g: 180, b: 80, world: true,
+  });
+  // Camera slow-zoom-out then ease back over 3 seconds
+  state._expandCamZoom = 180;
 
   // Place all buildings, resources, trees, crystals, ruins for this level
   placeEraBuildings(state.islandLevel);

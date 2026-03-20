@@ -974,7 +974,9 @@ function checkLoreTabletPickup() {
       // Naturalist's Codex lore tracking
       if (state.codex) {
         if (!state.codex.lore) state.codex.lore = {};
+        let _isNewLore = !state.codex.lore[String(lt.id)];
         state.codex.lore[String(lt.id)] = { read: true, firstDay: state.day };
+        if (_isNewLore && typeof markCodexDiscovery === 'function') markCodexDiscovery('lore', String(lt.id));
       }
       // Tablet 19 is the Final Inscription — Chapter IX objective
       if (lt.id === 19 && state.narrativeFlags) {

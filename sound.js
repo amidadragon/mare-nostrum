@@ -101,6 +101,13 @@ class SoundManager {
     this._wave3Noise = null;
     this._wave3Filter = null;
     this._wave3Gain = null;
+    // Shore lap: gentle rhythmic water lap near coastline
+    this._shoreNoise = null;
+    this._shoreFilter = null;
+    this._shoreGain = null;
+    this._shorePhase = 0; // phase accumulator for rhythmic swell
+    // Seagull ambient timer
+    this._seagullTimer = 0;
   }
 
   init() {
@@ -341,6 +348,20 @@ class SoundManager {
       this._wave3Noise.start();
       this._wave3Noise.amp(0.10);
 
+      // Shore lap: filtered noise with rhythmic amplitude swell
+      this._shoreNoise = new p5.Noise('pink');
+      this._shoreFilter = new p5.BandPass();
+      this._shoreFilter.freq(280);
+      this._shoreFilter.res(1.8);
+      this._shoreNoise.disconnect();
+      this._shoreNoise.connect(this._shoreFilter);
+      this._shoreGain = new p5.Gain();
+      this._shoreFilter.connect(this._shoreGain);
+      this._shoreGain.connect();
+      this._shoreGain.amp(0);
+      this._shoreNoise.start();
+      this._shoreNoise.amp(0.10);
+
       this.ready = true;
       console.log('[SoundManager] init OK — 3 lyre voices + harmony, 6 sfx slots, campfire + layered ocean ready');
     } catch (e) {
@@ -394,9 +415,18 @@ class SoundManager {
       this._wave3Filter.freq(waveFreq * 0.78 + sin(frameCount * 0.0019) * 45);
     }
 
-    // ─── Wind ───
-    let windVol = (0.03 + sin(frameCount * 0.001) * 0.015) * masterVol;
+    // ─── Wind (weather-reactive: clear=barely audible, storm=howling) ───
+    let isRain = (typeof state !== 'undefined' && state.weather && state.weather.type === 'rain');
+    let isStorm = (typeof stormActive !== 'undefined' && stormActive);
+    let weatherIntensity = (typeof state !== 'undefined' && state.weather && state.weather.intensity) ? state.weather.intensity : 0;
+    let windBase = isStorm ? 0.09 : isRain ? (0.04 + weatherIntensity * 0.03) : 0.015; // clear=barely there
+    let windVol = (windBase + sin(frameCount * 0.001) * (isStorm ? 0.03 : 0.008)) * masterVol;
     let windFreq = 500 + sin(frameCount * 0.002) * 150;
+    // LFO on filter cutoff for organic variation
+    let windLFO = sin(frameCount * 0.0013) * 120 + sin(frameCount * 0.0031) * 60;
+    windFreq += windLFO;
+    if (isStorm) windFreq = 320 + sin(frameCount * 0.003) * 100; // lower, more howling
+    else if (isRain) windFreq = 400 + sin(frameCount * 0.002) * 130;
     if (island === 'vulcan') windFreq = 800 + sin(frameCount * 0.002) * 100;
     if (diving) { windVol *= 0.2; windFreq = 120; }
     if (onBridge) { windVol = 0.07 * masterVol; windFreq = 280 + sin(frameCount * 0.0015) * 80; } // exposed wind, lower pitch
@@ -404,7 +434,7 @@ class SoundManager {
     this._windFilter.freq(windFreq);
 
     // Storm boost — slightly louder wind, rare thunder
-    if (typeof stormActive !== 'undefined' && stormActive && !diving) {
+    if (isStorm && !diving) {
       this._windGain.amp(windVol * 1.3, 0.5);
       this._windFilter.freq(350);
       // Thunder — every 20-40 seconds, with initial delay
@@ -570,13 +600,23 @@ class SoundManager {
       }
     }
 
-    // ─── Home island: chicken clucks & cat meows ───
+    // ─── Home island: chicken clucks & companion animal sounds ───
     if (island === 'home' && !diving && typeof state !== 'undefined') {
       if (state.chickens && state.chickens.length > 0 && frameCount % 400 < 1 && random() < 0.5) {
         this.playSFX('chicken_cluck');
       }
-      if (state.cats && state.cats.length > 0 && frameCount % 600 < 1 && random() < 0.4) {
-        this.playSFX('cat_meow');
+      // Cat meow: ~30-60s interval, only when adopted cat near player
+      if (state.cats && state.cats.some(c => c.adopted) && frameCount % 2400 < 1 && random() < 0.5) {
+        let nearCat = state.cats.find(c => c.adopted && dist(c.x, c.y, state.player.x, state.player.y) < 150);
+        if (nearCat) this.playSFX('cat_meow');
+      }
+      // Crow caw: ~45-90s interval, ambient island fauna
+      if (state.islandLevel >= 2 && frameCount % 3600 < 1 && random() < 0.5) {
+        this.playSFX('crow_caw');
+      }
+      // Tortoise blip: ~60-120s interval, subtle low blip
+      if (state.islandLevel >= 3 && frameCount % 5400 < 1 && random() < 0.4) {
+        this.playSFX('tortoise_blip');
       }
     }
 
@@ -615,6 +655,79 @@ class SoundManager {
         this._fireGain.amp(0, 0.2);
         this._fireTimer = 0;
       }
+    }
+
+    // ─── Shore lap: rhythmic water lap when near coastline (~60px) ───
+    if (this._shoreGain && typeof state !== 'undefined' && !diving && island === 'home') {
+      let px = state.player ? state.player.x : 0;
+      let py = state.player ? state.player.y : 0;
+      let srx = typeof getSurfaceRX === 'function' ? getSurfaceRX() : 450;
+      let sry = typeof getSurfaceRY === 'function' ? getSurfaceRY() : 144;
+      let cx = typeof WORLD !== 'undefined' ? WORLD.islandCX : 600;
+      let cy = typeof WORLD !== 'undefined' ? WORLD.islandCY : 400;
+      let dx = (px - cx) / srx;
+      let dy = (py - cy) / sry;
+      let edgeDist = Math.sqrt(dx * dx + dy * dy); // 1.0 = at edge
+      // Within ~60px of coastline (0.85 to 1.05 normalized distance)
+      let nearShore = edgeDist > 0.85 && edgeDist < 1.05;
+      if (nearShore) {
+        // Rhythmic swell: 2-3 second period with slight randomness
+        this._shorePhase += 0.018 + sin(frameCount * 0.0007) * 0.003;
+        let swell = Math.pow(Math.max(0, sin(this._shorePhase)), 2.5);
+        // Proximity factor: loudest right at edge, fades as you approach/leave
+        let proxFactor = 1.0 - Math.abs(edgeDist - 0.95) * 5;
+        proxFactor = Math.max(0, Math.min(1, proxFactor));
+        let shoreVol = swell * proxFactor * 0.04 * masterVol;
+        this._shoreGain.amp(shoreVol, 0.08);
+        // Modulate filter for each lap — lower as wave recedes
+        this._shoreFilter.freq(250 + swell * 120);
+      } else {
+        this._shoreGain.amp(0, 0.3);
+      }
+    } else if (this._shoreGain) {
+      this._shoreGain.amp(0, 0.3);
+    }
+
+    // ─── Ambient seagulls: daytime home island, every 20-40 seconds ───
+    if (island === 'home' && !diving && bright > 0.4) {
+      this._seagullTimer--;
+      if (this._seagullTimer <= 0) {
+        this._seagullTimer = floor(random(1200, 2400)); // 20-40s at 60fps
+        // Distant-sounding seagull: lower volume than the SFX version
+        let sg = this._getSfxSlot();
+        if (sg) {
+          let gullVol = random(0.04, 0.07) * masterVol;
+          sg.osc.setType('sine');
+          sg.osc.freq(800);
+          sg._vol = gullVol; sg._peak = gullVol;
+          sg.gain.amp(0, 0);
+          sg.gain.amp(gullVol, 0.02);
+          // Sweep 800→1200→600Hz with vibrato for seagull cry
+          let step = 0;
+          let dur = 25; // steps
+          let tick = () => {
+            step++;
+            let t = step / dur;
+            if (t >= 1) { sg.gain.amp(0, 0.08); sg.busy = false; return; }
+            // Two-part sweep: rise then fall
+            let freq;
+            if (t < 0.4) freq = 800 + (t / 0.4) * 400; // 800→1200
+            else freq = 1200 - ((t - 0.4) / 0.6) * 600; // 1200→600
+            // Add vibrato (5Hz rate, ~15Hz depth)
+            freq += sin(step * 0.5) * 15;
+            let env = sin(t * PI) * gullVol;
+            try {
+              sg.osc.freq(freq);
+              sg.gain.amp(Math.max(0, env), 0.02);
+            } catch(e) {}
+            setTimeout(tick, 22);
+          };
+          sg.busy = true;
+          setTimeout(tick, 22);
+        }
+      }
+    } else {
+      this._seagullTimer = floor(random(600, 1200)); // reset when conditions change
     }
 
     // ─── Dawn/Dusk transition sounds (one-shot per transition) ───
@@ -1301,6 +1414,14 @@ class SoundManager {
         }, 200);
         break;  // C5->E5->G5 satisfying ascending triad
       case 'chop':      play('triangle', 160, 0.25, 90, 120, { attack: 5 }); break;  // short thunk
+      case 'expand_rumble':
+        play('sine', 55, 0.25, 35, 800, { attack: 60 });  // low rumble
+        setTimeout(() => {
+          let sr = this._getSfxSlot();
+          if (sr) { sr.osc.setType('triangle'); sr.osc.freq(44); sr._vol = 0.15 * vol; sr._peak = sr._vol;
+            sr.gain.amp(0,0); sr.gain.amp(sr._vol, 0.08); this._sfxEnvSmooth(sr, 44, 28, 600, { attack: 40 }); }
+        }, 200);
+        break;  // deep rumble for island expansion
       case 'build':
         play('triangle', 330, 0.20, 220, 180, { attack: 10 });  // woody tap
         setTimeout(() => {
@@ -1469,6 +1590,12 @@ class SoundManager {
         setTimeout(() => play('sine', 523, 0.07, 440, 220, { attack: 18 }), 250);
         setTimeout(() => play('sine', 392, 0.06, 330, 300, { attack: 25 }), 500);
         break;
+      case 'dusk_lanterns':
+        // 3 gentle descending lyre notes: D5, A4, F#4 — going-home feeling
+        play('sine', 587, 0.07, 550, 350, { attack: 30 });   // D5
+        setTimeout(() => play('sine', 440, 0.06, 420, 400, { attack: 25 }), 400);  // A4
+        setTimeout(() => play('sine', 370, 0.05, 350, 500, { attack: 30 }), 850);  // F#4
+        break;
       case 'festival_start':
         playTwo('sine', 523, 784, 0.20, 400, 150);  // C5->G5 bright
         setTimeout(() => playTwo('sine', 659, 988, 0.18, 350, 130), 150);
@@ -1624,6 +1751,69 @@ class SoundManager {
             sf2.gain.amp(0,0); sf2.gain.amp(sf2._vol, 0.008); this._sfxEnvSmooth(sf2, 1175, 1175, 300, { attack: 8 }); }
         }, 160);
         break;  // G5->B5->D6 bright ascending chime
+      // Building interaction — door creak (descending filtered square 200→80Hz)
+      case 'door_creak':
+        play('square', 200, 0.12, 80, 150, { attack: 8 }); break;
+      // Coin clink — short metallic ping (2000Hz sine, fast decay)
+      case 'coin_clink':
+        play('sine', 2000, 0.14, 1600, 60, { attack: 2 });
+        setTimeout(() => {
+          let sc = this._getSfxSlot();
+          if (sc) { sc.osc.setType('sine'); sc.osc.freq(2400); sc._vol = 0.08 * vol; sc._peak = sc._vol;
+            sc.gain.amp(0,0); sc.gain.amp(sc._vol, 0.003); this._sfxEnvSmooth(sc, 2400, 2000, 40, { attack: 2 }); }
+        }, 15);
+        break;  // metallic ping + overtone shimmer
+      // Milestone jingle — D4-F#4-A4-D5 ascending triangle fanfare
+      case 'milestone':
+        play('triangle', 293.7, 0.22, 293.7, 100, { attack: 8 });  // D4
+        setTimeout(() => {
+          let s2 = this._getSfxSlot();
+          if (s2) { s2.osc.setType('triangle'); s2.osc.freq(370); s2._vol = 0.22 * vol; s2._peak = s2._vol;
+            s2.gain.amp(0,0); s2.gain.amp(s2._vol, 0.008); this._sfxEnvSmooth(s2, 370, 370, 100, { attack: 8 }); }
+        }, 100);  // F#4
+        setTimeout(() => {
+          let s3 = this._getSfxSlot();
+          if (s3) { s3.osc.setType('triangle'); s3.osc.freq(440); s3._vol = 0.24 * vol; s3._peak = s3._vol;
+            s3.gain.amp(0,0); s3.gain.amp(s3._vol, 0.008); this._sfxEnvSmooth(s3, 440, 440, 100, { attack: 8 }); }
+        }, 200);  // A4
+        setTimeout(() => {
+          let s4 = this._getSfxSlot();
+          if (s4) { s4.osc.setType('triangle'); s4.osc.freq(587.3); s4._vol = 0.26 * vol; s4._peak = s4._vol;
+            s4.gain.amp(0,0); s4.gain.amp(s4._vol, 0.008); this._sfxEnvSmooth(s4, 587.3, 587.3, 300, { attack: 8 }); }
+        }, 300);  // D5 — held longer for triumphant finish
+        break;
+      // Home sunrise: sustained warm D major chord (D4, F#4, A4)
+      case 'home_sunrise_chord':
+        play('sine', 293.7, 0.14, 293.7, 2500, { attack: 400 });  // D4
+        setTimeout(() => {
+          let s2 = this._getSfxSlot();
+          if (s2) { s2.osc.setType('sine'); s2.osc.freq(370); s2._vol = 0.12 * vol; s2._peak = s2._vol;
+            s2.gain.amp(0,0); s2.gain.amp(s2._vol, 0.4); this._sfxEnvSmooth(s2, 370, 370, 2400, { attack: 400 }); }
+        }, 50);  // F#4
+        setTimeout(() => {
+          let s3 = this._getSfxSlot();
+          if (s3) { s3.osc.setType('sine'); s3.osc.freq(440); s3._vol = 0.10 * vol; s3._peak = s3._vol;
+            s3.gain.amp(0,0); s3.gain.amp(s3._vol, 0.35); this._sfxEnvSmooth(s3, 440, 440, 2300, { attack: 400 }); }
+        }, 100);  // A4
+        break;
+      // Companion: crow caw — descending sawtooth
+      case 'crow_caw':
+        play('sawtooth', 400, 0.08, 200, 180, { attack: 10 }); break;
+      // Companion: tortoise blip — very brief low tone
+      case 'tortoise_blip':
+        play('sine', 150, 0.05, 140, 60, { attack: 5 }); break;
+      // Photo mode: shutter click — short percussive snap
+      case 'shutter_click':
+        play('square', 800, 0.12, 200, 50, { attack: 2 });
+        setTimeout(() => {
+          let s2 = this._getSfxSlot();
+          if (s2) {
+            s2.osc.setType('square'); s2.osc.freq(600); s2._vol = 0.06 * vol; s2._peak = s2._vol;
+            s2.gain.amp(0, 0); s2.gain.amp(s2._vol, 0.002);
+            this._sfxEnvSmooth(s2, 600, 100, 40, { attack: 2 });
+          }
+        }, 30);
+        break;
     }
   }
 
@@ -1705,6 +1895,26 @@ class SoundManager {
       this.vol = { master: 0.5, sfx: 0.7, ambient: 0.5, music: 0.4 };
       this._saveVolume();
     }
+  }
+
+  // ─── DIALOG TYPEWRITER BLIPS ───
+  // Short sine pip per character during typewriter text reveal.
+  // Each NPC has a distinct pitch for personality.
+  playDialogBlip(npcName) {
+    if (!this.ready) return;
+    let vol = this.vol.master * this.vol.sfx * 0.15;
+    if (vol < 0.001) return;
+    let freqs = { livia: 440, marcus: 280, vesta: 520, felix: 360 };
+    let freq = freqs[npcName] || 380;
+    freq *= (0.97 + Math.random() * 0.06);
+    let s = this._getSfxSlot();
+    if (!s) return;
+    s.osc.setType('sine');
+    s.osc.freq(freq);
+    s._vol = vol;
+    s._peak = vol;
+    s.gain.amp(vol, 0.005);
+    setTimeout(() => { s.gain.amp(0, 0.015); }, 30);
   }
 
   // Resume AudioContext on user gesture (required by browsers)

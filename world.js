@@ -37,20 +37,183 @@ function drawCoastlineShape(screenCX, screenCY, radiusX, radiusY, yOffset) {
 }
 
 // ─── SEASON COLORS ────────────────────────────────────────────────────────
-function getSeasonGrass() {
+const _seasonGrassPalette = [
+  { r: 72, g: 110, b: 48 },  // Spring — lush green
+  { r: 82, g: 100, b: 42 },  // Summer — warm olive-gold
+  { r: 95, g: 82, b: 38 },   // Autumn — golden amber
+  { r: 65, g: 78, b: 55 },   // Winter — sage green
+];
+const _seasonRimPalette = [
+  { r: 88, g: 125, b: 52 },
+  { r: 100, g: 110, b: 45 },
+  { r: 120, g: 95, b: 38 },
+  { r: 78, g: 88, b: 60 },
+];
+
+// Season transition lerp state
+let _seasonPrev = -1;
+let _seasonCur = -1;
+let _seasonTransitionProgress = 1; // 1 = fully transitioned
+let _seasonPrevGrass = null;
+let _seasonPrevRim = null;
+const _seasonTransitionFrames = 1800; // 30 seconds at 60fps
+
+function _updateSeasonTransition() {
   let s = getSeason();
-  if (s === 0) return { r: 72, g: 110, b: 48 };  // Spring — lush green
-  if (s === 1) return { r: 82, g: 100, b: 42 };  // Summer — warm olive-gold
-  if (s === 2) return { r: 95, g: 82, b: 38 };   // Autumn — golden amber
-  return { r: 65, g: 78, b: 55 };                 // Winter — sage green
+  if (_seasonCur === -1) { _seasonCur = s; _seasonPrev = s; }
+  if (s !== _seasonCur) {
+    _seasonPrev = _seasonCur;
+    _seasonCur = s;
+    _seasonPrevGrass = { ..._seasonGrassPalette[_seasonPrev] };
+    _seasonPrevRim = { ..._seasonRimPalette[_seasonPrev] };
+    _seasonTransitionProgress = 0;
+  }
+  if (_seasonTransitionProgress < 1) {
+    _seasonTransitionProgress = min(1, _seasonTransitionProgress + 1 / _seasonTransitionFrames);
+  }
+}
+
+function _lerpRGB(a, b, t) {
+  return { r: a.r + (b.r - a.r) * t, g: a.g + (b.g - a.g) * t, b: a.b + (b.b - a.b) * t };
+}
+
+function getSeasonGrass() {
+  _updateSeasonTransition();
+  let target = _seasonGrassPalette[_seasonCur] || _seasonGrassPalette[0];
+  if (_seasonTransitionProgress >= 1 || !_seasonPrevGrass) return target;
+  let t = _seasonTransitionProgress * _seasonTransitionProgress * (3 - 2 * _seasonTransitionProgress); // smoothstep
+  return _lerpRGB(_seasonPrevGrass, target, t);
 }
 
 function getSeasonRim() {
-  let s = getSeason();
-  if (s === 0) return { r: 88, g: 125, b: 52 };
-  if (s === 1) return { r: 100, g: 110, b: 45 };
-  if (s === 2) return { r: 120, g: 95, b: 38 };
-  return { r: 78, g: 88, b: 60 };
+  _updateSeasonTransition();
+  let target = _seasonRimPalette[_seasonCur] || _seasonRimPalette[0];
+  if (_seasonTransitionProgress >= 1 || !_seasonPrevRim) return target;
+  let t = _seasonTransitionProgress * _seasonTransitionProgress * (3 - 2 * _seasonTransitionProgress);
+  return _lerpRGB(_seasonPrevRim, target, t);
+}
+
+// ─── WEATHER TRANSITION STATE ─────────────────────────────────────────────
+let weatherTransition = {
+  active: false,
+  type: null,        // 'storm_in' or 'storm_out'
+  progress: 0,       // 0..1 over 5 seconds (300 frames)
+  earlyDrops: [],    // pre-storm large drops
+};
+const _weatherTransFrames = 300; // 5 seconds at 60fps
+
+function updateWeatherTransition() {
+  if (!weatherTransition.active) return;
+  weatherTransition.progress = min(1, weatherTransition.progress + 1 / _weatherTransFrames);
+  if (weatherTransition.progress >= 1) {
+    weatherTransition.active = false;
+    weatherTransition.type = null;
+    weatherTransition.earlyDrops = [];
+  }
+}
+
+function drawWeatherTransitionEffects() {
+  if (!weatherTransition.active) return;
+  let t = weatherTransition.progress;
+
+  if (weatherTransition.type === 'storm_in') {
+    // Sky gradually darkens
+    noStroke();
+    let overlayAlpha = t * 55;
+    fill(12, 16, 28, overlayAlpha);
+    rect(0, 0, width, height);
+
+    // Early large drops before full rain
+    if (t < 0.6) {
+      // Spawn a few large drops
+      if (weatherTransition.earlyDrops.length < 4 && random() < 0.03) {
+        weatherTransition.earlyDrops.push({
+          x: random(width * 0.1, width * 0.9),
+          y: random(-20, -5),
+          speed: random(5, 9),
+          len: random(14, 22),
+          wind: random(-1.0, -0.3),
+        });
+      }
+      stroke(130, 170, 210, 100);
+      strokeWeight(2);
+      for (let i = weatherTransition.earlyDrops.length - 1; i >= 0; i--) {
+        let d = weatherTransition.earlyDrops[i];
+        line(d.x, d.y, d.x + d.wind * 4, d.y + d.len);
+        d.y += d.speed;
+        d.x += d.wind;
+        if (d.y > height) weatherTransition.earlyDrops.splice(i, 1);
+      }
+      noStroke();
+    }
+  } else if (weatherTransition.type === 'storm_out') {
+    // Bright patch in clouds — clearing sky
+    let patchAlpha = t * 40;
+    noStroke();
+    fill(180, 200, 220, patchAlpha);
+    let px = width * 0.4 + sin(frameCount * 0.005) * 30;
+    let py = height * 0.08;
+    ellipse(px, py, 200 + t * 80, 40 + t * 15);
+    fill(220, 230, 240, patchAlpha * 0.5);
+    ellipse(px + 30, py - 5, 120 + t * 40, 25 + t * 10);
+  }
+}
+
+// ─── NIGHTFALL DUSK TRIGGER ──────────────────────────────────────────────
+let _duskTriggered = false;
+let _duskIgnitionFlashes = []; // {x, y, life, maxLife}
+
+function _resetDuskAtDawn() {
+  let h = state.time / 60;
+  if (h >= 5 && h < 6 && _duskTriggered) _duskTriggered = false;
+}
+
+function _triggerDuskMoment() {
+  let h = state.time / 60;
+  if (_duskTriggered || h < 18 || h >= 18.5) return;
+  _duskTriggered = true;
+
+  // Ignition flashes on torches/lanterns
+  if (state.buildings) {
+    state.buildings.forEach(b => {
+      if (b.type === 'torch' || b.type === 'lantern' || b.type === 'campfire') {
+        _duskIgnitionFlashes.push({
+          x: b.x, y: b.y,
+          life: 30, maxLife: 30, // half-second flash
+        });
+      }
+    });
+  }
+
+  // Play 3 gentle descending lyre notes: D5, A4, F#4
+  if (typeof snd !== 'undefined' && snd) snd.playSFX('dusk_lanterns');
+}
+
+function drawDuskIgnitionFlashes() {
+  if (_duskIgnitionFlashes.length === 0) return;
+  noStroke();
+  for (let i = _duskIgnitionFlashes.length - 1; i >= 0; i--) {
+    let f = _duskIgnitionFlashes[i];
+    let sx = w2sX(f.x);
+    let sy = w2sY(f.y);
+    let t = f.life / f.maxLife;
+    // Bright yellow-white flash that fades
+    let flashAlpha = t * 200;
+    let flashSize = 12 + (1 - t) * 8;
+    fill(255, 240, 140, flashAlpha);
+    ellipse(sx, sy - 10, flashSize, flashSize * 0.7);
+    fill(255, 255, 200, flashAlpha * 0.6);
+    ellipse(sx, sy - 10, flashSize * 0.5, flashSize * 0.35);
+    // Tiny sparks
+    if (t > 0.5 && random() < 0.4) {
+      fill(255, 200, 80, flashAlpha * 0.8);
+      let sparkX = sx + random(-6, 6);
+      let sparkY = sy - 10 + random(-8, -2);
+      rect(sparkX, sparkY, 2, 2);
+    }
+    f.life--;
+    if (f.life <= 0) _duskIgnitionFlashes.splice(i, 1);
+  }
 }
 
 // ─── CLOUD DATA ───────────────────────────────────────────────────────────
@@ -1974,6 +2137,10 @@ function drawExpansionZone(ix, iy, iw, ih) {
 
 // ─── NIGHT LIGHTING — torch/lantern/crystal glow at night ─────────────────
 function drawNightLighting() {
+  _resetDuskAtDawn();
+  _triggerDuskMoment();
+  drawDuskIgnitionFlashes();
+
   let bright = getSkyBrightness();
   if (bright > 0.45) return;
   let nightAlpha = map(bright, 0, 0.45, 1, 0);

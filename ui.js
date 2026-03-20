@@ -546,7 +546,7 @@ function drawNatFishTab(cx, cy, cw, ch) {
     let rec = state.codex.fish && state.codex.fish[k];
     let countStr = rec ? 'Caught: ' + rec.count : null;
     let extra = rec ? ' | Day ' + rec.firstDay : '';
-    _drawNatEntry(ex, ey, colW, d.label, d.rarity, d.desc + '  [' + d.season + ', ' + d.time + ']' + extra, countStr, !!rec);
+    _drawNatEntryWithDiscovery(ex, ey, colW, d.label, d.rarity, d.desc + '  [' + d.season + ', ' + d.time + ']' + extra, countStr, !!rec, 'fish', k);
   }
   // Completion reward note
   let tc = getNatTabCompletion(0);
@@ -564,7 +564,7 @@ function drawNatCropsTab(cx, cy, cw, ch) {
     if (ey + entH > cy + ch) continue;
     let rec = state.codex.crops && state.codex.crops[k];
     let countStr = rec ? 'Harvested: ' + rec.count : null;
-    _drawNatEntry(ex, ey, colW, d.label, d.rarity, d.desc, countStr, !!rec);
+    _drawNatEntryWithDiscovery(ex, ey, colW, d.label, d.rarity, d.desc, countStr, !!rec, 'crops', k);
   }
   let tc = getNatTabCompletion(1);
   fill(tc.complete ? [80, 140, 70] : [130, 110, 75]); textSize(7); textAlign(LEFT, BOTTOM);
@@ -581,7 +581,7 @@ function drawNatBestiaryTab(cx, cy, cw, ch) {
     if (ey + entH > cy + ch) continue;
     let rec = state.codex.enemies && state.codex.enemies[k];
     let countStr = rec ? 'Defeated: ' + rec.count : null;
-    _drawNatEntry(ex, ey, colW, d.label, d.rarity, d.desc, countStr, !!rec);
+    _drawNatEntryWithDiscovery(ex, ey, colW, d.label, d.rarity, d.desc, countStr, !!rec, 'enemies', k);
   }
   let tc = getNatTabCompletion(2);
   fill(tc.complete ? [80, 140, 70] : [130, 110, 75]); textSize(7); textAlign(LEFT, BOTTOM);
@@ -598,7 +598,7 @@ function drawNatRelicsTab(cx, cy, cw, ch) {
     if (ey + entH > cy + ch) continue;
     let rec = state.codex.relics && state.codex.relics[k];
     let countStr = rec ? 'Found day ' + rec.firstDay : null;
-    _drawNatEntry(ex, ey, colW, d.label, d.rarity, d.desc, countStr, !!rec);
+    _drawNatEntryWithDiscovery(ex, ey, colW, d.label, d.rarity, d.desc, countStr, !!rec, 'relics', k);
   }
   let tc = getNatTabCompletion(3);
   fill(130, 110, 75); textSize(7); textAlign(LEFT, BOTTOM);
@@ -1478,6 +1478,50 @@ function drawScreenshotIndicator() {
     let sNames = ['', 'WARM', 'COOL', 'SEPIA'];
     text(sNames[screenshotFilter], width - 25, 18);
   }
+  pop();
+}
+
+function drawPhotoModeOverlay() {
+  if (!photoMode && !screenshotMode) return;
+  push();
+  noStroke();
+
+  // Stronger vignette for photo/screenshot mode
+  let maxA = screenshotMode ? 140 : 120;
+  for (let i = 0; i < 10; i++) {
+    let t = i / 10;
+    let a = maxA * (1 - t) * (1 - t);
+    fill(0, 0, 0, a);
+    rect(0, 0, width, height * (0.22 - t * 0.02));
+    rect(0, height * (0.78 + t * 0.02), width, height * (0.22 - t * 0.02));
+    rect(0, 0, width * (0.18 - t * 0.015), height);
+    rect(width * (0.82 + t * 0.015), 0, width * (0.18 - t * 0.015), height);
+  }
+
+  // Watermark fade-in
+  if (photoModeWatermarkAlpha < 80) photoModeWatermarkAlpha = min(80, photoModeWatermarkAlpha + 2);
+  fill(255, 248, 230, photoModeWatermarkAlpha);
+  textSize(10);
+  textAlign(RIGHT, BOTTOM);
+  text('MARE NOSTRUM', width - 16, height - 12);
+
+  // Tip text — fades after 2 seconds
+  if (photoModeTipTimer > 0) {
+    photoModeTipTimer--;
+    let tipA = photoModeTipTimer > 30 ? 160 : floor(160 * (photoModeTipTimer / 30));
+    fill(255, 248, 230, tipA);
+    textSize(9);
+    textAlign(CENTER, CENTER);
+    text(screenshotMode ? 'Click to capture' : 'Press P to exit', width / 2, height - 30);
+  }
+
+  // White flash on capture
+  if (photoModeFlash > 0) {
+    fill(255, 255, 255, floor((photoModeFlash / 6) * 200));
+    rect(0, 0, width, height);
+    photoModeFlash--;
+  }
+
   pop();
 }
 
@@ -2499,5 +2543,204 @@ function drawRuinOverlays() {
       }
     }
   }
+}
+
+// ─── HARVEST ARC PROJECTILES ────────────────────────────────────────────
+// Items arc from harvest position toward HUD resource counter, then pulse it
+let _harvestArcs = [];
+
+function spawnHarvestArc(sx, sy, label, col, hudKey) {
+  // Target: top-left HUD resource area (approximate position of the resource text)
+  let tx = 80, ty = 38;
+  // Offset ty based on which resource
+  let keyOffsets = { seeds: 0, harvest: 11, wood: 22, stone: 33, crystals: 44, gold: 55, fish: 66 };
+  if (keyOffsets[hudKey] !== undefined) ty += keyOffsets[hudKey];
+  _harvestArcs.push({
+    x: sx, y: sy, sx: sx, sy: sy, tx: tx, ty: ty,
+    life: 40, maxLife: 40,
+    label: label, col: col, hudKey: hudKey,
+    sparkles: []
+  });
+}
+
+function updateHarvestArcs(dt) {
+  for (let i = _harvestArcs.length - 1; i >= 0; i--) {
+    let a = _harvestArcs[i];
+    a.life -= dt;
+    let t = 1 - (a.life / a.maxLife);
+    // Ease-in-out cubic
+    let ease = t < 0.5 ? 4 * t * t * t : 1 - pow(-2 * t + 2, 3) / 2;
+    // Arc with upward bulge
+    let midX = (a.sx + a.tx) / 2;
+    let midY = min(a.sy, a.ty) - 80;
+    // Quadratic bezier interpolation
+    let u = 1 - ease;
+    a.x = u * u * a.sx + 2 * u * ease * midX + ease * ease * a.tx;
+    a.y = u * u * a.sy + 2 * u * ease * midY + ease * ease * a.ty;
+    // Spawn sparkle trail
+    if (a.life % 6 < dt && a.sparkles.length < 3) {
+      a.sparkles.push({ x: a.x, y: a.y, life: 18 });
+    }
+    // Update sparkles
+    for (let j = a.sparkles.length - 1; j >= 0; j--) {
+      a.sparkles[j].life -= dt;
+      if (a.sparkles[j].life <= 0) a.sparkles.splice(j, 1);
+    }
+    if (a.life <= 0) {
+      // Trigger HUD pulse on arrival
+      if (a.hudKey) hudFlash[a.hudKey] = { timer: 15, delta: 1 };
+      _harvestArcs.splice(i, 1);
+    }
+  }
+}
+
+function drawHarvestArcs() {
+  for (let i = 0; i < _harvestArcs.length; i++) {
+    let a = _harvestArcs[i];
+    let alpha = map(a.life, 0, a.maxLife, 80, 255);
+    let c = color(a.col);
+    // Draw sparkle trail
+    for (let j = 0; j < a.sparkles.length; j++) {
+      let sp = a.sparkles[j];
+      let sa = (sp.life / 18) * 200;
+      fill(255, 240, 180, sa);
+      noStroke();
+      let sz = 1 + (sp.life / 18) * 2;
+      rect(floor(sp.x) - 1, floor(sp.y) - 1, sz, sz);
+    }
+    // Draw the item dot
+    fill(red(c), green(c), blue(c), alpha);
+    noStroke();
+    rect(floor(a.x) - 2, floor(a.y) - 2, 5, 5);
+    // Label fades as it travels
+    if (a.life > a.maxLife * 0.6) {
+      let la = map(a.life, a.maxLife * 0.6, a.maxLife, 0, 255);
+      fill(red(c), green(c), blue(c), la);
+      textSize(8);
+      textAlign(CENTER, BOTTOM);
+      text(a.label, floor(a.x), floor(a.y) - 5);
+      textAlign(LEFT, TOP);
+    }
+  }
+}
+
+// ─── CODEX DISCOVERY DELIGHT ────────────────────────────────────────────
+// Track newly discovered codex entries for gold flash + NEW badge
+let _codexNewEntries = {}; // { 'fish:sardine': timestamp, ... }
+
+function markCodexDiscovery(category, key) {
+  let id = category + ':' + key;
+  if (!_codexNewEntries[id]) {
+    _codexNewEntries[id] = frameCount;
+    if (snd) snd.playSFX('build'); // quill-scratch substitute (closest SFX)
+  }
+}
+
+function isCodexEntryNew(category, key) {
+  let id = category + ':' + key;
+  let fc = _codexNewEntries[id];
+  if (!fc) return false;
+  // NEW badge lasts 180 frames (~3 seconds at 60fps)
+  if (frameCount - fc < 180) return true;
+  return false;
+}
+
+// Patched entry drawer that adds gold flash and NEW badge
+function _drawNatEntryWithDiscovery(x, y, w, label, rarity, desc, countStr, discovered, category, key) {
+  let isNew = discovered && isCodexEntryNew(category, key);
+  let bg = discovered ? color(250, 245, 230, 220) : color(200, 195, 185, 140);
+  // Gold flash for new entries
+  if (isNew) {
+    let flashT = (frameCount - _codexNewEntries[category + ':' + key]) / 180;
+    let pulse = 0.5 + 0.5 * sin(flashT * PI * 6);
+    bg = lerpColor(color(255, 220, 100, 240), color(250, 245, 230, 220), flashT);
+  }
+  fill(bg); noStroke(); rect(x, y, w, 42, 4);
+  if (discovered) {
+    fill(color(NAT_RARITY_COLORS[rarity] || '#aabbcc')); textSize(7); textAlign(LEFT, TOP);
+    text(rarity, x + 6, y + 3);
+    fill(60, 40, 20); textSize(9); textStyle(BOLD);
+    text(label, x + 6, y + 12);
+    textStyle(NORMAL); fill(90, 70, 45); textSize(7);
+    text(desc, x + 6, y + 24, w - 60);
+    if (countStr) { fill(100, 140, 80); textSize(7); textAlign(RIGHT, TOP); text(countStr, x + w - 6, y + 12); }
+    // NEW badge
+    if (isNew) {
+      fill(255, 200, 40);
+      textSize(7); textStyle(BOLD); textAlign(RIGHT, TOP);
+      text('NEW!', x + w - 6, y + 3);
+      textStyle(NORMAL);
+    }
+  } else {
+    fill(140, 130, 110); textSize(9); textAlign(LEFT, TOP); textStyle(ITALIC);
+    text('???', x + 6, y + 14);
+    textStyle(NORMAL); textSize(7); fill(150, 140, 120);
+    text('Not yet discovered', x + 6, y + 26);
+  }
+  textAlign(LEFT, TOP); textStyle(NORMAL);
+}
+
+// ─── FISH CATCH CARD ────────────────────────────────────────────────────
+let _catchCard = null; // { name, rarity, rarityColor, weight, isNew, timer, maxTimer }
+
+function showCatchCard(fishName, rarity, weight, isNew) {
+  let rarityColor = NAT_RARITY_COLORS[rarity] || '#aabbcc';
+  _catchCard = {
+    name: fishName, rarity: rarity, rarityColor: rarityColor,
+    weight: weight, isNew: isNew,
+    timer: 90, maxTimer: 90 // 1.5 sec at 60fps
+  };
+}
+
+function updateCatchCard(dt) {
+  if (!_catchCard) return;
+  _catchCard.timer -= dt;
+  if (_catchCard.timer <= 0) _catchCard = null;
+}
+
+function drawCatchCard() {
+  if (!_catchCard) return;
+  let c = _catchCard;
+  let t = 1 - (c.timer / c.maxTimer); // 0 to 1
+  // Slide in from right (first 20%), hold, slide out (last 20%)
+  let slideX = 0;
+  if (t < 0.15) slideX = (1 - t / 0.15) * 200; // slide in
+  else if (t > 0.8) slideX = ((t - 0.8) / 0.2) * 200; // slide out
+  let cardW = 160, cardH = 60;
+  let cx = width - cardW - 12 + slideX;
+  let cy = height * 0.3;
+  // Card background
+  noStroke();
+  fill(25, 20, 12, 230);
+  rect(cx, cy, cardW, cardH, 5);
+  // Rarity border
+  let rc = color(c.rarityColor);
+  stroke(red(rc), green(rc), blue(rc), 220);
+  strokeWeight(2);
+  noFill();
+  rect(cx, cy, cardW, cardH, 5);
+  noStroke();
+  // Fish name
+  fill(240, 230, 200);
+  textSize(13); textStyle(BOLD);
+  textAlign(CENTER, TOP);
+  text(c.name, cx + cardW / 2, cy + 6);
+  textStyle(NORMAL);
+  // Rarity label
+  fill(red(rc), green(rc), blue(rc));
+  textSize(8);
+  text(c.rarity, cx + cardW / 2, cy + 23);
+  // Weight
+  fill(180, 170, 150);
+  textSize(8);
+  text('Weight: ' + c.weight, cx + cardW / 2, cy + 35);
+  // NEW badge
+  if (c.isNew) {
+    fill(255, 220, 60);
+    textSize(9); textStyle(BOLD);
+    text('NEW!', cx + cardW / 2, cy + 46);
+    textStyle(NORMAL);
+  }
+  textAlign(LEFT, TOP);
 }
 

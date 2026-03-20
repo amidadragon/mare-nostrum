@@ -201,11 +201,19 @@ function reelFish() {
     if (typeof grantXP === 'function') grantXP(fishType.weight * 5); // rare fish = more XP
     state.codex.fishCaught[fishType.name.toLowerCase()] = true;
     let _fk = fishType.name.toLowerCase();
+    let _isFirstCatch = !state.codex.fish[_fk];
     if (!state.codex.fish[_fk]) state.codex.fish[_fk] = { caught: true, count: 0, firstDay: state.day };
     state.codex.fish[_fk].count += amt;
     state.codex.fish[_fk].caught = true;
+    // Codex discovery + catch card
+    if (_isFirstCatch && typeof markCodexDiscovery === 'function') markCodexDiscovery('fish', _fk);
+    let _fishRarity = NAT_FISH_DATA[_fk] ? NAT_FISH_DATA[_fk].rarity : 'Common';
+    if (typeof showCatchCard === 'function') showCatchCard(fishType.name, _fishRarity, fishType.weight, _isFirstCatch);
     unlockJournal('first_fish');
-    addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 40, '+' + amt + ' ' + fishType.name + '!', fishType.color);
+    let _fishSx = w2sX(state.player.x), _fishSy = w2sY(state.player.y);
+    addFloatingText(_fishSx, _fishSy - 40, '+' + amt + ' ' + fishType.name + '!', fishType.color);
+    // Arc fish reward to HUD
+    if (typeof spawnHarvestArc === 'function') spawnHarvestArc(_fishSx, _fishSy - 40, '+' + amt, fishType.color, 'fish');
     if (f.streak >= 3) {
       addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 58, '+' + f.streak + ' streak!', '#ffdd55');
     }

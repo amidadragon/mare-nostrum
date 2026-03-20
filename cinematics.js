@@ -1090,6 +1090,11 @@ function skipCutscene() {
   } else if (state.cutscene === 'sailing') {
     state.cutscene = null;
     completeSailToHome();
+  } else if (state.cutscene === 'home_sunrise') {
+    state.cutscene = null;
+    camSmooth.x = cam.x; camSmooth.y = cam.y;
+    addFloatingText(width / 2, height * 0.3, 'HOME ISLAND REACHED', C.solarGold);
+    addFloatingText(width / 2, height * 0.36, 'Explore the ruins...', C.textDim);
   }
 }
 
@@ -1132,6 +1137,55 @@ function completeSailToHome() {
     addFloatingText(width / 2, height * 0.42, 'The stray cat followed you!', '#ffaa66');
   }
 
-  addFloatingText(width / 2, height * 0.3, 'HOME ISLAND REACHED', C.solarGold);
-  addFloatingText(width / 2, height * 0.36, 'Explore the ruins...', C.textDim);
+  // Begin sunrise cinematic before player gets control
+  state.cutscene = 'home_sunrise';
+  state.cutsceneTimer = 0;
+}
+
+// ─── HOME ISLAND SUNRISE — held emotional moment ──────────────────────────
+function drawHomeSunriseCinematic(dt) {
+  state.cutsceneTimer += dt;
+  let t = state.cutsceneTimer;
+  let dur = 200; // ~3.3 seconds at 60fps
+  let progress = min(1, t / dur);
+
+  // Camera slowly drifts rightward across the island
+  camSmooth.x = cam.x + progress * 80;
+  camSmooth.y = cam.y - progress * 10;
+
+  // Warm D major chord at the start (D4=293.7, F#4=370, A4=440)
+  if (t === dt && snd) snd.playSFX('home_sunrise_chord');
+
+  // Golden morning overlay — blooms then fades
+  let overlayAlpha;
+  if (progress < 0.3) {
+    overlayAlpha = (progress / 0.3) * 60; // bloom in
+  } else if (progress < 0.7) {
+    overlayAlpha = 60; // hold
+  } else {
+    overlayAlpha = 60 * (1 - (progress - 0.7) / 0.3); // fade out
+  }
+  fill(255, 210, 100, floor(overlayAlpha));
+  rect(0, 0, width, height);
+
+  // Text: "A new beginning..." fades in center then out
+  let textAlpha = 0;
+  if (progress > 0.2 && progress < 0.85) {
+    let tp = (progress - 0.2) / 0.65;
+    if (tp < 0.25) textAlpha = tp / 0.25;
+    else if (tp < 0.75) textAlpha = 1;
+    else textAlpha = 1 - (tp - 0.75) / 0.25;
+  }
+  if (textAlpha > 0.01) {
+    _drawCinematicText(width / 2, height * 0.45, 'A new beginning...', 20,
+      240, 220, 180, floor(textAlpha * 255));
+  }
+
+  // End: give player control
+  if (t >= dur) {
+    state.cutscene = null;
+    camSmooth.x = cam.x; camSmooth.y = cam.y;
+    addFloatingText(width / 2, height * 0.3, 'HOME ISLAND REACHED', C.solarGold);
+    addFloatingText(width / 2, height * 0.36, 'Explore the ruins...', C.textDim);
+  }
 }
