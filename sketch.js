@@ -17025,8 +17025,8 @@ function _addProceduralPerimeter(lvl, cx, cy, rx, ry) {
   // Crystal node on even levels
   if (lvl % 2 === 0) {
     let ca = angle0 + PI;
-    let crx = cx + cos(ca) * state.islandRX * 0.5;
-    let cry = cy + sin(ca) * state.islandRY * 0.4;
+    let crx = cx + cos(ca) * state.islandRX * 0.7;
+    let cry = cy + sin(ca) * state.islandRY * 0.55;
     let cSize = min(14 + floor(lvl / 5) * 2, 24);
     state.crystalNodes.push({
       x: crx, y: cry,
@@ -17154,8 +17154,6 @@ function placeEraBuildings(lvl) {
     tree(cx + 150, cy - 60);
     // Ruin on NE edge
     ruin(cx + 260, cy - 70, 30, 20);
-    // Farm plots
-    addFarmPlots(farmCX, farmCY, lvl);
     addFloatingText(width / 2, height * 0.3, 'Shrine consecrated — the gods watch!', '#ffaaff');
     spawnParticles(cx + rx * 0.4, cy - ry * 0.35, 'build', 10);
   }
@@ -17214,8 +17212,6 @@ function placeEraBuildings(lvl) {
     tree(cx + 350, cy - 40);
     // Ruin south
     ruin(cx, cy + 80, 35, 22);
-    // Farm plots
-    addFarmPlots(farmCX, farmCY, lvl);
     addFloatingText(width / 2, height * 0.25, 'Granary & Well constructed!', '#88cc66');
     spawnParticles(farmCX, farmCY - ry * 0.3, 'build', 12);
   }
@@ -17224,7 +17220,7 @@ function placeEraBuildings(lvl) {
     let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
     // RESIDENTIAL NW BLOCK — first two domus, side by side
     let houseStreetY = cy - ry * 0.2;
-    let houseStartX  = cx - rx * 0.25;
+    let houseStartX  = cx - rx * 0.35;
     pb(houseStartX,      houseStreetY, 44, 34, 'house');
     pb(houseStartX + 50, houseStreetY, 44, 34, 'house');
     // Torch between them on shared courtyard
@@ -17241,7 +17237,7 @@ function placeEraBuildings(lvl) {
   if (lvl === 7) {
     let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
     // MARKET BLOCK — east of center on Via Principalis
-    let mktX = cx + rx * 0.5;
+    let mktX = cx + rx * 0.45;
     let mktY = cy - 8; // ON the Decumanus centerline
     pb(mktX,       mktY,      44, 34, 'market');
     pb(mktX - 30,  mktY + 24, 24, 20, 'chest');
@@ -17251,7 +17247,6 @@ function placeEraBuildings(lvl) {
     pb(mktX + 26,  mktY - 8,  8, 16, 'torch');
     // Procedural
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
-    addFarmPlots(farmCX, farmCY, lvl);
     addFloatingText(width / 2, height * 0.3, 'Market opens for trade!', '#ffcc66');
     spawnParticles(mktX, mktY, 'build', 10);
   }
@@ -17318,7 +17313,6 @@ function placeEraBuildings(lvl) {
     // Bridge — residential NW to civic NE
     pb(cx, cy - ry * 0.3, 32, 32, 'bridge');
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
-    addFarmPlots(farmCX, farmCY, lvl);
     addFloatingText(width / 2, height * 0.3, 'Aqueduct spans the island!', '#66ccff');
     spawnParticles(cx, cy - ry * 0.55, 'build', 12);
   }
@@ -17342,9 +17336,8 @@ function placeEraBuildings(lvl) {
     pb(tempX - 42, tempY - 10, 20, 16, 'flower');
     pb(tempX + 42, tempY - 10, 20, 16, 'flower');
 
-    // SECOND MARKET — near port on eastern shore
-    let port = getPortPosition();
-    pb(port.x + 80, port.y - 30, 44, 34, 'market');
+    // SECOND MARKET — further east on Decumanus approach
+    pb(cx + rx * 0.65, cy - 8, 44, 34, 'market');
 
     // TOWN CENTER PLAZA — six floor tiles at crossing
     for (let r = 0; r < 2; r++) {
@@ -17360,7 +17353,6 @@ function placeEraBuildings(lvl) {
     pb(cx + rx * 0.4, cy,            32, 32, 'floor');
 
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
-    addFarmPlots(farmCX, farmCY, lvl);
     addFloatingText(width / 2, height * 0.25, 'GOVERNOR — Temple & Market erected!', '#ffdd66');
     triggerScreenShake(6, 15);
     spawnParticles(tempX, tempY, 'build', 15);
@@ -17375,7 +17367,6 @@ function placeEraBuildings(lvl) {
     pb(cx + rx * 0.55, cy - ry * 0.55, 28, 20, 'mosaic');
     pb(cx + rx * 0.5,  cy - ry * 0.25, 10, 20, 'lantern');
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
-    addFarmPlots(farmCX, farmCY, lvl);
     addFloatingText(width / 2, height * 0.3, 'Gardens and mosaics adorn the temple!', '#ffaaff');
     spawnParticles(cx + rx * 0.55, cy - ry * 0.15, 'build', 10);
   }
@@ -17383,37 +17374,47 @@ function placeEraBuildings(lvl) {
   if (lvl === 12) {
     let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
     // RESIDENTIAL BLOCK 2 — two more domus north of first pair on Cardo
-    let houseStreetY2 = cy - ry * 0.35;
-    let houseStartX2  = cx - rx * 0.25;
+    let houseStreetY2 = cy - ry * 0.2;
+    let houseStartX2  = cx - rx * 0.35;
     pb(houseStartX2,      houseStreetY2, 44, 34, 'house');
     pb(houseStartX2 + 50, houseStreetY2, 44, 34, 'house');
     pb(houseStartX2 + 25, houseStreetY2 + 18, 8, 16, 'torch');
-    // Also a second pair on interior Cardo
+    // Also a second pair on interior Cardo — spread along N-S axis
     pb(cx - rx * 0.15, cy - ry * 0.15, 44, 34, 'house');
-    pb(cx - rx * 0.15, cy - ry * 0.35, 44, 34, 'house');
+    pb(cx - rx * 0.15, cy - ry * 0.45, 44, 34, 'house');
     // Second well SW
     pb(cx - rx * 0.2, cy + ry * 0.4, 24, 24, 'well');
     // Via Principalis lanterns (3 posts along east road)
     pb(cx + rx * 0.15, cy, 10, 20, 'lantern');
     pb(cx + rx * 0.3,  cy, 10, 20, 'lantern');
     pb(cx + rx * 0.45, cy, 10, 20, 'lantern');
+    // Cardo lanterns (4 posts along N-S road)
+    pb(cx + rx * 0.05, cy - ry * 0.15, 10, 20, 'lantern');
+    pb(cx + rx * 0.05, cy - ry * 0.35, 10, 20, 'lantern');
+    pb(cx + rx * 0.05, cy + ry * 0.15, 10, 20, 'lantern');
+    pb(cx + rx * 0.05, cy + ry * 0.35, 10, 20, 'lantern');
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
-    addFarmPlots(farmCX, farmCY, lvl);
     addFloatingText(width / 2, height * 0.3, 'Housing fills the Cardo — second well dug!', '#ffee88');
     spawnParticles(houseStartX2, houseStreetY2, 'build', 10);
   }
 
   if (lvl === 13) {
     let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
+    // THIRD MARKET STALL — on Decumanus between forum and first market
+    pb(cx + rx * 0.3, cy - 8, 44, 34, 'market');
+    // HOUSE — fill empty east quadrant
+    pb(cx + rx * 0.55, cy + ry * 0.1, 44, 34, 'house');
     // WATCHTOWER — east edge sentinel
     pb(cx + rx * 0.7, cy, 20, 44, 'watchtower');
-    // WALLS — military perimeter near castrum
+    // WALLS — extended military perimeter near castrum
     pb(cx + rx * 0.25, cy + ry * 0.35, 32, 8, 'wall');
+    pb(cx + rx * 0.35, cy + ry * 0.35, 32, 8, 'wall');
     pb(cx + rx * 0.45, cy + ry * 0.35, 32, 8, 'wall');
+    // GATE — castrum entrance on Via Militaris
+    pb(cx + rx * 0.35, cy + ry * 0.35, 24, 28, 'door');
     // WATCHTOWER — farm-facing southern tower
     pb(cx - rx * 0.1, cy + ry * 0.35, 20, 44, 'watchtower');
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
-    addFarmPlots(farmCX, farmCY, lvl);
     addFloatingText(width / 2, height * 0.3, 'Watchtowers stand sentinel!', '#cc8844');
     spawnParticles(cx + rx * 0.7, cy, 'build', 10);
   }
@@ -17423,9 +17424,9 @@ function placeEraBuildings(lvl) {
     // EXTENDED AQUEDUCT — westward extension
     pb(cx - rx * 0.3, cy - ry * 0.55, 20, 40, 'aqueduct');
     pb(cx - rx * 0.5, cy - ry * 0.55, 20, 40, 'aqueduct');
-    // SECOND BATH HOUSE — NE civic, serves east district
-    let bath2X = cx + rx * 0.25;
-    let bath2Y = cy - ry * 0.2;
+    // SECOND BATH HOUSE — NE civic, near library
+    let bath2X = cx + rx * 0.4;
+    let bath2Y = cy - ry * 0.15;
     pb(bath2X,       bath2Y,      58, 44, 'bath');
     pb(bath2X - 36,  bath2Y,      20, 16, 'flower');
     pb(bath2X + 36,  bath2Y,      20, 16, 'flower');
@@ -17434,16 +17435,15 @@ function placeEraBuildings(lvl) {
     // Bridge connecting market to residential
     pb(cx + rx * 0.1, cy + ry * 0.1, 32, 32, 'bridge');
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
-    addFarmPlots(farmCX, farmCY, lvl);
     addFloatingText(width / 2, height * 0.3, 'Bath complex rises, aqueduct extended!', '#66ccff');
     spawnParticles(bath2X, bath2Y, 'build', 10);
   }
 
   if (lvl === 15) {
     let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
-    // FORUM — at Decumanus/Cardo intersection (city heart)
+    // FORUM — just south of Decumanus/Cardo crossing (open plaza at intersection)
     let forumX = cx + rx * 0.05;
-    let forumY = cy + ry * 0.08;
+    let forumY = cy + ry * 0.15;
     pb(forumX, forumY, 80, 60, 'forum');
     // Floor tiles surrounding forum (3x3 minus center)
     for (let dx = -1; dx <= 1; dx++) {
@@ -17461,12 +17461,13 @@ function placeEraBuildings(lvl) {
     pb(forumX - 28, forumY + 44, 32, 32, 'mosaic');
     pb(forumX,      forumY + 44, 32, 32, 'mosaic');
     pb(forumX + 28, forumY + 44, 32, 32, 'mosaic');
+    // GRANARY #2 — between forum and castrum
+    pb(cx + rx * 0.3, cy + ry * 0.3, 58, 44, 'granary');
     // TRIUMPHAL ARCH — east road landmark
     pb(cx + rx * 0.65, cy, 48, 52, 'arch');
     // WATCHTOWER — far east edge
     pb(cx + rx * 0.8, cy - ry * 0.1, 20, 44, 'watchtower');
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
-    addFarmPlots(farmCX, farmCY, lvl);
     addFloatingText(width / 2, height * 0.25, 'SENATOR — Forum raised!', '#ff9944');
     triggerScreenShake(8, 20);
     spawnParticles(forumX, forumY, 'build', 15);
@@ -17492,7 +17493,6 @@ function placeEraBuildings(lvl) {
     pb(streetX + 25,  streetY2 + 18, 8, 16, 'torch');
     pb(streetX + 75,  streetY2 + 18, 8, 16, 'torch');
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
-    addFarmPlots(farmCX, farmCY, lvl);
     addFloatingText(width / 2, height * 0.3, 'Housing district expands!', '#aaddff');
     spawnParticles(streetX + 75, streetY1, 'build', 12);
   }
@@ -17514,7 +17514,6 @@ function placeEraBuildings(lvl) {
     // Shrine in library courtyard
     pb(libX + 36, libY - 14, 32, 28, 'shrine');
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
-    addFarmPlots(farmCX, farmCY, lvl);
     addFloatingText(width / 2, height * 0.3, 'Great Library of Rome rises!', '#ddaaff');
     spawnParticles(libX, libY, 'build', 14);
   }
@@ -17534,7 +17533,6 @@ function placeEraBuildings(lvl) {
     pb(arenaX + 40, arenaY + 30, 8, 16, 'torch');
     pb(arenaX,      arenaY + 34, 32, 32, 'floor');
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
-    addFarmPlots(farmCX, farmCY, lvl);
     addFloatingText(width / 2, height * 0.3, 'Arena rises — glory awaits!', '#ff8844');
     spawnParticles(arenaX, arenaY, 'build', 14);
   }
@@ -17552,7 +17550,6 @@ function placeEraBuildings(lvl) {
     pb(cx + rx * 0.3, cy + ry * 0.15, 44, 34, 'house');
     pb(cx + rx * 0.15, cy + ry * 0.25, 44, 34, 'house');
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
-    addFarmPlots(farmCX, farmCY, lvl);
     addFloatingText(width / 2, height * 0.3, 'Arena complete — let the games begin!', '#ff6622');
     spawnParticles(arenaX, arenaY + 30, 'build', 16);
   }
@@ -17573,7 +17570,6 @@ function placeEraBuildings(lvl) {
     let port = getPortPosition();
     pb(port.x + 120, port.y - 15, 48, 52, 'arch');
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
-    addFarmPlots(farmCX, farmCY, lvl);
     addFloatingText(width / 2, height * 0.25, 'CONSUL — Villa Estate built!', '#ffaa00');
     triggerScreenShake(12, 30);
     spawnParticles(villaX, villaY, 'build', 20);
@@ -17592,7 +17588,6 @@ function placeEraBuildings(lvl) {
     pb(senX + 20, senY + 32, 24, 20, 'floor');
     pb(senX + 40, senY + 32, 24, 20, 'floor');
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
-    addFarmPlots(farmCX, farmCY, lvl);
     addFloatingText(width / 2, height * 0.3, 'Senate convenes — Forum Magnum!', '#ffaa44');
     spawnParticles(senX, senY, 'build', 14);
   }
@@ -17606,7 +17601,6 @@ function placeEraBuildings(lvl) {
     pb(cx + rx * 0.5, cy + ry * 0.1, 10, 20, 'lantern');
     pb(cx + rx * 0.6, cy + ry * 0.1, 10, 20, 'lantern');
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
-    addFarmPlots(farmCX, farmCY, lvl);
     addFloatingText(width / 2, height * 0.3, 'Harbor gate — the arch stands!', '#ddcc88');
     spawnParticles(cx + rx * 0.72, cy + ry * 0.1, 'build', 12);
   }
@@ -17623,7 +17617,6 @@ function placeEraBuildings(lvl) {
     pb(cx - rx * 0.35, cy - ry * 0.45, 32, 32, 'bridge');
     pb(cx + rx * 0.15, cy - ry * 0.45, 32, 32, 'bridge');
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
-    addFarmPlots(farmCX, farmCY, lvl);
     addFloatingText(width / 2, height * 0.3, 'Grand Aqueduct spans all of Mare Nostrum!', '#66ccff');
     spawnParticles(cx, cy - ry * 0.6, 'build', 16);
   }
@@ -17642,7 +17635,6 @@ function placeEraBuildings(lvl) {
     pb(palX - 20, palY + 60,  10, 20, 'lantern');
     pb(palX + 20, palY + 60,  10, 20, 'lantern');
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
-    addFarmPlots(farmCX, farmCY, lvl);
     addFloatingText(width / 2, height * 0.3, 'Imperial Palace rises — glory of Rome!', '#ffcc44');
     spawnParticles(palX, palY, 'build', 18);
   }
