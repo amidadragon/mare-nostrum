@@ -85,8 +85,9 @@ function updateFishing(dt) {
       f.waitDuration = floor(random(90, 300) * rodBonus / _natFishBonus);
       f.phaseTimer = f.waitDuration;
       f.nibbleTimer = floor(random(25, 45));
+      f.splashRings = [{r: 0, a: 200}, {r: 0, a: 150}]; // expanding water rings on plop
       spawnParticles(f.bobberX, f.bobberY, 'build', 6);
-      if (snd) snd.playSFX('water');
+      if (snd) snd.playSFX('bobber_plop');
     }
   } else if (f.phase === 'wait') {
     f.phaseTimer -= dt;
@@ -95,8 +96,10 @@ function updateFishing(dt) {
     f.bobberDip = sin(frameCount * 0.08) * 3;
     // Nibble dips
     if (f.nibbleTimer <= 0 && f.phaseTimer > 72) {
-      f.bobberDip = -3;
+      f.bobberDip = -5;
       f.nibbleTimer = floor(random(25, 45));
+      if (!f.splashRings) f.splashRings = [];
+      f.splashRings.push({r: 0, a: 80}); // subtle ring on nibble
     }
     // Net auto-catches at strike
     if (f.phaseTimer <= 0) {
@@ -105,7 +108,8 @@ function updateFishing(dt) {
       f.bobberDip = -12;
       f.bite = true;
       f.strikeWindowEnd = frameCount + 72;
-      if (snd) snd.playSFX('fish_cast');
+      f.splashRings = [{r: 0, a: 255}, {r: 0, a: 200}, {r: 0, a: 150}]; // big splash on bite
+      if (snd) snd.playSFX('fish_bite');
       triggerScreenShake(2, 4);
       spawnParticles(f.bobberX, f.bobberY, 'build', 4);
       if (state.tools.net) {
@@ -211,6 +215,9 @@ function reelFish() {
     f.phaseTimer = 40;
     f.bite = false;
     f.bobberDip = 0;
+    f.reelStart = frameCount;
+    f.reelBobberStartX = f.bobberX;
+    f.reelBobberStartY = f.bobberY;
   }
 }
 
@@ -239,12 +246,41 @@ function drawFishing() {
     by = lerp(rodEndY, w2sY(f.bobberY), t) - sin(t * PI) * 20;
   }
 
+  // Reel phase: bobber zips back toward player, line goes taut
+  if (f.phase === 'reel') {
+    let reelT = min(1, (frameCount - (f.reelStart || frameCount)) / 30);
+    let reelEase = reelT * reelT; // ease-in for snap feel
+    bx = lerp(w2sX(f.reelBobberStartX || f.bobberX), rodEndX, reelEase);
+    by = lerp(w2sY(f.reelBobberStartY || f.bobberY), rodEndY, reelEase);
+    // Taut line — straight, no sag
+    stroke(220, 220, 220, 220);
+    strokeWeight(1.4);
+    line(rodEndX, rodEndY, bx, by);
+    noStroke();
+    // Fish pixel sprite along the line
+    let fishX = bx + (rodEndX > bx ? 6 : -6);
+    let fishY = by;
+    fill(100, 180, 255);
+    rect(floor(fishX) - 3, floor(fishY) - 1, 6, 3);  // body
+    fill(80, 150, 220);
+    rect(floor(fishX) + (rodEndX > bx ? -5 : 3), floor(fishY) - 2, 2, 4);  // tail
+    // Water droplets flung during reel
+    fill(150, 200, 255, 180 - reelT * 150);
+    for (let d = 0; d < 3; d++) {
+      let dx = lerp(bx, rodEndX, reelT * 0.5 + d * 0.15);
+      let dy = by - 4 - random(2, 8);
+      rect(floor(dx), floor(dy), 2, 2);
+    }
+    noStroke();
+    return; // skip normal bobber draw during reel
+  }
+
   // Fishing line from rod tip to bobber
+  let lineTension = f.phase === 'strike' ? 0.6 : 1.0;
   stroke(200, 200, 200, 150);
-  strokeWeight(0.8);
-  // Slight sag in the line
+  strokeWeight(f.phase === 'strike' ? 1.0 : 0.8);
   let midX = (rodEndX + bx) / 2;
-  let midY = (rodEndY + by) / 2 + 8;
+  let midY = (rodEndY + by) / 2 + 8 * lineTension;
   noFill();
   beginShape();
   vertex(rodEndX, rodEndY);
@@ -252,22 +288,46 @@ function drawFishing() {
   endShape();
   noStroke();
 
-  // Bobber
+  // Bobber — white top, red bottom, pixel-art 4x6 block
   if (f.phase === 'strike') {
-    fill(220, 60, 40); // agitated red
+    // Agitated bobber — partially submerged, darker red
+    fill(200, 50, 30);
+    rect(floor(bx) - 2, floor(by), 4, 3);
+    fill(255, 255, 255, 180);
+    rect(floor(bx) - 1, floor(by), 2, 1);
   } else {
     fill(255, 60, 60);
+    rect(floor(bx) - 2, floor(by) - 2, 4, 4);
+    fill(255, 255, 255);
+    rect(floor(bx) - 1, floor(by) - 4, 2, 3); // white stick above
   }
-  rect(floor(bx) - 2, floor(by) - 2, 4, 4);
-  fill(255, 255, 255);
-  rect(floor(bx) - 1, floor(by) - 2, 2, 2);
 
-  // Water ripples around bobber
+  // Expanding splash rings (on plop and bite)
+  if (f.splashRings && f.splashRings.length > 0) {
+    noFill();
+    for (let i = f.splashRings.length - 1; i >= 0; i--) {
+      let ring = f.splashRings[i];
+      ring.r += 0.6;
+      ring.a -= 4;
+      if (ring.a <= 0) { f.splashRings.splice(i, 1); continue; }
+      stroke(255, 255, 255, ring.a);
+      strokeWeight(0.7);
+      ellipse(bx, by + 3, ring.r * 2, ring.r * 0.7);
+    }
+    noStroke();
+  }
+
+  // Ambient water ripples around bobber
   if (f.phase !== 'cast') {
     noFill();
     stroke(255, 255, 255, 30 + sin(frameCount * 0.1) * 15);
     strokeWeight(0.5);
     ellipse(bx, by + 3, 14 + sin(frameCount * 0.08) * 3, 5);
+    if (f.phase === 'wait') {
+      // Second subtle ripple, offset phase
+      stroke(255, 255, 255, 15 + sin(frameCount * 0.07 + 2) * 10);
+      ellipse(bx, by + 3, 20 + sin(frameCount * 0.06 + 1) * 4, 7);
+    }
     noStroke();
   }
 
@@ -284,18 +344,19 @@ function drawFishing() {
     textSize(10);
     textAlign(CENTER, BOTTOM);
     text('PRESS F', floor(px), floor(py) - 50);
-    // Splash pixels
-    fill(100, 180, 255, 120);
-    for (let s = 0; s < 3; s++) {
-      rect(floor(bx) + floor(random(-6, 6)), floor(by) + floor(random(-4, 2)), 2, 2);
+    // Splash pixels — more vigorous
+    fill(100, 180, 255, 140);
+    for (let s = 0; s < 5; s++) {
+      let sx = floor(bx) + floor(random(-8, 8));
+      let sy = floor(by) + floor(random(-6, 3));
+      rect(sx, sy, 2, 2);
     }
-  }
-
-  // Reel phase: taut line + fish sprite pop
-  if (f.phase === 'reel') {
-    stroke(200, 200, 200, 200);
-    strokeWeight(1.2);
-    line(rodEndX, rodEndY, bx, by);
+    // Water spray upward
+    for (let s = 0; s < 3; s++) {
+      fill(180, 220, 255, 100 + sin(frameCount * 0.2 + s) * 40);
+      let sprayY = floor(by) - 4 - floor(random(2, 8));
+      rect(floor(bx) + floor(random(-5, 5)), sprayY, 1, 2);
+    }
   }
   noStroke();
 }

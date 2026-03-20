@@ -1,6 +1,10 @@
-const CACHE_NAME = 'mare-nostrum-v1';
+const CACHE_NAME = 'mare-nostrum-v3';
 const ASSETS = [
   'index.html',
+  'libs/p5.min.js',
+  'libs/p5.sound.min.js',
+  'libs/cinzel-latin.woff2',
+  'libs/cinzel-latin-ext.woff2',
   'engine.js',
   'sound.js',
   'narrative.js',
@@ -13,6 +17,13 @@ const ASSETS = [
   'combat.js',
   'economy.js',
   'debug.js',
+  'world.js',
+  'player.js',
+  'farming.js',
+  'fishing.js',
+  'npc.js',
+  'ui.js',
+  'events.js',
   'menu_bg.webp',
   'favicon.ico',
   'manifest.json',

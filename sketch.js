@@ -250,180 +250,136 @@ let shakeTimer = 0;
 let hudFlash = {}; // { key: { timer, delta } } — tracks resource changes for pop effect
 let starPositions = null;
 
-// Fixed absolute building coordinates — 169 slots, no rx*factor drift
+// Fixed absolute building coordinates — organized districts, no overlaps
+// Island center: (600, 400). Walkable area ~500x320.
+// Districts: Farm(W), Residential(NW), Center(C), Civic(NE), Market(E), Military(SE), Sacred(N)
 const CITY_SLOTS = [
   // ERA 1: VILLAGE (Lv 2-8)
+  // --- Farm district (west, x:220-400) ---
   { id: 'fence_farm_e1',   x: 220, y: 365, w: 32, h:  8, type: 'fence',       level: 2,  district: 'farm' },
   { id: 'fence_farm_e2',   x: 220, y: 395, w: 32, h:  8, type: 'fence',       level: 2,  district: 'farm' },
+  { id: 'granary',         x: 340, y: 340, w: 58, h: 44, type: 'granary',     level: 5,  district: 'farm' },
+  { id: 'torch_gran_l',    x: 310, y: 354, w:  8, h: 16, type: 'torch',       level: 5,  district: 'farm' },
+  { id: 'fence_nw1',       x: 390, y: 318, w: 32, h:  8, type: 'fence',       level: 4,  district: 'farm' },
+  // --- Center (x:560-660, y:400-470) ---
   { id: 'torch_center',    x: 600, y: 415, w:  8, h: 16, type: 'torch',       level: 2,  district: 'center' },
-  { id: 'floor_sacra1',    x: 720, y: 318, w: 24, h: 20, type: 'floor',       level: 3,  district: 'civic' },
-  { id: 'floor_sacra2',    x: 745, y: 318, w: 24, h: 20, type: 'floor',       level: 3,  district: 'civic' },
-  { id: 'floor_sacra3',    x: 770, y: 318, w: 24, h: 20, type: 'floor',       level: 3,  district: 'civic' },
-  { id: 'shrine_civic',    x: 760, y: 298, w: 32, h: 28, type: 'shrine',      level: 3,  district: 'civic' },
-  { id: 'fence_nw1',       x: 390, y: 358, w: 32, h:  8, type: 'fence',       level: 4,  district: 'farm' },
-  { id: 'fence_nw2',       x: 390, y: 380, w: 32, h:  8, type: 'fence',       level: 4,  district: 'farm' },
   { id: 'well_center',     x: 660, y: 440, w: 24, h: 24, type: 'well',        level: 4,  district: 'center' },
-  { id: 'granary',         x: 375, y: 340, w: 58, h: 44, type: 'granary',     level: 5,  district: 'farm' },
-  { id: 'granary_torch_l', x: 347, y: 354, w:  8, h: 16, type: 'torch',       level: 5,  district: 'farm' },
-  { id: 'granary_torch_r', x: 403, y: 354, w:  8, h: 16, type: 'torch',       level: 5,  district: 'farm' },
-  { id: 'well_sw',         x: 490, y: 460, w: 24, h: 24, type: 'well',        level: 5,  district: 'center' },
-  { id: 'floor_via_g1',    x: 530, y: 340, w: 24, h: 20, type: 'floor',       level: 5,  district: 'farm' },
-  { id: 'floor_via_g2',    x: 530, y: 363, w: 24, h: 20, type: 'floor',       level: 5,  district: 'farm' },
-  { id: 'floor_via_g3',    x: 530, y: 386, w: 24, h: 20, type: 'floor',       level: 5,  district: 'farm' },
-  { id: 'house_res1',      x: 440, y: 330, w: 44, h: 34, type: 'house',       level: 6,  district: 'residential' },
+  { id: 'well_sw',         x: 540, y: 470, w: 24, h: 24, type: 'well',        level: 5,  district: 'center' },
+  // --- Residential (NW, x:420-540, y:290-380) ---
+  { id: 'house_res1',      x: 430, y: 330, w: 44, h: 34, type: 'house',       level: 6,  district: 'residential' },
   { id: 'house_res2',      x: 490, y: 330, w: 44, h: 34, type: 'house',       level: 6,  district: 'residential' },
-  { id: 'torch_res1',      x: 465, y: 348, w:  8, h: 16, type: 'torch',       level: 6,  district: 'residential' },
-  { id: 'flower_res1',     x: 462, y: 316, w: 20, h: 16, type: 'flower',      level: 6,  district: 'residential' },
-  { id: 'market_1',        x: 810, y: 375, w: 44, h: 34, type: 'market',      level: 7,  district: 'market' },
-  { id: 'chest_mkt1a',     x: 784, y: 399, w: 24, h: 20, type: 'chest',       level: 7,  district: 'market' },
-  { id: 'chest_mkt1b',     x: 836, y: 399, w: 24, h: 20, type: 'chest',       level: 7,  district: 'market' },
-  { id: 'torch_mkt1a',     x: 784, y: 367, w:  8, h: 16, type: 'torch',       level: 7,  district: 'market' },
-  { id: 'torch_mkt1b',     x: 836, y: 367, w:  8, h: 16, type: 'torch',       level: 7,  district: 'market' },
-  { id: 'bath_1',          x: 480, y: 460, w: 70, h: 52, type: 'bath',        level: 8,  district: 'bath' },
-  { id: 'flower_bath1a',   x: 444, y: 460, w: 20, h: 16, type: 'flower',      level: 8,  district: 'bath' },
-  { id: 'flower_bath1b',   x: 516, y: 460, w: 20, h: 16, type: 'flower',      level: 8,  district: 'bath' },
-  { id: 'castrum',         x: 832, y: 470, w: 80, h: 60, type: 'castrum',     level: 8,  district: 'military' },
-  { id: 'wall_cast_l',     x: 800, y: 470, w:  8, h: 50, type: 'wall',        level: 8,  district: 'military' },
-  { id: 'wall_cast_r',     x: 880, y: 470, w:  8, h: 50, type: 'wall',        level: 8,  district: 'military' },
-  { id: 'wall_cast_top',   x: 840, y: 440, w: 80, h:  8, type: 'wall',        level: 8,  district: 'military' },
-  { id: 'watchtower_cast', x: 884, y: 442, w: 24, h: 56, type: 'watchtower',  level: 8,  district: 'military' },
-  { id: 'torch_cast_l',    x: 822, y: 488, w:  8, h: 16, type: 'torch',       level: 8,  district: 'military' },
-  { id: 'torch_cast_r',    x: 858, y: 488, w:  8, h: 16, type: 'torch',       level: 8,  district: 'military' },
-  { id: 'floor_via_m1',    x: 760, y: 420, w: 24, h: 20, type: 'floor',       level: 8,  district: 'military' },
-  { id: 'floor_via_m2',    x: 760, y: 443, w: 24, h: 20, type: 'floor',       level: 8,  district: 'military' },
-  { id: 'floor_via_m3',    x: 760, y: 466, w: 24, h: 20, type: 'floor',       level: 8,  district: 'military' },
+  { id: 'torch_res1',      x: 460, y: 355, w:  8, h: 16, type: 'torch',       level: 6,  district: 'residential' },
+  // --- Civic (NE, x:720-870, y:280-360) ---
+  { id: 'shrine_civic',    x: 760, y: 290, w: 32, h: 28, type: 'shrine',      level: 3,  district: 'civic' },
+  { id: 'floor_sacra',     x: 760, y: 320, w: 32, h: 22, type: 'floor',       level: 3,  district: 'civic' },
+  // --- Market (E, x:850-960, y:350-420) ---
+  { id: 'market_1',        x: 870, y: 370, w: 44, h: 34, type: 'market',      level: 7,  district: 'market' },
+  { id: 'torch_mkt1a',     x: 844, y: 362, w:  8, h: 16, type: 'torch',       level: 7,  district: 'market' },
+  { id: 'torch_mkt1b',     x: 896, y: 362, w:  8, h: 16, type: 'torch',       level: 7,  district: 'market' },
+  // --- Bath (SW, x:440-520, y:450-510) ---
+  { id: 'bath_1',          x: 480, y: 480, w: 70, h: 52, type: 'bath',        level: 8,  district: 'bath' },
+  // --- Military (SE, x:800-920, y:440-530) ---
+  { id: 'castrum',         x: 860, y: 490, w: 80, h: 60, type: 'castrum',     level: 8,  district: 'military' },
+  { id: 'wall_cast_l',     x: 818, y: 490, w:  8, h: 50, type: 'wall',        level: 8,  district: 'military' },
+  { id: 'wall_cast_r',     x: 902, y: 490, w:  8, h: 50, type: 'wall',        level: 8,  district: 'military' },
+  { id: 'wall_cast_top',   x: 860, y: 458, w: 80, h:  8, type: 'wall',        level: 8,  district: 'military' },
+  { id: 'watchtower_cast', x: 908, y: 458, w: 24, h: 56, type: 'watchtower',  level: 8,  district: 'military' },
+  { id: 'torch_cast_l',    x: 840, y: 510, w:  8, h: 16, type: 'torch',       level: 8,  district: 'military' },
+  { id: 'torch_cast_r',    x: 880, y: 510, w:  8, h: 16, type: 'torch',       level: 8,  district: 'military' },
+
   // ERA 2: CITY (Lv 9-17)
-  { id: 'aqueduct_1',      x: 540, y: 218, w: 20, h: 40, type: 'aqueduct',    level: 9,  district: 'sacred' },
-  { id: 'aqueduct_2',      x: 600, y: 218, w: 20, h: 40, type: 'aqueduct',    level: 9,  district: 'sacred' },
-  { id: 'aqueduct_3',      x: 660, y: 218, w: 20, h: 40, type: 'aqueduct',    level: 9,  district: 'sacred' },
+  // --- Sacred (N, x:400-780, y:180-280) ---
+  { id: 'aqueduct_1',      x: 480, y: 218, w: 20, h: 40, type: 'aqueduct',    level: 9,  district: 'sacred' },
+  { id: 'aqueduct_2',      x: 560, y: 218, w: 20, h: 40, type: 'aqueduct',    level: 9,  district: 'sacred' },
+  { id: 'aqueduct_3',      x: 640, y: 218, w: 20, h: 40, type: 'aqueduct',    level: 9,  district: 'sacred' },
   { id: 'bridge_north',    x: 600, y: 288, w: 32, h: 32, type: 'bridge',      level: 9,  district: 'sacred' },
-  { id: 'temple_main',     x: 820, y: 303, w: 70, h: 50, type: 'temple',      level: 10, district: 'civic' },
-  { id: 'torch_temp_l',    x: 780, y: 313, w:  8, h: 16, type: 'torch',       level: 10, district: 'civic' },
-  { id: 'torch_temp_r',    x: 860, y: 313, w:  8, h: 16, type: 'torch',       level: 10, district: 'civic' },
-  { id: 'flower_temp_l',   x: 778, y: 293, w: 20, h: 16, type: 'flower',      level: 10, district: 'civic' },
-  { id: 'flower_temp_r',   x: 862, y: 293, w: 20, h: 16, type: 'flower',      level: 10, district: 'civic' },
-  { id: 'floor_temp_1',    x: 792, y: 338, w: 26, h: 22, type: 'floor',       level: 10, district: 'civic' },
-  { id: 'floor_temp_2',    x: 820, y: 338, w: 26, h: 22, type: 'floor',       level: 10, district: 'civic' },
-  { id: 'floor_temp_3',    x: 848, y: 338, w: 26, h: 22, type: 'floor',       level: 10, district: 'civic' },
-  { id: 'market_2',        x: 900, y: 375, w: 44, h: 34, type: 'market',      level: 10, district: 'market' },
-  { id: 'plaza_1',         x: 580, y: 410, w: 26, h: 22, type: 'floor',       level: 10, district: 'center' },
-  { id: 'plaza_2',         x: 600, y: 410, w: 26, h: 22, type: 'floor',       level: 10, district: 'center' },
-  { id: 'plaza_3',         x: 620, y: 410, w: 26, h: 22, type: 'floor',       level: 10, district: 'center' },
-  { id: 'plaza_4',         x: 580, y: 434, w: 26, h: 22, type: 'floor',       level: 10, district: 'center' },
-  { id: 'plaza_5',         x: 600, y: 434, w: 26, h: 22, type: 'floor',       level: 10, district: 'center' },
-  { id: 'plaza_6',         x: 620, y: 434, w: 26, h: 22, type: 'floor',       level: 10, district: 'center' },
+  // --- Civic temple (NE, moved to avoid shrine overlap) ---
+  { id: 'temple_main',     x: 840, y: 310, w: 70, h: 50, type: 'temple',      level: 10, district: 'civic' },
+  { id: 'torch_temp_l',    x: 800, y: 320, w:  8, h: 16, type: 'torch',       level: 10, district: 'civic' },
+  { id: 'torch_temp_r',    x: 880, y: 320, w:  8, h: 16, type: 'torch',       level: 10, district: 'civic' },
+  { id: 'floor_temp',      x: 840, y: 345, w: 32, h: 22, type: 'floor',       level: 10, district: 'civic' },
+  // --- Market 2 (further east) ---
+  { id: 'market_2',        x: 930, y: 370, w: 44, h: 34, type: 'market',      level: 10, district: 'market' },
+  // --- Center plaza (single large floor, not 6 tiles) ---
+  { id: 'plaza_floor',     x: 600, y: 420, w: 64, h: 48, type: 'floor',       level: 10, district: 'center' },
   { id: 'lantern_civ_n',   x: 700, y: 370, w: 10, h: 20, type: 'lantern',     level: 10, district: 'civic' },
-  { id: 'lantern_civ_s',   x: 700, y: 402, w: 10, h: 20, type: 'lantern',     level: 10, district: 'civic' },
-  { id: 'floor_e_road1',   x: 740, y: 380, w: 32, h: 32, type: 'floor',       level: 10, district: 'civic' },
-  { id: 'floor_e_road2',   x: 740, y: 400, w: 32, h: 32, type: 'floor',       level: 10, district: 'civic' },
-  { id: 'flower_tg1',      x: 760, y: 362, w: 20, h: 16, type: 'flower',      level: 11, district: 'civic' },
-  { id: 'flower_tg2',      x: 820, y: 362, w: 20, h: 16, type: 'flower',      level: 11, district: 'civic' },
-  { id: 'flower_tg3',      x: 880, y: 362, w: 20, h: 16, type: 'flower',      level: 11, district: 'civic' },
-  { id: 'mosaic_temp',     x: 820, y: 220, w: 28, h: 20, type: 'mosaic',      level: 11, district: 'civic' },
-  { id: 'lantern_tg',      x: 820, y: 268, w: 10, h: 20, type: 'lantern',     level: 11, district: 'civic' },
-  { id: 'lantern_via1',    x: 640, y: 392, w: 10, h: 20, type: 'lantern',     level: 12, district: 'center' },
-  { id: 'lantern_via2',    x: 700, y: 392, w: 10, h: 20, type: 'lantern',     level: 12, district: 'center' },
-  { id: 'lantern_via3',    x: 760, y: 392, w: 10, h: 20, type: 'lantern',     level: 12, district: 'center' },
-  { id: 'well_sw2',        x: 460, y: 460, w: 24, h: 24, type: 'well',        level: 12, district: 'residential' },
-  { id: 'house_res3',      x: 500, y: 340, w: 44, h: 34, type: 'house',       level: 12, district: 'residential' },
-  { id: 'house_res4',      x: 500, y: 308, w: 44, h: 34, type: 'house',       level: 12, district: 'residential' },
-  { id: 'watchtower_e',    x: 940, y: 392, w: 20, h: 44, type: 'watchtower',  level: 13, district: 'civic' },
-  { id: 'wall_mil1',       x: 770, y: 435, w: 32, h:  8, type: 'wall',        level: 13, district: 'military' },
-  { id: 'wall_mil2',       x: 802, y: 435, w: 32, h:  8, type: 'wall',        level: 13, district: 'military' },
-  { id: 'wall_mil3',       x: 834, y: 435, w: 32, h:  8, type: 'wall',        level: 13, district: 'military' },
-  { id: 'watchtower_sw',   x: 570, y: 435, w: 20, h: 44, type: 'watchtower',  level: 13, district: 'military' },
-  { id: 'market_3',        x: 740, y: 375, w: 44, h: 34, type: 'market',      level: 13, district: 'market' },
-  { id: 'aqueduct_4',      x: 480, y: 218, w: 20, h: 40, type: 'aqueduct',    level: 14, district: 'sacred' },
-  { id: 'aqueduct_5',      x: 420, y: 218, w: 20, h: 40, type: 'aqueduct',    level: 14, district: 'sacred' },
-  { id: 'bath_2',          x: 740, y: 368, w: 70, h: 52, type: 'bath',        level: 14, district: 'civic' },
-  { id: 'flower_bath2a',   x: 704, y: 368, w: 20, h: 16, type: 'flower',      level: 14, district: 'civic' },
-  { id: 'flower_bath2b',   x: 776, y: 368, w: 20, h: 16, type: 'flower',      level: 14, district: 'civic' },
-  { id: 'bridge_mkt',      x: 660, y: 410, w: 32, h: 32, type: 'bridge',      level: 14, district: 'center' },
-  { id: 'forum_main',      x: 620, y: 450, w: 80, h: 60, type: 'forum',       level: 15, district: 'center' },
-  { id: 'floor_forum_nw',  x: 570, y: 415, w: 32, h: 32, type: 'floor',       level: 15, district: 'center' },
-  { id: 'floor_forum_ne',  x: 670, y: 415, w: 32, h: 32, type: 'floor',       level: 15, district: 'center' },
-  { id: 'floor_forum_sw',  x: 570, y: 485, w: 32, h: 32, type: 'floor',       level: 15, district: 'center' },
-  { id: 'floor_forum_se',  x: 670, y: 485, w: 32, h: 32, type: 'floor',       level: 15, district: 'center' },
-  { id: 'lantern_f_nw',    x: 570, y: 412, w: 10, h: 20, type: 'lantern',     level: 15, district: 'center' },
-  { id: 'lantern_f_ne',    x: 670, y: 412, w: 10, h: 20, type: 'lantern',     level: 15, district: 'center' },
-  { id: 'mosaic_forum1',   x: 592, y: 494, w: 32, h: 32, type: 'mosaic',      level: 15, district: 'center' },
-  { id: 'mosaic_forum2',   x: 620, y: 494, w: 32, h: 32, type: 'mosaic',      level: 15, district: 'center' },
-  { id: 'mosaic_forum3',   x: 648, y: 494, w: 32, h: 32, type: 'mosaic',      level: 15, district: 'center' },
-  { id: 'granary_2',       x: 730, y: 450, w: 58, h: 44, type: 'granary',     level: 15, district: 'military' },
-  { id: 'arch_east',       x: 900, y: 392, w: 48, h: 52, type: 'arch',        level: 15, district: 'market' },
-  { id: 'watchtower_far',  x: 970, y: 370, w: 24, h: 56, type: 'watchtower',  level: 15, district: 'market' },
-  { id: 'house_row1',      x: 410, y: 360, w: 44, h: 34, type: 'house',       level: 16, district: 'residential' },
-  { id: 'house_row2',      x: 460, y: 360, w: 44, h: 34, type: 'house',       level: 16, district: 'residential' },
-  { id: 'house_row3',      x: 510, y: 360, w: 44, h: 34, type: 'house',       level: 16, district: 'residential' },
-  { id: 'house_row4',      x: 560, y: 360, w: 44, h: 34, type: 'house',       level: 16, district: 'residential' },
-  { id: 'torch_row1',      x: 435, y: 378, w:  8, h: 16, type: 'torch',       level: 16, district: 'residential' },
-  { id: 'torch_row2',      x: 485, y: 378, w:  8, h: 16, type: 'torch',       level: 16, district: 'residential' },
-  { id: 'torch_row3',      x: 535, y: 378, w:  8, h: 16, type: 'torch',       level: 16, district: 'residential' },
-  { id: 'house_deep1',     x: 410, y: 326, w: 44, h: 34, type: 'house',       level: 16, district: 'residential' },
-  { id: 'house_deep2',     x: 460, y: 326, w: 44, h: 34, type: 'house',       level: 16, district: 'residential' },
-  { id: 'house_deep3',     x: 510, y: 326, w: 44, h: 34, type: 'house',       level: 16, district: 'residential' },
-  { id: 'torch_deep1',     x: 435, y: 344, w:  8, h: 16, type: 'torch',       level: 16, district: 'residential' },
-  { id: 'torch_deep2',     x: 485, y: 344, w:  8, h: 16, type: 'torch',       level: 16, district: 'residential' },
-  { id: 'fence_res_back',  x: 458, y: 308, w:180, h:  6, type: 'fence',       level: 16, district: 'residential' },
-  { id: 'library',         x: 760, y: 303, w: 72, h: 52, type: 'library',     level: 17, district: 'civic' },
-  { id: 'mosaic_lib',      x: 760, y: 333, w: 32, h: 32, type: 'mosaic',      level: 17, district: 'civic' },
-  { id: 'lantern_lib_l',   x: 726, y: 313, w: 10, h: 20, type: 'lantern',     level: 17, district: 'civic' },
-  { id: 'lantern_lib_r',   x: 794, y: 313, w: 10, h: 20, type: 'lantern',     level: 17, district: 'civic' },
+  // --- Residential expansion ---
+  { id: 'house_res3',      x: 540, y: 330, w: 44, h: 34, type: 'house',       level: 12, district: 'residential' },
+  { id: 'house_res4',      x: 430, y: 290, w: 44, h: 34, type: 'house',       level: 12, district: 'residential' },
+  { id: 'well_sw2',        x: 400, y: 420, w: 24, h: 24, type: 'well',        level: 12, district: 'residential' },
+  // --- Military walls (between civic and military, y:435 line) ---
+  { id: 'wall_mil1',       x: 780, y: 445, w: 32, h:  8, type: 'wall',        level: 13, district: 'military' },
+  { id: 'wall_mil2',       x: 812, y: 445, w: 32, h:  8, type: 'wall',        level: 13, district: 'military' },
+  { id: 'watchtower_e',    x: 960, y: 390, w: 20, h: 44, type: 'watchtower',  level: 13, district: 'market' },
+  { id: 'watchtower_sw',   x: 380, y: 450, w: 20, h: 44, type: 'watchtower',  level: 13, district: 'farm' },
+  // --- Market 3 (south of market row, no overlap with bath_2) ---
+  { id: 'market_3',        x: 870, y: 420, w: 44, h: 34, type: 'market',      level: 13, district: 'market' },
+  // --- Bath 2 (civic, moved away from market_3) ---
+  { id: 'bath_2',          x: 700, y: 440, w: 70, h: 52, type: 'bath',        level: 14, district: 'civic' },
+  { id: 'aqueduct_4',      x: 400, y: 218, w: 20, h: 40, type: 'aqueduct',    level: 14, district: 'sacred' },
+  { id: 'aqueduct_5',      x: 720, y: 218, w: 20, h: 40, type: 'aqueduct',    level: 14, district: 'sacred' },
+  { id: 'bridge_mkt',      x: 660, y: 400, w: 32, h: 32, type: 'bridge',      level: 14, district: 'center' },
+  // --- Forum (center south) ---
+  { id: 'forum_main',      x: 600, y: 480, w: 80, h: 60, type: 'forum',       level: 15, district: 'center' },
+  { id: 'lantern_f_nw',    x: 555, y: 475, w: 10, h: 20, type: 'lantern',     level: 15, district: 'center' },
+  { id: 'lantern_f_ne',    x: 645, y: 475, w: 10, h: 20, type: 'lantern',     level: 15, district: 'center' },
+  { id: 'mosaic_forum',    x: 600, y: 520, w: 48, h: 22, type: 'mosaic',      level: 15, district: 'center' },
+  // --- Granary 2 (military supply) ---
+  { id: 'granary_2',       x: 780, y: 500, w: 58, h: 44, type: 'granary',     level: 15, district: 'military' },
+  { id: 'arch_east',       x: 960, y: 420, w: 48, h: 52, type: 'arch',        level: 15, district: 'market' },
+  // --- Residential row (NW block, spaced 55px apart) ---
+  { id: 'house_row1',      x: 420, y: 370, w: 44, h: 34, type: 'house',       level: 16, district: 'residential' },
+  { id: 'house_row2',      x: 475, y: 370, w: 44, h: 34, type: 'house',       level: 16, district: 'residential' },
+  { id: 'house_row3',      x: 530, y: 370, w: 44, h: 34, type: 'house',       level: 16, district: 'residential' },
+  { id: 'torch_row1',      x: 448, y: 390, w:  8, h: 16, type: 'torch',       level: 16, district: 'residential' },
+  { id: 'torch_row2',      x: 503, y: 390, w:  8, h: 16, type: 'torch',       level: 16, district: 'residential' },
+  { id: 'fence_res_back',  x: 475, y: 308, w:160, h:  6, type: 'fence',       level: 16, district: 'residential' },
+  // --- Library (civic, moved north to avoid shrine overlap) ---
+  { id: 'library',         x: 720, y: 310, w: 72, h: 52, type: 'library',     level: 17, district: 'civic' },
+  { id: 'lantern_lib_l',   x: 682, y: 320, w: 10, h: 20, type: 'lantern',     level: 17, district: 'civic' },
+
   // ERA 3: ATLANTIS (Lv 18-25)
-  { id: 'arena',           x: 820, y: 455, w: 84, h: 64, type: 'arena',       level: 18, district: 'military' },
-  { id: 'torch_arena_l',   x: 780, y: 485, w:  8, h: 16, type: 'torch',       level: 18, district: 'military' },
-  { id: 'torch_arena_r',   x: 860, y: 485, w:  8, h: 16, type: 'torch',       level: 18, district: 'military' },
-  { id: 'floor_arena',     x: 820, y: 489, w: 32, h: 32, type: 'floor',       level: 18, district: 'military' },
-  { id: 'mosaic_arena_l',  x: 800, y: 507, w: 28, h: 20, type: 'mosaic',      level: 19, district: 'military' },
-  { id: 'mosaic_arena_r',  x: 840, y: 507, w: 28, h: 20, type: 'mosaic',      level: 19, district: 'military' },
-  { id: 'lantern_aren_l',  x: 770, y: 485, w: 10, h: 20, type: 'lantern',     level: 19, district: 'military' },
-  { id: 'lantern_aren_r',  x: 870, y: 485, w: 10, h: 20, type: 'lantern',     level: 19, district: 'military' },
-  { id: 'house_mil1',      x: 730, y: 420, w: 44, h: 34, type: 'house',       level: 19, district: 'military' },
-  { id: 'house_mil2',      x: 680, y: 435, w: 44, h: 34, type: 'house',       level: 19, district: 'military' },
+  // --- Arena (SE, below castrum with proper spacing) ---
+  { id: 'arena',           x: 780, y: 530, w: 84, h: 64, type: 'arena',       level: 18, district: 'military' },
+  { id: 'torch_arena_l',   x: 735, y: 545, w:  8, h: 16, type: 'torch',       level: 18, district: 'military' },
+  { id: 'torch_arena_r',   x: 825, y: 545, w:  8, h: 16, type: 'torch',       level: 18, district: 'military' },
+  { id: 'mosaic_arena',    x: 780, y: 570, w: 48, h: 22, type: 'mosaic',      level: 19, district: 'military' },
+  // --- Military houses (between center and military) ---
+  { id: 'house_mil1',      x: 740, y: 480, w: 44, h: 34, type: 'house',       level: 19, district: 'military' },
+  { id: 'house_mil2',      x: 680, y: 500, w: 44, h: 34, type: 'house',       level: 19, district: 'military' },
+  // --- Villa NW ---
   { id: 'villa_nw',        x: 460, y: 268, w: 72, h: 52, type: 'villa',       level: 20, district: 'residential' },
-  { id: 'flower_vnw_l',    x: 418, y: 278, w: 20, h: 16, type: 'flower',      level: 20, district: 'residential' },
-  { id: 'flower_vnw_r',    x: 502, y: 278, w: 20, h: 16, type: 'flower',      level: 20, district: 'residential' },
-  { id: 'flower_vnw_l2',   x: 418, y: 258, w: 20, h: 16, type: 'flower',      level: 20, district: 'residential' },
-  { id: 'flower_vnw_r2',   x: 502, y: 258, w: 20, h: 16, type: 'flower',      level: 20, district: 'residential' },
-  { id: 'mosaic_villa_nw', x: 460, y: 300, w: 32, h: 32, type: 'mosaic',      level: 20, district: 'residential' },
-  { id: 'lantern_vnw',     x: 500, y: 296, w: 10, h: 20, type: 'lantern',     level: 20, district: 'residential' },
-  { id: 'senate_forum',    x: 560, y: 450, w: 64, h: 48, type: 'forum',       level: 21, district: 'center' },
-  { id: 'torch_sen_l',     x: 520, y: 470, w:  8, h: 16, type: 'torch',       level: 21, district: 'center' },
-  { id: 'torch_sen_r',     x: 624, y: 470, w:  8, h: 16, type: 'torch',       level: 21, district: 'center' },
-  { id: 'floor_sen1',      x: 540, y: 482, w: 24, h: 20, type: 'floor',       level: 21, district: 'center' },
-  { id: 'floor_sen2',      x: 564, y: 482, w: 24, h: 20, type: 'floor',       level: 21, district: 'center' },
-  { id: 'floor_sen3',      x: 588, y: 482, w: 24, h: 20, type: 'floor',       level: 21, district: 'center' },
-  { id: 'floor_sen4',      x: 612, y: 482, w: 24, h: 20, type: 'floor',       level: 21, district: 'center' },
-  { id: 'arch_harbor',     x: 980, y: 410, w: 48, h: 52, type: 'arch',        level: 22, district: 'market' },
-  { id: 'lantern_h1',      x: 860, y: 410, w: 10, h: 20, type: 'lantern',     level: 22, district: 'market' },
-  { id: 'lantern_h2',      x: 900, y: 410, w: 10, h: 20, type: 'lantern',     level: 22, district: 'market' },
-  { id: 'lantern_h3',      x: 940, y: 410, w: 10, h: 20, type: 'lantern',     level: 22, district: 'market' },
-  { id: 'aqueduct_ga1',    x: 360, y: 210, w: 20, h: 40, type: 'aqueduct',    level: 23, district: 'sacred' },
-  { id: 'aqueduct_ga2',    x: 420, y: 210, w: 20, h: 40, type: 'aqueduct',    level: 23, district: 'sacred' },
-  { id: 'aqueduct_ga3',    x: 600, y: 210, w: 20, h: 40, type: 'aqueduct',    level: 23, district: 'sacred' },
-  { id: 'aqueduct_ga4',    x: 720, y: 210, w: 20, h: 40, type: 'aqueduct',    level: 23, district: 'sacred' },
-  { id: 'aqueduct_ga5',    x: 780, y: 210, w: 20, h: 40, type: 'aqueduct',    level: 23, district: 'sacred' },
-  { id: 'bridge_grand_l',  x: 450, y: 258, w: 32, h: 32, type: 'bridge',      level: 23, district: 'sacred' },
-  { id: 'bridge_grand_r',  x: 680, y: 258, w: 32, h: 32, type: 'bridge',      level: 23, district: 'sacred' },
+  { id: 'flower_vnw_l',    x: 415, y: 268, w: 20, h: 16, type: 'flower',      level: 20, district: 'residential' },
+  { id: 'flower_vnw_r',    x: 505, y: 268, w: 20, h: 16, type: 'flower',      level: 20, district: 'residential' },
+  { id: 'lantern_vnw',     x: 505, y: 300, w: 10, h: 20, type: 'lantern',     level: 20, district: 'residential' },
+  // --- Senate forum (south center, below main forum) ---
+  { id: 'senate_forum',    x: 520, y: 510, w: 64, h: 48, type: 'forum',       level: 21, district: 'center' },
+  { id: 'torch_sen_l',     x: 484, y: 520, w:  8, h: 16, type: 'torch',       level: 21, district: 'center' },
+  { id: 'torch_sen_r',     x: 556, y: 520, w:  8, h: 16, type: 'torch',       level: 21, district: 'center' },
+  // --- Harbor arch (far east) ---
+  { id: 'arch_harbor',     x: 980, y: 430, w: 48, h: 52, type: 'arch',        level: 22, district: 'market' },
+  { id: 'lantern_h1',      x: 930, y: 430, w: 10, h: 20, type: 'lantern',     level: 22, district: 'market' },
+  // --- Grand aqueduct expansion ---
+  { id: 'aqueduct_ga1',    x: 340, y: 210, w: 20, h: 40, type: 'aqueduct',    level: 23, district: 'sacred' },
+  { id: 'aqueduct_ga2',    x: 780, y: 210, w: 20, h: 40, type: 'aqueduct',    level: 23, district: 'sacred' },
+  { id: 'bridge_grand_l',  x: 450, y: 260, w: 32, h: 32, type: 'bridge',      level: 23, district: 'sacred' },
+  { id: 'bridge_grand_r',  x: 720, y: 260, w: 32, h: 32, type: 'bridge',      level: 23, district: 'sacred' },
+  // --- Palace (sacred center) ---
   { id: 'palace',          x: 600, y: 242, w: 60, h: 44, type: 'villa',       level: 24, district: 'sacred' },
-  { id: 'mosaic_pal1',     x: 562, y: 294, w: 28, h: 20, type: 'mosaic',      level: 24, district: 'sacred' },
-  { id: 'mosaic_pal2',     x: 618, y: 294, w: 28, h: 20, type: 'mosaic',      level: 24, district: 'sacred' },
-  { id: 'flower_pal_l',    x: 556, y: 262, w: 20, h: 16, type: 'flower',      level: 24, district: 'sacred' },
-  { id: 'flower_pal_r',    x: 644, y: 262, w: 20, h: 16, type: 'flower',      level: 24, district: 'sacred' },
-  { id: 'flower_pal_l2',   x: 556, y: 282, w: 20, h: 16, type: 'flower',      level: 24, district: 'sacred' },
-  { id: 'flower_pal_r2',   x: 644, y: 282, w: 20, h: 16, type: 'flower',      level: 24, district: 'sacred' },
-  { id: 'lantern_pal_l',   x: 580, y: 300, w: 10, h: 20, type: 'lantern',     level: 24, district: 'sacred' },
-  { id: 'lantern_pal_r',   x: 620, y: 300, w: 10, h: 20, type: 'lantern',     level: 24, district: 'sacred' },
+  { id: 'flower_pal_l',    x: 555, y: 252, w: 20, h: 16, type: 'flower',      level: 24, district: 'sacred' },
+  { id: 'flower_pal_r',    x: 645, y: 252, w: 20, h: 16, type: 'flower',      level: 24, district: 'sacred' },
+  { id: 'lantern_pal_l',   x: 565, y: 290, w: 10, h: 20, type: 'lantern',     level: 24, district: 'sacred' },
+  { id: 'lantern_pal_r',   x: 635, y: 290, w: 10, h: 20, type: 'lantern',     level: 24, district: 'sacred' },
+  // --- Grand temple (top of sacred hill) ---
   { id: 'grand_temple',    x: 600, y: 183, w: 56, h: 40, type: 'temple',      level: 25, district: 'sacred' },
-  { id: 'flower_gt_l',     x: 540, y: 203, w: 20, h: 16, type: 'flower',      level: 25, district: 'sacred' },
-  { id: 'flower_gt_r',     x: 660, y: 203, w: 20, h: 16, type: 'flower',      level: 25, district: 'sacred' },
-  { id: 'arch_south',      x: 820, y: 435, w: 48, h: 52, type: 'arch',        level: 25, district: 'military' },
-  { id: 'villa_sw',        x: 430, y: 435, w: 60, h: 44, type: 'villa',       level: 25, district: 'residential' },
-  { id: 'mosaic_proc1',    x: 570, y: 368, w: 28, h: 20, type: 'mosaic',      level: 25, district: 'sacred' },
-  { id: 'mosaic_proc2',    x: 600, y: 368, w: 28, h: 20, type: 'mosaic',      level: 25, district: 'sacred' },
-  { id: 'mosaic_proc3',    x: 630, y: 368, w: 28, h: 20, type: 'mosaic',      level: 25, district: 'sacred' },
-  { id: 'lantern_proc_l',  x: 550, y: 368, w: 10, h: 20, type: 'lantern',     level: 25, district: 'sacred' },
-  { id: 'lantern_proc_r',  x: 650, y: 368, w: 10, h: 20, type: 'lantern',     level: 25, district: 'sacred' },
+  // --- Arch south (military gate, below wall line — no castrum overlap) ---
+  { id: 'arch_south',      x: 860, y: 545, w: 48, h: 52, type: 'arch',        level: 25, district: 'military' },
+  // --- Villa SW ---
+  { id: 'villa_sw',        x: 380, y: 480, w: 60, h: 44, type: 'villa',       level: 25, district: 'residential' },
+  // --- Sacred procession mosaics ---
+  { id: 'mosaic_proc',     x: 600, y: 340, w: 48, h: 22, type: 'mosaic',      level: 25, district: 'sacred' },
+  { id: 'lantern_proc_l',  x: 555, y: 340, w: 10, h: 20, type: 'lantern',     level: 25, district: 'sacred' },
+  { id: 'lantern_proc_r',  x: 645, y: 340, w: 10, h: 20, type: 'lantern',     level: 25, district: 'sacred' },
 ];
 
 // Blueprint types — cost wood, stone, crystals
@@ -1644,6 +1600,7 @@ let _delta = 0.016; // seconds per frame
 let _fpsSmooth = 60;
 let _lowFpsFrames = 0;
 let _particleCap = 300;
+let _jumpingFish = [];
 
 function draw() {
   // Engine camera bounds for culling
@@ -1664,6 +1621,8 @@ function draw() {
   if (_lowFpsFrames > 60 && _particleCap > 150) {
     _particleCap = 150;
     console.warn('[perf] FPS below 30 for 60+ frames — particle cap reduced to 150');
+  } else if (_lowFpsFrames === 0 && _particleCap < 300) {
+    _particleCap = min(_particleCap + 1, 300);
   }
 
   // ─── MUSIC (plays on all screens) ───
@@ -2267,8 +2226,11 @@ function drawInner() {
       }
     }
 
-    // Golden hour color grading — atmospheric tint over the world
-    if (!state.conquest.active && !state.adventure.active) drawColorGrading();
+    // Night darkness + golden hour color grading — atmospheric tint over the world
+    if (!state.conquest.active && !state.adventure.active) {
+      drawNightOverlay();
+      drawColorGrading();
+    }
 
     if (!screenshotMode) {
       drawHUD();
@@ -2770,23 +2732,22 @@ function drawOcean() {
   }
 
   // Jumping fish
-  if (frameCount % 180 === 0 || (typeof jumpingFish === 'undefined')) {
-    if (typeof jumpingFish === 'undefined') jumpingFish = [];
-    if (jumpingFish.length < 2) {
-      jumpingFish.push({
+  if (frameCount % 180 === 0) {
+    if (_jumpingFish.length < 2) {
+      _jumpingFish.push({
         x: random(width * 0.1, width * 0.9),
         y: oceanTop + random(30, height - oceanTop - 30),
         phase: 0, size: random(3, 6),
       });
     }
   }
-  if (typeof jumpingFish !== 'undefined') {
+  {
     noStroke();
-    for (let i = jumpingFish.length - 1; i >= 0; i--) {
-      let f = jumpingFish[i];
+    for (let i = _jumpingFish.length - 1; i >= 0; i--) {
+      let f = _jumpingFish[i];
       f.phase += 0.08;
       let jumpY = -sin(f.phase) * 18;
-      if (f.phase > PI) { jumpingFish.splice(i, 1); continue; }
+      if (f.phase > PI) { _jumpingFish.splice(i, 1); continue; }
       let fy2 = f.y + jumpY;
       let fx2 = floor(f.x), fy3 = floor(fy2);
       fill(165, 185, 205, 185);
@@ -2810,9 +2771,9 @@ function drawAmbientShips() {
     for (let i = 0; i < 4; i++) {
       _ambientShips.push({
         angle: random(TWO_PI),
-        dist: random(600, 1000),
-        speed: random(0.0003, 0.0008) * (random() > 0.5 ? 1 : -1),
-        size: random(1.0, 1.8),
+        dist: random(340, 480),
+        speed: random(0.0002, 0.0005) * (random() > 0.5 ? 1 : -1),
+        size: random(1.4, 2.2),
         type: floor(random(3)), // 0=trireme, 1=merchant, 2=fishing
       });
     }
@@ -3586,8 +3547,16 @@ function updateWeather(dt) {
 }
 
 let raindrops = [];
+let _stormWindOffset = 0; // subtle horizontal drift during storms
 function drawWeatherEffects() {
   let w = state.weather;
+
+  // Drift storms get full rain + dark overlay even when weather.type isn't 'rain'
+  if (stormActive && w.type !== 'rain') {
+    _drawStormRain();
+    return; // storm visuals override other weather
+  }
+
   if (w.type === 'clear') return;
 
   if (w.type === 'rain') {
@@ -3684,6 +3653,71 @@ function drawWeatherEffects() {
   }
   // Cap raindrop array
   if (raindrops.length > 300) raindrops.splice(0, 100);
+}
+
+// ─── DRIFT STORM RAIN ──────────────────────────────────────────────────
+function _drawStormRain() {
+  let intensity = 0.95;
+  noStroke();
+
+  // Dark gray-blue sky overlay — heavier than normal rain
+  fill(12, 16, 28, 70);
+  rect(0, 0, width, height);
+  // Extra sky darkening
+  fill(10, 18, 35, 50);
+  rect(0, 0, width, height * 0.55);
+
+  // Subtle wind wobble — horizontal offset that oscillates
+  _stormWindOffset = sin(frameCount * 0.015) * 2.5 + cos(frameCount * 0.037) * 1.2;
+
+  // Spawn heavy raindrops — 2x normal rain rate
+  for (let i = 0; i < 18; i++) {
+    raindrops.push({
+      x: random(-80, width + 80), y: random(-40, -5),
+      speed: random(10, 18),
+      len: random(8, 16),
+      wind: random(-2.5, -1.2), // steeper diagonal in storms
+    });
+  }
+
+  // Draw and update raindrops
+  stroke(130, 170, 210, 130);
+  strokeWeight(1.5);
+  for (let i = raindrops.length - 1; i >= 0; i--) {
+    let r = raindrops[i];
+    let wx = r.wind || -1.5;
+    line(r.x, r.y, r.x + wx * 4, r.y + r.len);
+    r.y += r.speed;
+    r.x += wx;
+    if (r.y > height) {
+      // Splash
+      if (r.y < height * 0.85 && random() < 0.35) {
+        noStroke();
+        fill(130, 170, 210, 55);
+        circle(r.x, height * 0.75 + random(-20, 20), random(2, 5));
+        stroke(130, 170, 210, 130);
+        strokeWeight(1.5);
+      }
+      raindrops.splice(i, 1);
+    }
+  }
+  noStroke();
+
+  // Ground puddle reflections
+  fill(90, 130, 170, 18);
+  for (let pi = 0; pi < 6; pi++) {
+    let ppx = w2sX(WORLD.islandCX + sin(pi * 1.8) * 180);
+    let ppy = w2sY(WORLD.islandCY + cos(pi * 1.3) * 40);
+    let shimmer = sin(frameCount * 0.06 + pi) * 0.3 + 0.7;
+    ellipse(ppx, ppy, 30 + pi * 8, 8 * shimmer);
+  }
+
+  // Desaturation wash
+  fill(35, 40, 55, 18);
+  rect(0, 0, width, height);
+
+  // Cap raindrop array (higher cap for storms)
+  if (raindrops.length > 500) raindrops.splice(0, 150);
 }
 
 // ─── HEART MILESTONES ────────────────────────────────────────────────────
@@ -5563,18 +5597,16 @@ function drawAmbientHouses() {
   let bright = getSkyBrightness();
   let cx = WORLD.islandCX, cy = WORLD.islandCY;
 
-  // Fixed positions for ambient houses — fill gaps between main buildings
+  // Fixed positions for ambient houses — sparse fill in gaps, avoid CITY_SLOTS zones
   let ambientSlots = [
-    // NW residential fill
-    { x: 380, y: 350 }, { x: 380, y: 380 }, { x: 420, y: 380 },
-    { x: 350, y: 370 }, { x: 350, y: 400 },
-    // East of center fill
-    { x: 700, y: 420 }, { x: 730, y: 440 }, { x: 680, y: 460 },
-    // South fill
-    { x: 550, y: 500 }, { x: 580, y: 510 }, { x: 620, y: 500 },
-    { x: 650, y: 510 }, { x: 680, y: 490 },
-    // NE civic fill
-    { x: 720, y: 330 }, { x: 750, y: 345 },
+    // W edge fill (away from farm buildings)
+    { x: 300, y: 380 }, { x: 300, y: 420 },
+    // NW fill (below residential row)
+    { x: 350, y: 400 },
+    // S edge fill (below forum area)
+    { x: 550, y: 540 }, { x: 620, y: 545 },
+    // SE fill (between center and military)
+    { x: 680, y: 530 },
   ];
 
   // Only draw slots that are on the island
@@ -9085,15 +9117,17 @@ function updateParticles(dt) {
     }
   }
 
-  // Storm rain (screen-space)
-  if (stormActive && frameCount % 3 === 0) {
-    particles.push({
-      x: random(width), y: random(-20, height * 0.5),
-      vx: random(-1, -3), vy: random(1, 4),
-      life: random(30, 70), maxLife: 70,
-      type: 'rain', size: random(1, 2),
-      r: 100, g: 160, b: 220, world: false,
-    });
+  // Storm rain particles (supplemental — main rain is in _drawStormRain)
+  if (stormActive && frameCount % 2 === 0) {
+    for (let _ri = 0; _ri < 3; _ri++) {
+      particles.push({
+        x: random(width), y: random(-20, height * 0.3),
+        vx: random(-2, -4), vy: random(3, 7),
+        life: random(30, 70), maxLife: 70,
+        type: 'rain', size: random(1, 2),
+        r: 100, g: 160, b: 220, world: false,
+      });
+    }
   }
 
   // Hard cap: prevent particle explosion
@@ -9635,6 +9669,17 @@ function spawnSeasonFanfare(seasonIdx) {
   triggerScreenShake(4, 10);
 }
 
+// ─── NIGHT DARKNESS OVERLAY ──────────────────────────────────────────────
+function drawNightOverlay() {
+  let bright = getSkyBrightness(); // 0 = deep night, 1 = full day
+  if (bright >= 1) return; // no overlay needed during day
+  // Max darkness at night: ~65% opacity dark blue
+  let darkness = (1 - bright) * 0.65;
+  noStroke();
+  fill(10, 12, 40, darkness * 255);
+  rect(0, 0, width, height);
+}
+
 // ─── JUICE: GOLDEN HOUR COLOR GRADING ────────────────────────────────────
 function drawColorGrading() {
   let h = state.time / 60;
@@ -9757,10 +9802,14 @@ function genLightningBranches(x) {
 function drawLightning() {
   lightningBolts.forEach(l => {
     let a = map(l.life, 0, l.maxLife, 0, 1);
-    // Full-screen flash on fresh strike
-    if (l.life > l.maxLife - 3) {
+    // Full-screen flash on fresh strike — bright white then quick fade
+    if (l.life > l.maxLife - 2) {
       noStroke();
-      fill(220, 230, 255, 60 * a);
+      fill(230, 235, 255, 140);
+      rect(0, 0, width, height);
+    } else if (l.life > l.maxLife - 4) {
+      noStroke();
+      fill(200, 215, 240, 50 * a);
       rect(0, 0, width, height);
     }
     // Outer glow pass
@@ -10572,6 +10621,10 @@ function updateShake(dt) {
     shakeY = random(-3, 3) * (shakeTimer / 20);
   } else {
     shakeX = 0; shakeY = 0;
+  }
+  // Subtle wind sway during drift storms
+  if (stormActive) {
+    shakeX += _stormWindOffset;
   }
 }
 
@@ -15381,6 +15434,12 @@ function keyPressed() {
     if (state.tradeRouteUI) { state.tradeRouteUI = false; return; }
     if (state.legia && state.legia.legiaUIOpen) { state.legia.legiaUIOpen = false; return; }
     if (state.activeEvent && state.activeEvent.data && state.activeEvent.data.shopOpen) { state.activeEvent.data.shopOpen = false; return; }
+    if (state.naturalistOpen) { state.naturalistOpen = false; return; }
+    if (empireDashOpen) { empireDashOpen = false; return; }
+    if (inventoryOpen) { inventoryOpen = false; return; }
+    if (typeof skillTreeOpen !== 'undefined' && skillTreeOpen) { skillTreeOpen = false; return; }
+    if (state.codexOpen) { state.codexOpen = false; return; }
+    if (state.journalOpen) { state.journalOpen = false; return; }
     saveGame();
     gameScreen = 'menu';
     menuFadeIn = 0;
@@ -15744,10 +15803,10 @@ function keyPressed() {
     if (state.crystalShrine && dist(state.player.x, state.player.y, state.crystalShrine.x, state.crystalShrine.y) < 55) {
       if (state.narrativeFlags && !state.narrativeFlags['rite_mare_nostrum']) {
         let lvlOk = (state.islandLevel || 0) >= 25;
-        let heartsOk = state.npc && state.npc.hearts >= 8 &&
-                       state.marcus && state.marcus.hearts >= 8 &&
-                       state.vesta && state.vesta.hearts >= 8 &&
-                       state.felix && state.felix.hearts >= 8;
+        let heartsOk = state.npc && state.npc.hearts >= 10 &&
+                       state.marcus && state.marcus.hearts >= 10 &&
+                       state.vesta && state.vesta.hearts >= 10 &&
+                       state.felix && state.felix.hearts >= 10;
         if (lvlOk && heartsOk) {
           state.narrativeFlags['rite_mare_nostrum'] = true;
           trackMilestone('game_complete');
@@ -15980,15 +16039,6 @@ function keyPressed() {
 
   // Dialog advance with Space
   if (dialogState.active && key === ' ') { advanceDialog(); return; }
-
-  // Close overlays with ESC
-  if (keyCode === 27) {
-    if (state.naturalistOpen) { state.naturalistOpen = false; return; }
-    if (empireDashOpen) { empireDashOpen = false; return; }
-    if (inventoryOpen) { inventoryOpen = false; return; }
-    if (typeof skillTreeOpen !== 'undefined' && skillTreeOpen) { skillTreeOpen = false; return; }
-    if (dialogState.active) { dialogState.active = false; return; }
-  }
 
   // Empire Dashboard toggle (Tab)
   if (keyCode === 9) {
@@ -16795,7 +16845,6 @@ function loadGame() {
       if (d.conquestIsleRY) state.conquest.isleRY = d.conquestIsleRY;
     }
     // Imperial Bridge
-    updatePortPositions(); // always recompute from current island size
     if (d.imperialBridge) {
       state.imperialBridge = d.imperialBridge;
     }
@@ -16901,6 +16950,7 @@ function loadGame() {
     }
     state.solar = d.solar || 80; state.maxSolar = d.maxSolar || 100;
     state.islandLevel = d.islandLevel || 1; state.islandRX = d.islandRX || WORLD.islandRX; state.islandRY = d.islandRY || WORLD.islandRY;
+    updatePortPositions(); // recompute from restored island size (must be after islandRX/RY load)
     if (d.pyramidLevel) state.pyramid.level = d.pyramidLevel;
     state.player.x = d.playerX || WORLD.islandCX; state.player.y = d.playerY || WORLD.islandCY;
     if (d.playerFacing) state.player.facing = d.playerFacing;
@@ -16950,6 +17000,25 @@ function loadGame() {
         if (BLUEPRINTS[b.type]) {
           b.w = BLUEPRINTS[b.type].w;
           b.h = BLUEPRINTS[b.type].h;
+        }
+      });
+    }
+    // Migrate city layout v2: snap buildings to new CITY_SLOTS positions
+    if (state.buildings && state.islandLevel >= 2) {
+      let claimed = new Set();
+      state.buildings.forEach(b => {
+        // Find the closest matching CITY_SLOT for this building type
+        let bestSlot = null, bestDist = 999;
+        CITY_SLOTS.forEach(s => {
+          if (s.type !== b.type || s.level > state.islandLevel) return;
+          if (claimed.has(s.id)) return;
+          let d = Math.abs(s.x - b.x) + Math.abs(s.y - b.y);
+          if (d < bestDist) { bestDist = d; bestSlot = s; }
+        });
+        if (bestSlot && bestDist < 300) {
+          b.x = bestSlot.x; b.y = bestSlot.y;
+          b.w = bestSlot.w; b.h = bestSlot.h;
+          claimed.add(bestSlot.id);
         }
       });
     }
@@ -17693,7 +17762,7 @@ function placeBuildingChecked(bld) {
       return true;
     }
   }
-  state.buildings.push(bld); // fallback: place anyway
+  // Skip placement if no valid position found — prevents overlaps
   return false;
 }
 

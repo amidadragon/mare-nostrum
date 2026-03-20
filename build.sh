@@ -27,6 +27,10 @@ FILES=(
   combat.js
   economy.js
   debug.js
+  libs/p5.min.js
+  libs/p5.sound.min.js
+  libs/cinzel-latin.woff2
+  libs/cinzel-latin-ext.woff2
   menu_bg.webp
   favicon.ico
   manifest.json
@@ -45,9 +49,9 @@ done
 mkdir -p "$DIST_DIR"
 rm -f "$DIST_DIR/$ZIP_NAME"
 
-# Create flat zip (no subdirectory)
+# Create zip (preserving libs/ subdirectory)
 cd "$PROJECT_DIR"
-zip -j "$DIST_DIR/$ZIP_NAME" "${FILES[@]}"
+zip "$DIST_DIR/$ZIP_NAME" "${FILES[@]}"
 
 echo ""
 echo "Built: dist/$ZIP_NAME"

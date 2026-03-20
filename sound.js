@@ -1147,6 +1147,8 @@ class SoundManager {
       // Fishing — watery plops
       case 'fish_cast': play('sine', 400, 0.16, 200, 250, { attack: 15 }); break;  // descending plop
       case 'fish_catch':playTwo('sine', 392, 523, 0.20, 300, 120); break;  // G4->C5 happy catch
+      case 'bobber_plop': play('sine', 320, 0.14, 140, 180, { attack: 8 }); break;  // bobber hitting water
+      case 'fish_bite': play('sine', 500, 0.22, 200, 150, { attack: 5 }); play('triangle', 180, 0.12, 100, 200, { attack: 10 }); break;  // sharp tug + underwater thud
       // Magical — shimmery tones
       case 'crystal':   playTwo('sine', 880, 1319, 0.22, 500, 150); break;  // A5->E6 sparkle
       case 'heart':     playTwo('sine', 659, 880, 0.16, 400, 130); break;   // E5->A5 warm
@@ -1395,6 +1397,22 @@ class SoundManager {
           if (s4) { s4.osc.setType('triangle'); s4.osc.freq(75); s4._vol = 0.18 * vol; s4._peak = s4._vol;
             s4.gain.amp(0,0); s4.gain.amp(s4._vol, 0.005); this._sfxEnvSmooth(s4, 75, 45, 90, { attack: 5 }); }
         }, 600);
+        break;
+      case 'visitor_arrive':
+        playTwo('sine', 523, 659, 0.16, 300, 120);  // C5->E5 welcoming major third
+        setTimeout(() => {
+          let sv = this._getSfxSlot();
+          if (sv) { sv.osc.setType('sine'); sv.osc.freq(784); sv._vol = 0.14 * vol; sv._peak = sv._vol;
+            sv.gain.amp(0,0); sv.gain.amp(sv._vol, 0.01); this._sfxEnvSmooth(sv, 784, 784, 350, { attack: 10 }); }
+        }, 220);
+        break;
+      case 'crystal_charge':
+        play('sine', 880, 0.16, 1320, 400, { attack: 30 });  // rising shimmer
+        setTimeout(() => {
+          let sc = this._getSfxSlot();
+          if (sc) { sc.osc.setType('sine'); sc.osc.freq(885); sc._vol = 0.12 * vol; sc._peak = sc._vol;
+            sc.gain.amp(0,0); sc.gain.amp(sc._vol, 0.03); this._sfxEnvSmooth(sc, 885, 1325, 400, { attack: 30 }); }
+        }, 5);
         break;
     }
   }

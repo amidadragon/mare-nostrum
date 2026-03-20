@@ -169,6 +169,7 @@ const Debug = {
           if (state.conquest.active) state.conquest.active = false;
           if (state.adventure.active) state.adventure.active = false;
           state.rowing.active = false;
+          state.progression.homeIslandReached = true;
           this.addLog('Teleported home', '#88ddff');
           break;
 

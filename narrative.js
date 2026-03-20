@@ -118,7 +118,7 @@ const MAIN_QUEST_CHAPTERS = [
     desc: 'Unite all islands. Build the final bridge. Become Imperator.',
     objectives: [
       { id: 'island_25', desc: 'Reach island level 25', check: () => state.islandLevel >= 25 },
-      { id: 'all_hearts_max', desc: 'Full hearts with all NPCs', check: () => state.npc.hearts >= 8 && state.marcus && state.marcus.hearts >= 8 && state.vesta && state.vesta.hearts >= 8 && state.felix && state.felix.hearts >= 8 },
+      { id: 'all_hearts_max', desc: 'Full hearts with all NPCs', check: () => state.npc.hearts >= 10 && state.marcus && state.marcus.hearts >= 10 && state.vesta && state.vesta.hearts >= 10 && state.felix && state.felix.hearts >= 10 },
       { id: 'final_ceremony', desc: 'Perform the Rite of Mare Nostrum', interact: 'rite_mare_nostrum' },
     ],
     reward: { gold: 200 },

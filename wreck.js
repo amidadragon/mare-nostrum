@@ -113,7 +113,7 @@ function updateWreckBeach(dt) {
   updateWreckAmbient(dt);
 
   // ── Tutorial hints ────────────────────────────────────────────────────────
-  if (!state.progression.tutorialsSeen.gather && state.wreck.scavNodes.some(n => !n.collected)) {
+  if (state.progression.tutorialsSeen && !state.progression.tutorialsSeen.gather && state.wreck.scavNodes.some(n => !n.collected)) {
     let nearest = getNearestScavNode();
     if (nearest && dist(p.x, p.y, nearest.x, nearest.y) < 50) {
       showTutorialHint('Press E to gather', nearest.x, nearest.y - 20);
