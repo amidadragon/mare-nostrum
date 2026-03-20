@@ -279,14 +279,14 @@ const CITY_SLOTS = [
   { id: 'chest_mkt1b',     x: 836, y: 399, w: 24, h: 20, type: 'chest',       level: 7,  district: 'market' },
   { id: 'torch_mkt1a',     x: 784, y: 367, w:  8, h: 16, type: 'torch',       level: 7,  district: 'market' },
   { id: 'torch_mkt1b',     x: 836, y: 367, w:  8, h: 16, type: 'torch',       level: 7,  district: 'market' },
-  { id: 'bath_1',          x: 480, y: 460, w: 58, h: 44, type: 'bath',        level: 8,  district: 'bath' },
+  { id: 'bath_1',          x: 480, y: 460, w: 70, h: 52, type: 'bath',        level: 8,  district: 'bath' },
   { id: 'flower_bath1a',   x: 444, y: 460, w: 20, h: 16, type: 'flower',      level: 8,  district: 'bath' },
   { id: 'flower_bath1b',   x: 516, y: 460, w: 20, h: 16, type: 'flower',      level: 8,  district: 'bath' },
-  { id: 'castrum',         x: 840, y: 470, w: 64, h: 50, type: 'castrum',     level: 8,  district: 'military' },
+  { id: 'castrum',         x: 832, y: 470, w: 80, h: 60, type: 'castrum',     level: 8,  district: 'military' },
   { id: 'wall_cast_l',     x: 800, y: 470, w:  8, h: 50, type: 'wall',        level: 8,  district: 'military' },
   { id: 'wall_cast_r',     x: 880, y: 470, w:  8, h: 50, type: 'wall',        level: 8,  district: 'military' },
   { id: 'wall_cast_top',   x: 840, y: 440, w: 80, h:  8, type: 'wall',        level: 8,  district: 'military' },
-  { id: 'watchtower_cast', x: 884, y: 442, w: 20, h: 44, type: 'watchtower',  level: 8,  district: 'military' },
+  { id: 'watchtower_cast', x: 884, y: 442, w: 24, h: 56, type: 'watchtower',  level: 8,  district: 'military' },
   { id: 'torch_cast_l',    x: 822, y: 488, w:  8, h: 16, type: 'torch',       level: 8,  district: 'military' },
   { id: 'torch_cast_r',    x: 858, y: 488, w:  8, h: 16, type: 'torch',       level: 8,  district: 'military' },
   { id: 'floor_via_m1',    x: 760, y: 420, w: 24, h: 20, type: 'floor',       level: 8,  district: 'military' },
@@ -335,7 +335,7 @@ const CITY_SLOTS = [
   { id: 'market_3',        x: 740, y: 375, w: 44, h: 34, type: 'market',      level: 13, district: 'market' },
   { id: 'aqueduct_4',      x: 480, y: 218, w: 20, h: 40, type: 'aqueduct',    level: 14, district: 'sacred' },
   { id: 'aqueduct_5',      x: 420, y: 218, w: 20, h: 40, type: 'aqueduct',    level: 14, district: 'sacred' },
-  { id: 'bath_2',          x: 740, y: 368, w: 58, h: 44, type: 'bath',        level: 14, district: 'civic' },
+  { id: 'bath_2',          x: 740, y: 368, w: 70, h: 52, type: 'bath',        level: 14, district: 'civic' },
   { id: 'flower_bath2a',   x: 704, y: 368, w: 20, h: 16, type: 'flower',      level: 14, district: 'civic' },
   { id: 'flower_bath2b',   x: 776, y: 368, w: 20, h: 16, type: 'flower',      level: 14, district: 'civic' },
   { id: 'bridge_mkt',      x: 660, y: 410, w: 32, h: 32, type: 'bridge',      level: 14, district: 'center' },
@@ -351,7 +351,7 @@ const CITY_SLOTS = [
   { id: 'mosaic_forum3',   x: 648, y: 494, w: 32, h: 32, type: 'mosaic',      level: 15, district: 'center' },
   { id: 'granary_2',       x: 730, y: 450, w: 58, h: 44, type: 'granary',     level: 15, district: 'military' },
   { id: 'arch_east',       x: 900, y: 392, w: 48, h: 52, type: 'arch',        level: 15, district: 'market' },
-  { id: 'watchtower_far',  x: 970, y: 370, w: 20, h: 44, type: 'watchtower',  level: 15, district: 'market' },
+  { id: 'watchtower_far',  x: 970, y: 370, w: 24, h: 56, type: 'watchtower',  level: 15, district: 'market' },
   { id: 'house_row1',      x: 410, y: 360, w: 44, h: 34, type: 'house',       level: 16, district: 'residential' },
   { id: 'house_row2',      x: 460, y: 360, w: 44, h: 34, type: 'house',       level: 16, district: 'residential' },
   { id: 'house_row3',      x: 510, y: 360, w: 44, h: 34, type: 'house',       level: 16, district: 'residential' },
@@ -365,12 +365,12 @@ const CITY_SLOTS = [
   { id: 'torch_deep1',     x: 435, y: 344, w:  8, h: 16, type: 'torch',       level: 16, district: 'residential' },
   { id: 'torch_deep2',     x: 485, y: 344, w:  8, h: 16, type: 'torch',       level: 16, district: 'residential' },
   { id: 'fence_res_back',  x: 458, y: 308, w:180, h:  6, type: 'fence',       level: 16, district: 'residential' },
-  { id: 'library',         x: 760, y: 303, w: 58, h: 44, type: 'library',     level: 17, district: 'civic' },
+  { id: 'library',         x: 760, y: 303, w: 72, h: 52, type: 'library',     level: 17, district: 'civic' },
   { id: 'mosaic_lib',      x: 760, y: 333, w: 32, h: 32, type: 'mosaic',      level: 17, district: 'civic' },
   { id: 'lantern_lib_l',   x: 726, y: 313, w: 10, h: 20, type: 'lantern',     level: 17, district: 'civic' },
   { id: 'lantern_lib_r',   x: 794, y: 313, w: 10, h: 20, type: 'lantern',     level: 17, district: 'civic' },
   // ERA 3: ATLANTIS (Lv 18-25)
-  { id: 'arena',           x: 820, y: 455, w: 68, h: 54, type: 'arena',       level: 18, district: 'military' },
+  { id: 'arena',           x: 820, y: 455, w: 84, h: 64, type: 'arena',       level: 18, district: 'military' },
   { id: 'torch_arena_l',   x: 780, y: 485, w:  8, h: 16, type: 'torch',       level: 18, district: 'military' },
   { id: 'torch_arena_r',   x: 860, y: 485, w:  8, h: 16, type: 'torch',       level: 18, district: 'military' },
   { id: 'floor_arena',     x: 820, y: 489, w: 32, h: 32, type: 'floor',       level: 18, district: 'military' },
@@ -439,7 +439,7 @@ const BLUEPRINTS = {
   lantern:{ name: 'Lucerna',  w: 10, h: 10, cost: { wood: 2, crystals: 1 },   key: '9', blocks: false },
   mosaic: { name: 'Mosaic',   w: 32, h: 32, cost: { stone: 3, crystals: 1 },key: '0', blocks: false },
   aqueduct:{ name: 'Aqueduct',w: 32, h: 12, cost: { stone: 4, wood: 2 },    key: '-', blocks: true },
-  bath:    { name: 'Balneum', w: 58, h: 44, cost: { stone: 8, wood: 4, crystals: 3 }, key: '=', blocks: true },
+  bath:    { name: 'Balneum', w: 70, h: 52, cost: { stone: 8, wood: 4, crystals: 3 }, key: '=', blocks: true },
   // Level 5+ (Governor)
   granary: { name: 'Granary',  w: 58, h: 44, cost: { stone: 6, wood: 4 },              key: '', blocks: true,  minLevel: 5 },
   well:    { name: 'Well',     w: 24, h: 24, cost: { stone: 4 },                        key: '', blocks: true,  minLevel: 5 },
@@ -448,18 +448,18 @@ const BLUEPRINTS = {
   market:  { name: 'Market',   w: 44, h: 34, cost: { wood: 6, stone: 3 },               key: '', blocks: true,  minLevel: 10 },
   // Level 15+ (Consul)
   forum:   { name: 'Forum',    w: 80, h: 60, cost: { stone: 15, gold: 50 },             key: '', blocks: true,  minLevel: 15 },
-  watchtower:{ name: 'Tower',  w: 20, h: 44, cost: { stone: 8, ironOre: 4 },            key: '', blocks: true,  minLevel: 15 },
+  watchtower:{ name: 'Tower',  w: 24, h: 56, cost: { stone: 8, ironOre: 4 },            key: '', blocks: true,  minLevel: 15 },
   // Level 20+ (Consul->Imperator)
   arch:    { name: 'Arch',     w: 48, h: 52, cost: { stone: 20, gold: 100, crystals: 10 }, key: '', blocks: false, minLevel: 20 },
   villa:   { name: 'Villa',    w: 72, h: 52, cost: { stone: 15, wood: 10, gold: 75 },   key: '', blocks: true,  minLevel: 20 },
   // New building types
   shrine:  { name: 'Sacellum', w: 32, h: 28, cost: { stone: 5, crystals: 3 },           key: '', blocks: true,  minLevel: 3 },
   house:   { name: 'Domus',    w: 44, h: 34, cost: { wood: 4, stone: 3 },                key: '', blocks: true,  minLevel: 6 },
-  library: { name: 'Biblioth', w: 58, h: 44, cost: { stone: 8, wood: 4, crystals: 2 },   key: '', blocks: true,  minLevel: 12 },
-  arena:   { name: 'Arena',    w: 68, h: 54, cost: { stone: 12, wood: 6, gold: 30 },     key: '', blocks: true,  minLevel: 15 },
+  library: { name: 'Biblioth', w: 72, h: 52, cost: { stone: 8, wood: 4, crystals: 2 },   key: '', blocks: true,  minLevel: 12 },
+  arena:   { name: 'Arena',    w: 84, h: 64, cost: { stone: 12, wood: 6, gold: 30 },     key: '', blocks: true,  minLevel: 15 },
   campfire:{ name: 'Focus',    w: 16, h: 16, cost: { wood: 1 },                           key: '', blocks: false },
   // Level 8+ (auto-spawned, not player-buildable)
-  castrum: { name: 'Castrum',  w: 64, h: 50, cost: { stone: 10, wood: 8, ironOre: 5, gold: 50 }, key: '', blocks: true, minLevel: 8 },
+  castrum: { name: 'Castrum',  w: 80, h: 60, cost: { stone: 10, wood: 8, ironOre: 5, gold: 50 }, key: '', blocks: true, minLevel: 8 },
 };
 
 function initState() {
@@ -2071,6 +2071,12 @@ function drawInner() {
     drawWorldObjectsSorted();
     drawCitySmoke();
     drawLaundryLines();
+    drawStreetWear();
+    drawGranaryArea();
+    drawAmphoraStacks();
+    drawTempleIncense();
+    drawForumBanner();
+    drawWindowGlow();
     drawRuinOverlays();
     drawCompanionTrail();
     drawPlayerTrail();
@@ -5345,6 +5351,211 @@ function drawLaundryLines() {
   });
 }
 
+function drawGranaryArea() {
+  if (state.islandLevel < 5) return;
+  // Find granary buildings from CITY_SLOTS
+  let granaries = state.buildings.filter(b => b.type === 'granary');
+  granaries.forEach(g => {
+    let gsx = w2sX(g.x);
+    let gsy = w2sY(g.y);
+    // 2 grain carts parked near granary
+    let cartOffsets = [{ dx: -g.w * 0.6, dy: g.h * 0.6 }, { dx: g.w * 0.5, dy: g.h * 0.55 }];
+    cartOffsets.forEach((co, ci) => {
+      let cx3 = floor(gsx + co.dx);
+      let cy3 = floor(gsy + co.dy);
+      push();
+      translate(cx3, cy3);
+      noStroke();
+      // Cart body — rough wood planks
+      fill(95, 68, 32);
+      rect(-9, -4, 18, 7, 1);
+      // Plank lines
+      stroke(78, 55, 25, 100);
+      strokeWeight(0.5);
+      line(-7, -4, -7, 3);
+      line(-1, -4, -1, 3);
+      line(5, -4, 5, 3);
+      noStroke();
+      // Grain sacks — lumpy beige
+      fill(192, 172, 128);
+      ellipse(-3, -6, 7, 5);
+      ellipse(3, -7, 6, 5);
+      ellipse(0, -8, 5, 4);
+      fill(178, 158, 115);
+      ellipse(-3, -5, 6, 3);
+      ellipse(3, -6, 5, 3);
+      // Wheels — 2 dark circles with spokes
+      fill(55, 40, 20);
+      circle(-7, 3, 7);
+      circle(7, 3, 7);
+      fill(75, 55, 28);
+      circle(-7, 3, 4);
+      circle(7, 3, 4);
+      stroke(55, 40, 20, 180);
+      strokeWeight(0.6);
+      for (let sp4 = 0; sp4 < 4; sp4++) {
+        let sang2 = sp4 * HALF_PI + frameCount * 0 + ci * 0.5; // static
+        line(-7 + cos(sang2) * 1, 3 + sin(sang2) * 1, -7 + cos(sang2) * 3.5, 3 + sin(sang2) * 3.5);
+        line(7 + cos(sang2) * 1, 3 + sin(sang2) * 1, 7 + cos(sang2) * 3.5, 3 + sin(sang2) * 3.5);
+      }
+      noStroke();
+      pop();
+    });
+  });
+}
+
+function drawAmphoraStacks() {
+  if (state.islandLevel < 10) return;
+  let markets = state.buildings.filter(b => b.type === 'market');
+  markets.forEach(m => {
+    let msx = w2sX(m.x);
+    let msy = w2sY(m.y);
+    // Stack of amphoras left of market
+    push();
+    translate(floor(msx - m.w * 0.7), floor(msy + m.h * 0.3));
+    noStroke();
+    // Bottom row — 3 amphoras
+    for (let ai = 0; ai < 3; ai++) {
+      let ax = (ai - 1) * 7;
+      let aColor = ai % 2 === 0 ? [175, 95, 48] : [162, 82, 38];
+      fill(aColor[0], aColor[1], aColor[2]);
+      // Body — tapered oval
+      ellipse(ax, 0, 5, 8);
+      // Neck
+      rect(ax - 1, -5, 2, 3);
+      // Rim
+      rect(ax - 1.5, -7, 3, 2, 1);
+      // Toe (pointy bottom)
+      fill(aColor[0] - 20, aColor[1] - 20, aColor[2] - 10);
+      ellipse(ax, 3, 3, 4);
+      // Handle lines
+      stroke(aColor[0] - 30, aColor[1] - 25, aColor[2] - 15, 150);
+      strokeWeight(0.7);
+      line(ax - 2, -3, ax - 3, 0);
+      line(ax + 2, -3, ax + 3, 0);
+      noStroke();
+    }
+    // Top row — 2 amphoras slightly offset
+    for (let ai = 0; ai < 2; ai++) {
+      let ax = (ai - 0.5) * 7;
+      fill(168, 88, 42);
+      ellipse(ax, -8, 5, 8);
+      rect(ax - 1, -13, 2, 3);
+      rect(ax - 1.5, -15, 3, 2, 1);
+    }
+    pop();
+  });
+}
+
+function drawTempleIncense() {
+  if (state.islandLevel < 10) return;
+  let temples = state.buildings.filter(b => b.type === 'temple');
+  temples.forEach(t => {
+    let tsx = w2sX(t.x);
+    let tsy = w2sY(t.y);
+    // Incense rises from temple door — slow, wispy, purple-tinted
+    let incAlpha = map(getSkyBrightness(), 0.0, 0.7, 55, 15);
+    for (let ii = 0; ii < 2; ii++) {
+      let iPhase = frameCount * 0.008 + ii * 1.8 + t.x * 0.005;
+      for (let ip = 0; ip < 6; ip++) {
+        let iFrac = ip / 5;
+        let ix = tsx + floor(sin(iPhase + ip * 0.5) * (1 + ip * 0.8)) + (ii - 0.5) * 4;
+        let iy = tsy - floor(t.h * 0.3) - floor(ip * 9 + (frameCount * 0.3 + ii * 18) % 54);
+        let iSize = 1 + floor(iFrac * 1.5);
+        let ia = incAlpha * (1 - iFrac * 0.85);
+        // Purple-grey tint — distinct from house smoke (grey-white) and castrum smoke (dark grey)
+        fill(165, 148, 175, ia);
+        noStroke();
+        rect(ix, iy, iSize, iSize);
+      }
+    }
+  });
+}
+
+function drawStreetWear() {
+  if (state.islandLevel < 8) return;
+  let bright = getSkyBrightness();
+  if (bright < 0.15) return;  // invisible at deep night
+  let cx4 = WORLD.islandCX;
+  let cy4 = WORLD.islandCY;
+  // The Decumanus runs east-west through city center
+  // Draw subtle darkened ellipses where foot traffic wears the ground
+  let wearPoints = [
+    { wx: cx4 - 80, wy: cy4 + 30 },
+    { wx: cx4, wy: cy4 + 30 },
+    { wx: cx4 + 80, wy: cy4 + 30 },
+    { wx: cx4 + 140, wy: cy4 + 40 },
+    { wx: cx4 - 140, wy: cy4 + 40 },
+    // Forum approach
+    { wx: cx4, wy: cy4 + 60 },
+    { wx: cx4, wy: cy4 + 10 },
+  ];
+  noStroke();
+  wearPoints.forEach(wp => {
+    let wsx = w2sX(wp.wx);
+    let wsy = w2sY(wp.wy);
+    fill(80, 68, 45, 18);
+    ellipse(wsx, wsy, 28, 12);
+    fill(70, 58, 38, 10);
+    ellipse(wsx, wsy, 44, 18);
+  });
+}
+
+function drawForumBanner() {
+  if (state.islandLevel < 15) return;
+  let forums = state.buildings.filter(b => b.type === 'forum');
+  forums.forEach(f => {
+    let fsx = w2sX(f.x);
+    let fsy = w2sY(f.y);
+    push();
+    translate(floor(fsx - f.w * 0.25), floor(fsy - f.h * 0.55));
+    noStroke();
+    // Pole
+    fill(110, 85, 45);
+    rect(-1, -22, 2, 22);
+    // Crossbar
+    rect(-5, -22, 10, 2);
+    // Animated banner — wind ripple
+    let bannerWave = sin(frameCount * 0.035 + f.x * 0.01) * 2.5;
+    fill(175, 28, 28);
+    beginShape();
+    vertex(0, -21);
+    vertex(10 + bannerWave, -20);
+    vertex(10 + bannerWave * 0.6, -15);
+    vertex(0, -14);
+    endShape(CLOSE);
+    // SPQR text suggestion — 3 tiny horizontal lines
+    fill(220, 195, 60, 200);
+    rect(2, -20, 6, 1);
+    rect(2, -18, 5, 1);
+    rect(2, -16, 6, 1);
+    pop();
+  });
+}
+
+function drawWindowGlow() {
+  let bright = getSkyBrightness();
+  if (bright >= 0.35) return;
+  let nightStr = map(bright, 0, 0.35, 1, 0);
+
+  state.buildings.forEach(b => {
+    if (b.type === 'forum' || b.type === 'temple' || b.type === 'granary' ||
+        b.type === 'market' || b.type === 'shrine' || b.type === 'villa' ||
+        b.type === 'arch') {
+      let sx5 = w2sX(b.x);
+      let sy5 = w2sY(b.y);
+      noStroke();
+      // 2-3 small warm rectangles per building — windows/doorways
+      fill(255, 195, 80, 50 * nightStr);
+      rect(floor(sx5 - b.w * 0.15), floor(sy5 - b.h * 0.25), 5, 4);
+      rect(floor(sx5 + b.w * 0.1), floor(sy5 - b.h * 0.25), 5, 4);
+      // Soft bloom
+      fill(255, 175, 60, 18 * nightStr);
+      ellipse(sx5, sy5 - b.h * 0.1, b.w * 0.5, b.h * 0.3);
+    }
+  });
+}
+
 // ─── Y-SORTED WORLD RENDERING ────────────────────────────────────────────
 function drawWorldObjectsSorted() {
   // Layer 0: ground-level flat objects (always behind characters)
@@ -5894,40 +6105,87 @@ function drawOneBuilding(b) {
         rect(4, -11.5, 8, 1.5, 1);
         break;
       case 'bath':
-        // Roman bath house (balneum) — heated pool with columns
+        // Roman bath house (balneum) — grand heated pool with steam
         noStroke();
-        // Foundation
-        fill(170, 160, 145);
-        rect(-24, -8, 48, 36, 2);
-        fill(180, 172, 158);
-        rect(-22, -6, 44, 32, 2);
-        // Pool
-        fill(55, 120, 170, 180);
-        rect(-18, -2, 36, 22, 3);
-        // Water shimmer
-        let bathPhase = frameCount * 0.04 + b.x * 0.1;
-        fill(80, 160, 210, 60 + sin(bathPhase) * 30);
-        rect(-14, 2, 12, 3, 2);
-        rect(4, 6, 12, 3, 2);
-        // Steam
-        for (let si = 0; si < 3; si++) {
-          let steamY = -10 - sin(frameCount * 0.02 + si * 2) * 8;
-          let steamA = 40 - abs(sin(frameCount * 0.02 + si * 2)) * 20;
-          fill(255, 255, 255, steamA);
-          ellipse(-8 + si * 8, steamY, 6 + sin(si + frameCount * 0.03) * 2, 4);
+        // Shadow
+        fill(0, 0, 0, 30);
+        rect(-bw / 2 + 3, bh / 2 - 3, bw, 7);
+        // Foundation — lower step
+        fill(165, 155, 138);
+        rect(-bw / 2 + 2, bh / 2 - 8, bw - 4, 8, 1);
+        // Main building body
+        fill(190, 180, 162);
+        rect(-bw / 2, -bh / 2 + 12, bw, bh - 12, 1);
+        // Stone course texture
+        stroke(172, 162, 145, 45);
+        strokeWeight(0.5);
+        for (let bly = -bh / 2 + 18; bly < bh / 2 - 10; bly += 6) {
+          line(-bw / 2 + 1, bly, bw / 2 - 1, bly);
         }
-        // Mini columns
-        fill(190, 185, 172);
-        rect(-22, -6, 3, 12, 1);
-        rect(19, -6, 3, 12, 1);
-        // Column caps
-        fill(200, 195, 180);
-        rect(-23, -8, 5, 3, 1);
-        rect(18, -8, 5, 3, 1);
-        // Steps
-        fill(175, 168, 155);
-        rect(-10, 22, 20, 4, 1);
-        rect(-8, 25, 16, 3, 1);
+        noStroke();
+        // Blue pool — main feature, large and prominent
+        fill(42, 105, 162, 195);
+        rect(-bw / 2 + 12, -bh / 2 + 22, bw - 24, bh - 42, 3);
+        // Pool shimmer
+        let bathPhase2 = frameCount * 0.04 + b.x * 0.1;
+        fill(75, 148, 210, 55 + sin(bathPhase2) * 28);
+        rect(-bw / 2 + 16, -bh / 2 + 26, 16, 4, 2);
+        fill(90, 165, 225, 35 + sin(bathPhase2 * 1.4) * 18);
+        rect(-bw / 2 + 36, -bh / 2 + 30, 12, 3, 2);
+        // Pool ripple highlight
+        fill(120, 185, 230, 25 + sin(bathPhase2 * 0.9) * 12);
+        rect(-bw / 2 + 14, -bh / 2 + 28, bw - 30, 2);
+        // 4 entrance columns — proper spacing for wider building
+        fill(200, 192, 175);
+        let bathCols = [-bw/2 + 4, -bw/2 + 4 + (bw-8)/3, -bw/2 + 4 + 2*(bw-8)/3, bw/2 - 4];
+        bathCols.forEach(bcx => {
+          rect(bcx - 3, -bh / 2 + 2, 6, 22, 1);
+          fill(210, 202, 185);
+          rect(bcx - 4, -bh / 2 + 1, 8, 3, 1);  // capital
+          fill(200, 192, 175);
+          rect(bcx - 3.5, -bh / 2 + 22, 7, 2, 1); // base
+          fill(200, 192, 175);
+        });
+        // Entablature
+        fill(180, 172, 155);
+        rect(-bw / 2 + 2, -bh / 2 + 8, bw - 4, 6, 1);
+        // Pediment
+        fill(168, 160, 145);
+        beginShape();
+        vertex(-bw / 2 + 2, -bh / 2 + 8);
+        vertex(0, -bh / 2 - 6);
+        vertex(bw / 2 - 2, -bh / 2 + 8);
+        endShape(CLOSE);
+        // Steam particles — multiple rising columns
+        {
+          let steamAlpha = map(getSkyBrightness(), 0.2, 1.0, 50, 18);
+          for (let si3 = 0; si3 < 4; si3++) {
+            let sPhase3 = frameCount * 0.018 + si3 * 2.4 + b.x * 0.007;
+            for (let sp3 = 0; sp3 < 5; sp3++) {
+              let sFrac3 = sp3 / 4;
+              let sx3 = -bw / 2 + 18 + si3 * (bw - 32) / 3 + floor(sin(sPhase3 + sp3 * 0.6) * (1.5 + sp3));
+              let sy3 = -bh / 2 + 20 - floor(sp3 * 8 + (frameCount * 0.5 + si3 * 20) % 32);
+              let sSize = 2 + floor(sFrac3 * 2);
+              let sa3 = steamAlpha * (1 - sFrac3 * 0.8);
+              fill(230, 235, 240, sa3);
+              noStroke();
+              rect(sx3, sy3, sSize, sSize);
+            }
+          }
+        }
+        // Steps to entrance
+        fill(175, 168, 152);
+        rect(-12, bh / 2 - 10, 24, 4, 1);
+        rect(-10, bh / 2 - 6, 20, 3, 1);
+        // Night: blue pool glow
+        if (getSkyBrightness() < 0.35) {
+          let bathNight = map(getSkyBrightness(), 0, 0.35, 1, 0);
+          fill(40, 100, 175, 30 * bathNight);
+          rect(-bw / 2 + 10, -bh / 2 + 20, bw - 22, bh - 40);
+          fill(255, 190, 80, 40 * bathNight);
+          rect(-bw / 2 + 14, -bh / 2 + 16, 8, 5);
+          rect(bw / 2 - 22, -bh / 2 + 16, 8, 5);
+        }
         break;
 
       case 'granary':
@@ -6220,6 +6478,7 @@ function drawOneBuilding(b) {
         fill(40, 30, 18, 200);
         rect(-1.5, -bh / 2 + 16, 3, 7, 1);
         rect(-1.5, -bh / 2 + 30, 3, 7, 1);
+        rect(-1.5, -bh / 2 + 44, 3, 7, 1);
         // Battlement
         fill(185, 177, 162);
         rect(-bw / 2, -bh / 2 + 6, bw, 6, 1);
@@ -6446,67 +6705,189 @@ function drawOneBuilding(b) {
 
       case 'library': {
         noStroke();
-        fill(0, 0, 0, 25);
-        rect(-bw / 2 + 2, bh / 2 - 3, bw, 5);
-        fill(195, 185, 168);
-        rect(-bw / 2, -bh / 2 + 6, bw, bh - 6, 1);
+        // Shadow
+        fill(0, 0, 0, 28);
+        rect(-bw / 2 + 3, bh / 2 - 3, bw, 6);
+        // Main body — warm marble
+        fill(205, 198, 180);
+        rect(-bw / 2, -bh / 2 + 10, bw, bh - 10, 1);
+        // Stone course lines
+        stroke(185, 178, 162, 50);
+        strokeWeight(0.5);
+        for (let ly2 = -bh / 2 + 16; ly2 < bh / 2; ly2 += 6) {
+          line(-bw / 2 + 1, ly2, bw / 2 - 1, ly2);
+        }
+        noStroke();
+        // Scroll niches — 6 arched recesses along facade
         for (let lni = 0; lni < 6; lni++) {
           let lnx = -bw / 2 + 8 + lni * ((bw - 16) / 5);
-          fill(55, 42, 28, 180);
-          rect(lnx, -bh / 2 + 12, 5, 8, 1);
-          fill(195, 175, 140);
-          rect(lnx + 1, -bh / 2 + 14, 3, 5, 1);
+          // Niche recess
+          fill(65, 52, 35, 180);
+          rect(lnx - 1, -bh / 2 + 14, 7, 12, 1);
+          // Niche arch top
+          fill(75, 60, 42, 160);
+          arc(lnx + 2.5, -bh / 2 + 14, 7, 6, PI, TWO_PI);
+          // Scroll silhouette inside niche
+          fill(195, 178, 142);
+          rect(lnx + 0.5, -bh / 2 + 17, 6, 7, 1);
+          // Scroll end caps (papyrus yellow)
+          fill(215, 195, 148);
+          rect(lnx, -bh / 2 + 17, 1.5, 7);
+          rect(lnx + 5, -bh / 2 + 17, 1.5, 7);
         }
-        fill(205, 198, 183);
-        rect(-8, -bh / 2 + 4, 5, bh - 10, 1);
-        rect(3, -bh / 2 + 4, 5, bh - 10, 1);
+        // 4 entrance columns — wider spacing on larger building
         fill(215, 208, 192);
-        rect(-9, -bh / 2 + 3, 7, 3, 1);
-        rect(2, -bh / 2 + 3, 7, 3, 1);
-        fill(180, 172, 158);
-        rect(-bw / 2, -bh / 2, bw, 8, 1);
-        fill(185, 177, 162);
-        for (let lpi = 0; lpi < 6; lpi++) {
-          let lpx = -bw / 2 + 2 + lpi * ((bw - 4) / 5);
-          rect(lpx, -bh / 2 - 3, 4, 4, 1);
+        let libColPositions = [-bw/2 + 5, -bw/2 + 5 + (bw-10)/3, -bw/2 + 5 + 2*(bw-10)/3, bw/2 - 5];
+        libColPositions.forEach(lcx => {
+          rect(lcx - 3, -bh / 2 + 2, 6, bh / 2 + 10, 1);
+          // Fluting
+          stroke(195, 188, 172, 60);
+          strokeWeight(0.4);
+          line(lcx - 1, -bh / 2 + 4, lcx - 1, bh / 2 - 12);
+          line(lcx + 1, -bh / 2 + 4, lcx + 1, bh / 2 - 12);
+          noStroke();
+          // Column capital
+          fill(225, 218, 202);
+          rect(lcx - 4, -bh / 2 + 1, 8, 3, 1);
+          // Base
+          fill(210, 203, 188);
+          rect(lcx - 3.5, bh / 2 - 14, 7, 2, 1);
+        });
+        // Entablature
+        fill(190, 182, 165);
+        rect(-bw / 2 + 2, -bh / 2 + 8, bw - 4, 5, 1);
+        // Pediment — triangular
+        fill(178, 170, 155);
+        beginShape();
+        vertex(-bw / 2 + 2, -bh / 2 + 8);
+        vertex(0, -bh / 2 - 10);
+        vertex(bw / 2 - 2, -bh / 2 + 8);
+        endShape(CLOSE);
+        // Owl symbol on pediment
+        fill(160, 152, 138);
+        circle(0, -bh / 2 + 1, 6);
+        fill(48, 42, 32);
+        circle(-1.2, -bh / 2 + 0.5, 1.8);
+        circle(1.2, -bh / 2 + 0.5, 1.8);
+        // Beak
+        fill(185, 155, 55);
+        triangle(0, -bh/2 + 1.5, -1, -bh/2 + 3, 1, -bh/2 + 3);
+        // Acroteria
+        fill(200, 158, 52, 180);
+        circle(-bw / 2 + 4, -bh / 2 + 7, 4);
+        circle(bw / 2 - 4, -bh / 2 + 7, 4);
+        circle(0, -bh / 2 - 11, 4);
+        // Entrance doorway
+        fill(45, 33, 18);
+        rect(-8, -bh / 2 + 13, 16, 16, 1);
+        arc(0, -bh / 2 + 13, 16, 10, PI, TWO_PI);
+        // Night: warm lamp glow through entrance
+        if (getSkyBrightness() < 0.35) {
+          let libNight = map(getSkyBrightness(), 0, 0.35, 1, 0);
+          fill(255, 205, 90, 60 * libNight);
+          rect(-7, -bh / 2 + 14, 14, 14);
+          fill(255, 190, 70, 25 * libNight);
+          ellipse(0, -bh / 2 + 26, 22, 14);
+          // Reading lamp windows
+          fill(255, 195, 80, 45 * libNight);
+          rect(-bw / 2 + 16, -bh / 2 + 30, 8, 5);
+          rect(bw / 2 - 24, -bh / 2 + 30, 8, 5);
         }
-        fill(195, 160, 55, 150);
-        rect(-bw / 2 + 1, -bh / 2 + 7, bw - 2, 2);
         break;
       }
 
       case 'arena': {
         noStroke();
-        fill(210, 190, 150);
-        ellipse(0, 0, bw - 8, bh - 8);
-        for (let ati = 0; ati < 12; ati++) {
-          let atx = (sin(ati * 2.3 + b.x) * (bw / 2 - 10));
-          let aty = (cos(ati * 1.7 + b.y) * (bh / 2 - 10));
-          fill(195, 175, 135, 80);
-          rect(atx - 1, aty - 1, 2, 2);
+        // Shadow ellipse
+        fill(0, 0, 0, 35);
+        ellipse(3, 6, bw, bh * 0.4);
+        // Outer wall — stone ellipse (largest, background)
+        fill(175, 162, 140);
+        ellipse(0, 0, bw, bh);
+        // Stone block texture on outer wall
+        stroke(155, 143, 122, 60);
+        strokeWeight(0.6);
+        for (let aRing = 0; aRing < 3; aRing++) {
+          let aRx = (bw / 2 - 2) * (1 - aRing * 0.04);
+          let aRy = (bh / 2 - 2) * (1 - aRing * 0.04);
+          ellipse(0, 0, aRx * 2, aRy * 2);
         }
-        for (let aai = 0; aai < 20; aai++) {
-          let aAngle = aai * TWO_PI / 20;
-          let asx = cos(aAngle) * (bw / 2 - 2);
-          let asy = sin(aAngle) * (bh / 2 - 2);
-          let seatCol = aai % 2 === 0 ? [170, 162, 148] : [160, 152, 138];
-          fill(seatCol[0], seatCol[1], seatCol[2]);
-          rect(asx - 3, asy - 3, 6, 6);
+        noStroke();
+        // Seating tier 1 — outer (stone, lightest)
+        fill(185, 172, 150);
+        ellipse(0, 0, bw - 6, bh - 6);
+        // Seating tier 2 — mid
+        fill(165, 152, 130);
+        ellipse(0, 0, bw - 18, bh - 18);
+        // Seating tier 3 — inner
+        fill(148, 135, 112);
+        ellipse(0, 0, bw - 30, bh - 30);
+        // Sand pit — arena floor
+        fill(212, 195, 158);
+        ellipse(0, 0, bw - 44, bh - 44);
+        // Sand texture streaks
+        fill(198, 182, 145, 80);
+        for (let st = 0; st < 6; st++) {
+          let sang = st * PI / 3 + 0.3;
+          let slen = (bw - 50) * 0.3;
+          stroke(185, 170, 135, 50);
+          strokeWeight(0.8);
+          line(cos(sang) * slen * 0.2, sin(sang) * slen * 0.15,
+               cos(sang) * slen, sin(sang) * slen * 0.75);
         }
-        fill(155, 148, 132);
-        rect(-8, bh / 2 - 10, 16, 10, 1);
-        fill(45, 35, 20, 200);
-        rect(-5, bh / 2 - 8, 10, 8);
-        arc(0, bh / 2 - 8, 10, 6, PI, TWO_PI);
-        fill(110, 85, 45);
-        rect(-bw / 2 + 4, -bh / 2 - 6, 2, 16);
-        rect(bw / 2 - 6, -bh / 2 - 6, 2, 16);
-        fill(180, 35, 35);
-        rect(-bw / 2 + 5, -bh / 2 - 4, 7, 10);
-        rect(bw / 2 - 12, -bh / 2 - 4, 7, 10);
-        fill(155, 25, 25);
-        rect(-bw / 2 + 5, -bh / 2 + 5, 7, 2);
-        rect(bw / 2 - 12, -bh / 2 + 5, 7, 2);
+        noStroke();
+        // Spectator dots on seating tiers — crowd suggestion
+        for (let aai = 0; aai < 28; aai++) {
+          let aAngle = aai * TWO_PI / 28 + 0.1;
+          let aTierR = 0.72 + (aai % 3) * 0.06;
+          let asx = cos(aAngle) * (bw / 2 - 4) * aTierR;
+          let asy = sin(aAngle) * (bh / 2 - 4) * aTierR;
+          // Alternate crowd color
+          let crowdColors = [[85, 35, 18], [42, 55, 95], [155, 85, 28], [28, 68, 38]];
+          let cc = crowdColors[aai % 4];
+          fill(cc[0], cc[1], cc[2], 140);
+          circle(asx, asy, 2.5);
+        }
+        // North gate (top)
+        fill(95, 82, 62);
+        rect(-6, -bh / 2 + 4, 12, 14, 1);
+        fill(38, 28, 16, 220);
+        rect(-4, -bh / 2 + 6, 8, 11);
+        arc(0, -bh / 2 + 6, 8, 6, PI, TWO_PI);
+        // South main gate (bottom)
+        fill(115, 100, 78);
+        rect(-8, bh / 2 - 16, 16, 16, 1);
+        fill(38, 28, 16, 220);
+        rect(-6, bh / 2 - 14, 12, 13);
+        arc(0, bh / 2 - 14, 12, 8, PI, TWO_PI);
+        // Velarium poles — awning poles at top of outer wall
+        fill(110, 88, 48);
+        rect(-bw / 2 + 4, -bh / 2 - 8, 2, 14);
+        rect(bw / 2 - 6, -bh / 2 - 8, 2, 14);
+        // Velarium rope lines
+        stroke(130, 110, 75, 120);
+        strokeWeight(0.7);
+        line(-bw / 2 + 5, -bh / 2 - 8, 0, -bh / 2 - 2);
+        line(bw / 2 - 5, -bh / 2 - 8, 0, -bh / 2 - 2);
+        noStroke();
+        // Red pennant banners on poles
+        fill(175, 28, 28);
+        rect(-bw / 2 + 6, -bh / 2 - 8, 7, 9);
+        rect(bw / 2 - 13, -bh / 2 - 8, 7, 9);
+        fill(145, 22, 22);
+        rect(-bw / 2 + 6, -bh / 2 - 2, 7, 2);
+        rect(bw / 2 - 13, -bh / 2 - 2, 7, 2);
+        // Night: torchlight in seating tiers
+        if (getSkyBrightness() < 0.35) {
+          let arenaNight = map(getSkyBrightness(), 0, 0.35, 1, 0);
+          for (let nt = 0; nt < 6; nt++) {
+            let ntAngle = nt * TWO_PI / 6;
+            let ntx = cos(ntAngle) * (bw / 2 - 10);
+            let nty = sin(ntAngle) * (bh / 2 - 10);
+            fill(255, 170, 55, 45 * arenaNight);
+            circle(ntx, nty, 8);
+          }
+        }
         break;
       }
 
@@ -6554,31 +6935,108 @@ function drawOneBuilding(b) {
       }
 
       case 'castrum':
-        // Roman military fort — stone walls, tower corners, red standard
+        // Roman military fortress — imposing stone walls with crenellations
         noStroke();
-        // Stone perimeter
-        fill(140, 128, 110);
+        // Ground shadow
+        fill(0, 0, 0, 35);
+        rect(-bw / 2 + 3, bh / 2 - 3, bw, 7);
+        // Outer stone wall (darker, fortress weight)
+        fill(125, 112, 92);
         rect(-bw / 2, -bh / 2, bw, bh, 2);
-        // Stone perimeter
-        fill(140, 128, 110);
-        rect(-bw / 2, -bh / 2, bw, bh, 2);
-        // Interior parade ground
-        fill(158, 145, 120);
-        rect(-bw / 2 + 5, -bh / 2 + 5, bw - 10, bh - 10);
-        // Corner towers
-        fill(128, 116, 98);
-        rect(-bw / 2, -bh / 2, 9, 9);
-        rect(bw / 2 - 9, -bh / 2, 9, 9);
-        rect(-bw / 2, bh / 2 - 9, 9, 9);
-        rect(bw / 2 - 9, bh / 2 - 9, 9, 9);
-        // Gate (south)
-        fill(60, 45, 25);
-        rect(-6, bh / 2 - 7, 12, 7);
-        // Red standard pole
-        fill(100, 80, 50);
-        rect(-1, -bh / 2 + 2, 2, 14);
-        fill(180, 35, 35);
-        rect(0, -bh / 2 + 3, 8, 5);
+        // Stone block variation — ashlar courses
+        stroke(108, 96, 78, 55);
+        strokeWeight(0.7);
+        for (let cy2 = -bh / 2 + 6; cy2 < bh / 2; cy2 += 7) {
+          line(-bw / 2 + 1, cy2, bw / 2 - 1, cy2);
+          let coff = (floor((cy2 + bh / 2) / 7) % 2) * 9;
+          for (let cx2 = -bw / 2 + coff + 5; cx2 < bw / 2 - 2; cx2 += 16) {
+            line(cx2, cy2, cx2, cy2 + 7);
+          }
+        }
+        noStroke();
+        // Interior parade ground — packed earth
+        fill(155, 138, 112);
+        rect(-bw / 2 + 8, -bh / 2 + 8, bw - 16, bh - 16);
+        // Parade ground texture — subtle
+        fill(148, 132, 108, 60);
+        for (let pi2 = 0; pi2 < 5; pi2++) {
+          rect(-bw / 2 + 12 + pi2 * 11, -bh / 2 + 14, 8, 3);
+        }
+        // Corner towers — thicker and taller
+        fill(112, 100, 82);
+        rect(-bw / 2, -bh / 2, 13, 14);
+        rect(bw / 2 - 13, -bh / 2, 13, 14);
+        rect(-bw / 2, bh / 2 - 14, 13, 14);
+        rect(bw / 2 - 13, bh / 2 - 14, 13, 14);
+        // Tower cap highlights
+        fill(128, 116, 96);
+        rect(-bw / 2, -bh / 2, 13, 3);
+        rect(bw / 2 - 13, -bh / 2, 13, 3);
+        // Wall crenellations (merlons) — top wall
+        fill(132, 120, 100);
+        for (let mi = 0; mi < 7; mi++) {
+          let mx2 = -bw / 2 + 14 + mi * (bw - 28) / 6;
+          rect(mx2, -bh / 2 - 5, 6, 7, 1);
+        }
+        // Wall crenellations — bottom wall
+        for (let mi = 0; mi < 7; mi++) {
+          let mx2 = -bw / 2 + 14 + mi * (bw - 28) / 6;
+          rect(mx2, bh / 2 - 2, 6, 7, 1);
+        }
+        // Gate archway (south) — iron portcullis feel
+        fill(45, 35, 22);
+        rect(-10, bh / 2 - 14, 20, 14, 1);
+        // Portcullis bars
+        stroke(30, 24, 14, 200);
+        strokeWeight(1.2);
+        for (let gi2 = -8; gi2 <= 8; gi2 += 4) {
+          line(gi2, bh / 2 - 13, gi2, bh / 2 - 2);
+        }
+        line(-10, bh / 2 - 8, 10, bh / 2 - 8);
+        noStroke();
+        // Gate arch top
+        fill(112, 100, 82);
+        arc(0, bh / 2 - 14, 20, 10, PI, TWO_PI);
+        // Red legion banner — animated wave
+        let castFlap = sin(frameCount * 0.04 + b.x * 0.01) * 2;
+        fill(100, 75, 42);
+        rect(-1.5, -bh / 2 - 14, 3, 18);   // pole
+        fill(185, 28, 28);
+        beginShape();
+        vertex(0, -bh / 2 - 13);
+        vertex(12 + castFlap, -bh / 2 - 10);
+        vertex(11 + castFlap * 0.6, -bh / 2 - 5);
+        vertex(0, -bh / 2 - 4);
+        endShape(CLOSE);
+        // Eagle sigil on banner
+        fill(220, 195, 60, 200);
+        circle(6 + castFlap * 0.4, -bh / 2 - 8, 4);
+        fill(185, 28, 28, 0);
+        // Military cooking smoke (darker, greyer than residential)
+        {
+          let castSmokeAlpha = map(getSkyBrightness(), 0.0, 0.6, 65, 18);
+          for (let si2 = 0; si2 < 2; si2++) {
+            let sPhase = frameCount * 0.012 + si2 * 3.1 + b.x * 0.008;
+            for (let sp = 0; sp < 4; sp++) {
+              let sFrac = sp / 3;
+              let sx2 = -bw / 4 + si2 * (bw / 2.5) + floor(sin(sPhase + sp * 0.8) * (2 + sp));
+              let sy2 = -bh / 2 - 4 - floor(sp * 7 + (frameCount * 0.6 + si2 * 25) % 28);
+              let sa = castSmokeAlpha * (1 - sFrac * 0.75);
+              fill(120, 115, 108, sa);  // darker grey than house smoke
+              noStroke();
+              rect(sx2, sy2, 2, 2);
+            }
+          }
+        }
+        // Night: window glow from barracks
+        if (getSkyBrightness() < 0.35) {
+          let nightStr = map(getSkyBrightness(), 0, 0.35, 1, 0);
+          fill(255, 185, 80, 55 * nightStr);
+          rect(-bw / 2 + 14, -bh / 2 + 14, 10, 7);
+          rect(bw / 2 - 24, -bh / 2 + 14, 10, 7);
+          fill(255, 170, 60, 20 * nightStr);
+          ellipse(0, -bh / 2 + 22, 20, 12);
+        }
         break;
     }
     pop();
@@ -16441,6 +16899,15 @@ function loadGame() {
       });
     }
     if (d.buildings) state.buildings = d.buildings;
+    // Normalize building sizes to current BLUEPRINTS on load
+    if (state.buildings) {
+      state.buildings.forEach(b => {
+        if (BLUEPRINTS[b.type]) {
+          b.w = BLUEPRINTS[b.type].w;
+          b.h = BLUEPRINTS[b.type].h;
+        }
+      });
+    }
     if (d.trees) {
       // Rebuild trees as natural grove flanking the road
       let cx = WORLD.islandCX, cy = WORLD.islandCY;
