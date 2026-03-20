@@ -334,7 +334,7 @@ function drawDriftClouds(bright) {
       cloudPositions.push({
         x: random(width * 1.5),
         y: random(height * 0.03, height * 0.22),
-        w: random(55, 150),
+        w: random(40, 100),
         h: random(16, 38),
         speed: random(0.06, 0.22),
         depth: random(0.5, 1), // parallax depth
@@ -372,7 +372,7 @@ function drawDriftClouds(bright) {
     if (cl.x > width + cl.w) cl.x = -cl.w;
     cl.y -= camDY * 0.04;
     cl.y = constrain(cl.y, height * 0.02, height * 0.22);
-    let alpha = map(bright, 0.1, 0.5, 15, 55) * cl.depth;
+    let alpha = map(bright, 0.1, 0.5, 8, 40) * cl.depth;
     let cx = floor(cl.x), cy = floor(cl.y);
     let cw = floor(cl.w), ch = floor(cl.h);
 

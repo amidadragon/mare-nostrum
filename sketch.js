@@ -18004,10 +18004,15 @@ function expandIsland() {
   placeEraBuildings(state.islandLevel);
 
   // Ambient background houses to fill empty space
-  if (state.islandLevel === 10) spawnAmbientHousing(8);
+  if (state.islandLevel === 8)  spawnAmbientHousing(6);
+  if (state.islandLevel === 10) spawnAmbientHousing(10);
+  if (state.islandLevel === 12) spawnAmbientHousing(8);
   if (state.islandLevel === 13) spawnAmbientHousing(10);
+  if (state.islandLevel === 15) spawnAmbientHousing(10);
   if (state.islandLevel === 16) spawnAmbientHousing(10);
+  if (state.islandLevel === 18) spawnAmbientHousing(8);
   if (state.islandLevel === 19) spawnAmbientHousing(8);
+  if (state.islandLevel === 21) spawnAmbientHousing(6);
   if (state.islandLevel === 22) spawnAmbientHousing(6);
 
   // Milestone journal unlocks and special effects
