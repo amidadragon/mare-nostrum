@@ -8,17 +8,25 @@ PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 FILES=(
   index.html
-  sketch.js
-  sound.js
-  combat.js
-  diving.js
-  economy.js
-  islands.js
-  narrative.js
   engine.js
-  debug.js
+  sound.js
+  narrative.js
   cinematics.js
+  fishing.js
+  farming.js
+  npc.js
+  events.js
+  world.js
+  player.js
+  ui.js
+  sketch.js
+  wreck.js
   menu.js
+  islands.js
+  diving.js
+  combat.js
+  economy.js
+  debug.js
   menu_bg.webp
   favicon.ico
   manifest.json
