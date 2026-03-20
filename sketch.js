@@ -1229,15 +1229,15 @@ function buildIsland() {
     });
   });
 
-  // Ruin fragments — at island edges only, far from pyramid
+  // Ruin fragments — inside walkable area, away from center
   state.ruins = [];
-  let ruinAngles = [PI * 0.25, PI * 0.75, PI * 1.5]; // top-right, bottom-left, bottom
+  let ruinAngles = [PI * 0.25, PI * 0.75, PI * 1.25]; // top-right, bottom-left, left
   ruinAngles.forEach(a => {
     let rx, ry, placed = false;
     for (let attempt = 0; attempt < 30; attempt++) {
-      let r = random(0.55, 0.72);
+      let r = random(0.45, 0.65);
       rx = cx + cos(a) * srx * r;
-      ry = cy + sin(a) * sry * r;
+      ry = cy + sin(a) * sry * r * 0.6; // flatten Y to stay inside ellipse
       let pdist = sqrt((rx - cx) * (rx - cx) + (ry - cy) * (ry - cy));
       if (pdist < 160) { a += 0.2; continue; }
       let fdx = rx - farmCX, fdy = ry - farmCY;

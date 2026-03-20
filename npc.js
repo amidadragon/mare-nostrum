@@ -908,8 +908,8 @@ function updateVestaCrystalGathering(dt) {
   if (v._crystalTimer > 0) return;
   v._crystalTimer = 600; // ~10 seconds at 60fps
 
-  // Find nearest charged crystal node
-  let best = null, bestD = 120; // 120px range
+  // Find nearest charged crystal node — island-wide range (Vesta walks to them)
+  let best = null, bestD = 9999;
   state.crystalNodes.forEach(cn => {
     if (cn.charge <= 0 || cn.respawnTimer > 0) return;
     let d = dist(v.x, v.y, cn.x, cn.y);
