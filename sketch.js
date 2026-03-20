@@ -7239,7 +7239,7 @@ function drawOneCrystal(node) {
     noStroke();
     let playerDist = dist2(state.player.x, state.player.y, node.x, node.y);
     if (playerDist < 200) {
-      let glS = floor(node.size * 0.72);
+      let glS = floor(node.size * 0.5);
       fill(0, 255, 136, floor(7 * pulse));
       rect(nx - glS, ny - 1, glS * 2, 2);
       rect(nx - 1, ny - glS, 2, glS * 2);
@@ -7272,7 +7272,7 @@ function drawOneCrystal(node) {
     strokeWeight(1.5);
     noFill();
     let chargeAngle = map(node.charge, 0, 100, 0, TWO_PI);
-    arc(nx, ny, node.size * 2.5, node.size * 2.5, -HALF_PI, -HALF_PI + chargeAngle);
+    arc(nx, ny, node.size * 1.75, node.size * 1.75, -HALF_PI, -HALF_PI + chargeAngle);
     noStroke();
 
     // Click prompt when player is near
@@ -17671,7 +17671,7 @@ function _addProceduralPerimeter(lvl, cx, cy, rx, ry) {
   // Crystal node on even levels
   if (lvl % 2 === 0) {
     let ca = angle0 + PI;
-    let crx = cx + cos(ca) * state.islandRX * 0.7;
+    let crx = cx + cos(ca) * state.islandRX * 0.8;
     let cry = cy + sin(ca) * state.islandRY * 0.55;
     let cSize = min(14 + floor(lvl / 5) * 2, 24);
     state.crystalNodes.push({
@@ -17954,9 +17954,10 @@ function spawnAmbientHousing(count) {
   let placed = 0;
   for (let attempt = 0; attempt < count * 5 && placed < count; attempt++) {
     let a = random(TWO_PI);
-    let r = random(0.15, 0.55);
+    let r = random(0.15, 0.45);
     let x = cx + cos(a) * srx * r;
     let y = cy + sin(a) * sry * r;
+    if (!isOnIsland(x, y)) continue;
     let tooClose = state.buildings.some(b => {
       let dx = x - b.x, dy = y - b.y;
       return dx * dx + dy * dy < 35 * 35;
