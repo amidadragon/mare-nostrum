@@ -250,6 +250,182 @@ let shakeTimer = 0;
 let hudFlash = {}; // { key: { timer, delta } } — tracks resource changes for pop effect
 let starPositions = null;
 
+// Fixed absolute building coordinates — 169 slots, no rx*factor drift
+const CITY_SLOTS = [
+  // ERA 1: VILLAGE (Lv 2-8)
+  { id: 'fence_farm_e1',   x: 220, y: 365, w: 32, h:  8, type: 'fence',       level: 2,  district: 'farm' },
+  { id: 'fence_farm_e2',   x: 220, y: 395, w: 32, h:  8, type: 'fence',       level: 2,  district: 'farm' },
+  { id: 'torch_center',    x: 600, y: 415, w:  8, h: 16, type: 'torch',       level: 2,  district: 'center' },
+  { id: 'floor_sacra1',    x: 720, y: 318, w: 24, h: 20, type: 'floor',       level: 3,  district: 'civic' },
+  { id: 'floor_sacra2',    x: 745, y: 318, w: 24, h: 20, type: 'floor',       level: 3,  district: 'civic' },
+  { id: 'floor_sacra3',    x: 770, y: 318, w: 24, h: 20, type: 'floor',       level: 3,  district: 'civic' },
+  { id: 'shrine_civic',    x: 760, y: 298, w: 32, h: 28, type: 'shrine',      level: 3,  district: 'civic' },
+  { id: 'fence_nw1',       x: 390, y: 358, w: 32, h:  8, type: 'fence',       level: 4,  district: 'farm' },
+  { id: 'fence_nw2',       x: 390, y: 380, w: 32, h:  8, type: 'fence',       level: 4,  district: 'farm' },
+  { id: 'well_center',     x: 660, y: 440, w: 24, h: 24, type: 'well',        level: 4,  district: 'center' },
+  { id: 'granary',         x: 375, y: 340, w: 58, h: 44, type: 'granary',     level: 5,  district: 'farm' },
+  { id: 'granary_torch_l', x: 347, y: 354, w:  8, h: 16, type: 'torch',       level: 5,  district: 'farm' },
+  { id: 'granary_torch_r', x: 403, y: 354, w:  8, h: 16, type: 'torch',       level: 5,  district: 'farm' },
+  { id: 'well_sw',         x: 490, y: 460, w: 24, h: 24, type: 'well',        level: 5,  district: 'center' },
+  { id: 'floor_via_g1',    x: 530, y: 340, w: 24, h: 20, type: 'floor',       level: 5,  district: 'farm' },
+  { id: 'floor_via_g2',    x: 530, y: 363, w: 24, h: 20, type: 'floor',       level: 5,  district: 'farm' },
+  { id: 'floor_via_g3',    x: 530, y: 386, w: 24, h: 20, type: 'floor',       level: 5,  district: 'farm' },
+  { id: 'house_res1',      x: 440, y: 330, w: 44, h: 34, type: 'house',       level: 6,  district: 'residential' },
+  { id: 'house_res2',      x: 490, y: 330, w: 44, h: 34, type: 'house',       level: 6,  district: 'residential' },
+  { id: 'torch_res1',      x: 465, y: 348, w:  8, h: 16, type: 'torch',       level: 6,  district: 'residential' },
+  { id: 'flower_res1',     x: 462, y: 316, w: 20, h: 16, type: 'flower',      level: 6,  district: 'residential' },
+  { id: 'market_1',        x: 810, y: 375, w: 44, h: 34, type: 'market',      level: 7,  district: 'market' },
+  { id: 'chest_mkt1a',     x: 784, y: 399, w: 24, h: 20, type: 'chest',       level: 7,  district: 'market' },
+  { id: 'chest_mkt1b',     x: 836, y: 399, w: 24, h: 20, type: 'chest',       level: 7,  district: 'market' },
+  { id: 'torch_mkt1a',     x: 784, y: 367, w:  8, h: 16, type: 'torch',       level: 7,  district: 'market' },
+  { id: 'torch_mkt1b',     x: 836, y: 367, w:  8, h: 16, type: 'torch',       level: 7,  district: 'market' },
+  { id: 'bath_1',          x: 480, y: 460, w: 58, h: 44, type: 'bath',        level: 8,  district: 'bath' },
+  { id: 'flower_bath1a',   x: 444, y: 460, w: 20, h: 16, type: 'flower',      level: 8,  district: 'bath' },
+  { id: 'flower_bath1b',   x: 516, y: 460, w: 20, h: 16, type: 'flower',      level: 8,  district: 'bath' },
+  { id: 'castrum',         x: 840, y: 470, w: 64, h: 50, type: 'castrum',     level: 8,  district: 'military' },
+  { id: 'wall_cast_l',     x: 800, y: 470, w:  8, h: 50, type: 'wall',        level: 8,  district: 'military' },
+  { id: 'wall_cast_r',     x: 880, y: 470, w:  8, h: 50, type: 'wall',        level: 8,  district: 'military' },
+  { id: 'wall_cast_top',   x: 840, y: 440, w: 80, h:  8, type: 'wall',        level: 8,  district: 'military' },
+  { id: 'watchtower_cast', x: 884, y: 442, w: 20, h: 44, type: 'watchtower',  level: 8,  district: 'military' },
+  { id: 'torch_cast_l',    x: 822, y: 488, w:  8, h: 16, type: 'torch',       level: 8,  district: 'military' },
+  { id: 'torch_cast_r',    x: 858, y: 488, w:  8, h: 16, type: 'torch',       level: 8,  district: 'military' },
+  { id: 'floor_via_m1',    x: 760, y: 420, w: 24, h: 20, type: 'floor',       level: 8,  district: 'military' },
+  { id: 'floor_via_m2',    x: 760, y: 443, w: 24, h: 20, type: 'floor',       level: 8,  district: 'military' },
+  { id: 'floor_via_m3',    x: 760, y: 466, w: 24, h: 20, type: 'floor',       level: 8,  district: 'military' },
+  // ERA 2: CITY (Lv 9-17)
+  { id: 'aqueduct_1',      x: 540, y: 218, w: 20, h: 40, type: 'aqueduct',    level: 9,  district: 'sacred' },
+  { id: 'aqueduct_2',      x: 600, y: 218, w: 20, h: 40, type: 'aqueduct',    level: 9,  district: 'sacred' },
+  { id: 'aqueduct_3',      x: 660, y: 218, w: 20, h: 40, type: 'aqueduct',    level: 9,  district: 'sacred' },
+  { id: 'bridge_north',    x: 600, y: 288, w: 32, h: 32, type: 'bridge',      level: 9,  district: 'sacred' },
+  { id: 'temple_main',     x: 820, y: 303, w: 70, h: 50, type: 'temple',      level: 10, district: 'civic' },
+  { id: 'torch_temp_l',    x: 780, y: 313, w:  8, h: 16, type: 'torch',       level: 10, district: 'civic' },
+  { id: 'torch_temp_r',    x: 860, y: 313, w:  8, h: 16, type: 'torch',       level: 10, district: 'civic' },
+  { id: 'flower_temp_l',   x: 778, y: 293, w: 20, h: 16, type: 'flower',      level: 10, district: 'civic' },
+  { id: 'flower_temp_r',   x: 862, y: 293, w: 20, h: 16, type: 'flower',      level: 10, district: 'civic' },
+  { id: 'floor_temp_1',    x: 792, y: 338, w: 26, h: 22, type: 'floor',       level: 10, district: 'civic' },
+  { id: 'floor_temp_2',    x: 820, y: 338, w: 26, h: 22, type: 'floor',       level: 10, district: 'civic' },
+  { id: 'floor_temp_3',    x: 848, y: 338, w: 26, h: 22, type: 'floor',       level: 10, district: 'civic' },
+  { id: 'market_2',        x: 900, y: 375, w: 44, h: 34, type: 'market',      level: 10, district: 'market' },
+  { id: 'plaza_1',         x: 580, y: 410, w: 26, h: 22, type: 'floor',       level: 10, district: 'center' },
+  { id: 'plaza_2',         x: 600, y: 410, w: 26, h: 22, type: 'floor',       level: 10, district: 'center' },
+  { id: 'plaza_3',         x: 620, y: 410, w: 26, h: 22, type: 'floor',       level: 10, district: 'center' },
+  { id: 'plaza_4',         x: 580, y: 434, w: 26, h: 22, type: 'floor',       level: 10, district: 'center' },
+  { id: 'plaza_5',         x: 600, y: 434, w: 26, h: 22, type: 'floor',       level: 10, district: 'center' },
+  { id: 'plaza_6',         x: 620, y: 434, w: 26, h: 22, type: 'floor',       level: 10, district: 'center' },
+  { id: 'lantern_civ_n',   x: 700, y: 370, w: 10, h: 20, type: 'lantern',     level: 10, district: 'civic' },
+  { id: 'lantern_civ_s',   x: 700, y: 402, w: 10, h: 20, type: 'lantern',     level: 10, district: 'civic' },
+  { id: 'floor_e_road1',   x: 740, y: 380, w: 32, h: 32, type: 'floor',       level: 10, district: 'civic' },
+  { id: 'floor_e_road2',   x: 740, y: 400, w: 32, h: 32, type: 'floor',       level: 10, district: 'civic' },
+  { id: 'flower_tg1',      x: 760, y: 362, w: 20, h: 16, type: 'flower',      level: 11, district: 'civic' },
+  { id: 'flower_tg2',      x: 820, y: 362, w: 20, h: 16, type: 'flower',      level: 11, district: 'civic' },
+  { id: 'flower_tg3',      x: 880, y: 362, w: 20, h: 16, type: 'flower',      level: 11, district: 'civic' },
+  { id: 'mosaic_temp',     x: 820, y: 220, w: 28, h: 20, type: 'mosaic',      level: 11, district: 'civic' },
+  { id: 'lantern_tg',      x: 820, y: 268, w: 10, h: 20, type: 'lantern',     level: 11, district: 'civic' },
+  { id: 'lantern_via1',    x: 640, y: 392, w: 10, h: 20, type: 'lantern',     level: 12, district: 'center' },
+  { id: 'lantern_via2',    x: 700, y: 392, w: 10, h: 20, type: 'lantern',     level: 12, district: 'center' },
+  { id: 'lantern_via3',    x: 760, y: 392, w: 10, h: 20, type: 'lantern',     level: 12, district: 'center' },
+  { id: 'well_sw2',        x: 460, y: 460, w: 24, h: 24, type: 'well',        level: 12, district: 'residential' },
+  { id: 'house_res3',      x: 500, y: 340, w: 44, h: 34, type: 'house',       level: 12, district: 'residential' },
+  { id: 'house_res4',      x: 500, y: 308, w: 44, h: 34, type: 'house',       level: 12, district: 'residential' },
+  { id: 'watchtower_e',    x: 940, y: 392, w: 20, h: 44, type: 'watchtower',  level: 13, district: 'civic' },
+  { id: 'wall_mil1',       x: 770, y: 435, w: 32, h:  8, type: 'wall',        level: 13, district: 'military' },
+  { id: 'wall_mil2',       x: 802, y: 435, w: 32, h:  8, type: 'wall',        level: 13, district: 'military' },
+  { id: 'wall_mil3',       x: 834, y: 435, w: 32, h:  8, type: 'wall',        level: 13, district: 'military' },
+  { id: 'watchtower_sw',   x: 570, y: 435, w: 20, h: 44, type: 'watchtower',  level: 13, district: 'military' },
+  { id: 'market_3',        x: 740, y: 375, w: 44, h: 34, type: 'market',      level: 13, district: 'market' },
+  { id: 'aqueduct_4',      x: 480, y: 218, w: 20, h: 40, type: 'aqueduct',    level: 14, district: 'sacred' },
+  { id: 'aqueduct_5',      x: 420, y: 218, w: 20, h: 40, type: 'aqueduct',    level: 14, district: 'sacred' },
+  { id: 'bath_2',          x: 740, y: 368, w: 58, h: 44, type: 'bath',        level: 14, district: 'civic' },
+  { id: 'flower_bath2a',   x: 704, y: 368, w: 20, h: 16, type: 'flower',      level: 14, district: 'civic' },
+  { id: 'flower_bath2b',   x: 776, y: 368, w: 20, h: 16, type: 'flower',      level: 14, district: 'civic' },
+  { id: 'bridge_mkt',      x: 660, y: 410, w: 32, h: 32, type: 'bridge',      level: 14, district: 'center' },
+  { id: 'forum_main',      x: 620, y: 450, w: 80, h: 60, type: 'forum',       level: 15, district: 'center' },
+  { id: 'floor_forum_nw',  x: 570, y: 415, w: 32, h: 32, type: 'floor',       level: 15, district: 'center' },
+  { id: 'floor_forum_ne',  x: 670, y: 415, w: 32, h: 32, type: 'floor',       level: 15, district: 'center' },
+  { id: 'floor_forum_sw',  x: 570, y: 485, w: 32, h: 32, type: 'floor',       level: 15, district: 'center' },
+  { id: 'floor_forum_se',  x: 670, y: 485, w: 32, h: 32, type: 'floor',       level: 15, district: 'center' },
+  { id: 'lantern_f_nw',    x: 570, y: 412, w: 10, h: 20, type: 'lantern',     level: 15, district: 'center' },
+  { id: 'lantern_f_ne',    x: 670, y: 412, w: 10, h: 20, type: 'lantern',     level: 15, district: 'center' },
+  { id: 'mosaic_forum1',   x: 592, y: 494, w: 32, h: 32, type: 'mosaic',      level: 15, district: 'center' },
+  { id: 'mosaic_forum2',   x: 620, y: 494, w: 32, h: 32, type: 'mosaic',      level: 15, district: 'center' },
+  { id: 'mosaic_forum3',   x: 648, y: 494, w: 32, h: 32, type: 'mosaic',      level: 15, district: 'center' },
+  { id: 'granary_2',       x: 730, y: 450, w: 58, h: 44, type: 'granary',     level: 15, district: 'military' },
+  { id: 'arch_east',       x: 900, y: 392, w: 48, h: 52, type: 'arch',        level: 15, district: 'market' },
+  { id: 'watchtower_far',  x: 970, y: 370, w: 20, h: 44, type: 'watchtower',  level: 15, district: 'market' },
+  { id: 'house_row1',      x: 410, y: 360, w: 44, h: 34, type: 'house',       level: 16, district: 'residential' },
+  { id: 'house_row2',      x: 460, y: 360, w: 44, h: 34, type: 'house',       level: 16, district: 'residential' },
+  { id: 'house_row3',      x: 510, y: 360, w: 44, h: 34, type: 'house',       level: 16, district: 'residential' },
+  { id: 'house_row4',      x: 560, y: 360, w: 44, h: 34, type: 'house',       level: 16, district: 'residential' },
+  { id: 'torch_row1',      x: 435, y: 378, w:  8, h: 16, type: 'torch',       level: 16, district: 'residential' },
+  { id: 'torch_row2',      x: 485, y: 378, w:  8, h: 16, type: 'torch',       level: 16, district: 'residential' },
+  { id: 'torch_row3',      x: 535, y: 378, w:  8, h: 16, type: 'torch',       level: 16, district: 'residential' },
+  { id: 'house_deep1',     x: 410, y: 326, w: 44, h: 34, type: 'house',       level: 16, district: 'residential' },
+  { id: 'house_deep2',     x: 460, y: 326, w: 44, h: 34, type: 'house',       level: 16, district: 'residential' },
+  { id: 'house_deep3',     x: 510, y: 326, w: 44, h: 34, type: 'house',       level: 16, district: 'residential' },
+  { id: 'torch_deep1',     x: 435, y: 344, w:  8, h: 16, type: 'torch',       level: 16, district: 'residential' },
+  { id: 'torch_deep2',     x: 485, y: 344, w:  8, h: 16, type: 'torch',       level: 16, district: 'residential' },
+  { id: 'fence_res_back',  x: 458, y: 308, w:180, h:  6, type: 'fence',       level: 16, district: 'residential' },
+  { id: 'library',         x: 760, y: 303, w: 58, h: 44, type: 'library',     level: 17, district: 'civic' },
+  { id: 'mosaic_lib',      x: 760, y: 333, w: 32, h: 32, type: 'mosaic',      level: 17, district: 'civic' },
+  { id: 'lantern_lib_l',   x: 726, y: 313, w: 10, h: 20, type: 'lantern',     level: 17, district: 'civic' },
+  { id: 'lantern_lib_r',   x: 794, y: 313, w: 10, h: 20, type: 'lantern',     level: 17, district: 'civic' },
+  // ERA 3: ATLANTIS (Lv 18-25)
+  { id: 'arena',           x: 820, y: 455, w: 68, h: 54, type: 'arena',       level: 18, district: 'military' },
+  { id: 'torch_arena_l',   x: 780, y: 485, w:  8, h: 16, type: 'torch',       level: 18, district: 'military' },
+  { id: 'torch_arena_r',   x: 860, y: 485, w:  8, h: 16, type: 'torch',       level: 18, district: 'military' },
+  { id: 'floor_arena',     x: 820, y: 489, w: 32, h: 32, type: 'floor',       level: 18, district: 'military' },
+  { id: 'mosaic_arena_l',  x: 800, y: 507, w: 28, h: 20, type: 'mosaic',      level: 19, district: 'military' },
+  { id: 'mosaic_arena_r',  x: 840, y: 507, w: 28, h: 20, type: 'mosaic',      level: 19, district: 'military' },
+  { id: 'lantern_aren_l',  x: 770, y: 485, w: 10, h: 20, type: 'lantern',     level: 19, district: 'military' },
+  { id: 'lantern_aren_r',  x: 870, y: 485, w: 10, h: 20, type: 'lantern',     level: 19, district: 'military' },
+  { id: 'house_mil1',      x: 730, y: 420, w: 44, h: 34, type: 'house',       level: 19, district: 'military' },
+  { id: 'house_mil2',      x: 680, y: 435, w: 44, h: 34, type: 'house',       level: 19, district: 'military' },
+  { id: 'villa_nw',        x: 460, y: 268, w: 72, h: 52, type: 'villa',       level: 20, district: 'residential' },
+  { id: 'flower_vnw_l',    x: 418, y: 278, w: 20, h: 16, type: 'flower',      level: 20, district: 'residential' },
+  { id: 'flower_vnw_r',    x: 502, y: 278, w: 20, h: 16, type: 'flower',      level: 20, district: 'residential' },
+  { id: 'flower_vnw_l2',   x: 418, y: 258, w: 20, h: 16, type: 'flower',      level: 20, district: 'residential' },
+  { id: 'flower_vnw_r2',   x: 502, y: 258, w: 20, h: 16, type: 'flower',      level: 20, district: 'residential' },
+  { id: 'mosaic_villa_nw', x: 460, y: 300, w: 32, h: 32, type: 'mosaic',      level: 20, district: 'residential' },
+  { id: 'lantern_vnw',     x: 500, y: 296, w: 10, h: 20, type: 'lantern',     level: 20, district: 'residential' },
+  { id: 'senate_forum',    x: 560, y: 450, w: 64, h: 48, type: 'forum',       level: 21, district: 'center' },
+  { id: 'torch_sen_l',     x: 520, y: 470, w:  8, h: 16, type: 'torch',       level: 21, district: 'center' },
+  { id: 'torch_sen_r',     x: 624, y: 470, w:  8, h: 16, type: 'torch',       level: 21, district: 'center' },
+  { id: 'floor_sen1',      x: 540, y: 482, w: 24, h: 20, type: 'floor',       level: 21, district: 'center' },
+  { id: 'floor_sen2',      x: 564, y: 482, w: 24, h: 20, type: 'floor',       level: 21, district: 'center' },
+  { id: 'floor_sen3',      x: 588, y: 482, w: 24, h: 20, type: 'floor',       level: 21, district: 'center' },
+  { id: 'floor_sen4',      x: 612, y: 482, w: 24, h: 20, type: 'floor',       level: 21, district: 'center' },
+  { id: 'arch_harbor',     x: 980, y: 410, w: 48, h: 52, type: 'arch',        level: 22, district: 'market' },
+  { id: 'lantern_h1',      x: 860, y: 410, w: 10, h: 20, type: 'lantern',     level: 22, district: 'market' },
+  { id: 'lantern_h2',      x: 900, y: 410, w: 10, h: 20, type: 'lantern',     level: 22, district: 'market' },
+  { id: 'lantern_h3',      x: 940, y: 410, w: 10, h: 20, type: 'lantern',     level: 22, district: 'market' },
+  { id: 'aqueduct_ga1',    x: 360, y: 210, w: 20, h: 40, type: 'aqueduct',    level: 23, district: 'sacred' },
+  { id: 'aqueduct_ga2',    x: 420, y: 210, w: 20, h: 40, type: 'aqueduct',    level: 23, district: 'sacred' },
+  { id: 'aqueduct_ga3',    x: 600, y: 210, w: 20, h: 40, type: 'aqueduct',    level: 23, district: 'sacred' },
+  { id: 'aqueduct_ga4',    x: 720, y: 210, w: 20, h: 40, type: 'aqueduct',    level: 23, district: 'sacred' },
+  { id: 'aqueduct_ga5',    x: 780, y: 210, w: 20, h: 40, type: 'aqueduct',    level: 23, district: 'sacred' },
+  { id: 'bridge_grand_l',  x: 450, y: 258, w: 32, h: 32, type: 'bridge',      level: 23, district: 'sacred' },
+  { id: 'bridge_grand_r',  x: 680, y: 258, w: 32, h: 32, type: 'bridge',      level: 23, district: 'sacred' },
+  { id: 'palace',          x: 600, y: 242, w: 60, h: 44, type: 'villa',       level: 24, district: 'sacred' },
+  { id: 'mosaic_pal1',     x: 562, y: 294, w: 28, h: 20, type: 'mosaic',      level: 24, district: 'sacred' },
+  { id: 'mosaic_pal2',     x: 618, y: 294, w: 28, h: 20, type: 'mosaic',      level: 24, district: 'sacred' },
+  { id: 'flower_pal_l',    x: 556, y: 262, w: 20, h: 16, type: 'flower',      level: 24, district: 'sacred' },
+  { id: 'flower_pal_r',    x: 644, y: 262, w: 20, h: 16, type: 'flower',      level: 24, district: 'sacred' },
+  { id: 'flower_pal_l2',   x: 556, y: 282, w: 20, h: 16, type: 'flower',      level: 24, district: 'sacred' },
+  { id: 'flower_pal_r2',   x: 644, y: 282, w: 20, h: 16, type: 'flower',      level: 24, district: 'sacred' },
+  { id: 'lantern_pal_l',   x: 580, y: 300, w: 10, h: 20, type: 'lantern',     level: 24, district: 'sacred' },
+  { id: 'lantern_pal_r',   x: 620, y: 300, w: 10, h: 20, type: 'lantern',     level: 24, district: 'sacred' },
+  { id: 'grand_temple',    x: 600, y: 183, w: 56, h: 40, type: 'temple',      level: 25, district: 'sacred' },
+  { id: 'flower_gt_l',     x: 540, y: 203, w: 20, h: 16, type: 'flower',      level: 25, district: 'sacred' },
+  { id: 'flower_gt_r',     x: 660, y: 203, w: 20, h: 16, type: 'flower',      level: 25, district: 'sacred' },
+  { id: 'arch_south',      x: 820, y: 435, w: 48, h: 52, type: 'arch',        level: 25, district: 'military' },
+  { id: 'villa_sw',        x: 430, y: 435, w: 60, h: 44, type: 'villa',       level: 25, district: 'residential' },
+  { id: 'mosaic_proc1',    x: 570, y: 368, w: 28, h: 20, type: 'mosaic',      level: 25, district: 'sacred' },
+  { id: 'mosaic_proc2',    x: 600, y: 368, w: 28, h: 20, type: 'mosaic',      level: 25, district: 'sacred' },
+  { id: 'mosaic_proc3',    x: 630, y: 368, w: 28, h: 20, type: 'mosaic',      level: 25, district: 'sacred' },
+  { id: 'lantern_proc_l',  x: 550, y: 368, w: 10, h: 20, type: 'lantern',     level: 25, district: 'sacred' },
+  { id: 'lantern_proc_r',  x: 650, y: 368, w: 10, h: 20, type: 'lantern',     level: 25, district: 'sacred' },
+];
+
 // Blueprint types — cost wood, stone, crystals
 const BLUEPRINTS = {
   floor:  { name: 'Tile',     w: 32, h: 32, cost: { wood: 2 },                  key: '1', blocks: false },
@@ -17066,18 +17242,13 @@ function placeEraBuildings(lvl) {
   let ry = getSurfaceRY();
   let cx = WORLD.islandCX;
   let cy = WORLD.islandCY;
+  let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
 
-  // Helper: place a building using overlap check, with small jitter fallback
-  function pb(x, y, w, h, type) {
-    placeBuildingChecked({ x: x, y: y, w: w, h: h, type: type, rot: 0 });
-  }
-
-  // Helper: place a row of N identical buildings spaced evenly along X
-  function pbRow(startX, y, spacingX, count, w, h, type) {
-    for (let i = 0; i < count; i++) {
-      pb(startX + i * spacingX, y, w, h, type);
-    }
-  }
+  // Place all CITY_SLOTS for this level (absolute coordinates, no drift)
+  CITY_SLOTS.forEach(slot => {
+    if (slot.level !== lvl) return;
+    placeBuildingChecked({ x: slot.x, y: slot.y, w: slot.w, h: slot.h, type: slot.type, rot: 0 });
+  });
 
   // Helper: resource placement (clamped to island surface)
   function res(x, y, type) {
@@ -17105,557 +17276,203 @@ function placeEraBuildings(lvl) {
   }
 
   // ─────────────────────────────────────────────────────────────────
-  // ERA 1: VILLAGE  (Lv 2-8)
-  // No grid. Organic. Farms, fences, first structures.
+  // Per-level extras: resources, trees, crystals, ruins, farm, effects
+  // (buildings handled by CITY_SLOTS above)
   // ─────────────────────────────────────────────────────────────────
 
   if (lvl === 2) {
-    // Farm perimeter fences (east side of farm plot)
-    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
-    pb(farmCX + 60, farmCY - 30, 32, 8, 'fence');
-    pb(farmCX + 60, farmCY + 10, 32, 8, 'fence');
-    // Town center brazier (campfire area)
-    pb(cx + rx * 0.05, cy + ry * 0.05, 8, 16, 'torch');
-    // Resources: south quarter
     res(cx - 120, cy + 70, 'stone');
     res(cx - 60,  cy + 75, 'stone');
     res(cx + 30,  cy + 70, 'vine');
     res(cx + 100, cy + 65, 'leaf');
-    // Crystal
     crystal(50, 30, 14, 50);
-    // Grove east expansion
     tree(cx + 180, cy + 40);
     tree(cx + 230, cy + 30);
     tree(cx + 300, cy - 10);
-    // Farm plots
     addFarmPlots(farmCX, farmCY, lvl);
     addFloatingText(width / 2, height * 0.3, 'Farm fenced — the homestead grows!', '#88cc66');
-    spawnParticles(farmCX + 60, farmCY - 10, 'build', 8);
+    spawnParticles(220, 380, 'build', 8);
   }
 
   if (lvl === 3) {
-    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
-    // Shrine plaza on Via Sacra approach (east, toward temple hill)
-    // Three floor tiles in a row, then shrine behind them
-    pb(cx + rx * 0.35 - 20, cy - ry * 0.3, 24, 20, 'floor');
-    pb(cx + rx * 0.35,      cy - ry * 0.3, 24, 20, 'floor');
-    pb(cx + rx * 0.35 + 20, cy - ry * 0.3, 24, 20, 'floor');
-    pb(cx + rx * 0.4,       cy - ry * 0.35, 32, 28, 'shrine');
-    // Resources: NE quarter
     res(cx + 200, cy - 70, 'vine');
     res(cx + 250, cy - 45, 'stone');
     res(cx + 160, cy - 80, 'vine');
     res(cx + 300, cy - 30, 'leaf');
-    // Crystal
     crystal(-50, 30, 14, 50);
-    // Trees NE grove
     tree(cx + 280, cy - 55);
     tree(cx + 320, cy - 25);
     tree(cx + 150, cy - 60);
-    // Ruin on NE edge
     ruin(cx + 260, cy - 70, 30, 20);
     addFloatingText(width / 2, height * 0.3, 'Shrine consecrated — the gods watch!', '#ffaaff');
-    spawnParticles(cx + rx * 0.4, cy - ry * 0.35, 'build', 10);
+    spawnParticles(760, 298, 'build', 10);
   }
 
   if (lvl === 4) {
-    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
-    // Well at town center (civic water access)
-    pb(cx + rx * 0.1, cy + ry * 0.3, 24, 24, 'well');
-    // Farm entrance fences NW
-    pb(cx - rx * 0.35, cy - ry * 0.1,  32, 8, 'fence');
-    pb(cx - rx * 0.35, cy + ry * 0.05, 32, 8, 'fence');
-    // Resources: NW quarter
     res(cx - 250, cy - 50, 'vine');
     res(cx - 300, cy - 20, 'leaf');
     res(cx - 200, cy - 70, 'stone');
     res(cx - 340, cy + 10, 'leaf');
-    // Crystal
     crystal(0, -45, 16, 60);
-    // Trees east expansion
     tree(cx + 250, cy - 40);
     tree(cx + 200, cy + 50);
     tree(cx + 340, cy + 15);
-    // Farm plots
     addFarmPlots(farmCX, farmCY, lvl);
     addFloatingText(width / 2, height * 0.3, 'Well dug — farm entrance fenced!', '#66aaff');
-    spawnParticles(cx + rx * 0.1, cy + ry * 0.3, 'build', 8);
+    spawnParticles(660, 440, 'build', 8);
   }
 
   if (lvl === 5) {
-    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
-    // GRANARY: north of farm on Via Granaria
-    pb(farmCX, farmCY - ry * 0.7, 58, 44, 'granary');
-    pb(farmCX - 28, farmCY - ry * 0.7 + 14, 8, 16, 'torch');
-    pb(farmCX + 28, farmCY - ry * 0.7 + 14, 8, 16, 'torch');
-    // Second well near market/east approach
-    pb(cx + rx * 0.35, cy + ry * 0.55, 24, 24, 'well');
-    pb(cx + rx * 0.35 + 16, cy + ry * 0.55, 8, 16, 'torch');
-    // Via Granaria paving (farm road leading north to granary)
-    pb(cx - rx * 0.1, cy - ry * 0.3,  24, 20, 'floor');
-    pb(cx - rx * 0.1, cy - ry * 0.15, 24, 20, 'floor');
-    pb(cx - rx * 0.1, cy,             24, 20, 'floor');
-    // Resources: grand perimeter ring
     res(cx - 350, cy + 30, 'stone');
     res(cx + 350, cy + 30, 'stone');
     res(cx - 150, cy + 90, 'vine');
     res(cx + 150, cy + 90, 'leaf');
     res(cx,       cy + 85, 'stone');
-    // Crystals: two large flanking shrine
     crystal(-60, -10, 18, 80);
     crystal( 60, -10, 18, 80);
-    // Trees: grand perimeter
     tree(cx + 360, cy);
     tree(cx + 300, cy + 50);
     tree(cx + 180, cy - 70);
     tree(cx + 240, cy + 60);
     tree(cx + 350, cy - 40);
-    // Ruin south
     ruin(cx, cy + 80, 35, 22);
     addFloatingText(width / 2, height * 0.25, 'Granary & Well constructed!', '#88cc66');
-    spawnParticles(farmCX, farmCY - ry * 0.3, 'build', 12);
+    spawnParticles(375, 340, 'build', 12);
   }
 
   if (lvl === 6) {
-    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
-    // RESIDENTIAL NW BLOCK — first two domus, side by side
-    let houseStreetY = cy - ry * 0.2;
-    let houseStartX  = cx - rx * 0.35;
-    pb(houseStartX,      houseStreetY, 44, 34, 'house');
-    pb(houseStartX + 50, houseStreetY, 44, 34, 'house');
-    // Torch between them on shared courtyard
-    pb(houseStartX + 25, houseStreetY + 18, 8, 16, 'torch');
-    // Shared garden in front
-    pb(houseStartX + 22, houseStreetY - 14, 20, 16, 'flower');
-    // Procedural: resources ring, crystal (even level), trees
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
     addFarmPlots(farmCX, farmCY, lvl);
     addFloatingText(width / 2, height * 0.3, 'Citizens settle — first Domus built!', '#aaddff');
-    spawnParticles(houseStartX + 25, houseStreetY, 'build', 10);
+    spawnParticles(465, 330, 'build', 10);
   }
 
   if (lvl === 7) {
-    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
-    // MARKET BLOCK — east of center on Via Principalis
-    let mktX = cx + rx * 0.45;
-    let mktY = cy - 8; // ON the Decumanus centerline
-    pb(mktX,       mktY,      44, 34, 'market');
-    pb(mktX - 30,  mktY + 24, 24, 20, 'chest');
-    pb(mktX + 30,  mktY + 24, 24, 20, 'chest');
-    pb(mktX,       mktY + 36, 32, 32, 'floor');
-    pb(mktX - 26,  mktY - 8,  8, 16, 'torch');
-    pb(mktX + 26,  mktY - 8,  8, 16, 'torch');
-    // Procedural
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
     addFloatingText(width / 2, height * 0.3, 'Market opens for trade!', '#ffcc66');
-    spawnParticles(mktX, mktY, 'build', 10);
+    spawnParticles(810, 375, 'build', 10);
   }
 
   if (lvl === 8) {
-    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
-    // BATH HOUSE — SW civic district
-    let bathX = cx - rx * 0.3;
-    let bathY = cy + ry * 0.35;
-    pb(bathX, bathY, 58, 44, 'bath');
-    pb(bathX - 36, bathY,      20, 16, 'flower');
-    pb(bathX + 36, bathY,      20, 16, 'flower');
-    pb(bathX,      bathY + 28, 32, 32, 'floor');
-    pb(bathX - 32, bathY + 24, 10, 20, 'lantern');
-
-    // CASTRUM — SE military compound (walled)
-    let castX = cx + rx * 0.45;
-    let castY = cy + ry * 0.5;
-    pb(castX,      castY,       64, 50, 'castrum');
-    pb(castX - 40, castY,       8,  50, 'wall');
-    pb(castX + 40, castY,       8,  50, 'wall');
-    pb(castX,      castY - 30,  80, 8,  'wall');
-    pb(castX + 44, castY - 28, 20, 44, 'watchtower');
-    pb(castX - 18, castY + 28,  8, 16, 'torch');
-    pb(castX + 18, castY + 28,  8, 16, 'torch');
-
-    // Via Militaris — paved approach road from center to castrum
-    pb(cx + rx * 0.35, cy + ry * 0.2,  24, 20, 'floor');
-    pb(cx + rx * 0.35, cy + ry * 0.3,  24, 20, 'floor');
-    pb(cx + rx * 0.35, cy + ry * 0.4,  24, 20, 'floor');
-
     // South road from port toward center (5 tiles)
     let _port = getPortPosition();
     for (let i = 0; i < 5; i++) {
       let t = (i + 1) / 6;
-      pb(lerp(_port.x, cx, t), lerp(_port.y, cy + 10, t), 24, 20, 'floor');
+      placeBuildingChecked({ x: lerp(_port.x, cx, t), y: lerp(_port.y, cy + 10, t), w: 24, h: 20, type: 'floor', rot: 0 });
     }
-
-    // Update legia state
+    // Update legia state with absolute castrum coords
     if (state.legia) {
       state.legia.castrumLevel = 1;
-      state.legia.castrumX = castX;
-      state.legia.castrumY = castY;
+      state.legia.castrumX = 840;
+      state.legia.castrumY = 470;
     }
     unlockJournal('legia_founded');
-
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
     addFarmPlots(farmCX, farmCY, lvl);
     addFloatingText(width / 2, height * 0.3, 'Baths & Castrum — Rome grows strong!', '#cc4444');
-    spawnParticles(castX, castY, 'build', 12);
+    spawnParticles(840, 470, 'build', 12);
   }
 
-  // ─────────────────────────────────────────────────────────────────
-  // ERA 2: CITY  (Lv 9-17)
-  // Grid takes shape. Cardo crosses Decumanus.
-  // ─────────────────────────────────────────────────────────────────
-
   if (lvl === 9) {
-    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
-    // AQUEDUCT ROW — spans north of island on east-west axis
-    pb(cx - rx * 0.1, cy - ry * 0.55, 20, 40, 'aqueduct');
-    pb(cx + rx * 0.1, cy - ry * 0.55, 20, 40, 'aqueduct');
-    pb(cx + rx * 0.3, cy - ry * 0.55, 20, 40, 'aqueduct');
-    // Bridge — residential NW to civic NE
-    pb(cx, cy - ry * 0.3, 32, 32, 'bridge');
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
     addFloatingText(width / 2, height * 0.3, 'Aqueduct spans the island!', '#66ccff');
-    spawnParticles(cx, cy - ry * 0.55, 'build', 12);
+    spawnParticles(600, 218, 'build', 12);
   }
 
   if (lvl === 10) {
-    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
-    // TEMPLE PRECINCT — civic NE, on Via Sacra
-    let tempX = cx + rx * 0.5;
-    let tempY = cy - ry * 0.35;
-    pb(tempX, tempY, 70, 50, 'temple');
-    // Processional floor grid in front of temple (3 cols x 2 rows)
-    for (let row = 0; row < 2; row++) {
-      for (let col = -1; col <= 1; col++) {
-        pb(tempX + col * 28, tempY + 35 + row * 24, 26, 22, 'floor');
-      }
-    }
-    // Flanking torches
-    pb(tempX - 40, tempY + 10, 8, 16, 'torch');
-    pb(tempX + 40, tempY + 10, 8, 16, 'torch');
-    // Flower beds
-    pb(tempX - 42, tempY - 10, 20, 16, 'flower');
-    pb(tempX + 42, tempY - 10, 20, 16, 'flower');
-
-    // SECOND MARKET — further east on Decumanus approach
-    pb(cx + rx * 0.65, cy - 8, 44, 34, 'market');
-
-    // TOWN CENTER PLAZA — six floor tiles at crossing
-    for (let r = 0; r < 2; r++) {
-      for (let c = -1; c <= 1; c++) {
-        pb(cx + c * 20, cy + 10 + r * 24, 26, 22, 'floor');
-      }
-    }
-    // Civic district entry lanterns
-    pb(cx + rx * 0.3, cy - ry * 0.15, 10, 20, 'lantern');
-    pb(cx + rx * 0.3, cy + ry * 0.05, 10, 20, 'lantern');
-    // East road paving tiles
-    pb(cx + rx * 0.4, cy - ry * 0.1, 32, 32, 'floor');
-    pb(cx + rx * 0.4, cy,            32, 32, 'floor');
-
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
     addFloatingText(width / 2, height * 0.25, 'GOVERNOR — Temple & Market erected!', '#ffdd66');
     triggerScreenShake(6, 15);
-    spawnParticles(tempX, tempY, 'build', 15);
+    spawnParticles(820, 303, 'build', 15);
   }
 
   if (lvl === 11) {
-    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
-    // TEMPLE GARDENS — flower beds and mosaic lining Via Sacra
-    pb(cx + rx * 0.45, cy - ry * 0.15, 20, 16, 'flower');
-    pb(cx + rx * 0.55, cy - ry * 0.15, 20, 16, 'flower');
-    pb(cx + rx * 0.65, cy - ry * 0.15, 20, 16, 'flower');
-    pb(cx + rx * 0.55, cy - ry * 0.55, 28, 20, 'mosaic');
-    pb(cx + rx * 0.5,  cy - ry * 0.25, 10, 20, 'lantern');
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
     addFloatingText(width / 2, height * 0.3, 'Gardens and mosaics adorn the temple!', '#ffaaff');
-    spawnParticles(cx + rx * 0.55, cy - ry * 0.15, 'build', 10);
+    spawnParticles(820, 362, 'build', 10);
   }
 
   if (lvl === 12) {
-    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
-    // RESIDENTIAL BLOCK 2 — two more domus north of first pair on Cardo
-    let houseStreetY2 = cy - ry * 0.2;
-    let houseStartX2  = cx - rx * 0.35;
-    pb(houseStartX2,      houseStreetY2, 44, 34, 'house');
-    pb(houseStartX2 + 50, houseStreetY2, 44, 34, 'house');
-    pb(houseStartX2 + 25, houseStreetY2 + 18, 8, 16, 'torch');
-    // Also a second pair on interior Cardo — spread along N-S axis
-    pb(cx - rx * 0.15, cy - ry * 0.15, 44, 34, 'house');
-    pb(cx - rx * 0.15, cy - ry * 0.45, 44, 34, 'house');
-    // Second well SW
-    pb(cx - rx * 0.2, cy + ry * 0.4, 24, 24, 'well');
-    // Via Principalis lanterns (3 posts along east road)
-    pb(cx + rx * 0.15, cy, 10, 20, 'lantern');
-    pb(cx + rx * 0.3,  cy, 10, 20, 'lantern');
-    pb(cx + rx * 0.45, cy, 10, 20, 'lantern');
-    // Cardo lanterns (4 posts along N-S road)
-    pb(cx + rx * 0.05, cy - ry * 0.15, 10, 20, 'lantern');
-    pb(cx + rx * 0.05, cy - ry * 0.35, 10, 20, 'lantern');
-    pb(cx + rx * 0.05, cy + ry * 0.15, 10, 20, 'lantern');
-    pb(cx + rx * 0.05, cy + ry * 0.35, 10, 20, 'lantern');
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
     addFloatingText(width / 2, height * 0.3, 'Housing fills the Cardo — second well dug!', '#ffee88');
-    spawnParticles(houseStartX2, houseStreetY2, 'build', 10);
+    spawnParticles(500, 340, 'build', 10);
   }
 
   if (lvl === 13) {
-    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
-    // THIRD MARKET STALL — on Decumanus between forum and first market
-    pb(cx + rx * 0.3, cy - 8, 44, 34, 'market');
-    // HOUSE — fill empty east quadrant
-    pb(cx + rx * 0.55, cy + ry * 0.1, 44, 34, 'house');
-    // WATCHTOWER — east edge sentinel
-    pb(cx + rx * 0.7, cy, 20, 44, 'watchtower');
-    // WALLS — extended military perimeter near castrum
-    pb(cx + rx * 0.25, cy + ry * 0.35, 32, 8, 'wall');
-    pb(cx + rx * 0.35, cy + ry * 0.35, 32, 8, 'wall');
-    pb(cx + rx * 0.45, cy + ry * 0.35, 32, 8, 'wall');
-    // GATE — castrum entrance on Via Militaris
-    pb(cx + rx * 0.35, cy + ry * 0.35, 24, 28, 'door');
-    // WATCHTOWER — farm-facing southern tower
-    pb(cx - rx * 0.1, cy + ry * 0.35, 20, 44, 'watchtower');
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
     addFloatingText(width / 2, height * 0.3, 'Watchtowers stand sentinel!', '#cc8844');
-    spawnParticles(cx + rx * 0.7, cy, 'build', 10);
+    spawnParticles(940, 392, 'build', 10);
   }
 
   if (lvl === 14) {
-    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
-    // EXTENDED AQUEDUCT — westward extension
-    pb(cx - rx * 0.3, cy - ry * 0.55, 20, 40, 'aqueduct');
-    pb(cx - rx * 0.5, cy - ry * 0.55, 20, 40, 'aqueduct');
-    // SECOND BATH HOUSE — NE civic, near library
-    let bath2X = cx + rx * 0.4;
-    let bath2Y = cy - ry * 0.15;
-    pb(bath2X,       bath2Y,      58, 44, 'bath');
-    pb(bath2X - 36,  bath2Y,      20, 16, 'flower');
-    pb(bath2X + 36,  bath2Y,      20, 16, 'flower');
-    pb(bath2X,       bath2Y + 28, 32, 32, 'floor');
-    pb(bath2X - 32,  bath2Y + 24, 10, 20, 'lantern');
-    // Bridge connecting market to residential
-    pb(cx + rx * 0.1, cy + ry * 0.1, 32, 32, 'bridge');
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
     addFloatingText(width / 2, height * 0.3, 'Bath complex rises, aqueduct extended!', '#66ccff');
-    spawnParticles(bath2X, bath2Y, 'build', 10);
+    spawnParticles(740, 368, 'build', 10);
   }
 
   if (lvl === 15) {
-    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
-    // FORUM — just south of Decumanus/Cardo crossing (open plaza at intersection)
-    let forumX = cx + rx * 0.05;
-    let forumY = cy + ry * 0.15;
-    pb(forumX, forumY, 80, 60, 'forum');
-    // Floor tiles surrounding forum (3x3 minus center)
-    for (let dx = -1; dx <= 1; dx++) {
-      for (let dy = -1; dy <= 1; dy++) {
-        if (dx === 0 && dy === 0) continue;
-        pb(forumX + dx * 50, forumY + dy * 35, 32, 32, 'floor');
-      }
-    }
-    // Corner lanterns marking forum square
-    pb(forumX - 50, forumY - 38, 10, 20, 'lantern');
-    pb(forumX + 50, forumY - 38, 10, 20, 'lantern');
-    pb(forumX - 50, forumY + 38, 10, 20, 'lantern');
-    pb(forumX + 50, forumY + 38, 10, 20, 'lantern');
-    // Mosaic processional south of forum
-    pb(forumX - 28, forumY + 44, 32, 32, 'mosaic');
-    pb(forumX,      forumY + 44, 32, 32, 'mosaic');
-    pb(forumX + 28, forumY + 44, 32, 32, 'mosaic');
-    // GRANARY #2 — between forum and castrum
-    pb(cx + rx * 0.3, cy + ry * 0.3, 58, 44, 'granary');
-    // TRIUMPHAL ARCH — east road landmark
-    pb(cx + rx * 0.65, cy, 48, 52, 'arch');
-    // WATCHTOWER — far east edge
-    pb(cx + rx * 0.8, cy - ry * 0.1, 20, 44, 'watchtower');
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
     addFloatingText(width / 2, height * 0.25, 'SENATOR — Forum raised!', '#ff9944');
     triggerScreenShake(8, 20);
-    spawnParticles(forumX, forumY, 'build', 15);
+    spawnParticles(620, 450, 'build', 15);
   }
 
   if (lvl === 16) {
-    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
-    // HOUSING ROW — NW residential street, 4 domus in a line
-    let streetX = cx - rx * 0.3;
-    let streetY1 = cy - ry * 0.35;
-    let streetY2 = cy - ry * 0.5;
-    // First row — 4 houses
-    for (let i = 0; i < 4; i++) {
-      pb(streetX + i * 50, streetY1, 44, 34, 'house');
-      if (i < 3) pb(streetX + i * 50 + 25, streetY1 + 18, 8, 16, 'torch');
-    }
-    // Fence along back of street (north side)
-    pb(streetX + 75, streetY1 - 22, 180, 6, 'fence');
-    // Second row behind first (deeper NW)
-    pb(streetX,       streetY2, 44, 34, 'house');
-    pb(streetX + 50,  streetY2, 44, 34, 'house');
-    pb(streetX + 100, streetY2, 44, 34, 'house');
-    pb(streetX + 25,  streetY2 + 18, 8, 16, 'torch');
-    pb(streetX + 75,  streetY2 + 18, 8, 16, 'torch');
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
     addFloatingText(width / 2, height * 0.3, 'Housing district expands!', '#aaddff');
-    spawnParticles(streetX + 75, streetY1, 'build', 12);
+    spawnParticles(460, 360, 'build', 12);
   }
 
   if (lvl === 17) {
-    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
-    // GREAT LIBRARY — NE civic quarter corner
-    let libX = cx + rx * 0.35;
-    let libY = cy - ry * 0.35;
-    pb(libX, libY, 58, 44, 'library');
-    // Mosaic forecourt
-    pb(libX, libY + 30, 32, 32, 'mosaic');
-    // Lanterns flanking entrance
-    pb(libX - 34, libY + 10, 10, 20, 'lantern');
-    pb(libX + 34, libY + 10, 10, 20, 'lantern');
-    // Floor tiles approach
-    pb(libX - 20, libY + 48, 32, 32, 'floor');
-    pb(libX + 20, libY + 48, 32, 32, 'floor');
-    // Shrine in library courtyard
-    pb(libX + 36, libY - 14, 32, 28, 'shrine');
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
     addFloatingText(width / 2, height * 0.3, 'Great Library of Rome rises!', '#ddaaff');
-    spawnParticles(libX, libY, 'build', 14);
+    spawnParticles(760, 303, 'build', 14);
   }
 
-  // ─────────────────────────────────────────────────────────────────
-  // ERA 3: ATLANTIS  (Lv 18-25)
-  // Monuments. Dense. The whole island is covered.
-  // ─────────────────────────────────────────────────────────────────
-
   if (lvl === 18) {
-    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
-    // ARENA — SE military district, massive landmark
-    let arenaX = cx + rx * 0.35;
-    let arenaY = cy + ry * 0.35;
-    pb(arenaX, arenaY, 68, 54, 'arena');
-    pb(arenaX - 40, arenaY + 30, 8, 16, 'torch');
-    pb(arenaX + 40, arenaY + 30, 8, 16, 'torch');
-    pb(arenaX,      arenaY + 34, 32, 32, 'floor');
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
     addFloatingText(width / 2, height * 0.3, 'Arena rises — glory awaits!', '#ff8844');
-    spawnParticles(arenaX, arenaY, 'build', 14);
+    spawnParticles(820, 455, 'build', 14);
   }
 
   if (lvl === 19) {
-    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
-    let arenaX = cx + rx * 0.35;
-    let arenaY = cy + ry * 0.35;
-    // ARENA FORECOURT — mosaics and lanterns completing the arena complex
-    pb(arenaX - 20, arenaY + 52, 28, 20, 'mosaic');
-    pb(arenaX + 20, arenaY + 52, 28, 20, 'mosaic');
-    pb(arenaX - 50, arenaY + 30, 10, 20, 'lantern');
-    pb(arenaX + 50, arenaY + 30, 10, 20, 'lantern');
-    // Fill military perimeter: extra wall, domus near castrum approach
-    pb(cx + rx * 0.3, cy + ry * 0.15, 44, 34, 'house');
-    pb(cx + rx * 0.15, cy + ry * 0.25, 44, 34, 'house');
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
     addFloatingText(width / 2, height * 0.3, 'Arena complete — let the games begin!', '#ff6622');
-    spawnParticles(arenaX, arenaY + 30, 'build', 16);
+    spawnParticles(820, 507, 'build', 16);
   }
 
   if (lvl === 20) {
-    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
-    // VILLA — NW north prominence, premium residential
-    let villaX = cx - rx * 0.3;
-    let villaY = cy - ry * 0.55;
-    pb(villaX, villaY, 72, 52, 'villa');
-    pb(villaX - 42, villaY + 10, 20, 16, 'flower');
-    pb(villaX + 42, villaY + 10, 20, 16, 'flower');
-    pb(villaX - 42, villaY - 10, 20, 16, 'flower');
-    pb(villaX + 42, villaY - 10, 20, 16, 'flower');
-    pb(villaX,      villaY + 32, 32, 32, 'mosaic');
-    pb(villaX + 40, villaY + 28, 10, 20, 'lantern');
-    // ARCH — port gate triumphal
-    let port = getPortPosition();
-    pb(port.x + 120, port.y - 15, 48, 52, 'arch');
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
     addFloatingText(width / 2, height * 0.25, 'CONSUL — Villa Estate built!', '#ffaa00');
     triggerScreenShake(12, 30);
-    spawnParticles(villaX, villaY, 'build', 20);
+    spawnParticles(460, 268, 'build', 20);
   }
 
   if (lvl === 21) {
-    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
-    // SENATE FORUM — second forum west of main forum
-    let senX = cx - rx * 0.15;
-    let senY = cy + ry * 0.15;
-    pb(senX, senY, 64, 48, 'forum');
-    pb(senX - 40, senY + 20, 8, 16, 'torch');
-    pb(senX + 72, senY + 20, 8, 16, 'torch');
-    pb(senX - 20, senY + 32, 24, 20, 'floor');
-    pb(senX,      senY + 32, 24, 20, 'floor');
-    pb(senX + 20, senY + 32, 24, 20, 'floor');
-    pb(senX + 40, senY + 32, 24, 20, 'floor');
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
     addFloatingText(width / 2, height * 0.3, 'Senate convenes — Forum Magnum!', '#ffaa44');
-    spawnParticles(senX, senY, 'build', 14);
+    spawnParticles(560, 450, 'build', 14);
   }
 
   if (lvl === 22) {
-    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
-    // HARBOR ARCH GATE — far east road terminus
-    pb(cx + rx * 0.72, cy + ry * 0.1, 48, 52, 'arch');
-    // Harbor road lanterns
-    pb(cx + rx * 0.4, cy + ry * 0.1, 10, 20, 'lantern');
-    pb(cx + rx * 0.5, cy + ry * 0.1, 10, 20, 'lantern');
-    pb(cx + rx * 0.6, cy + ry * 0.1, 10, 20, 'lantern');
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
     addFloatingText(width / 2, height * 0.3, 'Harbor gate — the arch stands!', '#ddcc88');
-    spawnParticles(cx + rx * 0.72, cy + ry * 0.1, 'build', 12);
+    spawnParticles(980, 410, 'build', 12);
   }
 
   if (lvl === 23) {
-    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
-    // GRAND AQUEDUCT — five segments spanning full island width
-    pb(cx - rx * 0.5,  cy - ry * 0.6, 20, 40, 'aqueduct');
-    pb(cx - rx * 0.25, cy - ry * 0.6, 20, 40, 'aqueduct');
-    pb(cx,             cy - ry * 0.6, 20, 40, 'aqueduct');
-    pb(cx + rx * 0.25, cy - ry * 0.6, 20, 40, 'aqueduct');
-    pb(cx + rx * 0.5,  cy - ry * 0.6, 20, 40, 'aqueduct');
-    // Grand bridges under aqueduct (pilgrimage route)
-    pb(cx - rx * 0.35, cy - ry * 0.45, 32, 32, 'bridge');
-    pb(cx + rx * 0.15, cy - ry * 0.45, 32, 32, 'bridge');
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
     addFloatingText(width / 2, height * 0.3, 'Grand Aqueduct spans all of Mare Nostrum!', '#66ccff');
-    spawnParticles(cx, cy - ry * 0.6, 'build', 16);
+    spawnParticles(600, 210, 'build', 16);
   }
 
   if (lvl === 24) {
-    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
-    // IMPERIAL PALACE — sacred hill, between aqueduct and pyramid
-    let palX = cx, palY = cy - ry * 0.5;
-    pb(palX,      palY,       60, 44, 'villa');
-    pb(palX - 38, palY + 52,  28, 20, 'mosaic');
-    pb(palX + 18, palY + 52,  28, 20, 'mosaic');
-    pb(palX - 44, palY + 20,  20, 16, 'flower');
-    pb(palX + 44, palY + 20,  20, 16, 'flower');
-    pb(palX - 44, palY + 40,  20, 16, 'flower');
-    pb(palX + 44, palY + 40,  20, 16, 'flower');
-    pb(palX - 20, palY + 60,  10, 20, 'lantern');
-    pb(palX + 20, palY + 60,  10, 20, 'lantern');
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
     addFloatingText(width / 2, height * 0.3, 'Imperial Palace rises — glory of Rome!', '#ffcc44');
-    spawnParticles(palX, palY, 'build', 18);
+    spawnParticles(600, 242, 'build', 18);
   }
 
-  // Lvl 25 is handled in expandIsland() directly (imperator banner, particle burst, etc.)
-  // Only add buildings here not in that block:
   if (lvl === 25) {
-    // GRAND TEMPLE — island peak, final monument
-    pb(cx, cy - ry * 0.7, 56, 40, 'temple');
-    pb(cx - 60, cy - ry * 0.7 + 20, 20, 16, 'flower');
-    pb(cx + 60, cy - ry * 0.7 + 20, 20, 16, 'flower');
-    // TRIUMPHAL ARCH — south
-    pb(cx + rx * 0.4, cy + ry * 0.3, 48, 52, 'arch');
-    // VILLA — SW counterpoint
-    pb(cx - rx * 0.4, cy + ry * 0.3, 60, 44, 'villa');
-    // MOSAIC PROCESSIONAL — grand approach to pyramid
-    pb(cx - 30, cy - ry * 0.1, 28, 20, 'mosaic');
-    pb(cx,      cy - ry * 0.1, 28, 20, 'mosaic');
-    pb(cx + 30, cy - ry * 0.1, 28, 20, 'mosaic');
-    pb(cx - 50, cy - ry * 0.1, 10, 20, 'lantern');
-    pb(cx + 50, cy - ry * 0.1, 10, 20, 'lantern');
     addFloatingText(width / 2, height * 0.25, 'IMPERATOR — Mare Nostrum is yours!', '#ff4400');
     triggerScreenShake(15, 40);
   }
