@@ -7235,15 +7235,18 @@ function drawOneCrystal(node) {
 
     let pulse = sin(node.phase) * 0.3 + 0.7;
 
-    // Glow aura — pixel cross
+    // Glow aura — pixel cross (only when player is nearby)
     noStroke();
-    let glS = floor(node.size * 1.2);
-    fill(0, 255, 136, floor(12 * pulse));
-    rect(nx - glS, ny - 1, glS * 2, 2);
-    rect(nx - 1, ny - glS, 2, glS * 2);
-    fill(0, 255, 136, floor(6 * pulse));
-    rect(nx - glS * 0.7, ny - 2, glS * 1.4, 4);
-    rect(nx - 2, ny - glS * 0.7, 4, glS * 1.4);
+    let playerDist = dist2(state.player.x, state.player.y, node.x, node.y);
+    if (playerDist < 200) {
+      let glS = floor(node.size * 0.72);
+      fill(0, 255, 136, floor(7 * pulse));
+      rect(nx - glS, ny - 1, glS * 2, 2);
+      rect(nx - 1, ny - glS, 2, glS * 2);
+      fill(0, 255, 136, floor(4 * pulse));
+      rect(nx - glS * 0.7, ny - 2, glS * 1.4, 4);
+      rect(nx - 2, ny - glS * 0.7, 4, glS * 1.4);
+    }
 
     // Stone altar pedestal — pixel
     fill(120, 115, 100, 150);
@@ -17945,6 +17948,31 @@ function placeEraBuildings(lvl) {
   }
 }
 
+function spawnAmbientHousing(count) {
+  let cx = WORLD.islandCX, cy = WORLD.islandCY;
+  let srx = getSurfaceRX(), sry = getSurfaceRY();
+  let placed = 0;
+  for (let attempt = 0; attempt < count * 5 && placed < count; attempt++) {
+    let a = random(TWO_PI);
+    let r = random(0.15, 0.55);
+    let x = cx + cos(a) * srx * r;
+    let y = cy + sin(a) * sry * r;
+    let tooClose = state.buildings.some(b => {
+      let dx = x - b.x, dy = y - b.y;
+      return dx * dx + dy * dy < 35 * 35;
+    });
+    if (tooClose) continue;
+    if (state.pyramid) {
+      let dx = x - state.pyramid.x, dy = y - state.pyramid.y;
+      if (dx * dx + dy * dy < 80 * 80) continue;
+    }
+    state.buildings.push({
+      x: x, y: y, w: 28, h: 22, type: 'house', rot: 0, ambient: true
+    });
+    placed++;
+  }
+}
+
 function expandIsland() {
   let cost = getExpandCost(state.islandLevel);
   if (!canAffordExpand()) {
@@ -17965,8 +17993,8 @@ function expandIsland() {
   showAchievement('Island Level ' + state.islandLevel + ' Reached!');
   addNotification('Island expanded to Level ' + state.islandLevel, '#ffdd66');
   // Island grows less per level at higher tiers
-  let rxGrowth = state.islandLevel <= 5 ? 60 : state.islandLevel <= 10 ? 45 : state.islandLevel <= 15 ? 35 : state.islandLevel <= 20 ? 25 : 18;
-  let ryGrowth = state.islandLevel <= 5 ? 40 : state.islandLevel <= 10 ? 30 : state.islandLevel <= 15 ? 22 : state.islandLevel <= 20 ? 16 : 12;
+  let rxGrowth = state.islandLevel <= 5 ? 35 : state.islandLevel <= 10 ? 28 : state.islandLevel <= 15 ? 22 : state.islandLevel <= 20 ? 16 : 12;
+  let ryGrowth = state.islandLevel <= 5 ? 24 : state.islandLevel <= 10 ? 18 : state.islandLevel <= 15 ? 14 : state.islandLevel <= 20 ? 10 : 8;
   state.islandRX += rxGrowth;
   state.islandRY += ryGrowth;
   state.pyramid.level = state.islandLevel;
@@ -17974,6 +18002,13 @@ function expandIsland() {
 
   // Place all buildings, resources, trees, crystals, ruins for this level
   placeEraBuildings(state.islandLevel);
+
+  // Ambient background houses to fill empty space
+  if (state.islandLevel === 10) spawnAmbientHousing(8);
+  if (state.islandLevel === 13) spawnAmbientHousing(10);
+  if (state.islandLevel === 16) spawnAmbientHousing(10);
+  if (state.islandLevel === 19) spawnAmbientHousing(8);
+  if (state.islandLevel === 22) spawnAmbientHousing(6);
 
   // Milestone journal unlocks and special effects
   let rx = getSurfaceRX(), ry = getSurfaceRY();

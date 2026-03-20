@@ -822,17 +822,17 @@ function drawIsland() {
         // Project cloud position onto island as shadow
         let shadowX = ix + (cl.x / width - 0.5) * iw * 1.2;
         let shadowY = iy - 18 + (cl.y / height) * ih * 0.6;
-        let shadowW = cl.w * 0.8;
-        let shadowH = cl.h * 0.4;
-        fill(0, 0, 0, 14 * bright * cl.depth);
+        let shadowW = cl.w * 0.4;
+        let shadowH = cl.h * 0.2;
+        fill(0, 0, 0, 12 * bright * cl.depth);
         ellipse(shadowX, shadowY, shadowW, shadowH);
       });
     } else {
       cloudShadows.forEach(cs => {
         let cx2 = ix + ((cs.x + frameCount * cs.speed * 0.001) % 1.6 - 0.8) * iw;
         let cy2 = iy - 18 + cs.y * ih * 0.3;
-        fill(0, 0, 0, 16 * bright);
-        ellipse(cx2, cy2, cs.w, cs.h);
+        fill(0, 0, 0, 12 * bright);
+        ellipse(cx2, cy2, cs.w * 0.5, cs.h * 0.5);
       });
     }
   }
