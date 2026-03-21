@@ -484,12 +484,26 @@ function handleEconomyKey(k, kCode) {
     }
   }
 
+  // Colony management UI (C key)
+  if (state.colonyManageOpen) {
+    if (handleColonyManageKey(k, kCode)) return true;
+  }
+  if ((k === 'c' || k === 'C') && !state.conquest.active && !state.adventure.active && !state.rowing.active &&
+      !state.tradeRouteUI && !state.colonyManageOpen && !state.buildMode) {
+    if (Object.keys(state.colonies || {}).length > 0) {
+      state.colonyManageOpen = true;
+      state.colonyManageSelected = null;
+      return true;
+    }
+  }
+
   return false;
 }
 
 // Handle trade route UI mouse clicks
 function handleEconomyClick(mx, my) {
   if (handlePrestigeClick(mx, my)) return true;
+  if (handleColonyManageClick(mx, my)) return true;
   if (!state.tradeRouteUI) return false;
 
   // Check if clicking on a good button to create route
@@ -573,6 +587,7 @@ function drawEconomyUIOverlay() {
   drawTradeRouteUI();
   drawColonySpecSelectUI();
   drawPrestigeUI();
+  drawColonyManageUI();
 
   // Port hint when near port and colony exists
   if (!state.tradeRouteUI && !state.conquest.active && !state.rowing.active && state.conquest.colonized) {
@@ -1275,4 +1290,247 @@ function drawPriceTrendArrow(x, y, trend) {
     rect(x - 3, y - 1, 6, 2);
   }
   pop();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ─── COLONY MANAGEMENT UI (Press C) ──────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+
+let _colonyNPCPool = ['Marcus', 'Livia', 'Vesta', 'Felix', 'Gaius', 'Aurelia', 'Quintus', 'Cassia'];
+
+function drawColonyManageUI() {
+  if (!state.colonyManageOpen) return;
+  push();
+
+  let pw = 420, ph = 400;
+  let px = width / 2 - pw / 2, py = height / 2 - ph / 2;
+
+  // Panel background
+  fill(15, 12, 8, 240);
+  stroke(140, 180, 100);
+  strokeWeight(2);
+  rect(px, py, pw, ph, 8);
+  noStroke();
+
+  // Title
+  fill(140, 220, 100);
+  textSize(15); textAlign(CENTER, TOP);
+  let colKeys = Object.keys(state.colonies || {});
+  text('COLONY MANAGEMENT  (' + colKeys.length + ' colonies)', width / 2, py + 10);
+
+  // Total income summary
+  let totalIncome = 0;
+  for (let k of colKeys) totalIncome += state.colonies[k].income + Math.floor(state.colonies[k].population * 0.5);
+  fill(200, 190, 140); textSize(9);
+  text('Total colony income: +' + totalIncome + 'g/day  |  Home income: ~' + (state.islandLevel || 1) * 5 + 'g/day', width / 2, py + 30);
+
+  let sel = state.colonyManageSelected;
+  let sy = py + 48;
+
+  if (!sel) {
+    // Colony list view
+    if (colKeys.length === 0) {
+      fill(140, 130, 110); textSize(10); textAlign(CENTER, TOP);
+      text('No colonies yet. Conquer Terra Nova or defeat a nation.', width / 2, sy + 20);
+    } else {
+      for (let i = 0; i < colKeys.length; i++) {
+        let k = colKeys[i];
+        let col = state.colonies[k];
+        let rowH = 44;
+        // Row background
+        fill(30, 28, 22, 200);
+        rect(px + 10, sy, pw - 20, rowH, 5);
+        // Colony name
+        fill(220, 210, 160); textSize(11); textAlign(LEFT, TOP);
+        text('[' + (i + 1) + '] ' + col.name, px + 18, sy + 4);
+        // Level, pop, income
+        fill(170, 160, 130); textSize(8);
+        text('LV.' + col.level + '  Pop: ' + col.population + '  Income: +' + (col.income + Math.floor(col.population * 0.5)) + 'g/day  Military: ' + col.military, px + 18, sy + 18);
+        // Governor
+        fill(col.governor ? color(100, 200, 100) : color(120, 110, 90)); textSize(7);
+        text('Governor: ' + (col.governor || 'None') + '  |  Trade: ' + (col.autoTrade ? 'ON' : 'OFF'), px + 18, sy + 30);
+        // Unique resource
+        if (col.uniqueResource) {
+          fill(200, 180, 80); textSize(7); textAlign(RIGHT, TOP);
+          text(col.uniqueResource, px + pw - 18, sy + 4);
+          textAlign(LEFT, TOP);
+        }
+        sy += rowH + 4;
+      }
+    }
+
+    // Instructions
+    fill(120, 110, 90); textSize(8); textAlign(CENTER, TOP);
+    text('Press 1-' + colKeys.length + ' to select  |  ESC or C to close', width / 2, py + ph - 18);
+  } else {
+    // Colony detail view
+    let col = state.colonies[sel];
+    if (!col) { state.colonyManageSelected = null; pop(); return; }
+
+    fill(220, 210, 160); textSize(13); textAlign(CENTER, TOP);
+    text(col.name + '  (LV.' + col.level + ')', width / 2, sy);
+    sy += 22;
+
+    // Stats
+    fill(180, 170, 140); textSize(9); textAlign(LEFT, TOP);
+    text('Population: ' + col.population, px + 18, sy);
+    text('Income: +' + (col.income + Math.floor(col.population * 0.5)) + 'g/day', px + 180, sy);
+    sy += 16;
+    text('Military: ' + col.military, px + 18, sy);
+    text('Troops stationed: ' + (col.troopsStationed || 0), px + 180, sy);
+    sy += 16;
+    text('Colony gold: ' + col.gold + 'g', px + 18, sy);
+    text('Days owned: ' + (col.daysOwned || 0), px + 180, sy);
+    sy += 16;
+    text('Resources — Wood: ' + (col.resources ? col.resources.wood : 0) + '  Stone: ' + (col.resources ? col.resources.stone : 0), px + 18, sy);
+    sy += 16;
+    if (col.uniqueResource) {
+      fill(200, 180, 80);
+      text('Unique resource: ' + col.uniqueResource + ' (produces every 3 days at LV.2+)', px + 18, sy);
+      sy += 16;
+    }
+    text('Governor: ' + (col.governor || 'None (assign for auto-growth)'), px + 18, sy);
+    sy += 22;
+
+    // Buildings
+    fill(200, 190, 150); textSize(10);
+    text('Buildings: ' + (col.buildings.length > 0 ? col.buildings.join(', ') : 'None'), px + 18, sy);
+    sy += 20;
+
+    // Action buttons (text-based)
+    fill(140, 220, 100); textSize(10); textAlign(LEFT, TOP);
+    let actions = [];
+    actions.push({ key: 'V', label: '[V] Visit colony (sail there)', action: 'visit' });
+    actions.push({ key: 'B', label: '[B] Build remotely (10 wood + 5 stone)', action: 'build' });
+    actions.push({ key: 'G', label: '[G] Assign governor' + (col.governor ? ' (current: ' + col.governor + ')' : ''), action: 'governor' });
+    actions.push({ key: 'T', label: '[T] Toggle trade route (' + (col.autoTrade ? 'ON' : 'OFF') + ')', action: 'trade' });
+    actions.push({ key: 'S', label: '[S] Station troops (+1 military, costs 20g)', action: 'troops' });
+
+    for (let a of actions) {
+      fill(30, 28, 22, 180);
+      rect(px + 14, sy, pw - 28, 22, 4);
+      fill(180, 220, 140); textSize(9);
+      text(a.label, px + 22, sy + 5);
+      sy += 26;
+    }
+
+    // Back
+    fill(120, 110, 90); textSize(8); textAlign(CENTER, TOP);
+    text('ESC = back to list  |  C = close', width / 2, py + ph - 18);
+  }
+
+  pop();
+}
+
+function handleColonyManageKey(k, kCode) {
+  if (!state.colonyManageOpen) return false;
+  let colKeys = Object.keys(state.colonies || {});
+
+  // Close
+  if (kCode === 27) {
+    if (state.colonyManageSelected) {
+      state.colonyManageSelected = null; // back to list
+    } else {
+      state.colonyManageOpen = false; state.colonyManageSelected = null;
+    }
+    return true;
+  }
+  if (k === 'c' || k === 'C') {
+    state.colonyManageOpen = false; state.colonyManageSelected = null;
+    return true;
+  }
+
+  // In list view — number selects colony
+  if (!state.colonyManageSelected) {
+    let num = parseInt(k);
+    if (num >= 1 && num <= colKeys.length) {
+      state.colonyManageSelected = colKeys[num - 1];
+      return true;
+    }
+    return true; // block keys while panel open
+  }
+
+  // In detail view — action keys
+  let sel = state.colonyManageSelected;
+  let col = state.colonies[sel];
+  if (!col) return true;
+
+  if (k === 'v' || k === 'V') {
+    // Visit colony — sail there
+    // Put player in rowboat aimed at colony position
+    state.colonyManageOpen = false; state.colonyManageSelected = null;
+    state.rowing.active = true;
+    state.rowing.x = state.player.x;
+    state.rowing.y = state.player.y + 50;
+    state.rowing.speed = 0;
+    state.rowing.angle = atan2(col.isleY - state.player.y, col.isleX - state.player.x);
+    state.rowing.wakeTrail = [];
+    addFloatingText(width / 2, height * 0.3, 'Sailing to ' + col.name + '...', '#88ccff');
+    return true;
+  }
+
+  if (k === 'b' || k === 'B') {
+    // Remote build
+    if (state.wood >= 10 && state.stone >= 5) {
+      state.wood -= 10; state.stone -= 5;
+      let bTypes = ['granary', 'barracks', 'market', 'wall', 'temple'];
+      let bt = bTypes[col.buildings.length % bTypes.length];
+      col.buildings.push(bt);
+      col.income += 2;
+      addFloatingText(width / 2, height * 0.25, bt + ' built in ' + col.name + '!', '#88cc88');
+      addNotification(col.name + ': ' + bt + ' constructed', '#88cc88');
+    } else {
+      addFloatingText(width / 2, height * 0.3, 'Need 10 wood + 5 stone!', '#ff6644');
+    }
+    return true;
+  }
+
+  if (k === 'g' || k === 'G') {
+    // Assign governor — cycle through NPC pool
+    let idx = _colonyNPCPool.indexOf(col.governor);
+    idx = (idx + 1) % _colonyNPCPool.length;
+    col.governor = _colonyNPCPool[idx];
+    addFloatingText(width / 2, height * 0.25, col.governor + ' governs ' + col.name, '#aaddff');
+    return true;
+  }
+
+  if (k === 't' || k === 'T') {
+    col.autoTrade = !col.autoTrade;
+    addFloatingText(width / 2, height * 0.25, 'Trade route: ' + (col.autoTrade ? 'ON' : 'OFF'), '#ddaa44');
+    return true;
+  }
+
+  if (k === 's' || k === 'S') {
+    if (state.gold >= 20) {
+      state.gold -= 20;
+      col.military += 1;
+      col.troopsStationed = (col.troopsStationed || 0) + 1;
+      addFloatingText(width / 2, height * 0.25, '+1 troops stationed at ' + col.name, '#cc8844');
+    } else {
+      addFloatingText(width / 2, height * 0.3, 'Need 20 gold!', '#ff6644');
+    }
+    return true;
+  }
+
+  return true; // block all keys while in detail view
+}
+
+function handleColonyManageClick(mx, my) {
+  if (!state.colonyManageOpen) return false;
+  let colKeys = Object.keys(state.colonies || {});
+
+  if (!state.colonyManageSelected) {
+    // Click on colony row to select
+    let pw = 420, ph = 400;
+    let px = width / 2 - pw / 2, py = height / 2 - ph / 2;
+    let sy = py + 48;
+    for (let i = 0; i < colKeys.length; i++) {
+      if (mx >= px + 10 && mx <= px + pw - 10 && my >= sy && my <= sy + 44) {
+        state.colonyManageSelected = colKeys[i];
+        return true;
+      }
+      sy += 48;
+    }
+  }
+  return true; // consume click when panel open
 }

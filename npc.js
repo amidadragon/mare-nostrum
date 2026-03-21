@@ -312,6 +312,8 @@ function drawNPC() {
   let n = state.npc;
   let sx = w2sX(n.x);
   let sy = w2sY(n.y);
+  // Cull offscreen
+  if (sx < -40 || sx > width + 40 || sy < -40 || sy > height + 40) return;
   let bob = sin(frameCount * 0.03) * 1.2;
   let breathe = sin(frameCount * 0.04) * 0.4;
   let pDist = dist(state.player.x, state.player.y, n.x, n.y);
@@ -1187,6 +1189,8 @@ function npcHeartPop(npc) {
 
 function drawNewNPC(npc, type) {
   let sx = w2sX(npc.x), sy = w2sY(npc.y);
+  // Cull offscreen
+  if (sx < -40 || sx > width + 40 || sy < -40 || sy > height + 40) return;
   updateNPCAnim(npc);
   let a = npc.anim;
   let bob = floor(sin(frameCount * 0.03 + npc.x * 0.1) + a.breathe) * 1;

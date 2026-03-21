@@ -772,7 +772,8 @@ function drawIsland() {
 
   // Foam waves — animated white froth at water's edge
   let foamPhase = frameCount * 0.02;
-  for (let fa = 0; fa < TWO_PI; fa += 0.3) {
+  let _foamStep = _fpsSmooth < 40 ? 0.5 : 0.3;
+  for (let fa = 0; fa < TWO_PI; fa += _foamStep) {
     let foamPulse = sin(foamPhase + fa * 3) * 0.01 + 0.005;
     let foamRX = iw * (0.465 + foamPulse);
     let foamRY = ih * (0.196 + foamPulse * 0.4);
@@ -784,7 +785,8 @@ function drawIsland() {
 
   // ─── WATER REFLECTIONS — shimmer band at coastline ───
   let reflPhase = frameCount * 0.015;
-  for (let ra = 0; ra < TWO_PI; ra += 0.18) {
+  let _reflStep = _fpsSmooth < 40 ? 0.3 : 0.18;
+  for (let ra = 0; ra < TWO_PI; ra += _reflStep) {
     let wave = sin(reflPhase + ra * 4) * 0.5 + 0.5;
     let wave2 = sin(reflPhase * 1.3 + ra * 6) * 0.5 + 0.5;
     // Outer shimmer ring — light bouncing off shallow water
@@ -2914,6 +2916,7 @@ function drawNightLighting() {
       if (b.type !== 'torch' && b.type !== 'lantern' && b.type !== 'campfire') return;
       let sx = w2sX(b.x);
       let sy = w2sY(b.y);
+      if (sx < -40 || sx > width + 40 || sy < -40 || sy > height + 40) return;
       fill(ng[0], ng[1], ng[2], 12 * nightAlpha);
       ellipse(sx, sy, nr * 2.5, nr * 1.5);
       fill(ng[0], ng[1], ng[2], 25 * nightAlpha);
@@ -2927,6 +2930,7 @@ function drawNightLighting() {
       if (cn.respawnTimer > 0) return;
       let sx = w2sX(cn.x);
       let sy = w2sY(cn.y);
+      if (sx < -50 || sx > width + 50 || sy < -50 || sy > height + 50) return;
       fill(80, 220, 200, 15 * nightAlpha);
       ellipse(sx, sy, 50, 30);
       fill(80, 240, 210, 8 * nightAlpha);

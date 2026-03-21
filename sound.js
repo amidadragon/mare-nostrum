@@ -704,6 +704,8 @@ class SoundManager {
 
   // ─── LOAD REAL AUDIO SAMPLES (CC0) ───
   loadSamples() {
+    if (this._samplesLoading) return;
+    this._samplesLoading = true;
     const files = {
       // Ambient loops
       ocean: 'sounds/ambient_ocean.flac',

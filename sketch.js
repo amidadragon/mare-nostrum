@@ -201,17 +201,37 @@ const FACTIONS = {
   },
 };
 
+// Faction data caches — invalidated only when faction changes (never mid-game)
+let _factionDataCache = null;
+let _factionBuildingColorsCache = null;
+let _factionMilitaryCache = null;
+let _factionCacheKey = null;
+
+function _invalidateFactionCache() {
+  _factionDataCache = null;
+  _factionBuildingColorsCache = null;
+  _factionMilitaryCache = null;
+  _factionCacheKey = null;
+}
+
 function getFactionBuildingColors() {
+  let key = state.faction || 'rome';
+  if (_factionBuildingColorsCache && _factionCacheKey === key) return _factionBuildingColorsCache;
   let fac = getFactionData();
   let s = fac.style;
-  return { wall: s.wall, roof: s.roof, trim: s.trim, accent: s.accent,
+  _factionBuildingColorsCache = { wall: s.wall, roof: s.roof, trim: s.trim, accent: s.accent,
     door: s.door, window: s.window, column: s.column, ground: s.ground,
     roofType: s.roofType, columnType: s.columnType, doorShape: s.doorShape,
     wallTexture: s.wallTexture, groundTint: s.groundTint };
+  return _factionBuildingColorsCache;
 }
 
 function getFactionData() {
-  return FACTIONS[state.faction] || FACTIONS.rome;
+  let key = state.faction || 'rome';
+  if (_factionDataCache && _factionCacheKey === key) return _factionDataCache;
+  _factionCacheKey = key;
+  _factionDataCache = FACTIONS[key] || FACTIONS.rome;
+  return _factionDataCache;
 }
 
 function getNPCDisplayName(npcKey) {
@@ -285,7 +305,10 @@ const FACTION_MILITARY = {
 };
 
 function getFactionMilitary() {
-  return FACTION_MILITARY[state.faction] || FACTION_MILITARY.rome;
+  let key = state.faction || 'rome';
+  if (_factionMilitaryCache && _factionCacheKey === key) return _factionMilitaryCache;
+  _factionMilitaryCache = FACTION_MILITARY[key] || FACTION_MILITARY.rome;
+  return _factionMilitaryCache;
 }
 
 const FACTION_WILDLIFE = {
@@ -1574,6 +1597,7 @@ function initState() {
 
     // Colony specialization (chosen at colony level 3)
     colonySpec: {}, // { 'conquest': 'agricultural' | 'mining' | 'military' | 'trading' | 'sacred' }
+    colonies: {}, colonyManageOpen: false, colonyManageSelected: null,
 
     // Crafted advanced resources
     steel: 0,    // Iron Ore + Wood (at forge)
@@ -2816,66 +2840,76 @@ function drawInner() {
       drawPlentyDistantLabel();
       drawNecropolisIsland();
       drawNecropolisDistantLabel();
+      drawHomeIslandDistant();
     }
     pop();
 
-    // Island + everything on it
+    // Island + everything on it — skip full render when sailing far from home
+    let _homeDist = 0;
+    if (state.rowing && state.rowing.active) {
+      let _hdx = state.rowing.x - WORLD.islandCX, _hdy = state.rowing.y - WORLD.islandCY;
+      _homeDist = sqrt(_hdx * _hdx + _hdy * _hdy);
+    }
     push();
     translate(shakeX, shakeY + floatOffset);
-    drawIsland();
-    drawAmbientHouses();
-    drawWorldObjectsSorted();
-    drawCitySmoke();
-    drawLaundryLines();
-    drawStreetWear();
-    drawGranaryArea();
-    drawAmphoraStacks();
-    drawTempleIncense();
-    drawForumBanner();
-    drawWindowGlow();
-    drawRuinOverlays();
-    drawCompanionTrail();
-    drawPlayerTrail();
-    drawNightLighting();
-    drawFishing();
-    drawParticles();
-    drawSeasonalEffects();
-    drawAmbientWildlife();
-    drawWeatherEffects();
-    drawEnergyArcs();
-    drawFloatingText();
-    drawShip();
-    drawOracleStone();
-    if (typeof drawLoreTablets === 'function') drawLoreTablets();
-    // Livia's scroll (Chapter 3 quest item)
-    if (state.mainQuest && state.mainQuest.chapter === 2 && !state.narrativeFlags['livia_scroll'] && state.ruins.length > 0) {
-      let rx = state.ruins[0].x, ry = state.ruins[0].y;
-      let ssx = w2sX(rx), ssy = w2sY(ry);
-      if (ssx > -20 && ssx < width + 20) {
-        push(); noStroke();
-        fill(200, 180, 120); rect(ssx - 3, ssy - 6, 6, 10);
-        fill(170, 150, 100); rect(ssx - 4, ssy - 7, 8, 2); rect(ssx - 4, ssy + 3, 8, 2);
-        let p = sin(frameCount * 0.08) * 0.4 + 0.6;
-        fill(220, 190, 80, floor(50 * p)); rect(ssx - 6, ssy - 8, 12, 14);
-        pop();
-        if (dist(state.player.x, state.player.y, rx, ry) < 50) {
-          fill(220, 190, 80); textAlign(CENTER, CENTER); textSize(11);
-          text('[E] Pick up scroll', ssx, ssy - 16); textAlign(LEFT, TOP);
+    if (!state.rowing || !state.rowing.active || _homeDist < 300) {
+      drawIsland();
+      drawAmbientHouses();
+      drawWorldObjectsSorted();
+      drawCitySmoke();
+      drawLaundryLines();
+      drawStreetWear();
+      drawGranaryArea();
+      drawAmphoraStacks();
+      drawTempleIncense();
+      drawForumBanner();
+      drawWindowGlow();
+      drawRuinOverlays();
+      drawCompanionTrail();
+      drawPlayerTrail();
+      drawNightLighting();
+      drawFishing();
+      drawParticles();
+      drawSeasonalEffects();
+      drawAmbientWildlife();
+      drawWeatherEffects();
+      drawEnergyArcs();
+      drawFloatingText();
+      drawShip();
+      drawOracleStone();
+      if (typeof drawLoreTablets === 'function') drawLoreTablets();
+      // Livia's scroll (Chapter 3 quest item)
+      if (state.mainQuest && state.mainQuest.chapter === 2 && !state.narrativeFlags['livia_scroll'] && state.ruins.length > 0) {
+        let rx = state.ruins[0].x, ry = state.ruins[0].y;
+        let ssx = w2sX(rx), ssy = w2sY(ry);
+        if (ssx > -20 && ssx < width + 20) {
+          push(); noStroke();
+          fill(200, 180, 120); rect(ssx - 3, ssy - 6, 6, 10);
+          fill(170, 150, 100); rect(ssx - 4, ssy - 7, 8, 2); rect(ssx - 4, ssy + 3, 8, 2);
+          let p = sin(frameCount * 0.08) * 0.4 + 0.6;
+          fill(220, 190, 80, floor(50 * p)); rect(ssx - 6, ssy - 8, 12, 14);
+          pop();
+          if (dist(state.player.x, state.player.y, rx, ry) < 50) {
+            fill(220, 190, 80); textAlign(CENTER, CENTER); textSize(11);
+            text('[E] Pick up scroll', ssx, ssy - 16); textAlign(LEFT, TOP);
+          }
         }
       }
+      drawFestivalDecorations();
+      drawBottles();
+      drawTreasureHint();
+      drawShoreWaves();
     }
-    drawFestivalDecorations();
-    drawBottles();
-    drawTreasureHint();
-    drawShoreWaves();
     drawRowingBoat();
     // Diving overlay — underwater tint + entities drawn in world space
     if (state.diving && state.diving.active && typeof drawDivingOverlay === 'function') drawDivingOverlay();
-    drawLegionPatrol();
-    drawRivalRaiders();
-    // Build mode ghost — drawn inside island float/shake context so it matches placed buildings
-    if (state.buildMode) {
-      drawBuildGhost();
+    if (!state.rowing || !state.rowing.active || _homeDist < 300) {
+      drawLegionPatrol();
+      drawRivalRaiders();
+      // Build mode ghost — drawn inside island float/shake context so it matches placed buildings
+      if (state.buildMode) {
+        drawBuildGhost();
+      }
     }
     pop();
 
@@ -2969,7 +3003,7 @@ function drawInner() {
                   state.rowing.nearIsle === 'hyperborea' ? '[E] Dock at Hyperborea' :
                   state.rowing.nearIsle === 'plenty' ? '[E] Dock at Isle of Plenty' :
                   state.rowing.nearIsle === 'necropolis' ? '[E] Dock at Necropolis' :
-                  (state.nations && state.nations[state.rowing.nearIsle]) ? '[E] Dock at ' + getNationName(state.rowing.nearIsle) :
+                  (state.nations && state.nations[state.rowing.nearIsle]) ? '[E] Dock at ' + (state.colonies[state.rowing.nearIsle] ? '[Colony] ' : '') + getNationName(state.rowing.nearIsle) :
                   isColonized ? '[E] Visit Colony' : '[E] Dock at Terra Nova';
       fill(255, 255, 220, 200 + sin(frameCount * 0.08) * 40);
       noStroke(); textAlign(CENTER); textSize(13);
@@ -3009,7 +3043,7 @@ function drawInner() {
       let _nKeys = Object.keys(state.nations || {});
       for (let _nk of _nKeys) {
         let _nv = state.nations[_nk];
-        if (_nv && !_nv.defeated) islands.push({ name: getNationName(_nk), x: _nv.isleX, y: _nv.isleY, col: getNationStanceColor(_nv) });
+        if (_nv && !_nv.defeated) islands.push({ name: (state.colonies[_nk] ? "[Colony] " : "") + getNationName(_nk), x: _nv.isleX, y: _nv.isleY, col: state.colonies[_nk] ? "#88cc88" : getNationStanceColor(_nv) });
       }
       for (let isle of islands) {
         let dx = isle.x - r.x, dy = isle.y - r.y;
@@ -3515,38 +3549,54 @@ function drawOcean() {
   else if (h >= 16 && h < 19) { tintR = 25; tintG = 8; tintB = -15; } // dusk warm
   else if (h >= 21 || h < 5) { tintR = -5; tintG = -5; tintB = 8; } // night cool
 
-  for (let band = 0; band < 12; band++) {
+  for (let band = 0; band < 8; band++) {
     let oceanH = height - oceanTop;
-    let y0 = oceanTop + band * oceanH / 12;
-    let d = band / 11;
+    let y0 = oceanTop + band * oceanH / 8;
+    let d = band / 7;
     let r = lerp(lerp(18, 50, dayMix), lerp(8, 22, dayMix), d) + tintR * (1 - d);
     let g = lerp(lerp(40, 140, dayMix), lerp(20, 65, dayMix), d) + tintG * (1 - d);
     let b = lerp(lerp(60, 175, dayMix), lerp(40, 100, dayMix), d) + tintB * (1 - d);
     fill(max(0, min(255, r)), max(0, min(255, g)), max(0, min(255, b)));
-    rect(0, y0, width, oceanH / 12 + 2);
+    rect(0, y0, width, oceanH / 8 + 2);
+  }
+
+  // Subtle horizon line where sea meets sky
+  {
+    let hLineY = floor(oceanTop);
+    let hBright = dayMix;
+    // Light horizon band — brighter where sky meets water
+    fill(lerp(80, 180, hBright), lerp(110, 210, hBright), lerp(140, 235, hBright), 35 + 25 * hBright);
+    rect(0, hLineY - 1, width, 3);
+    // Thin bright edge
+    fill(lerp(120, 220, hBright), lerp(150, 230, hBright), lerp(170, 245, hBright), 20 + 15 * hBright);
+    rect(0, hLineY, width, 1);
+    // Very subtle atmospheric glow above horizon
+    fill(lerp(100, 200, hBright), lerp(130, 215, hBright), lerp(160, 235, hBright), 10 + 8 * hBright);
+    rect(0, hLineY - 4, width, 4);
   }
 
   // Animated sine wave scan-lines — stepped pixel art (larger step, fewer rects)
   let waveStep = floor(t * 0.8);
-  for (let wy = oceanTop + 4; wy < height; wy += 20) {
+  let _waveRowStep = _fpsSmooth < 40 ? 40 : 28;
+  for (let wy = oceanTop + 4; wy < height; wy += _waveRowStep) {
     let depthFade = 1 - (wy - oceanTop) / (height - oceanTop) * 0.6;
     let waveAlpha = (25 + 22 * dayMix) * depthFade;
     let offsetX = floor(sin(t * 0.5 + wy * 0.03) * 12);
     // Primary wave highlight — wider segments, bigger spacing
     fill(120 + 70 * dayMix, 175 + 50 * dayMix, 210 + 30 * dayMix, waveAlpha);
-    for (let wx = offsetX % 56; wx < width; wx += 56) {
-      let segW = 24 + floor(sin(wy * 0.07 + wx * 0.04 + waveStep * 0.1) * 8);
+    for (let wx = offsetX % 72; wx < width; wx += 72) {
+      let segW = 28 + floor(sin(wy * 0.07 + wx * 0.04 + waveStep * 0.1) * 8);
       rect(wx, wy, segW, 3);
     }
     // Secondary sine wave (counter-phase for depth) — every other row
     let off2 = floor(sin(t * 0.35 + wy * 0.05 + 2) * 8);
     fill(90 + 50 * dayMix, 150 + 40 * dayMix, 195 + 25 * dayMix, waveAlpha * 0.5);
-    for (let wx = off2 % 70; wx < width; wx += 70) {
-      rect(wx, wy + 5, 16 + floor(sin(wy * 0.05 + wx * 0.03) * 6), 2);
+    for (let wx = off2 % 90; wx < width; wx += 90) {
+      rect(wx, wy + 5, 18 + floor(sin(wy * 0.05 + wx * 0.03) * 6), 2);
     }
     // Dark dither trough
     fill(10 + 20 * dayMix, 25 + 50 * dayMix, 50 + 70 * dayMix, waveAlpha * 0.6);
-    for (let wx = (offsetX + 14) % 56; wx < width; wx += 72) {
+    for (let wx = (offsetX + 14) % 72; wx < width; wx += 90) {
       rect(wx, wy + 7, 16, 2);
     }
   }
@@ -3554,7 +3604,7 @@ function drawOcean() {
   // Caustic light patterns on shallow water (near island)
   if (dayMix > 0.3) {
     let causticA = (dayMix - 0.3) * 25;
-    for (let ci = 0; ci < 8; ci++) {
+    for (let ci = 0; ci < 5; ci++) {
       let cx = floor(noise(ci * 7.3 + frameCount * 0.004) * width);
       let cy = floor(oceanTop + noise(ci * 11.1 + frameCount * 0.003) * (height - oceanTop) * 0.4);
       let cSize = 4 + floor(sin(frameCount * 0.06 + ci * 2.1) * 3);
@@ -3568,9 +3618,9 @@ function drawOcean() {
   }
 
   // Pixel foam whitecaps
-  for (let fy = oceanTop + 12; fy < height; fy += 28) {
+  for (let fy = oceanTop + 12; fy < height; fy += 36) {
     let depthFade = 1 - (fy - oceanTop) / (height - oceanTop) * 0.5;
-    for (let fx = 0; fx < width; fx += 50) {
+    for (let fx = 0; fx < width; fx += 64) {
       let foamPhase = sin(t * 1.2 + fx * 0.05 + fy * 0.06);
       if (foamPhase > 0.45) {
         let foamAlpha = (foamPhase - 0.45) * 65 * depthFade * max(0.3, dayMix);
@@ -3586,9 +3636,9 @@ function drawOcean() {
   }
 
   // Sun sparkles on water (only when FPS is healthy)
-  if (dayMix > 0.5 && _fpsSmooth > 40) {
+  if (dayMix > 0.5 && _fpsSmooth > 45) {
     let sparkleAlpha = (dayMix - 0.5) * 2;
-    for (let i = 0; i < 15; i++) {
+    for (let i = 0; i < 10; i++) {
       let sx2 = floor(noise(i * 10 + frameCount * 0.003) * width);
       let sy2 = floor(oceanTop + noise(i * 20 + frameCount * 0.002) * (height - oceanTop) * 0.6);
       let sparkle = sin(frameCount * 0.1 + i * 2.5);
@@ -3605,7 +3655,7 @@ function drawOcean() {
   if (dayMix > 0.3) {
     let sunH = state.time / 60;
     let sunX = floor(map(sunH, 5, 20, width * 0.1, width * 0.9));
-    for (let ry = oceanTop + 5; ry < oceanTop + 65; ry += 5) {
+    for (let ry = oceanTop + 5; ry < oceanTop + 65; ry += 8) {
       let reflAlpha = 14 * dayMix * (1 - (ry - oceanTop) / 65);
       let rw = floor(18 + sin(ry * 0.12 + t) * 8);
       let rx = sunX + floor(sin(t * 1.5 + ry * 0.04) * 8) - rw / 2;
@@ -3620,7 +3670,7 @@ function drawOcean() {
   // Bioluminescence at night — glowing plankton sparkles
   if (dayMix < 0.3) {
     let bioAlpha = map(dayMix, 0, 0.3, 1, 0);
-    for (let bi = 0; bi < 10; bi++) {
+    for (let bi = 0; bi < 6; bi++) {
       let bx = floor(noise(bi * 13.7 + frameCount * 0.002) * width);
       let by = floor(oceanTop + 15 + noise(bi * 9.3 + frameCount * 0.0015) * (height - oceanTop - 30));
       let pulse = sin(frameCount * 0.04 + bi * 2.3) * 0.5 + 0.5;
@@ -3825,7 +3875,7 @@ function drawShoreWaves() {
 
   noStroke();
   // Animated sine-based shoreline — foam crests roll in and out
-  for (let a = 0; a < TWO_PI; a += 0.025) {
+  for (let a = 0; a < TWO_PI; a += 0.045) {
     // Multi-frequency wave for organic shoreline movement
     let wave1 = sin(t * 2.5 + a * 6);
     let wave2 = sin(t * 1.8 + a * 3.5 + 1.2) * 0.5;
@@ -3857,7 +3907,7 @@ function drawShoreWaves() {
   let grassRX = state.islandRX * 0.90;
   let grassRY = state.islandRY * 0.36;
   let grassCY = iy - 18;
-  for (let a = 0; a < TWO_PI; a += 0.05) {
+  for (let a = 0; a < TWO_PI; a += 0.08) {
     let wavePhase = sin(t * 3.0 + a * 4 + 1.5);
     if (wavePhase > 0.35) {
       let waveOff = floor((wavePhase - 0.35) * 3);
@@ -5153,7 +5203,9 @@ function drawSeasonalEffects() {
   if (season === 0) {
     // === SPRING (Ver) — Cherry blossoms + butterflies + pollen ===
     // Cherry blossom petals — pink/white pixel petals drifting down
-    if (frameCount % 18 === 0 && seasonLeaves.length < 18) {
+    let _springInterval = _fpsSmooth < 35 ? 30 : 18;
+    let _springCap = _fpsSmooth < 35 ? 10 : 18;
+    if (frameCount % _springInterval === 0 && seasonLeaves.length < _springCap) {
       seasonLeaves.push({
         x: ix + random(-220, 220), y: iy - random(60, 120),
         vx: random(-0.3, 0.5), vy: random(0.3, 0.7),
@@ -5213,7 +5265,8 @@ function drawSeasonalEffects() {
     // Daytime: heat shimmer over ground
     if (bright > 0.7) {
       let shimmerA = (bright - 0.7) * 15;
-      for (let sy = iy - 30; sy < iy + 40; sy += 6) {
+      let _shimmerStep = _fpsSmooth < 35 ? 12 : 6;
+      for (let sy = iy - 30; sy < iy + 40; sy += _shimmerStep) {
         let wave = sin(sy * 0.08 + frameCount * 0.06) * 2;
         fill(255, 230, 160, shimmerA);
         rect(ix - 150 + wave, sy, 300, 2);
@@ -5231,7 +5284,8 @@ function drawSeasonalEffects() {
 
     // Dusk/night: fireflies
     if (hour > 17.5 || hour < 6) {
-      if (frameCount % 35 === 0 && seasonLeaves.length < 12) {
+      let _ffCap = _fpsSmooth < 35 ? 6 : 12;
+      if (frameCount % 35 === 0 && seasonLeaves.length < _ffCap) {
         seasonLeaves.push({
           x: ix + random(-180, 180), y: iy - random(10, 60),
           vx: random(-0.3, 0.3), vy: random(-0.2, 0.2),
@@ -5265,7 +5319,9 @@ function drawSeasonalEffects() {
 
   } else if (season === 2) {
     // === AUTUMN (Autumnus) — Falling leaves + misty mornings + harvest glow ===
-    if (frameCount % 14 === 0 && seasonLeaves.length < 20) {
+    let _autumnInterval = _fpsSmooth < 35 ? 24 : 14;
+    let _autumnCap = _fpsSmooth < 35 ? 12 : 20;
+    if (frameCount % _autumnInterval === 0 && seasonLeaves.length < _autumnCap) {
       let leafColors = [
         color(200, 100, 30, 175), color(220, 150, 40, 170),
         color(180, 70, 25, 165), color(160, 120, 30, 160),
@@ -5310,7 +5366,9 @@ function drawSeasonalEffects() {
 
   } else if (season === 3) {
     // === WINTER (Hiems) — Light snow + frost + bare tree blue tint + breath vapor ===
-    if (frameCount % 22 === 0 && seasonLeaves.length < 14) {
+    let _winterInterval = _fpsSmooth < 35 ? 36 : 22;
+    let _winterCap = _fpsSmooth < 35 ? 8 : 14;
+    if (frameCount % _winterInterval === 0 && seasonLeaves.length < _winterCap) {
       seasonLeaves.push({
         x: ix + random(-250, 250), y: iy - random(80, 130),
         vx: random(-0.35, 0.35), vy: random(0.2, 0.55),
@@ -6606,14 +6664,14 @@ function drawRuins() {
 }
 
 function drawCitySmoke() {
-  if (state.islandLevel < 6) return;
+  if (state.islandLevel < 6 || _fpsSmooth < 25) return;
   let bright = getSkyBrightness();
   let smokeAlpha = map(bright, 0.0, 0.5, 80, 25);
 
   state.buildings.forEach(b => {
     if (b.type !== 'house' && b.type !== 'villa') return;
-    let sx = w2sX(b.x);
-    let sy = w2sY(b.y);
+    let sx = w2sX(b.x), sy = w2sY(b.y);
+    if (sx < -60 || sx > width + 60 || sy < -60 || sy > height + 60) return;
     let chimneyX = floor(sx - b.w * 0.15);
     let chimneyY = floor(sy - b.h * 0.8);
     let windDrift = sin(frameCount * 0.005) * 0.8;
@@ -6672,6 +6730,7 @@ function drawGranaryArea() {
   granaries.forEach(g => {
     let gsx = w2sX(g.x);
     let gsy = w2sY(g.y);
+    if (gsx < -60 || gsx > width + 60 || gsy < -60 || gsy > height + 60) return;
     // 2 grain carts parked near granary
     let cartOffsets = [{ dx: -g.w * 0.6, dy: g.h * 0.6 }, { dx: g.w * 0.5, dy: g.h * 0.55 }];
     cartOffsets.forEach((co, ci) => {
@@ -6724,6 +6783,7 @@ function drawAmphoraStacks() {
   markets.forEach(m => {
     let msx = w2sX(m.x);
     let msy = w2sY(m.y);
+    if (msx < -60 || msx > width + 60 || msy < -60 || msy > height + 60) return;
     // Stack of amphoras left of market
     push();
     translate(floor(msx - m.w * 0.7), floor(msy + m.h * 0.3));
@@ -6767,6 +6827,7 @@ function drawTempleIncense() {
   temples.forEach(t => {
     let tsx = w2sX(t.x);
     let tsy = w2sY(t.y);
+    if (tsx < -40 || tsx > width + 40 || tsy < -60 || tsy > height + 60) return;
     // Incense rises from temple door — slow, wispy, purple-tinted
     let incAlpha = map(getSkyBrightness(), 0.0, 0.7, 55, 15);
     for (let ii = 0; ii < 2; ii++) {
@@ -6989,6 +7050,7 @@ function drawWindowGlow() {
         b.type === 'sculptor' || b.type === 'marketplace') {
       let sx5 = w2sX(b.x);
       let sy5 = w2sY(b.y);
+      if (sx5 < -30 || sx5 > width + 30 || sy5 < -30 || sy5 > height + 30) return;
       noStroke();
       // 2-3 small warm rectangles per building — windows/doorways
       fill(255, 195, 80, 50 * nightStr);
@@ -7423,7 +7485,8 @@ function drawOneBuilding(b) {
         // Bottom molding
         fill(_wfc.wall[0] - 20, _wfc.wall[1] - 15, _wfc.wall[2] - 15);
         rect(-bw / 2, -2, bw, 3, 1);
-        // Wall texture — faction-aware
+        // Wall texture — faction-aware (skip on low FPS)
+        if (_fpsSmooth < 30) { noStroke(); break; }
         stroke(_wfc.wall[0] - 25, _wfc.wall[1] - 22, _wfc.wall[2] - 18, 80);
         strokeWeight(0.8);
         if (_wfc.wallTexture === 'mudbrick') {
@@ -9668,6 +9731,8 @@ function drawOneCrystal(node) {
     node.phase += 0.025;
     let nx = w2sX(node.x);
     let ny = w2sY(node.y);
+    // Cull offscreen
+    if (nx < -40 || nx > width + 40 || ny < -40 || ny > height + 40) return;
 
     // Depleted crystals — dim and small
     if (node.charge <= 0) {
@@ -9769,6 +9834,8 @@ function drawOneResource(r) {
     r.pulsePhase += 0.03;
     let rx = floor(w2sX(r.x));
     let ry = floor(w2sY(r.y));
+    // Cull offscreen
+    if (rx < -30 || rx > width + 30 || ry < -30 || ry > height + 30) return;
     let pulse = sin(r.pulsePhase) * 0.2 + 0.8;
 
     noStroke();
@@ -9960,6 +10027,100 @@ function updateRowing(dt) {
   }
   r.wakeTrail.forEach(w => w.life--);
   r.wakeTrail = r.wakeTrail.filter(w => w.life > 0);
+}
+
+
+// ─── HOME ISLAND DISTANT — visible when sailing away ────────────────────
+function drawHomeIslandDistant() {
+  if (!state.rowing || !state.rowing.active) return;
+  let ix = w2sX(WORLD.islandCX);
+  let iy = w2sY(WORLD.islandCY);
+  let horizMinY = max(height * 0.06, height * 0.25 - (typeof horizonOffset !== 'undefined' ? horizonOffset : 0)) + 10;
+  iy = max(iy, horizMinY);
+  let homeRX = state.islandRX || WORLD.islandRX;
+  let homeRY = state.islandRY || WORLD.islandRY;
+  let _ds = _getDistantScale(WORLD.islandCX, WORLD.islandCY, homeRX);
+  if (_ds.dist < 300) return;
+  if (_ds.dist > 4500) return;
+  if (ix < -500 || ix > width + 500) return;
+  push(); noStroke();
+  if (_ds.scale < 0.98) {
+    translate(ix, iy); scale(_ds.scale); translate(-ix, -iy);
+  }
+  let bright = getSkyBrightness();
+  let bs = min(1, _ds.dist / 3500) * 0.4;
+  fill(140, 165, 190, 15 * bright);
+  ellipse(ix, iy, homeRX * 2.5, homeRY * 1.2);
+  fill(20, 60, 80, 40);
+  ellipse(ix + 4, iy + 6, homeRX * 2.15, homeRY * 0.95);
+  fill(lerp(55, 100, bs), lerp(145, 155, bs), lerp(165, 185, bs), 55);
+  ellipse(ix, iy, homeRX * 2.12, homeRY * 0.92);
+  stroke(200, 220, 255, 20 + sin(frameCount * 0.04) * 10);
+  strokeWeight(1.5); noFill();
+  ellipse(ix, iy, homeRX * 2.08 + sin(frameCount * 0.025) * 3, homeRY * 0.90 + sin(frameCount * 0.025) * 2);
+  noStroke();
+  fill(lerp(195, 180, bs), lerp(180, 185, bs), lerp(135, 160, bs));
+  ellipse(ix, iy, homeRX * 2, homeRY * 0.86);
+  fill(lerp(60, 80, bs), lerp(105, 120, bs), lerp(42, 75, bs));
+  ellipse(ix, iy, homeRX * 1.85, homeRY * 0.80);
+  fill(lerp(70, 90, bs), lerp(120, 130, bs), lerp(48, 80, bs), 60);
+  ellipse(ix, iy + homeRY * 0.05, homeRX * 0.9, homeRY * 0.4);
+  let fac = getFactionData();
+  let wallC = fac.style ? fac.style.wall : [218, 198, 168];
+  let roofC = fac.style ? fac.style.roof : [185, 100, 58];
+  let accentC = fac.style ? fac.style.accent : [175, 28, 28];
+  let bldgs = state.buildings || [];
+  let bCount = min(bldgs.length, 20);
+  for (let i = 0; i < bCount; i++) {
+    let b = bldgs[i];
+    let bx = ix + (w2sX(b.x) - w2sX(WORLD.islandCX));
+    let by = iy + (w2sY(b.y) - w2sY(WORLD.islandCY));
+    if (b.type === 'temple' || b.type === 'grand_temple') {
+      fill(lerp(wallC[0], 140, bs), lerp(wallC[1], 155, bs), lerp(wallC[2], 175, bs));
+      rect(floor(bx - 6), floor(by - 10), 12, 10);
+      fill(lerp(accentC[0], 140, bs), lerp(accentC[1], 150, bs), lerp(accentC[2], 170, bs));
+      rect(floor(bx - 7), floor(by - 12), 14, 3);
+      fill(lerp(210, 170, bs), lerp(200, 175, bs), lerp(185, 185, bs));
+      rect(floor(bx - 5), floor(by - 9), 2, 8);
+      rect(floor(bx + 3), floor(by - 9), 2, 8);
+    } else if (b.type === 'wall' || b.type === 'gate') {
+      fill(lerp(160, 150, bs), lerp(150, 155, bs), lerp(130, 160, bs), 120);
+      rect(floor(bx - 2), floor(by - 3), 4, 6);
+    } else {
+      fill(lerp(wallC[0], 140, bs), lerp(wallC[1], 155, bs), lerp(wallC[2], 175, bs));
+      rect(floor(bx - 4), floor(by - 5), 8, 6);
+      fill(lerp(roofC[0], 140, bs), lerp(roofC[1], 150, bs), lerp(roofC[2], 170, bs));
+      rect(floor(bx - 5), floor(by - 6), 10, 2);
+    }
+  }
+  let trees = state.trees || [];
+  let tCount = min(trees.length, 25);
+  for (let i = 0; i < tCount; i++) {
+    let tr = trees[i];
+    let tx = ix + (w2sX(tr.x) - w2sX(WORLD.islandCX));
+    let ty = iy + (w2sY(tr.y) - w2sY(WORLD.islandCY));
+    fill(lerp(35, 60, bs), lerp(75, 95, bs), lerp(30, 65, bs));
+    ellipse(floor(tx), floor(ty - 4), 6, 8);
+    fill(lerp(60, 80, bs), lerp(40, 60, bs), lerp(20, 45, bs));
+    rect(floor(tx - 1), floor(ty), 2, 4);
+  }
+  fill(lerp(accentC[0], 140, bs), lerp(accentC[1], 150, bs), lerp(accentC[2], 170, bs));
+  rect(floor(ix), floor(iy - homeRY * 0.25 - 12), 6, 4);
+  fill(lerp(120, 130, bs), lerp(100, 120, bs), lerp(70, 100, bs));
+  rect(floor(ix + 1), floor(iy - homeRY * 0.25 - 14), 1, 16);
+  fill(lerp(120, 130, bs), lerp(90, 110, bs), lerp(50, 80, bs));
+  rect(floor(ix - 4), floor(iy + homeRY * 0.38), 8, 12);
+  fill(lerp(100, 120, bs), lerp(75, 100, bs), lerp(40, 70, bs));
+  rect(floor(ix - 6), floor(iy + homeRY * 0.37), 12, 3);
+  if (_ds.haze > 5) {
+    fill(160, 185, 210, _ds.haze * 0.5 * bright);
+    ellipse(ix, iy, homeRX * 2.2, homeRY * 1.0);
+  }
+  fill(200, 185, 150, 80 + (1 - bs) * 80);
+  textSize(10); textAlign(CENTER); textStyle(ITALIC);
+  text('Home Island', ix, iy + homeRY * 0.52);
+  textStyle(NORMAL);
+  pop();
 }
 
 function drawRowingBoat() {
@@ -13346,8 +13507,9 @@ function drawOneTree(t) {
       rect(0.5 * s, -10 * s, 1 * s, 6 * s);
 
       // Foliage — sway increases toward top (realistic wind)
-      for (let layer = 0; layer < 8; layer++) {
-        let t_frac = layer / 7; // 0=bottom, 1=top
+      let _foliageLayers = _fpsSmooth < 35 ? 5 : 8;
+      for (let layer = 0; layer < _foliageLayers; layer++) {
+        let t_frac = layer / (_foliageLayers - 1); // 0=bottom, 1=top
         let layerSway = floor(sway * t_frac); // pre-rounded to prevent flicker
         let layerY = -30 * s - layer * 9 * s;
         let layerW = (7 - abs(layer - 3.5) * 1.3) * s; // tapered: wider in middle, narrow at top/bottom
@@ -13359,9 +13521,11 @@ function drawOneTree(t) {
         // Lighter inner layer
         fill(darkG + 10, lightG, darkG + 5, 180);
         rect(floor(-layerW * 0.7 + layerSway), floor(layerY + 1), floor(layerW * 1.4), floor(7 * s), 1);
-        // Sunlit edge — right side highlight
-        fill(45 + layer * 3, 85 + layer * 4, 35, 80);
-        rect(floor(layerW * 0.3 + layerSway), floor(layerY + 2), floor(layerW * 0.4), floor(5 * s));
+        // Sunlit edge — right side highlight (skip on low FPS)
+        if (_fpsSmooth >= 35) {
+          fill(45 + layer * 3, 85 + layer * 4, 35, 80);
+          rect(floor(layerW * 0.3 + layerSway), floor(layerY + 2), floor(layerW * 0.4), floor(5 * s));
+        }
       }
       // Pointed tip
       let tipSway = sway;
@@ -16491,10 +16655,104 @@ function upgradeColony() {
   triggerScreenShake(6, 15);
 }
 
+// ─── COLONY BASE SYSTEM ─────────────────────────────────────────────────
+
+function createColony(key, opts) {
+  if (state.colonies[key]) return state.colonies[key];
+  let col = {
+    level: opts.level || 1, buildings: opts.buildings || [],
+    population: opts.population || 5, gold: 0,
+    income: opts.income || 10, military: opts.military || 0,
+    resources: { wood: 0, stone: 0 },
+    governor: opts.governor || null, autoHarvest: false, autoTrade: false,
+    name: opts.name || key,
+    isleX: opts.isleX || 0, isleY: opts.isleY || 0,
+    isleRX: opts.isleRX || 300, isleRY: opts.isleRY || 200,
+    uniqueResource: opts.uniqueResource || null,
+    daysOwned: 0, troopsStationed: 0,
+  };
+  state.colonies[key] = col;
+  addNotification('New colony: ' + col.name + '!', '#88cc88');
+  addFloatingText(width / 2, height * 0.15, 'COLONY ESTABLISHED: ' + col.name, '#88cc88');
+  if (snd) snd.playSFX('fanfare');
+  return col;
+}
+
+function ensureConquestColony() {
+  if (!state.conquest.colonized) return;
+  if (state.colonies['conquest']) return;
+  let c = state.conquest;
+  createColony('conquest', {
+    level: c.colonyLevel || 1, buildings: (c.colonyBuildings || []).map(function(b) { return b.type; }),
+    population: c.colonyWorkers || 5, income: c.colonyIncome || 10,
+    name: 'Terra Nova', isleX: c.isleX, isleY: c.isleY, isleRX: c.isleRX, isleRY: c.isleRY,
+  });
+}
+
+function createNationColony(nationKey) {
+  if (state.colonies[nationKey]) return;
+  let rv = state.nations[nationKey];
+  if (!rv) return;
+  let nationName = (typeof getNationName === 'function') ? getNationName(nationKey) : nationKey;
+  let uniqueRes = null;
+  if (nationKey === 'carthage') uniqueRes = 'exoticSpices';
+  else if (nationKey === 'egypt') uniqueRes = 'scrolls';
+  else if (nationKey === 'greece') uniqueRes = 'oil';
+  else if (nationKey === 'rome') uniqueRes = 'steel';
+  createColony(nationKey, {
+    level: 1, buildings: (rv.buildings || []).slice(0, 3).map(function(b) { return b.type || b; }),
+    population: max(3, floor((rv.population || 5) * 0.6)),
+    income: 5 + (rv.level || 1) * 2, military: 0,
+    name: nationName + ' Colony',
+    isleX: rv.isleX, isleY: rv.isleY, isleRX: rv.isleRX, isleRY: rv.isleRY,
+    uniqueResource: uniqueRes,
+  });
+}
+
+function updateAllColoniesDaily() {
+  let keys = Object.keys(state.colonies);
+  let totalIncome = 0;
+  for (let k of keys) {
+    let col = state.colonies[k];
+    col.daysOwned = (col.daysOwned || 0) + 1;
+    let dayIncome = col.income + floor(col.population * 0.5);
+    col.gold += dayIncome;
+    state.gold += dayIncome;
+    totalIncome += dayIncome;
+    if (col.daysOwned % 5 === 0 && col.population < 10 + col.level * 5) col.population += 1;
+    if (col.governor && col.daysOwned % 10 === 0 && col.level < 10) {
+      col.level += 1; col.income += 3;
+      addNotification(col.name + ' grew to level ' + col.level + '!', '#88cc88');
+    }
+    if (col.uniqueResource && col.level >= 2 && col.daysOwned % 3 === 0) {
+      let amt = floor(col.level * 0.5) + 1;
+      state[col.uniqueResource] = (state[col.uniqueResource] || 0) + amt;
+    }
+    if (col.autoTrade && col.gold >= 20) {
+      let exported = floor(col.gold * 0.5);
+      col.gold -= exported; state.gold += exported; totalIncome += exported;
+    }
+  }
+  if (totalIncome > 0) {
+    addNotification('Colony income: +' + totalIncome + 'g from ' + keys.length + ' colonies', '#ddcc66');
+  }
+}
+
+function getTotalColonyIncome() {
+  let total = 0;
+  for (let k of Object.keys(state.colonies)) {
+    let col = state.colonies[k];
+    total += col.income + floor(col.population * 0.5);
+  }
+  return total;
+}
+
+function getColonyCount() { return Object.keys(state.colonies).length; }
+
 // Colony income — called from updateTime
 function updateColonyIncome() {
   let c = state.conquest;
-  if (c.colonized && c.colonyIncome > 0) {
+  if (c.colonized && c.colonyIncome > 0 && !state.colonies['conquest']) {
     state.gold += c.colonyIncome;
     addNotification('+' + c.colonyIncome + 'g from Terra Nova colony', '#ddcc66');
     // Auto-harvest colony farms
@@ -16516,6 +16774,17 @@ function updateColonyIncome() {
       state.seeds += floor(harvested * 0.3);
     }
   }
+  // Migrate legacy conquest colony to new system
+  ensureConquestColony();
+  // Create colonies for vassalized nations
+  if (state.nations) {
+    for (let nk of Object.keys(state.nations)) {
+      let rv = state.nations[nk];
+      if (rv && rv.vassal && !state.colonies[nk]) createNationColony(nk);
+    }
+  }
+  // All colonies daily update
+  updateAllColoniesDaily();
 }
 
 
@@ -20502,6 +20771,7 @@ function keyPressed() {
     if (state.nightMarket && state.nightMarket.shopOpen) { state.nightMarket.shopOpen = false; return; }
     if (state.ship && state.ship.shopOpen) { state.ship.shopOpen = false; return; }
     if (state.tradeRouteUI) { state.tradeRouteUI = false; return; }
+    if (state.colonyManageOpen) { state.colonyManageOpen = false; state.colonyManageSelected = null; return; }
     if (state.legia && state.legia.legiaUIOpen) { state.legia.legiaUIOpen = false; return; }
     if (state.activeEvent && state.activeEvent.data && state.activeEvent.data.shopOpen) { state.activeEvent.data.shopOpen = false; return; }
     if (state.naturalistOpen) { state.naturalistOpen = false; return; }
@@ -22002,10 +22272,12 @@ function saveGame() {
           defeated: n.defeated, allied: n.allied, personality: n.personality,
           isleX: n.isleX, isleY: n.isleY, isleRX: n.isleRX, isleRY: n.isleRY,
           relations: n.relations, wars: n.wars || [], allies: n.allies || [],
+          vassal: n.vassal || false, tributePerDay: n.tributePerDay || 0,
         };
       }
       return saved;
     })(),
+    colonies: (function() { var saved = {}; for (var ck of Object.keys(state.colonies || {})) { var cc = state.colonies[ck]; saved[ck] = { level: cc.level, buildings: cc.buildings, population: cc.population, gold: cc.gold, income: cc.income, military: cc.military, resources: cc.resources, governor: cc.governor, autoHarvest: cc.autoHarvest, autoTrade: cc.autoTrade, name: cc.name, isleX: cc.isleX, isleY: cc.isleY, isleRX: cc.isleRX, isleRY: cc.isleRY, uniqueResource: cc.uniqueResource, daysOwned: cc.daysOwned || 0, troopsStationed: cc.troopsStationed || 0 }; } return saved; })(),
     worldEvents: state.worldEvents || [],
     victoryAchieved: state.victoryAchieved || null,
     // Imperial Bridge
@@ -22170,7 +22442,7 @@ function saveGame() {
 }
 
 // ─── SAVE FORMAT VERSION ─────────────────────────────────────────────────
-// Current version: 8
+// Current version: 9
 // Migration history:
 //   v1 — Base save: day, time, resources, plots, buildings, trees
 //   v2 — Added NPC hearts, companion/woodcutter positions, crystals, solar
@@ -22185,7 +22457,7 @@ function saveGame() {
 //         dynamic market prices with supply/demand
 // ─────────────────────────────────────────────────────────────────────────
 
-const SAVE_VERSION = 8;
+const SAVE_VERSION = 9;
 
 function migrateSave(d) {
   let v = d.version || 1;
@@ -22308,6 +22580,12 @@ function migrateSave(d) {
     d.score = d.score || { goldEarned: 0, buildingsBuilt: 0, questsCompleted: 0, fishCaught: 0, enemiesDefeated: 0, daysSurvived: d.day || 0 };
     d.automation = d.automation || { granaryAuto: false, fishingPier: false, tradeRouteAuto: false, watchtowerAuto: false };
     v = 8;
+  }
+
+  // v8 -> v9: Colony management system
+  if (v < 9) {
+    d.colonies = d.colonies || {};
+    v = 9;
   }
 
   d.version = v;
@@ -22463,6 +22741,23 @@ function loadGame() {
       if (typeof _nextRouteId !== 'undefined' && state.tradeRoutes.length > 0) _nextRouteId = Math.max.apply(null, state.tradeRoutes.map(function(r) { return r.id; })) + 1;
     }
     if (d.colonySpec) state.colonySpec = d.colonySpec;
+    // Colony management system
+    if (d.colonies && typeof d.colonies === 'object') {
+      state.colonies = {};
+      for (var ck of Object.keys(d.colonies)) {
+        var sc = d.colonies[ck];
+        state.colonies[ck] = {
+          level: sc.level || 1, buildings: sc.buildings || [], population: sc.population || 5,
+          gold: sc.gold || 0, income: sc.income || 10, military: sc.military || 0,
+          resources: sc.resources || { wood: 0, stone: 0 },
+          governor: sc.governor || null, autoHarvest: sc.autoHarvest || false, autoTrade: sc.autoTrade || false,
+          name: sc.name || ck, isleX: sc.isleX || 0, isleY: sc.isleY || 0,
+          isleRX: sc.isleRX || 300, isleRY: sc.isleRY || 200,
+          uniqueResource: sc.uniqueResource || null,
+          daysOwned: sc.daysOwned || 0, troopsStationed: sc.troopsStationed || 0,
+        };
+      }
+    }
     // Nations (multi-rival system) -- load or migrate from old single rival
     if (d.nations && Object.keys(d.nations).length > 0) {
       state.nations = {};

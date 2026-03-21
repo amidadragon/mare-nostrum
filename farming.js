@@ -403,6 +403,7 @@ function drawFarmPlots() {
 function drawOnePlot(p) {
     let px = w2sX(p.x);
     let py = w2sY(p.y);
+    if (px < -40 || px > width + 40 || py < -40 || py > height + 40) return;
 
     px = floor(px); py = floor(py);
     // Pixel stone border

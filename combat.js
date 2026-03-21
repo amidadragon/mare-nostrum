@@ -1814,6 +1814,7 @@ function launchInvasionOnNation(nationKey) {
         addFloatingText(width / 2, height * 0.15, nationName + ' CONQUERED!', '#ffdd44');
         addFloatingText(width / 2, height * 0.22, 'They are now your vassal. Tribute: ' + rv.tributePerDay + 'g/day', '#88cc88');
         addNotification(nationName + ' is now a vassal state!', '#ffdd44');
+        if (typeof createNationColony === 'function') createNationColony(nationKey);
         if (typeof checkAllVictoryConditions === 'function') checkAllVictoryConditions();
       },
       onDefeat: function(battle) {
