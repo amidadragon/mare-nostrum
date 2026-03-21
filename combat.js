@@ -1119,6 +1119,14 @@ const UNIT_TYPES = {
   centurion:  { name: 'Elite Centurion', hp: 40, damage: 12, speed: 1.2, cost: 50, minLevel: 5, ranged: false, desc: 'Buffs nearby +20%', aura: 0.2 },
 };
 
+function getUnitDisplayName(type) {
+  let ft = (typeof getFactionTerms === 'function') ? getFactionTerms() : null;
+  if (!ft) return UNIT_TYPES[type] ? UNIT_TYPES[type].name : type;
+  if (type === 'legionary') return ft.soldier;
+  if (type === 'centurion') return 'Elite ' + ft.elite;
+  return UNIT_TYPES[type] ? UNIT_TYPES[type].name : type;
+}
+
 const CASTRUM_LEVELS = [
   null, // index 0 unused
   { name: 'Barracks',         maxSoldiers: 10, damageMult: 1.0, hpMult: 1.0, defenseMult: 1.0, unlocks: ['legionary'] },
@@ -1127,6 +1135,19 @@ const CASTRUM_LEVELS = [
   { name: 'Fortress',         maxSoldiers: 40, damageMult: 1.2, hpMult: 1.3, defenseMult: 1.5, unlocks: ['legionary','archer','cavalry','siege_ram'], cost: { gold: 500, stone: 80, ironOre: 20 } },
   { name: 'Imperial Legion',  maxSoldiers: 50, damageMult: 1.4, hpMult: 1.3, defenseMult: 1.5, unlocks: ['legionary','archer','cavalry','siege_ram','centurion'], cost: { gold: 800, stone: 100, ironOre: 30, crystals: 10 } },
 ];
+
+const CASTRUM_LV5_NAMES = {
+  rome: 'Imperial Legion', carthage: 'Sacred Host', egypt: 'Royal Guard',
+  greece: 'Grand Phalanx', seapeople: 'Storm Fleet', persia: 'Immortal Corps',
+  phoenicia: 'Tyrian Armada', gaul: 'Grand War Band'
+};
+
+function getCastrumLevelName(lv) {
+  let data = CASTRUM_LEVELS[min(lv, 5)];
+  if (!data) return '';
+  if (lv === 5) return CASTRUM_LV5_NAMES[state.faction || 'rome'] || data.name;
+  return data.name;
+}
 
 function getCastrumLevelData() {
   let lv = state.legia ? state.legia.castrumLevel : 0;
@@ -1166,7 +1187,7 @@ function trainUnit(type) {
   let def = UNIT_TYPES[type];
   if (!def) return false;
   if (lg.castrumLevel < def.minLevel) {
-    addFloatingText(width / 2, height * 0.3, 'Need Castrum level ' + def.minLevel, '#ff6644');
+    addFloatingText(width / 2, height * 0.3, 'Need ' + getFactionTerms().barracks + ' level ' + def.minLevel, '#ff6644');
     return false;
   }
   if (getArmyCount() >= getMaxSoldiers()) {
@@ -3377,6 +3398,15 @@ const OFFICER_RANKS = {
   legate:    { name: 'Legate',    maxTroops: 30, xpThreshold: 600,  promoteCost: 500 },
 };
 
+function getOfficerRankName(rank) {
+  let ft = (typeof getFactionTerms === 'function') ? getFactionTerms() : null;
+  if (!ft) return OFFICER_RANKS[rank] ? OFFICER_RANKS[rank].name : rank;
+  if (rank === 'decurion') return ft.officer;
+  if (rank === 'centurion') return ft.rank2;
+  if (rank === 'legate') return ft.rank3;
+  return rank;
+}
+
 const OFFICER_ORDERS = {
   ESCORT:  { name: 'Escort Player', desc: 'Follow and protect' },
   PATROL:  { name: 'Patrol',        desc: 'Walk between two points' },
@@ -3786,7 +3816,7 @@ function drawOfficerPanel() {
     fill(220, 195, 120); textSize(11); textAlign(LEFT, TOP);
     text((i + 1) + '. ' + o.name, px + 42, sy + 6);
     fill(160, 140, 100); textSize(9);
-    text(rankData.name + ' (Lv.' + o.level + ')  XP: ' + floor(o.xp), px + 42, sy + 19);
+    text(getOfficerRankName(o.rank) + ' (Lv.' + o.level + ')  XP: ' + floor(o.xp), px + 42, sy + 19);
 
     // Troops + order
     fill(140, 120, 90); textSize(9);

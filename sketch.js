@@ -484,6 +484,25 @@ function getFactionMilitary() {
   return _factionMilitaryCache;
 }
 
+var _factionTermsCache = null, _factionTermsCacheKey = null;
+const FACTION_TERMS = {
+  rome:      { leader:'Centurion', soldier:'Legionary', barracks:'Castrum', army:'Legion', elite:'Praetorian', officer:'Decurion', rank2:'Centurion', rank3:'Legate' },
+  carthage:  { leader:'Suffete', soldier:'Libyan Infantry', barracks:'War Camp', army:'Host', elite:'Sacred Band', officer:'Captain', rank2:'Suffete', rank3:'General' },
+  egypt:     { leader:'Commander', soldier:'Medjay', barracks:'Garrison', army:'Royal Guard', elite:"Pharaoh's Elite", officer:'Scribe', rank2:'Commander', rank3:'Vizier' },
+  greece:    { leader:'Strategos', soldier:'Hoplite', barracks:'Stratopedo', army:'Phalanx', elite:'Companion', officer:'Lochagos', rank2:'Strategos', rank3:'Polemarch' },
+  seapeople: { leader:'Warchief', soldier:'Raider', barracks:'Longhouse', army:'War Band', elite:'Storm Warrior', officer:'Thane', rank2:'Warchief', rank3:'High King' },
+  persia:    { leader:'Satrap', soldier:'Immortal', barracks:'Apadana', army:'Royal Army', elite:'Immortal Guard', officer:'Hazarapatis', rank2:'Satrap', rank3:'Spahbod' },
+  phoenicia: { leader:'Admiral', soldier:'Marine', barracks:'Dockfort', army:'Fleet Guard', elite:'Tyrian Elite', officer:'Helmsman', rank2:'Admiral', rank3:'Archon' },
+  gaul:      { leader:'Chieftain', soldier:'Warrior', barracks:'Hill Fort', army:'War Band', elite:'Champion', officer:'Ambact', rank2:'Chieftain', rank3:'Vercingetorix' },
+};
+function getFactionTerms() {
+  let key = state.faction || 'rome';
+  if (_factionTermsCache && _factionTermsCacheKey === key) return _factionTermsCache;
+  _factionTermsCacheKey = key;
+  _factionTermsCache = FACTION_TERMS[key] || FACTION_TERMS.rome;
+  return _factionTermsCache;
+}
+
 const FACTION_WILDLIFE = {
   rome: [
     { type: 'rabbit', speed: 0.4, size: 6 },
@@ -5167,7 +5186,7 @@ const NAT_ENEMY_DATA = {
   minotaur:      { label: 'Minotaur',      rarity: 'Rare',     desc: 'The bull-man of legend. Defeating one is the stuff of heroes.' },
   shield_bearer: { label: 'Shield Bearer', rarity: 'Uncommon', desc: 'A disciplined soldier who fights from behind an iron wall.' },
   archer:        { label: 'Archer',        rarity: 'Uncommon', desc: 'Keeps distance and fires without mercy. Close the gap fast.' },
-  centurion:     { label: 'Centurion',     rarity: 'Rare',     desc: 'Commands respect even in death. A true officer of Rome gone rogue.' },
+  centurion:     { label: 'Centurion',     rarity: 'Rare',     desc: 'Commands respect even in death. A true officer gone rogue.' },
 };
 const NAT_RELIC_DATA = {
   bronze_eagle:  { label: 'Bronze Eagle',  rarity: 'Uncommon', desc: 'A legionary\'s standard, lost long ago. Rome\'s symbol endures.' },
@@ -8783,128 +8802,338 @@ function drawOneBuilding(b) {
       case 'well':
         // Roman stone well with rope and bucket
         noStroke();
+        // Ground shadow
         fill(0, 0, 0, 25);
         ellipse(0, bh / 2 - 2, bw * 0.9, 5);
-        // Base ring
+        // Cobblestone surround
+        fill(fc.trim[0] - 25, fc.trim[1] - 25, fc.trim[2] - 22);
+        ellipse(0, bh / 2 - 4, bw + 4, 10);
+        // Small cobblestones around base
+        fill(fc.trim[0] - 18, fc.trim[1] - 18, fc.trim[2] - 15, 120);
+        rect(-bw / 2 - 1, bh / 2 - 6, 3, 2, 1);
+        rect(bw / 2 - 2, bh / 2 - 5, 3, 2, 1);
+        rect(-3, bh / 2 - 3, 2, 2, 1);
+        rect(2, bh / 2 - 4, 2, 2, 1);
+        // Circular stone rim (ellipse)
         fill(fc.trim[0] - 10, fc.trim[1] - 10, fc.trim[2] - 10);
         ellipse(0, bh / 2 - 6, bw - 4, 8);
-        // Shaft
+        // Stone shaft
         fill(fc.wall[0] - 10, fc.wall[1] - 10, fc.wall[2] - 3);
         rect(-bw / 2 + 2, -bh / 4, bw - 4, bh * 0.75, 2);
+        // Stone course lines
         stroke(fc.wall[0] - 40, fc.wall[1] - 40, fc.wall[2] - 30, 70);
         strokeWeight(0.6);
         for (let wl = -bh / 4 + 5; wl < bh / 2 - 6; wl += 5) {
           line(-bw / 2 + 3, wl, bw / 2 - 3, wl);
         }
         noStroke();
+        // Stone rim cap
         fill(fc.trim[0] + 10, fc.trim[1] + 10, fc.trim[2] + 10);
         rect(-bw / 2 + 1, -bh / 4 - 2, bw - 2, 4, 1);
-        // Dark water
+        // Dark water with shimmer
         fill(35, 65, 95, 200);
         ellipse(0, -bh / 4 + 2, bw - 10, 5);
         fill(50, 90, 130, 80);
         ellipse(-3, -bh / 4 + 1, 8, 2);
-        // Crossbeam
+        // Water shimmer flash
+        let wellPhase = frameCount * 0.06 + b.x * 0.1;
+        fill(120, 180, 220, 30 + sin(wellPhase) * 25);
+        ellipse(sin(wellPhase * 0.5) * 2, -bh / 4 + 1.5, 4, 2);
+        // Occasional white sparkle
+        if (sin(wellPhase * 0.3) > 0.8) {
+          fill(220, 240, 255, 120);
+          circle(sin(wellPhase) * 3, -bh / 4 + 1, 1.5);
+        }
+        // Wooden crossbar
         fill(95, 68, 32);
         rect(-bw / 2 - 2, -bh / 2 - 2, bw + 4, 4, 1);
+        // Upright posts
         fill(85, 60, 28);
         rect(-bw / 2, -bh / 2 - 2, 4, bh / 4 + 4, 1);
         rect(bw / 2 - 4, -bh / 2 - 2, 4, bh / 4 + 4, 1);
-        // Rope and bucket
+        // Rope dangling with sway
         stroke(130, 100, 48);
         strokeWeight(0.8);
-        line(0, -bh / 2, 0, -bh / 4 - 2);
+        let ropeSway = sin(frameCount * 0.02 + b.x * 0.05) * 1;
+        line(0, -bh / 2, ropeSway, -bh / 4 - 2);
         noStroke();
+        // Bucket (small trapezoid)
         fill(90, 62, 25);
-        rect(-3, -bh / 2 - 4, 6, 5, 1);
+        beginShape();
+        vertex(-3 + ropeSway, -bh / 2 - 4);
+        vertex(3 + ropeSway, -bh / 2 - 4);
+        vertex(4 + ropeSway, -bh / 2);
+        vertex(-4 + ropeSway, -bh / 2);
+        endShape(CLOSE);
+        // Bucket bands
         fill(140, 115, 55);
-        rect(-3, -bh / 2 - 3, 6, 1);
-        rect(-3, -bh / 2 - 1, 6, 1);
+        rect(-3 + ropeSway, -bh / 2 - 3, 6, 1);
+        rect(-3 + ropeSway, -bh / 2 - 1, 6, 1);
+        // Handle
+        fill(120, 100, 48);
+        rect(-1 + ropeSway, -bh / 2 - 5, 2, 2);
         break;
 
       case 'temple': {
         noStroke();
         let _tfc = fc;
-        // Foundation steps
-        fill(_tfc.trim[0] - 30, _tfc.trim[1] - 27, _tfc.trim[2] - 22);
-        rect(-bw / 2 + 2, bh / 2 - 8, bw - 4, 4, 1);
-        fill(_tfc.trim[0] - 20, _tfc.trim[1] - 17, _tfc.trim[2] - 12);
-        rect(-bw / 2 + 4, bh / 2 - 14, bw - 8, 6, 1);
-        // Stylobate
-        fill(_tfc.trim[0] - 10, _tfc.trim[1] - 7, _tfc.trim[2] - 2);
-        rect(-bw / 2, -bh / 2 + 18, bw, bh / 2 - 18, 1);
-        // Cella
-        fill(_tfc.wall[0], _tfc.wall[1], _tfc.wall[2]);
-        rect(-bw / 2 + 8, -bh / 2 + 4, bw - 16, bh / 2 + 8, 1);
-        // Columns — faction style
-        fill(_tfc.column[0], _tfc.column[1], _tfc.column[2]);
-        for (let tci = 0; tci < 4; tci++) {
-          let tcpx = -bw / 2 + 6 + tci * (bw - 12) / 3;
-          if (_tfc.columnType === 'lotus') {
-            // Lotus columns — wider at top
-            rect(tcpx - 2, -bh / 2 + 10, 4, bh / 2 + 6, 1);
-            fill(_tfc.accent[0], _tfc.accent[1], _tfc.accent[2], 160);
-            beginShape(); vertex(tcpx - 4, -bh / 2 + 6); vertex(tcpx, -bh / 2 + 2); vertex(tcpx + 4, -bh / 2 + 6); endShape(CLOSE);
-            fill(_tfc.column[0], _tfc.column[1], _tfc.column[2]);
-          } else if (_tfc.columnType === 'ionic') {
-            // Ionic — volute capitals
-            rect(tcpx - 2.5, -bh / 2 + 6, 5, bh / 2 + 10, 1);
-            fill(_tfc.column[0] + 5, _tfc.column[1] + 5, _tfc.column[2] + 5);
-            rect(tcpx - 5, -bh / 2 + 4, 10, 3, 1);
-            // Volute curls
-            fill(_tfc.accent[0], _tfc.accent[1], _tfc.accent[2], 120);
-            circle(tcpx - 4, -bh / 2 + 5, 3);
-            circle(tcpx + 4, -bh / 2 + 5, 3);
-          } else if (_tfc.columnType === 'rounded') {
-            // Simple rounded — Carthage
-            rect(tcpx - 2, -bh / 2 + 6, 4, bh / 2 + 10, 1);
-            fill(_tfc.column[0] + 10, _tfc.column[1] + 10, _tfc.column[2] + 10);
-            ellipse(tcpx, -bh / 2 + 5, 8, 4);
-          } else {
-            // Fluted Roman
-            rect(tcpx - 2.5, -bh / 2 + 6, 5, bh / 2 + 10, 1);
-            stroke(_tfc.column[0] - 15, _tfc.column[1] - 12, _tfc.column[2] - 7, 60);
-            strokeWeight(0.4);
-            line(tcpx - 1, -bh / 2 + 8, tcpx - 1, bh / 2 - 18);
-            line(tcpx + 1, -bh / 2 + 8, tcpx + 1, bh / 2 - 18);
+        let _tFac = state.faction || 'rome';
+        let _tGrand = (b.id === 'grand_temple');
+        let _tPulse = sin(frameCount * 0.03 + b.x * 0.05);
+        let _tGlow = 30 + _tPulse * 20;
+        if (_tFac === 'rome') {
+          // === ROME — Classical Temple ===
+          fill(180, 175, 165);
+          rect(-bw / 2 + 1, bh / 2 - 6, bw - 2, 3, 1);
+          fill(190, 185, 175);
+          rect(-bw / 2 + 3, bh / 2 - 11, bw - 6, 5, 1);
+          fill(200, 195, 185);
+          rect(-bw / 2 + 5, bh / 2 - 16, bw - 10, 5, 1);
+          fill(210, 205, 195);
+          rect(-bw / 2 + 2, -bh / 2 + 14, bw - 4, bh / 2 - 14, 1);
+          fill(225, 220, 210);
+          rect(-bw / 2 + 10, -bh / 2 + 6, bw - 20, bh / 2 + 2, 1);
+          fill(235, 232, 225);
+          for (let ci = 0; ci < 6; ci++) {
+            let cx = -bw / 2 + 5 + ci * (bw - 10) / 5;
+            rect(cx - 2, -bh / 2 + 8, 4, bh / 2 + 4, 1);
+            stroke(215, 210, 200, 60); strokeWeight(0.4);
+            line(cx - 0.8, -bh / 2 + 10, cx - 0.8, bh / 2 - 18);
+            line(cx + 0.8, -bh / 2 + 10, cx + 0.8, bh / 2 - 18);
             noStroke();
-            fill(_tfc.column[0] + 5, _tfc.column[1] + 8, _tfc.column[2] + 13);
-            rect(tcpx - 4, -bh / 2 + 4, 8, 3, 1);
+            fill(240, 237, 230); rect(cx - 3.5, -bh / 2 + 6, 7, 3, 1);
+            fill(220, 215, 205); rect(cx - 3, bh / 2 - 18, 6, 2, 1);
+            fill(235, 232, 225);
           }
-          fill(_tfc.column[0] - 5, _tfc.column[1] - 2, _tfc.column[2] + 3);
-          rect(tcpx - 3.5, bh / 2 - 20, 7, 2, 1);
-          fill(_tfc.column[0], _tfc.column[1], _tfc.column[2]);
-        }
-        // Entablature
-        fill(_tfc.trim[0], _tfc.trim[1], _tfc.trim[2]);
-        rect(-bw / 2 + 2, -bh / 2 + 2, bw - 4, 6, 1);
-        // Pediment / roof top — faction style
-        if (_tfc.roofType === 'flat') {
-          fill(_tfc.roof[0], _tfc.roof[1], _tfc.roof[2]);
-          rect(-bw / 2 + 1, -bh / 2 - 2, bw - 2, 5, 1);
-          fill(_tfc.trim[0], _tfc.trim[1], _tfc.trim[2]);
-          for (let pi = 0; pi < 5; pi++) {
-            rect(-bw / 2 + 4 + pi * ((bw - 8) / 5), -bh / 2 - 4, (bw - 8) / 7, 3, 1);
+          fill(215, 210, 200); rect(-bw / 2 + 1, -bh / 2 + 3, bw - 2, 5, 1);
+          fill(185, 100, 58);
+          beginShape(); vertex(-bw / 2 + 2, -bh / 2 + 3); vertex(0, -bh / 2 - 10); vertex(bw / 2 - 2, -bh / 2 + 3); endShape(CLOSE);
+          stroke(175, 28, 28); strokeWeight(0.8);
+          line(-bw / 2 + 2, -bh / 2 + 3, 0, -bh / 2 - 10);
+          line(0, -bh / 2 - 10, bw / 2 - 2, -bh / 2 + 3);
+          noStroke();
+          fill(210, 180, 60); ellipse(0, -bh / 2 - 5, 6, 5);
+          fill(175, 28, 28); rect(-1.5, -bh / 2 - 7, 3, 2, 1);
+          fill(95, 58, 24); rect(-5, -bh / 2 + 12, 10, 10, 1);
+          arc(0, -bh / 2 + 12, 10, 6, PI, TWO_PI);
+          fill(200, 160, 80, _tGlow); rect(-4, -bh / 2 + 14, 8, 7, 1);
+          if (_tGrand) {
+            fill(235, 232, 225, 120);
+            for (let gi = 0; gi < 6; gi++) { let gx = -bw / 2 + 7 + gi * (bw - 14) / 5; rect(gx - 1.5, -bh / 2 + 10, 3, bh / 2, 1); }
+            fill(220, 190, 50);
+            beginShape(); vertex(-4, -bh / 2 - 12); vertex(0, -bh / 2 - 16); vertex(4, -bh / 2 - 12); endShape(CLOSE);
+            ellipse(0, -bh / 2 - 12, 4, 3);
+          }
+        } else if (_tFac === 'carthage') {
+          // === CARTHAGE — Temple of Tanit ===
+          fill(212, 170, 95); rect(-bw / 2, -bh / 2 + 12, bw, bh / 2 - 6, 1);
+          fill(200, 158, 82); rect(-bw / 2 + 2, bh / 2 - 6, bw - 4, 4, 1);
+          fill(220, 180, 105); rect(-bw / 2, -bh / 2 + 8, bw, 6, 1);
+          fill(230, 190, 115);
+          for (let ci = 0; ci < 5; ci++) { rect(-bw / 2 + 3 + ci * (bw - 6) / 5, -bh / 2 + 5, (bw - 6) / 7, 4, 1); }
+          fill(240, 230, 208);
+          rect(-bw / 2 + 3, -bh / 2 + 2, 5, bh / 2 + 8, 1);
+          rect(bw / 2 - 8, -bh / 2 + 2, 5, bh / 2 + 8, 1);
+          fill(100, 40, 140);
+          arc(-bw / 2 + 5.5, -bh / 2 + 5, 4, 4, PI + 0.3, TWO_PI - 0.3);
+          arc(bw / 2 - 5.5, -bh / 2 + 5, 4, 4, PI + 0.3, TWO_PI - 0.3);
+          fill(120, 50, 160, 140);
+          rect(-bw / 2 + 9, -bh / 2 + 10, 3, bh / 2 - 4, 1);
+          rect(bw / 2 - 12, -bh / 2 + 10, 3, bh / 2 - 4, 1);
+          fill(200, 170, 50, 100);
+          rect(-bw / 2 + 9, -bh / 2 + 10, 3, 2, 1);
+          rect(bw / 2 - 12, -bh / 2 + 10, 3, 2, 1);
+          fill(80, 60, 40);
+          rect(-bw / 2 - 2, bh / 2 - 14, 5, 8, 1);
+          rect(bw / 2 - 3, bh / 2 - 14, 5, 8, 1);
+          fill(255, 140, 30, 150 + _tPulse * 40);
+          ellipse(-bw / 2, bh / 2 - 16, 6, 5); ellipse(bw / 2, bh / 2 - 16, 6, 5);
+          fill(255, 200, 50, 100 + _tPulse * 30);
+          ellipse(-bw / 2, bh / 2 - 18, 4, 3); ellipse(bw / 2, bh / 2 - 18, 4, 3);
+          fill(200, 170, 50);
+          beginShape(); vertex(-4, -bh / 2 + 4); vertex(0, -bh / 2 - 2); vertex(4, -bh / 2 + 4); endShape(CLOSE);
+          ellipse(0, -bh / 2 - 4, 4, 4); rect(-0.5, -bh / 2 - 1, 1, 3);
+          stroke(200, 170, 50); strokeWeight(0.6); line(-3, -bh / 2, 3, -bh / 2); noStroke();
+          fill(74, 48, 32); rect(-5, -bh / 2 + 14, 10, 10, 1);
+          fill(200, 160, 80, _tGlow); rect(-4, -bh / 2 + 16, 8, 7, 1);
+          if (_tGrand) {
+            fill(120, 50, 160, 80); rect(-bw / 2 + 1, -bh / 2 + 9, bw - 2, 2, 1);
+            fill(255, 140, 30, 100 + _tPulse * 50);
+            ellipse(-bw / 2, bh / 2 - 20, 8, 6); ellipse(bw / 2, bh / 2 - 20, 8, 6);
+          }
+        } else if (_tFac === 'egypt') {
+          // === EGYPT — Temple of Ra ===
+          fill(232, 200, 114);
+          beginShape(); vertex(-bw / 2 + 2, bh / 2 - 4); vertex(-bw / 2 + 8, -bh / 2 + 6); vertex(bw / 2 - 8, -bh / 2 + 6); vertex(bw / 2 - 2, bh / 2 - 4); endShape(CLOSE);
+          fill(210, 180, 100); rect(-bw / 2, bh / 2 - 6, bw, 4, 1);
+          fill(245, 240, 224);
+          rect(-bw / 2 - 1, -bh / 2 - 4, 4, bh / 2 + 14, 1);
+          rect(bw / 2 - 3, -bh / 2 - 4, 4, bh / 2 + 14, 1);
+          fill(220, 190, 50);
+          beginShape(); vertex(-bw / 2 - 1, -bh / 2 - 4); vertex(-bw / 2 + 1, -bh / 2 - 8); vertex(-bw / 2 + 3, -bh / 2 - 4); endShape(CLOSE);
+          beginShape(); vertex(bw / 2 - 3, -bh / 2 - 4); vertex(bw / 2 - 1, -bh / 2 - 8); vertex(bw / 2 + 1, -bh / 2 - 4); endShape(CLOSE);
+          fill(64, 176, 160, 160);
+          rect(-8, -bh / 2 + 10, 2, 2); rect(-4, -bh / 2 + 10, 2, 2); rect(2, -bh / 2 + 10, 2, 2); rect(6, -bh / 2 + 10, 2, 2);
+          fill(200, 170, 40, 140);
+          rect(-6, -bh / 2 + 14, 2, 2); rect(0, -bh / 2 + 14, 2, 2); rect(4, -bh / 2 + 14, 2, 2);
+          fill(220, 190, 50); ellipse(0, -bh / 2 + 4, 8, 7);
+          fill(255, 220, 80, 140 + _tPulse * 40); ellipse(0, -bh / 2 + 4, 6, 5);
+          fill(245, 240, 224);
+          for (let ci = 0; ci < 3; ci++) {
+            let cx = -12 + ci * 12;
+            rect(cx - 1.5, -bh / 2 + 8, 3, bh / 2 + 2, 1);
+            fill(64, 176, 160, 140);
+            beginShape(); vertex(cx - 4, -bh / 2 + 8); vertex(cx, -bh / 2 + 4); vertex(cx + 4, -bh / 2 + 8); endShape(CLOSE);
+            fill(245, 240, 224);
+          }
+          fill(58, 58, 74); rect(-5, -bh / 2 + 16, 10, 10, 1);
+          fill(200, 160, 80, _tGlow); rect(-4, -bh / 2 + 18, 8, 7, 1);
+          if (_tGrand) {
+            fill(220, 190, 50, 80); ellipse(0, -bh / 2 + 4, 12, 10);
+            fill(64, 176, 160, 100); rect(-14, -bh / 2 + 10, 2, 2); rect(12, -bh / 2 + 10, 2, 2);
+          }
+        } else if (_tFac === 'greece') {
+          // === GREECE — Parthenon-style ===
+          fill(220, 220, 228); rect(-bw / 2 + 1, bh / 2 - 6, bw - 2, 3, 1);
+          fill(228, 228, 236); rect(-bw / 2 + 3, bh / 2 - 11, bw - 6, 5, 1);
+          fill(235, 235, 242); rect(-bw / 2 + 2, -bh / 2 + 14, bw - 4, bh / 2 - 14, 1);
+          fill(240, 240, 248); rect(-bw / 2 + 10, -bh / 2 + 6, bw - 20, bh / 2, 1);
+          fill(242, 242, 250);
+          for (let ci = 0; ci < 8; ci++) {
+            let cx = -bw / 2 + 4 + ci * (bw - 8) / 7;
+            rect(cx - 1.5, -bh / 2 + 8, 3, bh / 2 + 4, 1);
+            fill(240, 240, 248); rect(cx - 3.5, -bh / 2 + 6, 7, 2.5, 1);
+            fill(80, 144, 192, 120); circle(cx - 3, -bh / 2 + 7, 2.5); circle(cx + 3, -bh / 2 + 7, 2.5);
+            fill(242, 242, 250);
+          }
+          fill(230, 230, 238); rect(-bw / 2 + 1, -bh / 2 + 3, bw - 2, 5, 1);
+          fill(208, 112, 64);
+          beginShape(); vertex(-bw / 2 + 2, -bh / 2 + 3); vertex(0, -bh / 2 - 10); vertex(bw / 2 - 2, -bh / 2 + 3); endShape(CLOSE);
+          fill(80, 144, 192, 140);
+          ellipse(-8, -bh / 2, 4, 3); ellipse(0, -bh / 2 - 3, 4, 3); ellipse(8, -bh / 2, 4, 3);
+          fill(90, 140, 60, 180); ellipse(0, -bh / 2 + 1, 8, 6);
+          fill(208, 112, 64); ellipse(0, -bh / 2 + 1, 4, 3);
+          fill(90, 65, 40); rect(-5, -bh / 2 + 14, 10, 10, 1);
+          arc(0, -bh / 2 + 14, 10, 6, PI, TWO_PI);
+          fill(200, 160, 80, _tGlow); rect(-4, -bh / 2 + 16, 8, 7, 1);
+          if (_tGrand) {
+            fill(242, 242, 250, 120);
+            for (let gi = 0; gi < 4; gi++) { let gx = -bw / 2 + 8 + gi * (bw - 16) / 3; rect(gx - 1, -bh / 2 + 10, 2, bh / 2, 1); }
+            fill(90, 140, 60, 120); ellipse(0, -bh / 2 - 10, 6, 5);
+          }
+        } else if (_tFac === 'seapeople') {
+          // === SEA PEOPLE — Driftwood Shrine ===
+          fill(90, 72, 48); rect(-bw / 2 + 2, bh / 2 - 6, bw - 4, 4, 1);
+          fill(210, 205, 195);
+          rect(-bw / 2 + 4, -bh / 2 + 4, 4, bh / 2 + 8, 1);
+          rect(bw / 2 - 8, -bh / 2 + 4, 4, bh / 2 + 8, 1);
+          arc(-bw / 2 + 6, -bh / 2 + 6, 8, 8, PI, PI + HALF_PI);
+          arc(bw / 2 - 6, -bh / 2 + 6, 8, 8, PI + HALF_PI, TWO_PI);
+          fill(75, 58, 35);
+          beginShape(); vertex(-bw / 4, bh / 2 - 4); vertex(-bw / 4 - 4, -bh / 2 + 12); vertex(0, -bh / 2 + 6); vertex(bw / 4 + 4, -bh / 2 + 12); vertex(bw / 4, bh / 2 - 4); endShape(CLOSE);
+          fill(100, 82, 55);
+          rect(-bw / 2 + 2, -bh / 2 + 2, bw - 4, 3, 1);
+          rect(-bw / 2 + 6, -bh / 2 + 10, bw - 12, 2, 1);
+          stroke(140, 120, 80, 100); strokeWeight(0.4);
+          for (let ni = 0; ni < 5; ni++) { let nx = -bw / 4 + ni * bw / 8; line(nx, -bh / 2 + 3, nx + 1, -bh / 2 + 9); line(nx + 1, -bh / 2 + 3, nx, -bh / 2 + 9); }
+          noStroke();
+          fill(230, 220, 200, 160);
+          circle(-bw / 4 + 2, -bh / 2 + 8, 2); circle(bw / 4 - 2, -bh / 2 + 8, 2); circle(0, -bh / 2 + 5, 2);
+          fill(42, 138, 106);
+          rect(-0.5, -bh / 2 - 2, 1, 6); rect(-3, -bh / 2 - 4, 1, 3); rect(2, -bh / 2 - 4, 1, 3); rect(-0.5, -bh / 2 - 4, 1, 2);
+          fill(40, 35, 25); rect(-4, -bh / 2 + 14, 8, 10, 1);
+          fill(200, 160, 80, _tGlow * 0.7); rect(-3, -bh / 2 + 16, 6, 7, 1);
+          if (_tGrand) {
+            fill(210, 205, 195, 100); arc(0, -bh / 2 + 2, bw - 8, 10, PI, TWO_PI);
+            fill(42, 138, 106, 140); rect(-0.5, -bh / 2 - 8, 1, 5);
+          }
+        } else if (_tFac === 'persia') {
+          // === PERSIA — Fire Temple (Atash Behram) ===
+          fill(220, 212, 195); rect(-bw / 2, bh / 2 - 6, bw, 4, 1);
+          fill(230, 222, 205); rect(-bw / 2 + 3, bh / 2 - 12, bw - 6, 6, 1);
+          fill(240, 232, 208); rect(-bw / 2 + 5, -bh / 2 + 10, bw - 10, bh / 2 - 4, 1);
+          fill(245, 238, 218); rect(-8, -bh / 2 - 4, 16, bh / 2 + 18, 1);
+          fill(80, 50, 30);
+          rect(-bw / 2 + 7, -bh / 2 + 18, 7, 10, 1); arc(-bw / 2 + 10.5, -bh / 2 + 18, 7, 5, PI, TWO_PI);
+          rect(bw / 2 - 14, -bh / 2 + 18, 7, 10, 1); arc(bw / 2 - 10.5, -bh / 2 + 18, 7, 5, PI, TWO_PI);
+          fill(42, 74, 138, 160);
+          for (let ti = 0; ti < 4; ti++) { rect(-6 + ti * 4, -bh / 2, 2, 2); rect(-4 + ti * 4, -bh / 2 + 3, 2, 2); }
+          fill(212, 160, 48, 160);
+          for (let ti = 0; ti < 3; ti++) { rect(-4 + ti * 4, -bh / 2, 2, 2); rect(-6 + ti * 4, -bh / 2 + 3, 2, 2); }
+          fill(255, 140, 30, 180 + _tPulse * 50); ellipse(0, -bh / 2 - 6, 8, 8);
+          fill(255, 200, 50, 150 + _tPulse * 40); ellipse(0, -bh / 2 - 8, 5, 6);
+          fill(255, 240, 120, 100 + _tPulse * 30); ellipse(0, -bh / 2 - 9, 3, 4);
+          fill(212, 160, 48); ellipse(0, -bh / 2 + 8, 6, 4);
+          beginShape(); vertex(-3, -bh / 2 + 8); vertex(-10, -bh / 2 + 5); vertex(-8, -bh / 2 + 9); endShape(CLOSE);
+          beginShape(); vertex(3, -bh / 2 + 8); vertex(10, -bh / 2 + 5); vertex(8, -bh / 2 + 9); endShape(CLOSE);
+          fill(80, 50, 30); rect(-4, -bh / 2 + 14, 8, 12, 1); arc(0, -bh / 2 + 14, 8, 5, PI, TWO_PI);
+          fill(200, 160, 80, _tGlow); rect(-3, -bh / 2 + 16, 6, 9, 1);
+          if (_tGrand) {
+            fill(255, 140, 30, 120 + _tPulse * 60); ellipse(0, -bh / 2 - 10, 12, 12);
+            fill(212, 160, 48, 100); rect(-bw / 2 + 5, -bh / 2 + 7, bw - 10, 2, 1);
+          }
+        } else if (_tFac === 'phoenicia') {
+          // === PHOENICIA — Temple of Melqart ===
+          fill(180, 170, 158); rect(-bw / 2, bh / 2 - 6, bw, 4, 1);
+          fill(138, 16, 80); rect(-bw / 2 + 4, -bh / 2 + 8, bw - 8, bh / 2 - 2, 1);
+          fill(170, 40, 100); rect(-bw / 2 + 8, -bh / 2 + 10, bw - 16, bh / 2 - 4, 1);
+          fill(90, 130, 90); rect(-bw / 2 + 1, -bh / 2, 5, bh / 2 + 12, 1);
+          fill(100, 140, 100); ellipse(-bw / 2 + 3.5, -bh / 2, 6, 4);
+          fill(190, 170, 80); rect(bw / 2 - 6, -bh / 2, 5, bh / 2 + 12, 1);
+          fill(200, 180, 90); ellipse(bw / 2 - 3.5, -bh / 2, 6, 4);
+          fill(106, 74, 42); rect(-bw / 2 + 2, -bh / 2 + 6, bw - 4, 4, 1);
+          fill(200, 190, 175); rect(-5, -bh / 2 - 6, 10, 14, 1);
+          fill(230, 220, 200); rect(-4, -bh / 2 - 8, 8, 3, 1);
+          fill(255, 200, 60, 140 + _tPulse * 40); ellipse(0, -bh / 2 - 9, 6, 5);
+          fill(120, 90, 50);
+          beginShape(); vertex(-8, bh / 2 - 8); vertex(-10, bh / 2 - 10); vertex(10, bh / 2 - 10); vertex(8, bh / 2 - 8); endShape(CLOSE);
+          stroke(48, 112, 176, 120); strokeWeight(0.6);
+          for (let wi = 0; wi < 4; wi++) { let wx = -10 + wi * 7; arc(wx, -bh / 2 + 18, 5, 3, PI, TWO_PI); }
+          noStroke();
+          fill(48, 112, 176, 160); rect(-0.5, -bh / 2 + 12, 1, 5); ellipse(0, -bh / 2 + 12, 3, 2);
+          fill(80, 55, 30); rect(-4, -bh / 2 + 16, 8, 10, 1); arc(0, -bh / 2 + 16, 8, 5, PI, TWO_PI);
+          fill(200, 160, 80, _tGlow); rect(-3, -bh / 2 + 18, 6, 7, 1);
+          if (_tGrand) {
+            fill(255, 200, 60, 120 + _tPulse * 50); ellipse(0, -bh / 2 - 12, 10, 8);
+            fill(138, 16, 80, 100); rect(-bw / 2 + 4, -bh / 2 + 6, bw - 8, 2, 1);
+          }
+        } else if (_tFac === 'gaul') {
+          // === GAUL — Sacred Grove / Dolmen ===
+          fill(85, 100, 60); ellipse(0, bh / 2 - 4, bw - 2, 8);
+          fill(130, 125, 115);
+          for (let si = 0; si < 5; si++) {
+            let sa = PI + si * PI / 4; let sx2 = cos(sa) * (bw / 2 - 6); let sy2 = sin(sa) * (bh / 2 - 10) * 0.5 - 4;
+            rect(sx2 - 2, sy2, 4, 10, 1);
+            fill(100, 95, 85, 120); circle(sx2, sy2 + 4, 2); fill(130, 125, 115);
+          }
+          fill(145, 138, 125); rect(-12, -bh / 2 + 8, 5, bh / 2 + 4, 1); rect(7, -bh / 2 + 8, 5, bh / 2 + 4, 1);
+          fill(155, 148, 135); rect(-14, -bh / 2 + 4, 28, 5, 2);
+          fill(80, 160, 50, 180); circle(-8, -bh / 2 + 10, 3); circle(0, -bh / 2 + 11, 2.5); circle(8, -bh / 2 + 10, 3);
+          fill(100, 180, 60, 140); circle(-4, -bh / 2 + 12, 2); circle(4, -bh / 2 + 12, 2);
+          fill(50, 42, 30); ellipse(0, bh / 2 - 10, 10, 6);
+          fill(60, 50, 35); rect(-4, bh / 2 - 14, 8, 5, 1);
+          fill(255, 140, 30, 160 + _tPulse * 50); ellipse(0, bh / 2 - 16, 6, 6);
+          fill(255, 200, 50, 120 + _tPulse * 40); ellipse(0, bh / 2 - 18, 4, 4);
+          fill(120, 115, 105, 140);
+          arc(-6, -bh / 2 + 6, 4, 3, 0, PI + HALF_PI); arc(6, -bh / 2 + 6, 4, 3, HALF_PI, TWO_PI);
+          if (_tGrand) {
+            fill(130, 125, 115, 120);
+            for (let gi = 0; gi < 3; gi++) { let ga = PI + 0.5 + gi * PI / 3; let gx = cos(ga) * (bw / 2 - 2); let gy = sin(ga) * (bh / 2 - 6) * 0.5 - 4; rect(gx - 2, gy, 4, 12, 1); }
+            fill(255, 140, 30, 120 + _tPulse * 60); ellipse(0, bh / 2 - 20, 10, 8);
           }
         } else {
+          // Fallback — simple generic temple
+          fill(_tfc.trim[0] - 20, _tfc.trim[1] - 17, _tfc.trim[2] - 12);
+          rect(-bw / 2 + 2, bh / 2 - 8, bw - 4, 4, 1);
+          fill(_tfc.wall[0], _tfc.wall[1], _tfc.wall[2]);
+          rect(-bw / 2 + 4, -bh / 2 + 6, bw - 8, bh / 2 + 6, 1);
+          fill(_tfc.column[0], _tfc.column[1], _tfc.column[2]);
+          rect(-bw / 2 + 6, -bh / 2 + 6, 4, bh / 2 + 8, 1); rect(bw / 2 - 10, -bh / 2 + 6, 4, bh / 2 + 8, 1);
           fill(_tfc.roof[0], _tfc.roof[1], _tfc.roof[2]);
-          beginShape(); vertex(-bw / 2 + 2, -bh / 2 + 2); vertex(0, -bh / 2 - 10); vertex(bw / 2 - 2, -bh / 2 + 2); endShape(CLOSE);
-          fill(_tfc.trim[0] + 10, _tfc.trim[1] + 8, _tfc.trim[2] + 4);
-          rect(-2, -bh / 2 - 12, 4, 3, 1);
-          fill(_tfc.accent[0], _tfc.accent[1], _tfc.accent[2], 180);
-          circle(-bw / 2 + 4, -bh / 2 + 1, 4);
-          circle(bw / 2 - 4, -bh / 2 + 1, 4);
-          circle(0, -bh / 2 - 12, 4);
+          beginShape(); vertex(-bw / 2 + 2, -bh / 2 + 6); vertex(0, -bh / 2 - 6); vertex(bw / 2 - 2, -bh / 2 + 6); endShape(CLOSE);
+          fill(_tfc.door[0], _tfc.door[1], _tfc.door[2]); rect(-5, -bh / 2 + 14, 10, 10, 1);
+          fill(200, 160, 80, _tGlow); rect(-4, -bh / 2 + 16, 8, 7, 1);
         }
-        // Door
-        fill(_tfc.door[0], _tfc.door[1], _tfc.door[2]);
-        rect(-6, -bh / 2 + 10, 12, 12, 1);
-        if (_tfc.doorShape !== 'rect') {
-          arc(0, -bh / 2 + 10, 12, 8, PI, TWO_PI);
-        }
-        let templePulse = 30 + sin(frameCount * 0.03 + b.x * 0.05) * 20;
-        fill(200, 160, 80, templePulse);
-        rect(-5, -bh / 2 + 12, 10, 8, 1);
         break;
       }
 
@@ -8913,19 +9142,39 @@ function drawOneBuilding(b) {
         noStroke();
         fill(0, 0, 0, 25);
         rect(-bw / 2 + 2, bh / 2 - 4, bw, 5);
-        // Counter — faction
+        // Wooden counter — faction
         fill(fc.wall[0], fc.wall[1], fc.wall[2]);
         rect(-bw / 2, -bh / 2 + 10, bw, bh / 2, 1);
+        // Counter wood grain
+        fill(fc.wall[0] - 12, fc.wall[1] - 10, fc.wall[2] - 8, 50);
+        rect(-bw / 2 + 1, -bh / 2 + 10, bw - 2, 2);
+        rect(-bw / 2 + 1, -bh / 2 + 16, bw - 2, 1.5);
+        // Counter legs
         fill(fc.trim[0] - 15, fc.trim[1] - 18, fc.trim[2] - 20);
         rect(-bw / 2 + 3, -bh / 2 + 20, 3, bh / 2 - 2, 1);
         rect(bw / 2 - 6, -bh / 2 + 20, 3, bh / 2 - 2, 1);
-        // Goods on counter
+        // Goods on counter — bread basket
         fill(180, 130, 45);
         ellipse(-bw / 4, -bh / 2 + 8, 10, 5);
+        fill(200, 165, 80);
+        ellipse(-bw / 4 - 2, -bh / 2 + 6, 4, 2.5);
+        ellipse(-bw / 4 + 2, -bh / 2 + 6, 4, 2.5);
+        // Amphora
         fill(170, 65, 40);
         rect(-1, -bh / 2 + 3, 5, 8, 2);
+        fill(155, 55, 32);
+        rect(0, -bh / 2 + 1, 3, 2, 1);
+        // Green produce
         fill(55, 120, 65);
         ellipse(bw / 4, -bh / 2 + 7, 8, 5);
+        fill(70, 140, 75);
+        ellipse(bw / 4 - 2, -bh / 2 + 6, 3, 2);
+        ellipse(bw / 4 + 2, -bh / 2 + 6, 3, 2);
+        // Fruit dots
+        fill(200, 50, 40, 180);
+        circle(-bw / 4 + 6, -bh / 2 + 7, 2.5);
+        fill(230, 180, 40, 180);
+        circle(-bw / 4 + 9, -bh / 2 + 8, 2);
         // Support poles
         fill(120, 90, 40);
         rect(-bw / 2 + 1, -bh / 2 - 10, 3, 22, 1);
@@ -8945,6 +9194,13 @@ function drawOneBuilding(b) {
           line(mafx, -bh / 2, mafx, -bh / 2 + 3);
         }
         noStroke();
+        // Hanging lantern from left pole
+        fill(160, 130, 55);
+        rect(-bw / 2 + 5, -bh / 2 - 6, 1, 4);
+        fill(180, 150, 60);
+        rect(-bw / 2 + 3, -bh / 2 - 2, 5, 4, 1);
+        fill(255, 200, 80, 60 + sin(frameCount * 0.08 + b.x * 0.1) * 30);
+        rect(-bw / 2 + 4, -bh / 2 - 1, 3, 2);
         // Price tablet
         fill(175, 160, 120);
         rect(-4, -bh / 2 - 14, 8, 5, 1);
@@ -8972,29 +9228,56 @@ function drawOneBuilding(b) {
         break;
 
       case 'forum':
-        // Public forum — tiled plaza — faction
+        // Public forum — raised stone platform — faction
         noStroke();
+        // Raised platform steps (front)
+        fill(fc.ground[0] - 20, fc.ground[1] - 20, fc.ground[2] - 18);
+        rect(-bw / 2 + 4, bh / 2 - 4, bw - 8, 4, 1);
+        fill(fc.ground[0] - 12, fc.ground[1] - 12, fc.ground[2] - 10);
+        rect(-bw / 2 + 2, bh / 2 - 8, bw - 4, 4, 1);
+        // Main platform
         fill(fc.ground[0], fc.ground[1], fc.ground[2]);
-        rect(-bw / 2, -bh / 2, bw, bh, 2);
-        // Flagstone grid
-        stroke(fc.ground[0] - 20, fc.ground[1] - 20, fc.ground[2] - 20, 50);
-        strokeWeight(0.6);
-        for (let ffy = -bh / 2 + 8; ffy < bh / 2; ffy += 8) {
+        rect(-bw / 2, -bh / 2, bw, bh - 8, 2);
+        // Mosaic checkered floor pattern
+        for (let ffy = -bh / 2 + 2; ffy < bh / 2 - 10; ffy += 6) {
+          for (let ffx = -bw / 2 + 2; ffx < bw / 2 - 2; ffx += 6) {
+            if ((floor(ffx / 6) + floor(ffy / 6)) % 2 === 0) {
+              fill(fc.ground[0] - 10, fc.ground[1] - 8, fc.ground[2] - 12, 60);
+              rect(ffx, ffy, 5.5, 5.5);
+            }
+          }
+        }
+        // Flagstone grout lines
+        stroke(fc.ground[0] - 20, fc.ground[1] - 20, fc.ground[2] - 20, 40);
+        strokeWeight(0.4);
+        for (let ffy = -bh / 2 + 8; ffy < bh / 2 - 8; ffy += 8) {
           line(-bw / 2 + 2, ffy, bw / 2 - 2, ffy);
         }
         for (let ffx = -bw / 2 + 8; ffx < bw / 2; ffx += 8) {
-          line(ffx, -bh / 2 + 2, ffx, bh / 2 - 2);
+          line(ffx, -bh / 2 + 2, ffx, bh / 2 - 10);
         }
         noStroke();
-        // Border colonnade stubs — faction
+        // 4 columns supporting a roof along top edge
         fill(fc.column[0], fc.column[1], fc.column[2]);
-        for (let ffci = 0; ffci < 5; ffci++) {
-          let ffcpx = -bw / 2 + 5 + ffci * (bw - 10) / 4;
-          rect(ffcpx - 1.5, -bh / 2, 3, 6, 1);
-          rect(ffcpx - 1.5, bh / 2 - 6, 3, 6, 1);
+        for (let fci = 0; fci < 4; fci++) {
+          let fcpx = -bw / 2 + 8 + fci * (bw - 16) / 3;
+          rect(fcpx - 2, -bh / 2 - 4, 4, bh / 3, 1);
+          // Capital
+          fill(fc.column[0] + 12, fc.column[1] + 12, fc.column[2] + 8);
+          rect(fcpx - 3, -bh / 2 - 6, 6, 3, 1);
+          fill(fc.column[0], fc.column[1], fc.column[2]);
+          // Faction-colored banner on column
+          let fBannerFlap = sin(frameCount * 0.03 + fci * 1.5 + b.x * 0.01) * 1.5;
+          fill(fc.accent[0], fc.accent[1], fc.accent[2], 160);
+          rect(fcpx + 3, -bh / 2 + 2, 2 + fBannerFlap, 8);
         }
+        // Entablature / roof beam connecting columns
+        fill(fc.trim[0], fc.trim[1], fc.trim[2]);
+        rect(-bw / 2 + 5, -bh / 2 - 7, bw - 10, 3, 1);
+        // Side colonnade stubs
+        fill(fc.column[0], fc.column[1], fc.column[2]);
         for (let ffcj = 1; ffcj < 4; ffcj++) {
-          let ffcpy = -bh / 2 + 8 + ffcj * (bh - 16) / 3;
+          let ffcpy = -bh / 2 + 8 + ffcj * (bh - 24) / 3;
           rect(-bw / 2, ffcpy - 1.5, 6, 3, 1);
           rect(bw / 2 - 6, ffcpy - 1.5, 6, 3, 1);
         }
@@ -9004,21 +9287,31 @@ function drawOneBuilding(b) {
         fill(50, 105, 160, 180);
         ellipse(0, 0, 16, 10);
         let forumPhase = frameCount * 0.05 + b.x * 0.08;
+        // Water shimmer
         fill(80, 145, 200, 50 + sin(forumPhase) * 30);
         ellipse(-2, -1, 7, 4);
         fill(80, 160, 210, 100 + sin(forumPhase * 1.3) * 40);
         ellipse(0, -4, 3, 5);
-        // Rostra
+        // Water spray particle
+        fill(180, 215, 240, 50 + sin(forumPhase * 2) * 40);
+        circle(sin(forumPhase * 0.7) * 2, -3, 2);
+        // Speaker's podium (rostra with detail)
         fill(fc.trim[0] - 5, fc.trim[1] - 6, fc.trim[2] - 7);
-        rect(-10, bh / 2 - 10, 20, 8, 1);
+        rect(-10, bh / 2 - 18, 20, 8, 1);
         fill(fc.trim[0] + 3, fc.trim[1] + 2, fc.trim[2]);
-        rect(-8, bh / 2 - 14, 16, 5, 1);
-        // Statues
+        rect(-8, bh / 2 - 22, 16, 5, 1);
+        // Podium decoration
+        fill(fc.accent[0], fc.accent[1], fc.accent[2], 80);
+        rect(-6, bh / 2 - 20, 12, 2);
+        // Statues on plinths
+        fill(fc.column[0] - 10, fc.column[1] - 10, fc.column[2] - 8);
+        rect(-bw / 2 + 11, 2, 5, 3, 1);
+        rect(bw / 2 - 16, 2, 5, 3, 1);
         fill(fc.column[0] + 2, fc.column[1] + 2, fc.column[2]);
-        rect(-bw / 2 + 12, -2, 3, 10, 1);
-        rect(bw / 2 - 15, -2, 3, 10, 1);
-        circle(-bw / 2 + 13, -3, 4);
-        circle(bw / 2 - 14, -3, 4);
+        rect(-bw / 2 + 12, -6, 3, 10, 1);
+        rect(bw / 2 - 15, -6, 3, 10, 1);
+        circle(-bw / 2 + 13, -7, 4);
+        circle(bw / 2 - 14, -7, 4);
         break;
 
       case 'watchtower':
@@ -9026,54 +9319,90 @@ function drawOneBuilding(b) {
         noStroke();
         fill(0, 0, 0, 30);
         rect(-bw / 2 + 1, bh / 2 - 4, bw, 6);
-        // Wide base
+        // Wide tapered base
         fill(fc.wall[0] - 30, fc.wall[1] - 30, fc.wall[2] - 28);
-        rect(-bw / 2 - 3, bh / 2 - 10, bw + 6, 10, 1);
-        // Shaft
+        beginShape();
+        vertex(-bw / 2 - 3, bh / 2);
+        vertex(bw / 2 + 3, bh / 2);
+        vertex(bw / 2 + 1, bh / 2 - 10);
+        vertex(-bw / 2 - 1, bh / 2 - 10);
+        endShape(CLOSE);
+        // Stone shaft (slightly tapered)
         fill(fc.wall[0] - 15, fc.wall[1] - 15, fc.wall[2] - 10);
-        rect(-bw / 2, -bh / 2 + 8, bw, bh - 18, 1);
+        beginShape();
+        vertex(-bw / 2, bh / 2 - 10);
+        vertex(bw / 2, bh / 2 - 10);
+        vertex(bw / 2 - 1, -bh / 2 + 8);
+        vertex(-bw / 2 + 1, -bh / 2 + 8);
+        endShape(CLOSE);
+        // Stone block texture
         stroke(fc.wall[0] - 35, fc.wall[1] - 35, fc.wall[2] - 30, 65);
         strokeWeight(0.6);
         for (let wtl = -bh / 2 + 12; wtl < bh / 2 - 12; wtl += 6) {
-          line(-bw / 2 + 1, wtl, bw / 2 - 1, wtl);
+          line(-bw / 2 + 2, wtl, bw / 2 - 2, wtl);
           let wtoff = (floor((wtl + 12) / 6) % 2) * 5;
           for (let wtlx = -bw / 2 + wtoff + 3; wtlx < bw / 2 - 2; wtlx += 8) {
             line(wtlx, wtl, wtlx, wtl + 6);
           }
         }
         noStroke();
-        // Arrow slits
+        // Arrow slits (thin dark rects)
         fill(40, 30, 18, 200);
         rect(-1.5, -bh / 2 + 16, 3, 7, 1);
         rect(-1.5, -bh / 2 + 30, 3, 7, 1);
         rect(-1.5, -bh / 2 + 44, 3, 7, 1);
-        // Battlement
-        fill(fc.trim[0], fc.trim[1], fc.trim[2]);
-        rect(-bw / 2, -bh / 2 + 6, bw, 6, 1);
-        // Merlons
+        // Wooden platform at top (wider than shaft)
+        fill(100, 72, 32);
+        rect(-bw / 2 - 2, -bh / 2 + 6, bw + 4, 4, 1);
+        // Platform planks
+        fill(90, 65, 28);
+        rect(-bw / 2 - 1, -bh / 2 + 7, bw + 2, 1);
+        // Wooden railings
+        fill(95, 68, 30);
+        rect(-bw / 2 - 2, -bh / 2 + 2, 2, 6);
+        rect(bw / 2, -bh / 2 + 2, 2, 6);
+        rect(-bw / 2 - 2, -bh / 2 + 2, bw + 4, 2);
+        // Battlement merlons
         fill(fc.trim[0] + 5, fc.trim[1] + 4, fc.trim[2] + 5);
-        rect(-bw / 2, -bh / 2, 4, 8, 1);
-        rect(-bw / 2 + 6, -bh / 2, 4, 8, 1);
-        rect(bw / 2 - 10, -bh / 2, 4, 8, 1);
-        rect(bw / 2 - 4, -bh / 2, 4, 8, 1);
+        rect(-bw / 2 - 1, -bh / 2 - 2, 4, 6, 1);
+        rect(-bw / 2 + 5, -bh / 2 - 2, 4, 6, 1);
+        rect(bw / 2 - 9, -bh / 2 - 2, 4, 6, 1);
+        rect(bw / 2 - 3, -bh / 2 - 2, 4, 6, 1);
         // Iron reinforcement bands
         fill(70, 60, 50, 120);
         rect(-bw / 2, -bh / 2 + 20, bw, 2);
         rect(-bw / 2, -bh / 2 + 34, bw, 2);
-        // Beacon torch
+        // Guard silhouette on platform
+        fill(55, 45, 35, 160);
+        rect(2, -bh / 2 - 2, 3, 6);
+        circle(3, -bh / 2 - 4, 3);
+        // Spear
+        fill(80, 70, 55, 140);
+        rect(4, -bh / 2 - 10, 1, 12);
+        // Beacon torch at top
         let wtFlicker = sin(frameCount * 0.28 + b.x * 0.6) * 1.5;
         fill(255, 120, 30, 160);
         beginShape();
-        vertex(wtFlicker * 0.3, -bh / 2 - 8 + wtFlicker);
-        vertex(-3, -bh / 2 + 2);
-        vertex(3, -bh / 2 + 2);
+        vertex(-bw / 4 + wtFlicker * 0.3, -bh / 2 - 12 + wtFlicker);
+        vertex(-bw / 4 - 3, -bh / 2 - 2);
+        vertex(-bw / 4 + 3, -bh / 2 - 2);
         endShape(CLOSE);
         fill(255, 210, 60, 180);
         beginShape();
-        vertex(0, -bh / 2 - 5 + wtFlicker * 0.5);
-        vertex(-2, -bh / 2 + 2);
-        vertex(2, -bh / 2 + 2);
+        vertex(-bw / 4, -bh / 2 - 9 + wtFlicker * 0.5);
+        vertex(-bw / 4 - 2, -bh / 2 - 2);
+        vertex(-bw / 4 + 2, -bh / 2 - 2);
         endShape(CLOSE);
+        // Night: torch glow
+        if (getSkyBrightness() < 0.4) {
+          let wtNight = map(getSkyBrightness(), 0, 0.4, 1, 0);
+          fill(255, 160, 50, 35 * wtNight);
+          ellipse(-bw / 4, -bh / 2 - 4, 16, 12);
+          // Arrow slit glow
+          fill(255, 180, 70, 25 * wtNight);
+          rect(-1, -bh / 2 + 17, 2, 5);
+          rect(-1, -bh / 2 + 31, 2, 5);
+        }
         break;
 
       case 'arch':
@@ -9229,11 +9558,15 @@ function drawOneBuilding(b) {
       case 'house': {
         noStroke();
         let _fc = fc;
+        // Ground shadow
         fill(0, 0, 0, 25);
         rect(-bw / 2 + 2, bh / 2 - 3, bw, 5);
-        // Walls — faction color
+        // Whitewashed walls — faction color
         fill(_fc.wall[0], _fc.wall[1], _fc.wall[2]);
         rect(-bw / 2, -bh / 2 + 8, bw, bh - 8, 1);
+        // Wall highlight (sun-facing side)
+        fill(_fc.wall[0] + 12, _fc.wall[1] + 12, _fc.wall[2] + 8, 50);
+        rect(-bw / 2, -bh / 2 + 8, bw * 0.35, bh - 8);
         // Wall texture
         stroke(_fc.wall[0] - 20, _fc.wall[1] - 20, _fc.wall[2] - 20, 60);
         strokeWeight(0.5);
@@ -9268,12 +9601,16 @@ function drawOneBuilding(b) {
           }
         }
         noStroke();
-        // Door
+        // Wooden door with plank detail
         fill(_fc.door[0], _fc.door[1], _fc.door[2]);
         rect(-5, -bh / 2 + 14, 10, bh - 22, 1);
         fill(_fc.door[0] - 20, _fc.door[1] - 13, _fc.door[2] - 6);
         rect(-4, -bh / 2 + 15, 3.5, bh - 24);
         rect(0.5, -bh / 2 + 15, 3.5, bh - 24);
+        // Door iron bands
+        fill(_fc.door[0] - 40, _fc.door[1] - 30, _fc.door[2] - 20, 100);
+        rect(-5, -bh / 2 + 18, 10, 1.5);
+        rect(-5, -bh / 2 + 24, 10, 1.5);
         if (_fc.doorShape === 'pointed') {
           fill(_fc.trim[0], _fc.trim[1], _fc.trim[2]);
           beginShape(); vertex(-6, -bh / 2 + 14); vertex(0, -bh / 2 + 8); vertex(6, -bh / 2 + 14); endShape(CLOSE);
@@ -9281,18 +9618,26 @@ function drawOneBuilding(b) {
           fill(_fc.accent[0], _fc.accent[1], _fc.accent[2], 140);
           rect(-7, -bh / 2 + 12, 14, 2);
         }
+        // Door handle
         fill(180, 150, 70);
         rect(3, -bh / 2 + 20, 2, 2, 1);
-        // Windows
+        // Windows with shutters
         fill(_fc.window[0], _fc.window[1], _fc.window[2], 180);
         rect(-bw / 2 + 4, -bh / 2 + 12, 8, 6);
         rect(bw / 2 - 12, -bh / 2 + 12, 8, 6);
+        // Window crossbars
         fill(_fc.roof[0], _fc.roof[1], _fc.roof[2]);
         rect(-bw / 2 + 3, -bh / 2 + 11, 3, 8);
         rect(-bw / 2 + 10, -bh / 2 + 11, 3, 8);
+        rect(-bw / 2 + 3, -bh / 2 + 14, 10, 1.5);
         rect(bw / 2 - 13, -bh / 2 + 11, 3, 8);
         rect(bw / 2 - 6, -bh / 2 + 11, 3, 8);
-        // Roof — faction style
+        rect(bw / 2 - 13, -bh / 2 + 14, 10, 1.5);
+        // Window sills
+        fill(_fc.trim[0], _fc.trim[1], _fc.trim[2]);
+        rect(-bw / 2 + 3, -bh / 2 + 18, 10, 2, 1);
+        rect(bw / 2 - 13, -bh / 2 + 18, 10, 2, 1);
+        // Terracotta roof — faction style with tile rows
         if (_fc.roofType === 'flat') {
           fill(_fc.roof[0], _fc.roof[1], _fc.roof[2]);
           rect(-bw / 2 - 1, -bh / 2 + 5, bw + 2, 5, 1);
@@ -9304,6 +9649,15 @@ function drawOneBuilding(b) {
         } else if (_fc.roofType === 'pediment') {
           fill(_fc.roof[0], _fc.roof[1], _fc.roof[2]);
           beginShape(); vertex(-bw / 2 - 2, -bh / 2 + 8); vertex(0, -bh / 2 - 6); vertex(bw / 2 + 2, -bh / 2 + 8); endShape(CLOSE);
+          // Tile row lines on pediment
+          stroke(_fc.roof[0] - 20, _fc.roof[1] - 15, _fc.roof[2] - 10, 80);
+          strokeWeight(0.5);
+          for (let tr = 1; tr < 4; tr++) {
+            let ty = -bh / 2 + 8 - tr * 3.2;
+            let tx = (bw / 2 + 2) * (1 - tr * 3.2 / 14);
+            line(-tx, ty, tx, ty);
+          }
+          noStroke();
           fill(_fc.trim[0], _fc.trim[1], _fc.trim[2]);
           rect(-bw / 2 - 2, -bh / 2 + 6, bw + 4, 3, 1);
           fill(_fc.accent[0], _fc.accent[1], _fc.accent[2], 160);
@@ -9311,11 +9665,48 @@ function drawOneBuilding(b) {
         } else {
           fill(_fc.roof[0], _fc.roof[1], _fc.roof[2]);
           beginShape(); vertex(-bw / 2 - 2, -bh / 2 + 8); vertex(0, -bh / 2 - 4); vertex(bw / 2 + 2, -bh / 2 + 8); endShape(CLOSE);
+          // Alternating tile rows
           fill(_fc.roof[0] + 10, _fc.roof[1] + 15, _fc.roof[2] + 10);
           beginShape(); vertex(-bw / 2 + 2, -bh / 2 + 7); vertex(0, -bh / 2 - 2); vertex(bw / 2 - 2, -bh / 2 + 7); endShape(CLOSE);
+          // Tile row lines
+          stroke(_fc.roof[0] - 18, _fc.roof[1] - 12, _fc.roof[2] - 8, 70);
+          strokeWeight(0.5);
+          for (let tr = 1; tr < 4; tr++) {
+            let ty = -bh / 2 + 7 - tr * 2.6;
+            let tx = (bw / 2 - 2) * (1 - tr * 2.6 / 12);
+            line(-tx, ty, tx, ty);
+          }
+          noStroke();
           fill(0, 0, 0, 30);
           rect(-bw / 2 - 2, -bh / 2 + 7, bw + 4, 3);
         }
+        // Chimney with smoke
+        fill(_fc.trim[0] - 30, _fc.trim[1] - 33, _fc.trim[2] - 37);
+        rect(bw / 4 - 2, -bh / 2 - 4, 5, 7);
+        fill(_fc.trim[0] - 20, _fc.trim[1] - 23, _fc.trim[2] - 27);
+        rect(bw / 4 - 3, -bh / 2 - 5, 7, 2, 1);
+        // Smoke wisps
+        {
+          let hSmAlpha = map(getSkyBrightness(), 0.2, 1.0, 38, 14);
+          for (let hsi = 0; hsi < 3; hsi++) {
+            let hsX = bw / 4 + sin(frameCount * 0.015 + hsi * 2.1 + b.x * 0.01) * (2 + hsi);
+            let hsY = -bh / 2 - 6 - hsi * 5 - (frameCount * 0.4 + hsi * 12) % 16;
+            fill(170, 165, 155, hSmAlpha * (1 - hsi * 0.3));
+            rect(hsX, hsY, 2 + floor(hsi * 0.5), 2 + floor(hsi * 0.5));
+          }
+        }
+        // Flower pot / vine on right side
+        fill(55, 90, 35, 180);
+        rect(bw / 2 - 4, -bh / 2 + 20, 3, 3);
+        fill(65, 105, 40, 160);
+        rect(bw / 2 - 5, -bh / 2 + 18, 2, 3);
+        fill(45, 78, 30, 140);
+        rect(bw / 2 - 3, -bh / 2 + 17, 2, 2);
+        // Terracotta pot
+        fill(170, 95, 50);
+        rect(bw / 2 - 5, -bh / 2 + 22, 4, 4, 1);
+        fill(155, 82, 42);
+        rect(bw / 2 - 6, -bh / 2 + 22, 6, 1.5);
         // Faction details
         if (state.faction === 'carthage') {
           fill(60, 100, 160, 140); rect(-bw / 2 + 1, -bh / 2 + 8, 3, 4);
@@ -9332,13 +9723,19 @@ function drawOneBuilding(b) {
             rect(mx, -bh / 2 + 8, 3, 1); rect(mx + 3, -bh / 2 + 9, 1, 2); rect(mx + 1, -bh / 2 + 10, 3, 1);
           }
         }
+        // Foundation molding
+        fill(_fc.wall[0] - 25, _fc.wall[1] - 20, _fc.wall[2] - 15);
+        rect(-bw / 2, bh / 2 - 4, bw, 4, 1);
+        // Night glow
         if (getSkyBrightness() < 0.5) {
           let houseNight = map(getSkyBrightness(), 0, 0.5, 1, 0);
           fill(255, 200, 80, 60 * houseNight);
           rect(-bw / 2 + 4, -bh / 2 + 12, 8, 6);
           rect(bw / 2 - 12, -bh / 2 + 12, 8, 6);
-          fill(255, 190, 70, 20 * houseNight);
-          ellipse(0, -bh / 2 + 18, 16, 10);
+          fill(255, 190, 70, 30 * houseNight);
+          rect(-4, -bh / 2 + 15, 8, bh - 24);
+          fill(255, 190, 70, 15 * houseNight);
+          ellipse(0, -bh / 2 + 22, 18, 12);
         }
         break;
       }
@@ -9612,6 +10009,24 @@ function drawOneBuilding(b) {
         rect(bw / 2 - 54, -bh / 2 + 22, 30, 20, 1);
         fill(128, 114, 92);
         rect(bw / 2 - 54, -bh / 2 + 22, 30, 4);
+        // Training dummy (cross shape) in courtyard
+        fill(110, 82, 42);
+        rect(-2, -bh / 2 + 46, 4, 14);
+        rect(-7, -bh / 2 + 48, 14, 3);
+        fill(140, 120, 80);
+        circle(0, -bh / 2 + 44, 5);
+        // Weapon rack (right side of courtyard)
+        fill(95, 70, 35);
+        rect(bw / 4 - 3, -bh / 2 + 44, 2, 14);
+        rect(bw / 4 + 4, -bh / 2 + 44, 2, 14);
+        rect(bw / 4 - 3, -bh / 2 + 48, 9, 2);
+        // Weapons on rack (grey tips)
+        fill(140, 140, 135);
+        rect(bw / 4 - 1, -bh / 2 + 42, 1, 6);
+        rect(bw / 4 + 2, -bh / 2 + 43, 1, 5);
+        fill(160, 155, 145);
+        rect(bw / 4 - 2, -bh / 2 + 41, 2, 2);
+        rect(bw / 4 + 1, -bh / 2 + 42, 2, 2);
         // Corner towers — bigger and thicker
         fill(112, 100, 82);
         rect(-bw / 2, -bh / 2, 20, 22);
@@ -9659,6 +10074,16 @@ function drawOneBuilding(b) {
         // Gate arch top
         fill(112, 100, 82);
         arc(0, bh / 2 - 20, 28, 14, PI, TWO_PI);
+        // Gate guard silhouettes
+        fill(65, 50, 35, 170);
+        rect(-18, bh / 2 - 14, 3, 8);
+        circle(-17, bh / 2 - 16, 3);
+        rect(15, bh / 2 - 14, 3, 8);
+        circle(16, bh / 2 - 16, 3);
+        // Guard spears
+        fill(100, 90, 70, 140);
+        rect(-17, bh / 2 - 22, 1, 16);
+        rect(17, bh / 2 - 22, 1, 16);
         // Faction legion banner — animated wave (taller pole)
         let castFlap = sin(frameCount * 0.04 + b.x * 0.01) * 2.5;
         fill(100, 75, 42);
@@ -9769,6 +10194,9 @@ function drawOneBuilding(b) {
         let _bkfc = fc;
         fill(_bkfc.wall[0], _bkfc.wall[1], _bkfc.wall[2]);
         rect(-bw / 2, -bh / 2 + 8, bw, bh - 8, 1);
+        // Wall highlight
+        fill(_bkfc.wall[0] + 10, _bkfc.wall[1] + 10, _bkfc.wall[2] + 6, 40);
+        rect(-bw / 2, -bh / 2 + 8, bw * 0.3, bh - 8);
         stroke(_bkfc.wall[0] - 20, _bkfc.wall[1] - 20, _bkfc.wall[2] - 20, 50);
         strokeWeight(0.5);
         for (let bky = -bh / 2 + 12; bky < bh / 2; bky += 5) {
@@ -9778,6 +10206,12 @@ function drawOneBuilding(b) {
         if (state.faction === 'rome' || state.faction === 'greece') {
           fill(165, 155, 138);
           arc(bw / 4, -bh / 2 + 16, 20, 16, PI, TWO_PI, PIE);
+          // Brick course arcs on dome
+          stroke(150, 140, 122, 70);
+          strokeWeight(0.4);
+          arc(bw / 4, -bh / 2 + 16, 16, 12, PI, TWO_PI);
+          arc(bw / 4, -bh / 2 + 16, 10, 8, PI, TWO_PI);
+          noStroke();
           fill(155, 145, 128);
           rect(bw / 4 - 10, -bh / 2 + 16, 20, 6, 1);
           fill(40, 30, 18, 200);
@@ -9785,6 +10219,9 @@ function drawOneBuilding(b) {
           let ovenGlow = 80 + sin(frameCount * 0.06 + b.x * 0.1) * 40;
           fill(255, 120, 30, ovenGlow);
           rect(bw / 4 - 3, -bh / 2 + 16, 6, 5);
+          // Inner glow
+          fill(255, 180, 60, ovenGlow * 0.5);
+          rect(bw / 4 - 2, -bh / 2 + 17, 4, 3);
         } else {
           fill(178, 130, 82);
           rect(bw / 4 - 7, -bh / 2 + 10, 14, 14, 2);
@@ -9801,14 +10238,26 @@ function drawOneBuilding(b) {
         fill(95, 65, 28);
         rect(-bw / 2 + 4, -bh / 2 + 15, 14, 1);
         rect(-bw / 2 + 4, -bh / 2 + 21, 14, 1);
+        // Bread loaves with scoring marks
         fill(195, 155, 75);
         ellipse(-bw / 2 + 8, -bh / 2 + 13, 5, 3);
         ellipse(-bw / 2 + 14, -bh / 2 + 13, 5, 3);
+        stroke(175, 135, 55, 80);
+        strokeWeight(0.4);
+        line(-bw / 2 + 7, -bh / 2 + 13, -bw / 2 + 9, -bh / 2 + 12);
+        line(-bw / 2 + 13, -bh / 2 + 13, -bw / 2 + 15, -bh / 2 + 12);
+        noStroke();
         fill(205, 165, 80);
         ellipse(-bw / 2 + 8, -bh / 2 + 19, 5, 3);
         ellipse(-bw / 2 + 14, -bh / 2 + 19, 5, 3);
+        // Bottom shelf — long loaf
         fill(190, 150, 70);
-        ellipse(-bw / 2 + 11, -bh / 2 + 25, 5, 3);
+        ellipse(-bw / 2 + 11, -bh / 2 + 25, 8, 3);
+        // Flour sack beside counter
+        fill(210, 200, 175);
+        rect(-bw / 2 + 2, -bh / 2 + 27, 5, 4, 1);
+        fill(195, 185, 160);
+        rect(-bw / 2 + 2, -bh / 2 + 27, 5, 1.5);
         fill(fc.roof[0], fc.roof[1], fc.roof[2]);
         beginShape();
         vertex(-bw / 2 - 2, -bh / 2 + 8);
@@ -9821,13 +10270,22 @@ function drawOneBuilding(b) {
         vertex(0, -bh / 2 - 2);
         vertex(bw / 2 - 2, -bh / 2 + 7);
         endShape(CLOSE);
+        // Tile row lines on roof
+        stroke(fc.roof[0] - 18, fc.roof[1] - 12, fc.roof[2] - 8, 65);
+        strokeWeight(0.5);
+        for (let btr = 1; btr < 4; btr++) {
+          let bty = -bh / 2 + 7 - btr * 2.6;
+          let btx = (bw / 2 - 2) * (1 - btr * 2.6 / 12);
+          line(-btx, bty, btx, bty);
+        }
+        noStroke();
         fill(fc.trim[0] - 30, fc.trim[1] - 33, fc.trim[2] - 37);
         rect(bw / 4 - 3, -bh / 2 - 6, 6, 8);
         fill(fc.trim[0] - 20, fc.trim[1] - 23, fc.trim[2] - 27);
         rect(bw / 4 - 4, -bh / 2 - 8, 8, 3, 1);
         {
           let bkSmoke = map(getSkyBrightness(), 0.2, 1.0, 50, 22);
-          for (let si6 = 0; si6 < 2; si6++) {
+          for (let si6 = 0; si6 < 3; si6++) {
             let sP6 = frameCount * 0.014 + si6 * 2 + b.x * 0.008;
             for (let sp6 = 0; sp6 < 4; sp6++) {
               let sF6 = sp6 / 3;
@@ -9839,14 +10297,24 @@ function drawOneBuilding(b) {
             }
           }
         }
+        // Door with plank detail
         fill(fc.door[0], fc.door[1], fc.door[2]);
         rect(-3, -bh / 2 + 20, 6, 10, 1);
+        fill(fc.door[0] - 15, fc.door[1] - 10, fc.door[2] - 5, 80);
+        rect(-1, -bh / 2 + 21, 1, 8);
+        rect(2, -bh / 2 + 21, 1, 8);
+        // Foundation
+        fill(_bkfc.wall[0] - 25, _bkfc.wall[1] - 20, _bkfc.wall[2] - 15);
+        rect(-bw / 2, bh / 2 - 3, bw, 3, 1);
+        // Night: oven + door glow + ambient warmth
         if (getSkyBrightness() < 0.4) {
           let bkNight = map(getSkyBrightness(), 0, 0.4, 1, 0);
-          fill(255, 150, 50, 40 * bkNight);
-          ellipse(bw / 4, -bh / 2 + 18, 16, 12);
-          fill(255, 190, 70, 25 * bkNight);
+          fill(255, 150, 50, 45 * bkNight);
+          ellipse(bw / 4, -bh / 2 + 18, 18, 14);
+          fill(255, 190, 70, 30 * bkNight);
           rect(-4, -bh / 2 + 20, 8, 10);
+          fill(255, 160, 60, 10 * bkNight);
+          ellipse(0, 0, bw + 10, bh + 6);
         }
         break;
       }
@@ -12346,11 +12814,11 @@ function drawCenturion() {
   }
 
   // Rank text — faction-appropriate title
-  let _cenTitles = { rome: 'CENTURION', carthage: 'CAPTAIN', egypt: 'MEDJAY', greece: 'STRATEGOS' };
+  let _ft = (typeof getFactionTerms === 'function') ? getFactionTerms() : { leader: 'CENTURION' };
   fill(195, 170, 60, 100);
   textSize(5);
   textAlign(CENTER);
-  text((_cenTitles[fk] || 'CENTURION') + getCompanionPetCenturionLabel(), 0, -s * 1.3);
+  text(_ft.leader.toUpperCase() + getCompanionPetCenturionLabel(), 0, -s * 1.3);
   textAlign(LEFT, TOP);
 
   pop();
@@ -12829,7 +13297,7 @@ function tryCompanionGift(wx, wy) {
       let leveled = addCompanionXp(cp.centurion, 1);
       addFloatingText(w2sX(cen.x), w2sY(cen.y) - 25, '*salutes*', '#ffcc44');
       spawnCompanionHeart(cen.x, cen.y);
-      if (leveled) addFloatingText(w2sX(cen.x), w2sY(cen.y) - 38, 'Centurion Level ' + cp.centurion.level + '!', '#ffcc44');
+      if (leveled) addFloatingText(w2sX(cen.x), w2sY(cen.y) - 38, getFactionTerms().leader + ' Level ' + cp.centurion.level + '!', '#ffcc44');
       return true;
     }
   }
@@ -16627,7 +17095,7 @@ function updateLegia(dt) {
       lg.recruits = min(lg.recruits + 1, lg.maxRecruits + getFactionData().recruitBonus);
       lg.trainingQueue--;
       lg.trainingTimer = lg.trainingQueue > 0 ? 300 : 0;
-      addFloatingText(w2sX(lg.castrumX), w2sY(lg.castrumY) - 30, 'Legionary Ready!', '#cc4444');
+      addFloatingText(w2sX(lg.castrumX), w2sY(lg.castrumY) - 30, getFactionTerms().soldier + ' Ready!', '#cc4444');
       // Spawn ambient soldier entity near castrum
       let cx = lg.castrumX, cy = lg.castrumY;
       let soldierMaxHP = 60 + (state.expeditionUpgrades ? state.expeditionUpgrades.soldierHP : 0) * 20;
@@ -16653,16 +17121,16 @@ function handleLegiaKey(k) {
     } else {
       if (state.gold < 20) { addFloatingText(width / 2, height * 0.3, 'Need 20 gold', '#ff6644'); return true; }
       if (state.meals < 1) { addFloatingText(width / 2, height * 0.3, 'Need 1 meal', '#ff6644'); return true; }
-      if (lg.recruits + lg.trainingQueue >= lg.maxRecruits + getFactionData().recruitBonus) { addFloatingText(width / 2, height * 0.3, 'Legion at capacity!', '#ff6644'); return true; }
+      if (lg.recruits + lg.trainingQueue >= lg.maxRecruits + getFactionData().recruitBonus) { addFloatingText(width / 2, height * 0.3, getFactionTerms().army + ' at capacity!', '#ff6644'); return true; }
       state.gold = max(0, state.gold - 20); state.meals = max(0, state.meals - 1);
       lg.trainingQueue++; if (lg.trainingTimer <= 0) lg.trainingTimer = 300;
-      addFloatingText(width / 2, height * 0.3, 'Training legionary...', '#cc8844');
+      addFloatingText(width / 2, height * 0.3, 'Training ' + getFactionTerms().soldier.toLowerCase() + '...', '#cc8844');
     }
     return true;
   }
   // [2] Upgrade castrum
   if (k === '2') {
-    if (lg.castrumLevel >= 5) { addFloatingText(width / 2, height * 0.3, 'Castrum at max level!', '#aaaaaa'); return true; }
+    if (lg.castrumLevel >= 5) { addFloatingText(width / 2, height * 0.3, getFactionTerms().barracks + ' at max level!', '#aaaaaa'); return true; }
     let nextLv = lg.castrumLevel + 1;
     let lvData = (typeof CASTRUM_LEVELS !== 'undefined') ? CASTRUM_LEVELS[nextLv] : null;
     if (lvData && lvData.cost) {
@@ -16674,11 +17142,11 @@ function handleLegiaKey(k) {
       state.gold = max(0, state.gold - (c.gold || 0)); state.stone = max(0, state.stone - (c.stone || 0)); state.ironOre = max(0, state.ironOre - (c.ironOre || 0)); state.crystals = max(0, state.crystals - (c.crystals || 0));
       lg.castrumLevel = nextLv;
       lg.maxRecruits = lvData.maxSoldiers;
-      addFloatingText(width / 2, height * 0.3, 'Castrum upgraded to ' + lvData.name + '!', '#cc8844');
+      addFloatingText(width / 2, height * 0.3, getFactionTerms().barracks + ' upgraded to ' + getCastrumLevelName(nextLv) + '!', '#cc8844');
       if (typeof snd !== 'undefined' && snd) snd.playSFX('upgrade');
     } else {
       // Fallback for levels without CASTRUM_LEVELS data
-      addFloatingText(width / 2, height * 0.3, 'Castrum at max level', '#aaaaaa');
+      addFloatingText(width / 2, height * 0.3, getFactionTerms().barracks + ' at max level', '#aaaaaa');
     }
     return true;
   }
@@ -23046,7 +23514,7 @@ function updateDiscoveryEvents(dt) {
     prog.companionsAwakened.centurion = true;
     state.centurion.x = state.player.x - 20;
     state.centurion.y = state.player.y + 15;
-    addFloatingText(width / 2, height * 0.3, 'CENTURION JOINS YOU', C.solarGold);
+    addFloatingText(width / 2, height * 0.3, getFactionTerms().leader.toUpperCase() + ' JOINS YOU', C.solarGold);
     addFloatingText(width / 2, height * 0.36, 'Loyal guard, follows & fights', C.textDim);
     unlockJournal('centurion_join');
   }
@@ -25660,7 +26128,7 @@ function placeEraBuildings(lvl) {
     unlockJournal('legia_founded');
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
     addFarmPlots(farmCX, farmCY, lvl);
-    addFloatingText(width / 2, height * 0.3, 'Baths & Castrum — Rome grows strong!', '#cc4444');
+    addFloatingText(width / 2, height * 0.3, 'Baths & ' + getFactionTerms().barracks + ' — your settlement grows strong!', '#cc4444');
     spawnParticles(920, 480, 'build', 12);
   }
 

@@ -453,7 +453,7 @@ const EVENT_DEFS = [
   {
     id: 'wandering_soldier',
     name: 'WANDERING SOLDIER',
-    desc: 'A weary legionary arrives seeking trade.',
+    desc: 'A weary soldier arrives seeking trade.',
     duration: 8000,    // 1 day
     cooldown: 30,
     oneShot: false,

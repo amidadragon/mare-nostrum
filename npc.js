@@ -630,6 +630,331 @@ function drawNPC() {
     fill(80, 144, 192);
     rect(-1, -7, 2, 1);
 
+  } else if (_fac === 'seapeople') {
+    // ─── SEA PEOPLE LIVIA (THALASSA) — Sea Raider Queen ───
+    fill(140, 110, 70);
+    rect(-8, 20, 5, 3); rect(3, 20, 5, 3);
+    // Fur-trimmed boots
+    fill(120, 90, 55);
+    rect(-7, 18, 3, 2); rect(4, 18, 3, 2);
+    // Dark tunic with sea-green trim
+    fill(26, 58, 92);
+    rect(-10, -5, 20, 26);
+    fill(42, 138, 106, 150);
+    rect(-10, -6, 14, 5);
+    // Shell belt
+    fill(220, 210, 190);
+    rect(-10, 3, 20, 2);
+    fill(200, 190, 170);
+    rect(-4, 3, 2, 2); rect(2, 3, 2, 2);
+    // Arms — tanned
+    fill(195, 155, 110);
+    rect(-12, -2, 2, 8); rect(10, -2, 2, 8);
+    // Trident in hand
+    fill(100, 80, 50);
+    rect(-15, -8, 2, 14);
+    fill(138, 112, 80);
+    rect(-16, -8, 1, 2); rect(-14, -8, 1, 2); rect(-15, -10, 2, 3);
+    // Neck
+    fill(195, 155, 110);
+    rect(-4, -9, 8, 4);
+    // Head
+    fill(195, 155, 110);
+    rect(-8, -22, 16, 14);
+    // Wild windblown hair — dark with sea-salt streaks
+    fill(50, 40, 30);
+    rect(-9, -24, 18, 6);
+    rect(-10, -20, 3, 12); rect(7, -20, 3, 12);
+    fill(90, 80, 65);
+    rect(-8, -23, 4, 2); rect(4, -22, 3, 2);
+    let hairWind = floor(sin(frameCount * 0.04) * 2);
+    rect(8 + hairWind, -18, 2, 4);
+    // Shell headband
+    fill(220, 210, 190);
+    rect(-7, -25, 14, 2);
+    fill(42, 138, 106);
+    rect(-1, -25, 2, 2);
+    // Eyes
+    let npcBlink = (frameCount % 300 > 292);
+    if (npcBlink) {
+      fill(175, 135, 98);
+      rect(-6, -16, 4, 1); rect(2, -16, 4, 1);
+    } else {
+      fill(255);
+      rect(-6, -17, 4, 3); rect(2, -17, 4, 3);
+      fill(55, 100, 90);
+      rect(-5, -17, 2, 2); rect(3, -17, 2, 2);
+      fill(30, 60, 55);
+      rect(-4, -16, 1, 1); rect(4, -16, 1, 1);
+      fill(255, 255, 255, 240);
+      rect(-5, -17, 1, 1); rect(3, -17, 1, 1);
+      fill(20, 15, 10);
+      rect(-7, -18, 5, 1); rect(2, -18, 5, 1);
+    }
+    fill(55, 38, 25);
+    rect(-6, -20, 4, 1); rect(2, -20, 4, 1);
+    fill(175, 135, 98);
+    rect(0, -14, 1, 2);
+    fill(170, 75, 65);
+    rect(-2, -12, 4, 1);
+    fill(160, 65, 58);
+    rect(-3, -11, 6, 2);
+    // Shark tooth necklace
+    fill(230, 225, 215);
+    rect(-5, -8, 10, 1);
+    fill(240, 235, 225);
+    rect(-3, -7, 2, 1); rect(1, -7, 2, 1);
+
+  } else if (_fac === 'persia') {
+    // ─── PERSIA LIVIA (ESTHER) — Persian Noblewoman ───
+    fill(170, 130, 80);
+    rect(-8, 20, 5, 3); rect(3, 20, 5, 3);
+    // Ornate robe — purple/gold
+    fill(106, 42, 138);
+    rect(-10, -5, 20, 26);
+    fill(130, 60, 160, 100);
+    rect(4, -4, 6, 24);
+    // Gold trim overlay
+    fill(212, 160, 48);
+    rect(-10, -6, 20, 2);
+    rect(-10, 10, 20, 1);
+    // Scale pattern on robe
+    fill(120, 50, 150, 60);
+    for (let py = 0; py < 18; py += 3) rect(-8, py - 3, 16, 1);
+    // Gold belt with jewel
+    fill(212, 160, 48);
+    rect(-10, 3, 20, 2);
+    fill(220, 170, 55);
+    rect(-1, 2, 2, 3);
+    fill(80, 40, 120);
+    rect(0, 3, 1, 1);
+    // Arms
+    fill(195, 155, 115);
+    rect(-12, -2, 2, 8); rect(10, -2, 2, 8);
+    fill(212, 160, 48);
+    rect(-12, 2, 2, 1); rect(10, 2, 2, 1);
+    // Fan in hand
+    fill(106, 42, 138);
+    rect(-15, -6, 4, 8);
+    fill(212, 160, 48);
+    rect(-15, -6, 4, 1); rect(-15, 1, 4, 1);
+    // Neck
+    fill(195, 155, 115);
+    rect(-4, -9, 8, 4);
+    // Head
+    fill(195, 155, 115);
+    rect(-8, -22, 16, 14);
+    // Dark flowing hair under veil
+    fill(25, 18, 12);
+    rect(-9, -24, 18, 6);
+    rect(-10, -20, 3, 14); rect(7, -20, 3, 14);
+    fill(35, 25, 18);
+    rect(-9, -22, 18, 2);
+    // Ornate gold headpiece/veil
+    fill(212, 160, 48);
+    rect(-7, -25, 14, 2);
+    rect(-8, -24, 2, 3); rect(6, -24, 2, 3);
+    fill(106, 42, 138);
+    rect(-2, -26, 4, 2);
+    fill(220, 175, 55);
+    rect(-1, -26, 2, 1);
+    // Eyes
+    let npcBlink = (frameCount % 300 > 292);
+    if (npcBlink) {
+      fill(175, 135, 100);
+      rect(-6, -16, 4, 1); rect(2, -16, 4, 1);
+    } else {
+      fill(255);
+      rect(-6, -17, 4, 3); rect(2, -17, 4, 3);
+      fill(60, 40, 25);
+      rect(-5, -17, 2, 2); rect(3, -17, 2, 2);
+      fill(35, 22, 15);
+      rect(-4, -16, 1, 1); rect(4, -16, 1, 1);
+      fill(255, 255, 255, 240);
+      rect(-5, -17, 1, 1); rect(3, -17, 1, 1);
+      fill(15, 10, 8);
+      rect(-7, -18, 5, 1); rect(2, -18, 5, 1);
+    }
+    fill(30, 20, 12);
+    rect(-6, -20, 4, 1); rect(2, -20, 4, 1);
+    fill(180, 140, 105);
+    rect(0, -14, 1, 2);
+    fill(170, 60, 55);
+    rect(-2, -12, 4, 1);
+    fill(160, 50, 48);
+    rect(-3, -11, 6, 2);
+    // Gold earrings
+    fill(212, 160, 48);
+    rect(-9, -16, 2, 3); rect(7, -16, 2, 3);
+    // Gold necklace
+    fill(212, 160, 48);
+    rect(-5, -8, 10, 1);
+    fill(106, 42, 138);
+    rect(-1, -7, 2, 1);
+
+  } else if (_fac === 'phoenicia') {
+    // ─── PHOENICIA LIVIA (DIDO) — Phoenician Queen ───
+    fill(180, 140, 85);
+    rect(-8, 20, 5, 3); rect(3, 20, 5, 3);
+    // Tyrian purple robe
+    fill(138, 16, 80);
+    rect(-10, -5, 20, 26);
+    fill(160, 30, 95, 100);
+    rect(4, -4, 6, 24);
+    // White linen underlayer showing
+    fill(240, 240, 240);
+    rect(-10, -6, 20, 3);
+    // Gold belt with cedar emblem
+    fill(212, 160, 48);
+    rect(-10, 3, 20, 2);
+    fill(48, 112, 176);
+    rect(-1, 2, 2, 3);
+    // Arms
+    fill(200, 165, 125);
+    rect(-12, -2, 2, 8); rect(10, -2, 2, 8);
+    fill(212, 160, 48);
+    rect(-12, 4, 2, 1); rect(10, 4, 2, 1);
+    // Amphora in hand
+    fill(180, 110, 65);
+    rect(-15, -4, 4, 6);
+    fill(160, 95, 50);
+    rect(-15, -6, 3, 2);
+    // Neck
+    fill(200, 165, 125);
+    rect(-4, -9, 8, 4);
+    // Head
+    fill(200, 165, 125);
+    rect(-8, -22, 16, 14);
+    // Dark hair — elegant updo
+    fill(30, 22, 15);
+    rect(-9, -24, 18, 6);
+    rect(-10, -20, 3, 12); rect(7, -20, 3, 12);
+    fill(40, 30, 20);
+    rect(-9, -22, 18, 2);
+    // Gold diadem
+    fill(212, 160, 48);
+    rect(-6, -25, 12, 2);
+    fill(138, 16, 80);
+    rect(-2, -26, 4, 2);
+    fill(48, 112, 176);
+    rect(-1, -26, 2, 1);
+    // Eyes
+    let npcBlink = (frameCount % 300 > 292);
+    if (npcBlink) {
+      fill(180, 148, 110);
+      rect(-6, -16, 4, 1); rect(2, -16, 4, 1);
+    } else {
+      fill(255);
+      rect(-6, -17, 4, 3); rect(2, -17, 4, 3);
+      fill(50, 35, 22);
+      rect(-5, -17, 2, 2); rect(3, -17, 2, 2);
+      fill(30, 20, 12);
+      rect(-4, -16, 1, 1); rect(4, -16, 1, 1);
+      fill(255, 255, 255, 240);
+      rect(-5, -17, 1, 1); rect(3, -17, 1, 1);
+      fill(20, 15, 8);
+      rect(-7, -18, 5, 1); rect(2, -18, 5, 1);
+    }
+    fill(35, 25, 15);
+    rect(-6, -20, 4, 1); rect(2, -20, 4, 1);
+    fill(185, 150, 115);
+    rect(0, -14, 1, 2);
+    fill(175, 65, 65);
+    rect(-2, -12, 4, 1);
+    fill(165, 55, 58);
+    rect(-3, -11, 6, 2);
+    // Gold earrings
+    fill(212, 160, 48);
+    rect(-9, -16, 2, 2); rect(7, -16, 2, 2);
+    // Gold necklace with purple gem
+    fill(212, 160, 48);
+    rect(-5, -8, 10, 1);
+    fill(138, 16, 80);
+    rect(-1, -7, 2, 1);
+
+  } else if (_fac === 'gaul') {
+    // ─── GAUL LIVIA (BOUDICCA) — Celtic Warrior Queen ───
+    fill(110, 80, 45);
+    rect(-8, 20, 5, 3); rect(3, 20, 5, 3);
+    fill(95, 68, 38);
+    rect(-6, 18, 1, 2); rect(5, 18, 1, 2);
+    // Plaid tunic — green/brown check
+    fill(42, 106, 48);
+    rect(-10, -5, 20, 26);
+    // Plaid pattern
+    fill(60, 130, 60, 80);
+    for (let py = -4; py < 20; py += 4) rect(-10, py, 20, 1);
+    for (let px = -9; px < 10; px += 4) rect(px, -5, 1, 26);
+    fill(200, 160, 32, 50);
+    for (let py = -2; py < 20; py += 4) rect(-10, py, 20, 1);
+    // Leather belt with gold buckle
+    fill(90, 64, 32);
+    rect(-10, 3, 20, 2);
+    fill(200, 160, 32);
+    rect(-1, 2, 2, 3);
+    // Arms — fair skin
+    fill(225, 195, 160);
+    rect(-12, -2, 2, 8); rect(10, -2, 2, 8);
+    // Torque bracelet
+    fill(200, 160, 32);
+    rect(-12, 3, 2, 1); rect(10, 3, 2, 1);
+    // Spear in hand
+    fill(80, 60, 30);
+    rect(-15, -10, 2, 16);
+    fill(170, 170, 180);
+    rect(-15, -12, 2, 3);
+    // Neck
+    fill(225, 195, 160);
+    rect(-4, -9, 8, 4);
+    // Gold torque necklace
+    fill(200, 160, 32);
+    rect(-5, -8, 10, 1);
+    fill(220, 180, 50);
+    rect(-5, -8, 2, 2); rect(3, -8, 2, 2);
+    // Head
+    fill(225, 195, 160);
+    rect(-8, -22, 16, 14);
+    // Fiery red hair — wild and braided
+    fill(170, 70, 30);
+    rect(-9, -24, 18, 6);
+    rect(-10, -20, 3, 16); rect(7, -20, 3, 16);
+    fill(190, 85, 35);
+    rect(-9, -23, 18, 2);
+    // Braids detail
+    fill(155, 60, 25);
+    rect(-10, -14, 2, 8); rect(8, -14, 2, 8);
+    let hairSway = floor(sin(frameCount * 0.03) * 1);
+    rect(-10 + hairSway, -6, 2, 3); rect(8 - hairSway, -6, 2, 3);
+    // Woad face paint — blue marks
+    fill(40, 80, 160, 100);
+    rect(-7, -16, 2, 1); rect(5, -16, 2, 1);
+    rect(-8, -14, 1, 3); rect(7, -14, 1, 3);
+    // Eyes
+    let npcBlink = (frameCount % 300 > 292);
+    if (npcBlink) {
+      fill(205, 175, 145);
+      rect(-6, -16, 4, 1); rect(2, -16, 4, 1);
+    } else {
+      fill(255);
+      rect(-6, -17, 4, 3); rect(2, -17, 4, 3);
+      fill(50, 120, 80);
+      rect(-5, -17, 2, 2); rect(3, -17, 2, 2);
+      fill(30, 80, 50);
+      rect(-4, -16, 1, 1); rect(4, -16, 1, 1);
+      fill(255, 255, 255, 240);
+      rect(-5, -17, 1, 1); rect(3, -17, 1, 1);
+      fill(20, 15, 10);
+      rect(-7, -18, 5, 1); rect(2, -18, 5, 1);
+    }
+    fill(130, 55, 25);
+    rect(-6, -20, 4, 1); rect(2, -20, 4, 1);
+    fill(210, 180, 148);
+    rect(0, -14, 1, 2);
+    fill(180, 70, 65);
+    rect(-2, -12, 4, 1);
+    fill(170, 60, 55);
+    rect(-3, -11, 6, 2);
+
   } else {
     // ─── ROME LIVIA — Original Roman Noblewoman ───
     // Pixel gold sandals
@@ -1051,43 +1376,127 @@ function drawOneCitizen(c) {
   rect(-1, -12, 1, 1);
   rect(1, -12, 1, 1);
 
-  // Variant-specific detail
+  // Variant-specific detail — faction-aware
+  let _cFac = (typeof state !== 'undefined') ? (state.faction || 'rome') : 'rome';
   if (c.variant === 'soldier') {
-    let mil = (typeof getFactionMilitary === 'function') ? getFactionMilitary() : { cape: [140, 40, 35], helmCrest: [140, 40, 35] };
-    // Spear
-    stroke(100, 80, 60);
-    strokeWeight(1);
-    line(5, -16, 5, 3);
-    noStroke();
-    // Spear tip
-    fill(180, 175, 165);
-    rect(4, -17, 2, 2);
+    let mil = (typeof getFactionMilitary === 'function') ? getFactionMilitary() : { cape: [140, 40, 35], helmCrest: [140, 40, 35], weapon: 'gladius' };
+    // Weapon — faction specific
+    if (mil.weapon === 'spear') {
+      stroke(100, 80, 60); strokeWeight(1);
+      line(5, -18, 5, 3); noStroke();
+      fill(180, 175, 165); rect(4, -19, 2, 2);
+    } else if (mil.weapon === 'axe') {
+      fill(100, 75, 35); rect(5, -10, 1, 8);
+      fill(160, 160, 170); rect(4, -12, 3, 3);
+    } else {
+      stroke(100, 80, 60); strokeWeight(1);
+      line(5, -16, 5, 3); noStroke();
+      fill(180, 175, 165); rect(4, -17, 2, 2);
+    }
     // Cape snippet — faction color
     fill(mil.cape[0], mil.cape[1], mil.cape[2]);
     rect(3, -7, 2, 4);
-    // Helmet crest — faction color
-    fill(mil.helmCrest[0], mil.helmCrest[1], mil.helmCrest[2]);
-    rect(-2, -16, 4, 1);
+    // Helmet — faction-styled
+    if (_cFac === 'seapeople') {
+      fill(mil.helmCrest[0], mil.helmCrest[1], mil.helmCrest[2]);
+      rect(-3, -16, 6, 2);
+      fill(colors.hair[0], colors.hair[1], colors.hair[2]);
+      rect(-4, -16, 1, 2); rect(3, -16, 1, 2);
+    } else if (_cFac === 'egypt') {
+      fill(200, 170, 40);
+      rect(-3, -16, 6, 2);
+      fill(58, 58, 74);
+      rect(-2, -16, 1, 1); rect(1, -16, 1, 1);
+    } else {
+      fill(mil.helmCrest[0], mil.helmCrest[1], mil.helmCrest[2]);
+      rect(-2, -16, 4, 1);
+    }
   } else if (c.variant === 'merchant') {
-    // Sack/bundle carried
-    fill(colors.tunic[0] + 25, colors.tunic[1] + 15, colors.tunic[2] - 5);
-    rect(4, -7, 3, 3);
-    rect(4, -8, 2, 1);
-    // Slightly richer tunic trim
-    fill(200, 170, 60);
+    // Carried item — faction appropriate
+    if (_cFac === 'egypt' || _cFac === 'persia') {
+      // Basket
+      fill(180, 150, 80);
+      rect(4, -8, 3, 4);
+      fill(165, 135, 70);
+      rect(4, -8, 3, 1);
+    } else if (_cFac === 'phoenicia') {
+      // Amphora
+      fill(180, 110, 65);
+      rect(4, -8, 2, 4);
+      fill(165, 95, 50);
+      rect(4, -9, 2, 1);
+    } else if (_cFac === 'gaul') {
+      // Bundle of furs
+      fill(130, 100, 60);
+      rect(4, -7, 3, 3);
+      fill(145, 115, 70, 80);
+      rect(4, -8, 2, 1);
+    } else {
+      // Sack/bundle
+      fill(colors.tunic[0] + 25, colors.tunic[1] + 15, colors.tunic[2] - 5);
+      rect(4, -7, 3, 3);
+      rect(4, -8, 2, 1);
+    }
+    // Richer tunic trim — faction accent
+    let _mTrim = (typeof getFactionData === 'function') ? getFactionData().accentColor || [200, 170, 60] : [200, 170, 60];
+    fill(_mTrim[0], _mTrim[1], _mTrim[2]);
     rect(-4, -4, 8, 1);
   } else if (c.variant === 'priest') {
-    // White stole over tunic
-    fill(240, 235, 225);
-    rect(-1, -8, 2, 7);
-    // Laurel/headband
-    fill(90, 130, 50);
-    rect(-3, -15, 6, 1);
+    // Stole/sash — faction colored
+    if (_cFac === 'egypt') {
+      fill(200, 170, 40);
+      rect(-1, -8, 2, 7);
+      fill(64, 176, 160);
+      rect(-3, -15, 6, 1);
+    } else if (_cFac === 'gaul') {
+      // Druid — mistletoe crown
+      fill(90, 140, 50);
+      rect(-3, -15, 6, 1);
+      fill(240, 240, 220);
+      rect(-1, -15, 1, 1);
+      fill(70, 55, 30);
+      rect(4, -12, 1, 8); // staff
+    } else if (_cFac === 'persia') {
+      fill(212, 160, 48);
+      rect(-1, -8, 2, 7);
+      fill(106, 42, 138);
+      rect(-3, -15, 6, 1);
+    } else {
+      fill(240, 235, 225);
+      rect(-1, -8, 2, 7);
+      fill(90, 130, 50);
+      rect(-3, -15, 6, 1);
+    }
   } else {
-    // Farmer — straw hat
-    fill(200, 180, 120);
-    rect(-4, -16, 8, 2);
-    rect(-3, -17, 6, 1);
+    // Farmer — faction-appropriate hat/tool
+    if (_cFac === 'egypt') {
+      // White head cloth
+      fill(245, 240, 224);
+      rect(-3, -16, 6, 2);
+      rect(-4, -15, 1, 2); rect(3, -15, 1, 2);
+    } else if (_cFac === 'seapeople') {
+      // No hat — windblown hair
+      fill(colors.hair[0] - 10, colors.hair[1] - 10, colors.hair[2] - 5);
+      rect(-4, -16, 2, 2); rect(2, -15, 2, 1);
+    } else if (_cFac === 'gaul') {
+      // Cloth cap
+      fill(90, 64, 32);
+      rect(-3, -16, 6, 2);
+      fill(42, 106, 48, 60);
+      rect(-2, -16, 4, 1);
+    } else {
+      // Straw hat
+      fill(200, 180, 120);
+      rect(-4, -16, 8, 2);
+      rect(-3, -17, 6, 1);
+    }
+    // Carried tool — 30% chance
+    if ((c.walkBobPhase || 0) > 4.0) {
+      fill(90, 70, 40);
+      rect(5, -10, 1, 7); // hoe handle
+      fill(140, 130, 120);
+      rect(4, -10, 2, 2); // hoe head
+    }
   }
 
   pop();
@@ -1485,6 +1894,320 @@ function drawNewNPC(npc, type) {
       fill(180, 155, 128);
       rect(-2, -8, 4, 1);
 
+    } else if (_npcFac === 'seapeople') {
+      // ─── SEA PEOPLE MARCUS (NEREUS) — Sea Raider Warchief ───
+      let cWave = floor(sin(frameCount * 0.05) * 2);
+      let cLen = 16 + cWave;
+      fill(42, 138, 106, 160);
+      rect(5, -4, 4, cLen);
+      fill(50, 150, 115, 190);
+      rect(4, -5, 4, cLen - 1);
+      // Fur boots
+      fill(130, 100, 60);
+      rect(-5, 9, 4, 3); rect(1, 9, 4, 3);
+      fill(145, 115, 70, 100);
+      rect(-4, 9, 2, 1); rect(2, 9, 2, 1);
+      // Muscular legs
+      fill(195, 155, 110);
+      rect(-4, 4, 3, 6); rect(1, 4, 3, 6);
+      // Bare chest with tattoo marks
+      fill(195, 155, 110);
+      rect(-7, -4, 14, 10);
+      // Tattoo dots
+      fill(26, 58, 92, 140);
+      rect(-4, -3, 1, 1); rect(-2, -1, 1, 1); rect(0, -3, 1, 1);
+      rect(2, -2, 1, 1); rect(4, -1, 1, 1); rect(-3, 1, 1, 1);
+      // Fur waistband
+      fill(110, 85, 50);
+      rect(-6, 2, 12, 3);
+      fill(125, 95, 60, 80);
+      rect(-5, 2, 2, 1); rect(1, 3, 2, 1);
+      // Shoulder guards — bone/leather
+      fill(220, 210, 190);
+      rect(-9, -5, 4, 3); rect(5, -5, 4, 3);
+      // Arms
+      fill(195, 155, 110);
+      rect(-9, -1, 2, 5); rect(7, -1, 2, 5);
+      // Round shield — sea serpent
+      fill(26, 58, 92);
+      rect(-13, -5, 5, 12);
+      fill(42, 138, 106);
+      rect(-12, -2, 3, 3);
+      fill(138, 112, 80);
+      rect(-13, -5, 5, 1); rect(-13, 6, 5, 1);
+      // Battle axe in right hand
+      fill(100, 75, 35);
+      rect(7, -2, 2, 10);
+      fill(160, 160, 170);
+      rect(6, -4, 4, 3);
+      // Neck
+      fill(195, 155, 110);
+      rect(-3, -7, 6, 3);
+      // Head
+      fill(195, 155, 110);
+      rect(-5, -14, 10, 8);
+      // Wild hair
+      fill(65, 50, 35);
+      rect(-5, -16, 10, 4);
+      rect(-6, -14, 1, 4); rect(5, -14, 1, 4);
+      // Horned helm
+      fill(138, 112, 80);
+      rect(-6, -17, 12, 3);
+      fill(148, 122, 88);
+      rect(-7, -20, 2, 4); rect(5, -20, 2, 4);
+      rect(-8, -21, 1, 2); rect(6, -21, 1, 2);
+      // Thick beard
+      fill(50, 38, 25);
+      rect(-4, -8, 8, 3); rect(-3, -5, 6, 1);
+      if (blinking) {
+        fill(175, 135, 95);
+        rect(-3, -11, 2, 1); rect(1, -11, 2, 1);
+      } else {
+        fill(255);
+        rect(-3, -12, 2, 2); rect(1, -12, 2, 2);
+        fill(55, 90, 80);
+        rect(-2, -12, 1, 1); rect(2, -12, 1, 1);
+      }
+      fill(160, 125, 88);
+      rect(-4, -13, 3, 1); rect(1, -13, 3, 1);
+
+    } else if (_npcFac === 'persia') {
+      // ─── PERSIA MARCUS (CYRUS) — Persian Immortal Captain ───
+      let cWave = floor(sin(frameCount * 0.05) * 2);
+      let cLen = 18 + cWave;
+      fill(106, 42, 138, 160);
+      rect(5, -4, 4, cLen);
+      fill(120, 55, 150, 190);
+      rect(4, -5, 4, cLen - 1);
+      // Pointed boots
+      fill(100, 65, 35);
+      rect(-5, 9, 4, 3); rect(1, 9, 4, 3);
+      // Legs — ornate trousers
+      fill(106, 42, 138);
+      rect(-4, 4, 3, 6); rect(1, 4, 3, 6);
+      fill(212, 160, 48, 60);
+      rect(-3, 5, 1, 4); rect(2, 5, 1, 4);
+      // Ornate robe + scale armor
+      fill(106, 42, 138);
+      rect(-7, -4, 14, 10);
+      // Scale pattern
+      fill(212, 160, 48, 100);
+      for (let sr = -3; sr <= 3; sr += 2) rect(-6, sr, 12, 1);
+      // Gold belt
+      fill(212, 160, 48);
+      rect(-6, 1, 12, 2);
+      fill(220, 170, 55);
+      rect(-2, 1, 4, 2);
+      // Shoulder guards — gold
+      fill(212, 160, 48);
+      rect(-9, -5, 4, 4); rect(5, -5, 4, 4);
+      // Arms
+      fill(185, 145, 100);
+      rect(-9, -1, 2, 5); rect(7, -1, 2, 5);
+      // Shield
+      fill(106, 42, 138);
+      rect(-13, -5, 5, 12);
+      fill(212, 160, 48);
+      rect(-12, -1, 3, 3);
+      // Scimitar
+      fill(180, 180, 190);
+      rect(7, -2, 2, 5);
+      rect(8, -4, 2, 3);
+      fill(212, 160, 48);
+      rect(7, 2, 2, 2);
+      // Neck
+      fill(185, 145, 100);
+      rect(-3, -7, 6, 3);
+      // Head
+      fill(185, 145, 100);
+      rect(-5, -14, 10, 8);
+      // Tall kulah hat
+      fill(212, 160, 48);
+      rect(-5, -16, 10, 4);
+      rect(-4, -22, 8, 6);
+      fill(106, 42, 138);
+      rect(-5, -16, 10, 1);
+      fill(220, 175, 60, 60);
+      rect(-3, -20, 2, 3);
+      // Beard — groomed
+      fill(25, 18, 10);
+      rect(-4, -8, 8, 3); rect(-3, -5, 6, 2);
+      if (blinking) {
+        fill(165, 128, 88);
+        rect(-3, -11, 2, 1); rect(1, -11, 2, 1);
+      } else {
+        fill(255);
+        rect(-3, -12, 2, 2); rect(1, -12, 2, 2);
+        fill(35, 25, 15);
+        rect(-2, -12, 1, 1); rect(2, -12, 1, 1);
+      }
+      fill(165, 125, 85);
+      rect(-4, -13, 3, 1); rect(1, -13, 3, 1);
+
+    } else if (_npcFac === 'phoenicia') {
+      // ─── PHOENICIA MARCUS (HIRAM) — Phoenician Admiral ───
+      let cWave = floor(sin(frameCount * 0.05) * 2);
+      let cLen = 16 + cWave;
+      fill(138, 16, 80, 160);
+      rect(5, -4, 4, cLen);
+      fill(155, 25, 92, 190);
+      rect(4, -5, 4, cLen - 1);
+      // Leather boots
+      fill(110, 80, 40);
+      rect(-5, 9, 4, 3); rect(1, 9, 4, 3);
+      // Legs
+      fill(200, 165, 125);
+      rect(-4, 4, 3, 6); rect(1, 4, 3, 6);
+      // White tunic with purple sash
+      fill(240, 240, 240);
+      rect(-7, -4, 14, 10);
+      fill(138, 16, 80, 140);
+      rect(-7, -4, 6, 8);
+      // Gold belt
+      fill(212, 160, 48);
+      rect(-6, 1, 12, 2);
+      fill(48, 112, 176);
+      rect(-2, 1, 4, 2);
+      // Shoulder guards
+      fill(200, 180, 140);
+      rect(-9, -5, 4, 4); rect(5, -5, 4, 4);
+      // Arms
+      fill(200, 165, 125);
+      rect(-9, -1, 2, 5); rect(7, -1, 2, 5);
+      // Round shield — cedar tree
+      fill(138, 16, 80);
+      rect(-13, -5, 5, 12);
+      fill(48, 112, 176);
+      rect(-12, -2, 3, 4);
+      fill(42, 90, 45);
+      rect(-11, -1, 1, 3);
+      // Short sword
+      fill(180, 180, 190);
+      rect(7, -1, 2, 5);
+      fill(212, 160, 48);
+      rect(7, 3, 2, 2);
+      fill(100, 70, 35);
+      rect(7, 5, 2, 2);
+      // Neck
+      fill(200, 165, 125);
+      rect(-3, -7, 6, 3);
+      // Head
+      fill(200, 165, 125);
+      rect(-5, -14, 10, 8);
+      // Naval cap
+      fill(200, 180, 140);
+      rect(-5, -16, 10, 4);
+      rect(-4, -18, 8, 2);
+      fill(138, 16, 80);
+      rect(-5, -14, 10, 1);
+      // Short beard
+      fill(35, 25, 15);
+      rect(-4, -8, 8, 2); rect(-3, -6, 6, 1);
+      if (blinking) {
+        fill(180, 148, 110);
+        rect(-3, -11, 2, 1); rect(1, -11, 2, 1);
+      } else {
+        fill(255);
+        rect(-3, -12, 2, 2); rect(1, -12, 2, 2);
+        fill(40, 30, 20);
+        rect(-2, -12, 1, 1); rect(2, -12, 1, 1);
+      }
+      fill(170, 138, 100);
+      rect(-4, -13, 3, 1); rect(1, -13, 3, 1);
+
+    } else if (_npcFac === 'gaul') {
+      // ─── GAUL MARCUS (VERCINGETORIX) — Gallic Chieftain ───
+      let cWave = floor(sin(frameCount * 0.05) * 2);
+      let cLen = 18 + cWave;
+      fill(90, 64, 32, 160);
+      rect(5, -4, 4, cLen);
+      fill(100, 72, 38, 190);
+      rect(4, -5, 4, cLen - 1);
+      // Heavy boots
+      fill(85, 60, 30);
+      rect(-5, 9, 4, 3); rect(1, 9, 4, 3);
+      // Plaid trousers
+      fill(42, 106, 48);
+      rect(-4, 4, 3, 6); rect(1, 4, 3, 6);
+      fill(60, 130, 60, 60);
+      rect(-3, 5, 1, 4); rect(2, 6, 1, 3);
+      // Plaid tunic with leather vest
+      fill(42, 106, 48);
+      rect(-7, -4, 14, 10);
+      // Plaid lines
+      fill(60, 130, 60, 80);
+      for (let pr = -3; pr <= 4; pr += 3) rect(-7, pr, 14, 1);
+      fill(200, 160, 32, 40);
+      for (let pr = -1; pr <= 4; pr += 3) rect(-7, pr, 14, 1);
+      // Leather vest over tunic
+      fill(90, 64, 32);
+      rect(-5, -4, 10, 6);
+      fill(100, 72, 38, 80);
+      rect(-3, -3, 6, 4);
+      // Belt with gold buckle
+      fill(80, 58, 28);
+      rect(-6, 1, 12, 2);
+      fill(200, 160, 32);
+      rect(-2, 1, 4, 2);
+      // Shoulder guards — iron
+      fill(112, 120, 124);
+      rect(-9, -5, 4, 4); rect(5, -5, 4, 4);
+      // Arms — fair skin
+      fill(225, 195, 160);
+      rect(-9, -1, 2, 5); rect(7, -1, 2, 5);
+      // Tall oval shield — green/gold
+      fill(42, 106, 48);
+      rect(-13, -6, 5, 14);
+      fill(200, 160, 32);
+      rect(-12, -1, 3, 3);
+      rect(-13, -6, 5, 1); rect(-13, 7, 5, 1);
+      // Longsword
+      fill(180, 180, 190);
+      rect(7, -4, 2, 8);
+      fill(195, 195, 205);
+      rect(7, -4, 1, 2);
+      fill(200, 160, 32);
+      rect(6, 3, 4, 2);
+      fill(80, 55, 28);
+      rect(7, 5, 2, 3);
+      // Neck
+      fill(225, 195, 160);
+      rect(-3, -7, 6, 3);
+      // Torque necklace
+      fill(200, 160, 32);
+      rect(-4, -7, 8, 1);
+      fill(220, 180, 50);
+      rect(-4, -7, 2, 2); rect(2, -7, 2, 2);
+      // Head
+      fill(225, 195, 160);
+      rect(-5, -14, 10, 8);
+      // Wild hair + long mustache
+      fill(90, 65, 35);
+      rect(-6, -16, 12, 4);
+      rect(-7, -14, 2, 5); rect(5, -14, 2, 5);
+      fill(100, 75, 42);
+      rect(-6, -15, 12, 2);
+      // Long drooping mustache
+      fill(80, 58, 30);
+      rect(-4, -8, 2, 1); rect(2, -8, 2, 1);
+      rect(-5, -7, 1, 2); rect(4, -7, 1, 2);
+      // Iron helm
+      fill(112, 120, 124);
+      rect(-6, -17, 12, 3);
+      fill(200, 160, 32);
+      rect(-3, -18, 6, 1);
+      if (blinking) {
+        fill(205, 175, 142);
+        rect(-3, -11, 2, 1); rect(1, -11, 2, 1);
+      } else {
+        fill(255);
+        rect(-3, -12, 2, 2); rect(1, -12, 2, 2);
+        fill(50, 75, 55);
+        rect(-2, -12, 1, 1); rect(2, -12, 1, 1);
+      }
+      fill(190, 160, 128);
+      rect(-4, -13, 3, 1); rect(1, -13, 3, 1);
+
     } else {
       // ─── ROME MARCUS — Centurion (original) ───
       let cWave = floor(sin(frameCount * 0.05) * 2);
@@ -1802,6 +2525,249 @@ function drawNewNPC(npc, type) {
       fill(180, 200, 230, 8 + floor(sin(frameCount * 0.04) * 6));
       rect(-10, -16, 20, 30);
 
+    } else if (_npcFac === 'seapeople') {
+      // ─── SEA PEOPLE VESTA (SCYLLA) — Sea Witch/Shaman ───
+      fill(120, 95, 55);
+      rect(-4, 10, 3, 2); rect(1, 10, 3, 2);
+      // Dark sea-green robes
+      fill(26, 58, 52);
+      rect(-6, -4, 12, 17);
+      fill(42, 78, 66, 150);
+      rect(2, -3, 4, 15);
+      // Shell and bone belt
+      fill(220, 210, 190);
+      rect(-6, 1, 12, 2);
+      fill(200, 190, 170);
+      rect(-3, 1, 2, 2); rect(3, 1, 2, 2);
+      // Arms — weathered skin
+      fill(185, 148, 108);
+      rect(-8, -1, 2, 6); rect(6, -1, 2, 6);
+      // Staff with shell
+      fill(80, 65, 40);
+      rect(-9, -10, 2, 16);
+      fill(220, 210, 190);
+      rect(-10, -12, 3, 3);
+      fill(42, 138, 106);
+      rect(-9, -11, 1, 1);
+      // Neck
+      fill(185, 148, 108);
+      rect(-3, -6, 6, 3);
+      // Head
+      fill(185, 148, 108);
+      rect(-5, -14, 10, 9);
+      // Wild grey-white hair
+      fill(180, 175, 165);
+      rect(-6, -16, 12, 4);
+      rect(-7, -14, 2, 8); rect(5, -14, 2, 8);
+      fill(165, 160, 150);
+      rect(-6, -15, 12, 2);
+      // Seaweed in hair
+      fill(42, 100, 70, 120);
+      rect(-6, -12, 1, 3); rect(5, -11, 1, 3);
+      // Shell headband
+      fill(220, 210, 190);
+      rect(-5, -17, 10, 2);
+      fill(42, 138, 106);
+      rect(-1, -17, 2, 1);
+      if (blinking) {
+        fill(168, 132, 95);
+        rect(-3, -11, 2, 1); rect(1, -11, 2, 1);
+      } else {
+        fill(42, 138, 106, 180);
+        rect(-3, -12, 2, 2); rect(1, -12, 2, 2);
+        fill(26, 100, 80);
+        rect(-2, -12, 1, 1); rect(2, -12, 1, 1);
+      }
+      fill(165, 130, 95);
+      rect(-1, -10, 2, 2);
+      fill(130, 90, 70, 100);
+      rect(-1, -7, 2, 1);
+
+    } else if (_npcFac === 'persia') {
+      // ─── PERSIA VESTA (DARIUS) — Persian Royal Vizier ───
+      fill(160, 120, 70);
+      rect(-4, 10, 3, 2); rect(1, 10, 3, 2);
+      // Ornate gold/purple robes
+      fill(212, 160, 48);
+      rect(-6, -4, 12, 17);
+      fill(106, 42, 138, 120);
+      rect(-6, -4, 6, 14);
+      // Scale overlay
+      fill(220, 175, 55, 60);
+      for (let vr = -2; vr <= 10; vr += 3) rect(-5, vr, 10, 1);
+      // Jeweled belt
+      fill(106, 42, 138);
+      rect(-6, 1, 12, 2);
+      fill(212, 160, 48);
+      rect(-2, 1, 4, 2);
+      // Arms
+      fill(175, 135, 90);
+      rect(-8, -1, 2, 6); rect(6, -1, 2, 6);
+      // Royal scepter
+      fill(212, 160, 48);
+      rect(-9, -8, 2, 14);
+      fill(106, 42, 138);
+      rect(-10, -10, 3, 3);
+      fill(212, 160, 48);
+      rect(-9, -10, 1, 1);
+      // Neck
+      fill(175, 135, 90);
+      rect(-3, -6, 6, 3);
+      // Head
+      fill(175, 135, 90);
+      rect(-5, -14, 10, 9);
+      // Groomed dark beard
+      fill(20, 14, 8);
+      rect(-4, -5, 8, 3); rect(-3, -2, 6, 1);
+      // Tall hat
+      fill(212, 160, 48);
+      rect(-5, -17, 10, 5);
+      rect(-4, -22, 8, 5);
+      fill(106, 42, 138);
+      rect(-5, -14, 10, 1);
+      fill(220, 175, 60, 50);
+      rect(-3, -20, 2, 3);
+      if (blinking) {
+        fill(158, 120, 82);
+        rect(-3, -11, 2, 1); rect(1, -11, 2, 1);
+      } else {
+        fill(255);
+        rect(-3, -12, 2, 2); rect(1, -12, 2, 2);
+        fill(30, 20, 10);
+        rect(-2, -12, 1, 1); rect(2, -12, 1, 1);
+      }
+      fill(155, 118, 80);
+      rect(-4, -13, 3, 1); rect(1, -13, 3, 1);
+      fill(160, 120, 85);
+      rect(-1, -10, 2, 2);
+
+    } else if (_npcFac === 'phoenicia') {
+      // ─── PHOENICIA VESTA (JEZEBEL) — Phoenician High Priestess ───
+      fill(180, 145, 85);
+      rect(-4, 10, 3, 2); rect(1, 10, 3, 2);
+      // White robe with Tyrian purple sash
+      fill(240, 240, 240);
+      rect(-6, -4, 12, 17);
+      fill(138, 16, 80, 160);
+      rect(-6, -4, 5, 14);
+      // Gold trim
+      fill(212, 160, 48);
+      rect(-6, -4, 12, 1); rect(-6, 12, 12, 1);
+      // Belt
+      fill(212, 160, 48);
+      rect(-6, 1, 12, 2);
+      fill(48, 112, 176);
+      rect(-1, 1, 2, 2);
+      // Arms
+      fill(195, 160, 118);
+      rect(-8, -1, 2, 6); rect(6, -1, 2, 6);
+      // Incense burner
+      fill(212, 160, 48);
+      rect(-9, -4, 3, 5);
+      fill(180, 170, 155, 60);
+      let sw = floor(sin(frameCount * 0.04) * 2);
+      rect(-8 + sw, -8, 1, 4);
+      // Neck
+      fill(195, 160, 118);
+      rect(-3, -6, 6, 3);
+      // Head
+      fill(195, 160, 118);
+      rect(-5, -14, 10, 9);
+      // Dark hair with gold pins
+      fill(25, 18, 12);
+      rect(-6, -16, 12, 4);
+      rect(-7, -14, 2, 8); rect(5, -14, 2, 8);
+      fill(35, 25, 18);
+      rect(-6, -15, 12, 2);
+      // Gold hairpins
+      fill(212, 160, 48);
+      rect(-5, -17, 2, 1); rect(3, -17, 2, 1);
+      // Veil — purple
+      fill(138, 16, 80, 100);
+      rect(-7, -16, 14, 2);
+      if (blinking) {
+        fill(175, 142, 105);
+        rect(-3, -11, 2, 1); rect(1, -11, 2, 1);
+      } else {
+        fill(255);
+        rect(-3, -12, 2, 2); rect(1, -12, 2, 2);
+        fill(40, 25, 15);
+        rect(-2, -12, 1, 1); rect(2, -12, 1, 1);
+      }
+      fill(175, 140, 105);
+      rect(-1, -10, 2, 2);
+      fill(140, 100, 75, 100);
+      rect(-1, -7, 2, 1);
+
+    } else if (_npcFac === 'gaul') {
+      // ─── GAUL VESTA (DRUANTIA) — Druidess ───
+      fill(100, 75, 40);
+      rect(-4, 10, 3, 2); rect(1, 10, 3, 2);
+      // Green/brown druid robes
+      fill(60, 90, 45);
+      rect(-6, -4, 12, 17);
+      fill(75, 105, 55, 150);
+      rect(2, -3, 4, 14);
+      // Vine pattern
+      fill(50, 100, 40, 60);
+      rect(-5, -2, 1, 3); rect(-4, 1, 1, 3);
+      rect(-5, 4, 1, 3); rect(-4, 7, 1, 3);
+      // Leather belt with mistletoe
+      fill(90, 64, 32);
+      rect(-6, 1, 12, 2);
+      fill(90, 140, 50);
+      rect(-2, 0, 4, 2);
+      fill(240, 240, 220);
+      rect(-1, 0, 1, 1); rect(1, 0, 1, 1);
+      // Arms — fair
+      fill(225, 198, 165);
+      rect(-8, -1, 2, 6); rect(6, -1, 2, 6);
+      // Druid staff with mistletoe
+      fill(70, 55, 30);
+      rect(-9, -12, 2, 18);
+      fill(90, 140, 50);
+      rect(-10, -13, 3, 3);
+      fill(240, 240, 220);
+      rect(-9, -12, 1, 1);
+      // Neck
+      fill(225, 198, 165);
+      rect(-3, -6, 6, 3);
+      // Head
+      fill(225, 198, 165);
+      rect(-5, -14, 10, 9);
+      // Silver-white hair — long braids
+      fill(200, 195, 185);
+      rect(-6, -16, 12, 4);
+      rect(-7, -14, 2, 10); rect(5, -14, 2, 10);
+      fill(185, 180, 170);
+      rect(-6, -15, 12, 2);
+      // Braid detail
+      fill(190, 185, 175);
+      rect(-7, -10, 1, 4); rect(6, -10, 1, 4);
+      // Oak leaf crown
+      fill(70, 110, 40);
+      rect(-5, -17, 10, 2);
+      fill(90, 130, 50);
+      rect(-6, -16, 2, 2); rect(4, -16, 2, 2);
+      fill(80, 120, 45);
+      rect(-3, -18, 2, 1); rect(1, -18, 2, 1);
+      // Woad marks
+      fill(40, 80, 160, 80);
+      rect(-6, -14, 1, 2); rect(5, -14, 1, 2);
+      if (blinking) {
+        fill(205, 180, 150);
+        rect(-3, -11, 2, 1); rect(1, -11, 2, 1);
+      } else {
+        fill(140, 180, 160);
+        rect(-3, -12, 2, 2); rect(1, -12, 2, 2);
+        fill(80, 130, 100);
+        rect(-2, -12, 1, 1); rect(2, -12, 1, 1);
+      }
+      fill(200, 175, 148);
+      rect(-1, -10, 2, 2);
+      fill(160, 135, 110, 100);
+      rect(-1, -7, 2, 1);
+
     } else {
       // ─── ROME VESTA — Original Priestess ───
       fill(210, 180, 80);
@@ -2078,6 +3044,283 @@ function drawNewNPC(npc, type) {
       fill(215, 180, 150);
       rect(-1, -10, 2, 2);
       fill(175, 145, 120, 100);
+      rect(-1, -7, 2, 1);
+
+    } else if (_npcFac === 'seapeople') {
+      // ─── SEA PEOPLE FELIX (TRITON) — Sea People Navigator/Storyteller ───
+      fill(130, 100, 55);
+      rect(-4, 10, 3, 2); rect(1, 10, 3, 2);
+      fill(120, 90, 48);
+      rect(-3, 10, 1, 1); rect(2, 10, 1, 1);
+      fill(190, 150, 108);
+      rect(-4, 4, 3, 7); rect(1, 4, 3, 7);
+      // Weathered tunic — dark blue
+      fill(26, 58, 92);
+      rect(-6, -3, 12, 9);
+      fill(35, 70, 105, 100);
+      rect(-3, -2, 6, 8);
+      // Shell and rope belt
+      fill(140, 120, 80);
+      rect(-6, 0, 12, 1);
+      fill(220, 210, 190);
+      rect(-2, 0, 1, 1); rect(3, 0, 1, 1);
+      // Arms — tanned
+      fill(190, 150, 108);
+      rect(-8, -1, 2, 6); rect(6, -1, 2, 6);
+      // Fishing net draped over shoulder
+      fill(140, 125, 90, 120);
+      rect(7, -4, 2, 8);
+      rect(8, -2, 1, 4);
+      // Navigation stick in hand
+      fill(90, 70, 40);
+      rect(-9, -6, 2, 12);
+      fill(42, 138, 106);
+      rect(-9, -7, 2, 2);
+      // Neck
+      fill(190, 150, 108);
+      rect(-3, -6, 6, 3);
+      // Head
+      fill(190, 150, 108);
+      rect(-5, -14, 10, 9);
+      fill(200, 160, 118, 80);
+      rect(-4, -13, 4, 4);
+      // Weathered grey-brown hair
+      fill(110, 95, 70);
+      rect(-6, -16, 12, 4);
+      rect(-6, -13, 2, 3); rect(4, -13, 2, 3);
+      fill(125, 108, 80);
+      rect(-5, -15, 10, 2);
+      // Headband with shell
+      fill(140, 120, 80);
+      rect(-5, -17, 10, 2);
+      fill(220, 210, 190);
+      rect(-1, -17, 2, 1);
+      // Short salt-pepper beard
+      fill(130, 120, 100);
+      rect(-3, -5, 6, 2); rect(-2, -3, 4, 1);
+      if (blinking) {
+        fill(172, 135, 98);
+        rect(-3, -11, 2, 1); rect(1, -11, 2, 1);
+      } else {
+        fill(55, 90, 80);
+        rect(-3, -12, 2, 2); rect(1, -12, 2, 2);
+        fill(35, 65, 55);
+        rect(-3, -12, 1, 1); rect(1, -12, 1, 1);
+      }
+      fill(170, 135, 100, 80);
+      rect(-5, -11, 1, 1); rect(4, -11, 1, 1);
+      fill(175, 138, 100);
+      rect(-1, -10, 2, 2);
+      fill(140, 105, 80, 100);
+      rect(-1, -7, 2, 1);
+
+    } else if (_npcFac === 'persia') {
+      // ─── PERSIA FELIX (ZARATHUSTRA) — Persian Fire Priest/Sage ───
+      fill(155, 115, 65);
+      rect(-4, 10, 3, 2); rect(1, 10, 3, 2);
+      fill(140, 100, 55);
+      rect(-3, 10, 1, 1); rect(2, 10, 1, 1);
+      fill(170, 130, 85);
+      rect(-4, 4, 3, 7); rect(1, 4, 3, 7);
+      // White priestly robe with gold trim
+      fill(240, 235, 220);
+      rect(-6, -3, 12, 9);
+      fill(250, 245, 230, 100);
+      rect(-3, -2, 6, 8);
+      // Gold sash
+      fill(212, 160, 48);
+      rect(-6, 0, 12, 1);
+      fill(106, 42, 138);
+      rect(3, 0, 2, 2);
+      // Arms
+      fill(170, 130, 85);
+      rect(-8, -1, 2, 6); rect(6, -1, 2, 6);
+      // Fire brazier in hand
+      fill(212, 160, 48);
+      rect(7, -4, 3, 5);
+      fill(220, 120, 30, 150 + floor(sin(frameCount * 0.1) * 40));
+      rect(7, -6, 3, 2);
+      fill(255, 180, 40, 100);
+      rect(8, -7, 1, 1);
+      // Scroll in other hand
+      fill(220, 200, 150);
+      rect(-9, -2, 3, 6);
+      // Neck
+      fill(170, 130, 85);
+      rect(-3, -6, 6, 3);
+      // Head
+      fill(170, 130, 85);
+      rect(-5, -14, 10, 9);
+      fill(180, 140, 95, 80);
+      rect(-4, -13, 4, 4);
+      // Long white beard — wise sage
+      fill(235, 230, 215);
+      rect(-4, -5, 8, 4); rect(-3, -1, 6, 2); rect(-2, 1, 4, 1);
+      // Tall cylindrical hat
+      fill(240, 235, 220);
+      rect(-5, -17, 10, 5);
+      rect(-4, -21, 8, 4);
+      fill(212, 160, 48);
+      rect(-5, -14, 10, 1);
+      fill(106, 42, 138);
+      rect(-4, -18, 8, 1);
+      if (blinking) {
+        fill(152, 115, 78);
+        rect(-3, -11, 2, 1); rect(1, -11, 2, 1);
+      } else {
+        fill(50, 35, 20);
+        rect(-3, -12, 2, 2); rect(1, -12, 2, 2);
+        fill(70, 50, 30);
+        rect(-3, -12, 1, 1); rect(1, -12, 1, 1);
+      }
+      fill(152, 115, 78, 80);
+      rect(-5, -11, 1, 1); rect(4, -11, 1, 1);
+      fill(160, 122, 82);
+      rect(-1, -10, 2, 2);
+
+    } else if (_npcFac === 'phoenicia') {
+      // ─── PHOENICIA FELIX (CADMUS) — Phoenician Scribe/Inventor ───
+      fill(160, 125, 75);
+      rect(-4, 10, 3, 2); rect(1, 10, 3, 2);
+      fill(145, 110, 65);
+      rect(-3, 10, 1, 1); rect(2, 10, 1, 1);
+      fill(190, 155, 115);
+      rect(-4, 4, 3, 7); rect(1, 4, 3, 7);
+      // White tunic with purple hem
+      fill(240, 240, 240);
+      rect(-6, -3, 12, 9);
+      fill(138, 16, 80);
+      rect(-6, 4, 12, 2);
+      // Belt with navigation tools
+      fill(200, 180, 140);
+      rect(-6, 0, 12, 1);
+      fill(212, 160, 48);
+      rect(-2, 0, 1, 1); rect(3, 0, 2, 1);
+      // Arms
+      fill(190, 155, 115);
+      rect(-8, -1, 2, 6); rect(6, -1, 2, 6);
+      // Alphabet tablet
+      fill(200, 180, 140);
+      rect(7, -4, 3, 7);
+      fill(20, 15, 10);
+      rect(8, -3, 1, 1); rect(8, -1, 1, 1); rect(8, 1, 1, 1);
+      // Stylus
+      fill(140, 110, 60);
+      rect(-9, -3, 1, 7);
+      // Neck
+      fill(190, 155, 115);
+      rect(-3, -6, 6, 3);
+      // Head
+      fill(190, 155, 115);
+      rect(-5, -14, 10, 9);
+      fill(200, 165, 125, 80);
+      rect(-4, -13, 4, 4);
+      // Dark curly hair
+      fill(30, 22, 14);
+      rect(-6, -16, 12, 4);
+      rect(-6, -13, 2, 3); rect(4, -13, 2, 3);
+      fill(40, 30, 20);
+      rect(-5, -15, 10, 2);
+      // Naval cap
+      fill(200, 180, 140);
+      rect(-5, -18, 10, 3);
+      fill(138, 16, 80);
+      rect(-5, -16, 10, 1);
+      // Short neat beard
+      fill(30, 22, 14);
+      rect(-3, -5, 6, 2); rect(-2, -3, 4, 1);
+      if (blinking) {
+        fill(172, 138, 100);
+        rect(-3, -11, 2, 1); rect(1, -11, 2, 1);
+      } else {
+        fill(45, 30, 18);
+        rect(-3, -12, 2, 2); rect(1, -12, 2, 2);
+        fill(65, 45, 28);
+        rect(-3, -12, 1, 1); rect(1, -12, 1, 1);
+      }
+      fill(172, 135, 100, 80);
+      rect(-5, -11, 1, 1); rect(4, -11, 1, 1);
+      fill(178, 142, 105);
+      rect(-1, -10, 2, 2);
+      fill(145, 108, 82, 100);
+      rect(-1, -7, 2, 1);
+
+    } else if (_npcFac === 'gaul') {
+      // ─── GAUL FELIX (BRENNUS) — Gallic Bard/Storyteller ───
+      fill(105, 78, 42);
+      rect(-4, 10, 3, 2); rect(1, 10, 3, 2);
+      fill(90, 65, 35);
+      rect(-3, 10, 1, 1); rect(2, 10, 1, 1);
+      fill(220, 192, 158);
+      rect(-4, 4, 3, 7); rect(1, 4, 3, 7);
+      // Plaid tunic — muted browns/greens
+      fill(90, 64, 32);
+      rect(-6, -3, 12, 9);
+      // Plaid detail
+      fill(42, 106, 48, 80);
+      for (let pr = -2; pr <= 4; pr += 3) rect(-6, pr, 12, 1);
+      for (let pc = -5; pc <= 4; pc += 3) rect(pc, -3, 1, 9);
+      // Leather belt
+      fill(80, 58, 28);
+      rect(-6, 0, 12, 1);
+      fill(200, 160, 32);
+      rect(-1, 0, 2, 1);
+      // Arms — fair
+      fill(220, 192, 158);
+      rect(-8, -1, 2, 6); rect(6, -1, 2, 6);
+      // Lyre in hand
+      fill(140, 100, 50);
+      rect(7, -4, 3, 6);
+      fill(200, 160, 32);
+      rect(7, -5, 1, 7); rect(9, -5, 1, 7);
+      fill(180, 140, 60);
+      rect(7, -5, 3, 1);
+      // Walking stick
+      fill(70, 55, 28);
+      rect(-9, -8, 2, 14);
+      // Neck
+      fill(220, 192, 158);
+      rect(-3, -6, 6, 3);
+      // Torque
+      fill(200, 160, 32);
+      rect(-4, -6, 8, 1);
+      // Head
+      fill(220, 192, 158);
+      rect(-5, -14, 10, 9);
+      fill(230, 202, 168, 80);
+      rect(-4, -13, 4, 4);
+      // Wild red-brown hair and braids
+      fill(140, 80, 35);
+      rect(-6, -16, 12, 4);
+      rect(-7, -14, 2, 6); rect(5, -14, 2, 6);
+      fill(155, 90, 42);
+      rect(-6, -15, 12, 2);
+      // Feather in hair
+      fill(42, 106, 48);
+      rect(5, -18, 1, 3);
+      fill(200, 160, 32);
+      rect(5, -18, 1, 1);
+      // Long droopy mustache
+      fill(120, 72, 30);
+      rect(-4, -7, 2, 1); rect(2, -7, 2, 1);
+      rect(-5, -6, 1, 2); rect(4, -6, 1, 2);
+      // Short beard
+      fill(130, 80, 35);
+      rect(-3, -5, 6, 2);
+      if (blinking) {
+        fill(200, 175, 142);
+        rect(-3, -11, 2, 1); rect(1, -11, 2, 1);
+      } else {
+        fill(55, 100, 70);
+        rect(-3, -12, 2, 2); rect(1, -12, 2, 2);
+        fill(35, 70, 48);
+        rect(-3, -12, 1, 1); rect(1, -12, 1, 1);
+      }
+      fill(200, 175, 145, 80);
+      rect(-5, -11, 1, 1); rect(4, -11, 1, 1);
+      fill(210, 178, 148);
+      rect(-1, -10, 2, 2);
+      fill(170, 138, 112, 100);
       rect(-1, -7, 2, 1);
 
     } else {
@@ -2668,6 +3911,38 @@ const FACTION_CITIZEN_TUNICS = {
     [100, 140, 180],  // lighter blue
     [220, 215, 205],  // cream chiton
     [60, 120, 170],   // deep blue
+  ],
+  seapeople: [
+    [26, 58, 92],     // dark navy
+    [42, 78, 66],     // sea green
+    [80, 70, 55],     // weathered brown
+    [50, 80, 70],     // dark teal
+    [95, 85, 65],     // driftwood
+    [35, 65, 85],     // storm blue
+  ],
+  persia: [
+    [106, 42, 138],   // royal purple
+    [130, 60, 160],   // lighter purple
+    [212, 160, 48],   // gold
+    [80, 50, 110],    // deep violet
+    [190, 145, 42],   // darker gold
+    [145, 75, 170],   // amethyst
+  ],
+  phoenicia: [
+    [138, 16, 80],    // Tyrian purple
+    [240, 240, 240],  // white linen
+    [160, 30, 95],    // lighter purple
+    [220, 215, 200],  // cream
+    [120, 12, 65],    // deep purple
+    [48, 112, 176],   // sea blue
+  ],
+  gaul: [
+    [42, 106, 48],    // forest green
+    [90, 64, 32],     // leather brown
+    [60, 90, 45],     // moss green
+    [110, 80, 45],    // warm brown
+    [50, 100, 55],    // deep green
+    [120, 95, 55],    // tan leather
   ],
 };
 

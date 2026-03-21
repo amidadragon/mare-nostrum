@@ -1166,8 +1166,10 @@ function completeSailToHome() {
     setTimeout(function() {
       if (state.progression.homeIslandReached && !state.progression.tutorialsSeen._marcusWelcome) {
         state.progression.tutorialsSeen._marcusWelcome = true;
-        openDialog('Marcus', 'marcus',
-          'Salve, exile! By the gods, another survivor! I am Marcus — a legionary like yourself. ' +
+        let _mnm = getFactionData().npcNames.marcus;
+        let _mst = getFactionTerms().soldier.toLowerCase();
+        openDialog(_mnm, 'marcus',
+          'Salve, exile! By the gods, another survivor! I am ' + _mnm + ' — a ' + _mst + ' like yourself. ' +
           'This island has ruins, fields, fresh water... everything we need to rebuild. ' +
           'Explore the island. Find the farm to the west, the crystal shrine... ' +
           'and come find me near the barracks when you are ready.',

@@ -181,7 +181,7 @@ const NPC_QUEST_CHAINS = {
       objectives: [{ id: 'kill_15', desc: 'Defeat 15 enemies on Terra Nova', counter: 'nq_marcus_kills', target: 15 }],
       reward: { gold: 30, rareHide: 3, titanBone: 2 },
       dialogueStart: "Something's moving in the western forest. If we don't patrol, they'll find us. I need you on the line with me.",
-      dialogueEnd: "Quiet. Finally quiet. You fight like a legionary — no wasted motion. Whoever trained you did it right.",
+      dialogueEnd: "Quiet. Finally quiet. You fight like a true soldier — no wasted motion. Whoever trained you did it right.",
     },
     {
       id: 'marcus_q3', title: "The Centurion's Toast",
@@ -316,7 +316,7 @@ const DAILY_WANTS = {
     { type: 'gift', resource: 'fish', label: 'Marcus wants fish for the troops' },
     { type: 'gift', resource: 'wood', label: 'Marcus needs timber for repairs' },
     { type: 'gift', resource: 'stone', label: 'Marcus wants stone for the walls' },
-    { type: 'favor', zone: 'castrum', label: 'Marcus asks you to inspect the castrum' },
+    { type: 'favor', zone: 'castrum', label: 'Marcus asks you to inspect the barracks' },
     { type: 'favor', zone: 'arena', label: 'Marcus wants you to train in the arena' },
     { type: 'activity', action: 'spar', label: 'Marcus challenges you to spar' },
     { type: 'gift', resource: 'ironOre', label: 'Marcus needs iron for weapons' },
@@ -566,9 +566,9 @@ const LIVIA_MAX_DIALOGUE = [
 ];
 const MARCUS_MAX_DIALOGUE = [
   "Polished my gladius this morning. Force of habit. The peace here makes me restless... in a good way.",
-  "Caught three mackerel before dawn. Take one. Consider it a standing order from your centurion.",
+  "Caught three mackerel before dawn. Take one. Consider it a standing order.",
   "I've been teaching the young ones sword forms. They're terrible. Reminds me of myself.",
-  "Found an old legionary coin in the sand. Keep it. For luck. Not that you need it.",
+  "Found an old coin in the sand. Keep it. For luck. Not that you need it.",
   "The walls are holding well. I check them every morning. Old soldiers never stop patrolling.",
   "I carved a chess set from driftwood. You're the only one here worth playing against.",
   "Dreamed of marching with the Ninth again last night. Woke up glad to be here instead.",

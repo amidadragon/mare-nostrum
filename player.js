@@ -711,22 +711,59 @@ function drawPlayerShadow(s) {
 }
 
 function drawPlayerFeet(s, legOff) {
-  // Caligae (Roman military sandals) with straps
-  fill(107, 66, 38);
-  rect(-5, s - 3 + legOff, 4, 3);
-  rect(1, s - 3 - legOff, 4, 3);
-  // Sandal sole — darker bottom
-  fill(80, 50, 25);
-  rect(-5, s - 1 + legOff, 4, 1);
-  rect(1, s - 1 - legOff, 4, 1);
-  // Leather straps criss-crossing up ankle
-  fill(120, 78, 42, 140);
-  rect(-4, s - 5 + legOff, 2, 1);
-  rect(2, s - 5 - legOff, 2, 1);
-  // Shin guard/greave bottom hint
-  fill(170, 140, 58, 60);
-  rect(-5, s - 6 + legOff, 4, 1);
-  rect(1, s - 6 - legOff, 4, 1);
+  let _fFac = state.faction || 'rome';
+  let _fIsRoman = state.progression && state.progression.homeIslandReached;
+  if (_fIsRoman && _fFac === 'seapeople') {
+    // Fur boots
+    fill(130, 100, 60);
+    rect(-5, s - 4 + legOff, 4, 4); rect(1, s - 4 - legOff, 4, 4);
+    fill(145, 115, 70, 100);
+    rect(-5, s - 4 + legOff, 2, 1); rect(3, s - 4 - legOff, 2, 1);
+    // Fur pants visible above
+    fill(110, 85, 50);
+    rect(-5, s - 7 + legOff, 4, 3); rect(1, s - 7 - legOff, 4, 3);
+    fill(125, 95, 60, 80);
+    rect(-4, s - 6 + legOff, 2, 1); rect(2, s - 6 - legOff, 2, 1);
+  } else if (_fIsRoman && _fFac === 'egypt') {
+    // Gold-trimmed sandals
+    fill(200, 170, 40);
+    rect(-5, s - 3 + legOff, 4, 3); rect(1, s - 3 - legOff, 4, 3);
+    fill(180, 150, 35);
+    rect(-5, s - 1 + legOff, 4, 1); rect(1, s - 1 - legOff, 4, 1);
+    // White linen kilt peek
+    fill(245, 240, 224);
+    rect(-5, s - 6 + legOff, 4, 2); rect(1, s - 6 - legOff, 4, 2);
+  } else if (_fIsRoman && _fFac === 'gaul') {
+    // Leather boots + plaid trouser peek
+    fill(90, 65, 35);
+    rect(-5, s - 3 + legOff, 4, 3); rect(1, s - 3 - legOff, 4, 3);
+    fill(75, 55, 28);
+    rect(-5, s - 1 + legOff, 4, 1); rect(1, s - 1 - legOff, 4, 1);
+    // Plaid trouser peeking above boot
+    let gt = getFactionData().player.tunic;
+    fill(gt[0] + 20, gt[1] + 20, gt[2] + 10);
+    rect(-5, s - 6 + legOff, 4, 2); rect(1, s - 6 - legOff, 4, 2);
+    fill(gt[0] - 10, gt[1] - 10, gt[2] - 5, 80);
+    rect(-4, s - 6 + legOff, 1, 1); rect(2, s - 6 - legOff, 1, 1);
+  } else if (_fIsRoman && _fFac === 'persia') {
+    // Ornate pointed shoes
+    fill(106, 42, 138);
+    rect(-5, s - 3 + legOff, 4, 3); rect(1, s - 3 - legOff, 4, 3);
+    fill(212, 160, 48);
+    rect(-5, s - 3 + legOff, 1, 1); rect(4, s - 3 - legOff, 1, 1);
+    fill(90, 35, 120);
+    rect(-5, s - 1 + legOff, 4, 1); rect(1, s - 1 - legOff, 4, 1);
+  } else {
+    // Standard caligae (Roman military sandals) with straps
+    fill(107, 66, 38);
+    rect(-5, s - 3 + legOff, 4, 3); rect(1, s - 3 - legOff, 4, 3);
+    fill(80, 50, 25);
+    rect(-5, s - 1 + legOff, 4, 1); rect(1, s - 1 - legOff, 4, 1);
+    fill(120, 78, 42, 140);
+    rect(-4, s - 5 + legOff, 2, 1); rect(2, s - 5 - legOff, 2, 1);
+    fill(170, 140, 58, 60);
+    rect(-5, s - 6 + legOff, 4, 1); rect(1, s - 6 - legOff, 4, 1);
+  }
 }
 
 function drawPlayerCape(fDir, moving, isRoman) {
@@ -806,6 +843,8 @@ function drawPlayerBody(isRoman) {
   let _ft = _fpl.tunic || [175, 58, 44];
   let _fs = _fpl.sash || [200, 170, 50];
   let _fh = _fpl.helm || [196, 162, 70];
+  let _fac = state.faction || 'rome';
+
   // Tunic — faction color
   fill(_hasCostume ? _tc[0] : _ft[0], _hasCostume ? _tc[1] : _ft[1], _hasCostume ? _tc[2] : _ft[2]);
   rect(-floor(chestW / 2), -5, chestW, 18);
@@ -817,19 +856,102 @@ function drawPlayerBody(isRoman) {
   rect(-5, 12, 2, 1);
   rect(2, 13, 3, 1);
 
-  // Armor/sash bands — faction style
-  fill(_fh[0], _fh[1], _fh[2]);
-  rect(-6, -5, 12, 3);
-  fill(_fh[0] - 16, _fh[1] - 14, _fh[2] - 8);
-  rect(-6, -2, 12, 3);
-  fill(_fh[0], _fh[1], _fh[2]);
-  rect(-6, 1, 12, 2);
-  fill(_fh[0] + 24, _fh[1] + 33, _fh[2] + 30, 50);
-  rect(-5, -5, 4, 1);
-
-  // Pteruges
-  fill(140, 100, 45);
-  for (let i = -2; i <= 2; i++) rect(i * 3 - 1, 3, 2, 4);
+  // ─── Faction-specific armor/body detail ───
+  if (_fac === 'rome') {
+    // Segmented lorica armor — horizontal bands
+    fill(_fh[0], _fh[1], _fh[2]);
+    rect(-6, -5, 12, 3);
+    fill(_fh[0] - 16, _fh[1] - 14, _fh[2] - 8);
+    rect(-6, -2, 12, 3);
+    fill(_fh[0], _fh[1], _fh[2]);
+    rect(-6, 1, 12, 2);
+    fill(_fh[0] + 24, _fh[1] + 33, _fh[2] + 30, 50);
+    rect(-5, -5, 4, 1);
+    // Pteruges
+    fill(140, 100, 45);
+    for (let i = -2; i <= 2; i++) rect(i * 3 - 1, 3, 2, 4);
+  } else if (_fac === 'carthage') {
+    // Bronze cuirass with purple sash drape
+    fill(180, 160, 120);
+    rect(-6, -5, 12, 6);
+    fill(165, 145, 105);
+    rect(-6, -3, 12, 1); rect(-6, -1, 12, 1);
+    // Crescent emblem on chest
+    fill(120, 50, 160);
+    rect(-2, -4, 4, 3);
+    fill(180, 160, 120);
+    rect(-1, -4, 3, 2);
+  } else if (_fac === 'egypt') {
+    // Gold collar/broad collar necklace
+    fill(200, 170, 40);
+    rect(-7, -5, 14, 2);
+    fill(64, 176, 160);
+    rect(-6, -5, 3, 1); rect(3, -5, 3, 1);
+    // Bare chest with gold waist sash
+    fill(200, 170, 40);
+    rect(-6, -3, 12, 1);
+  } else if (_fac === 'greece') {
+    // Bronze muscled cuirass — visible chest plate
+    fill(200, 195, 185);
+    rect(-6, -5, 12, 7);
+    fill(190, 185, 175);
+    rect(-4, -3, 8, 4);
+    // Abs detail
+    fill(210, 205, 195, 80);
+    rect(-3, -2, 2, 1); rect(1, -2, 2, 1);
+    rect(-3, 0, 2, 1); rect(1, 0, 2, 1);
+  } else if (_fac === 'seapeople') {
+    // Bare chest with tattoo dots
+    fill(212, 165, 116);
+    rect(-6, -5, 12, 7);
+    // Tattoo marks — small dots
+    fill(60, 90, 110, 140);
+    rect(-4, -3, 1, 1); rect(-2, -4, 1, 1); rect(0, -3, 1, 1);
+    rect(2, -4, 1, 1); rect(4, -2, 1, 1);
+    rect(-3, -1, 1, 1); rect(1, 0, 1, 1); rect(3, -1, 1, 1);
+    // Fur waistband
+    fill(130, 100, 60);
+    rect(-7, 1, 14, 3);
+    fill(145, 115, 70, 100);
+    rect(-6, 1, 2, 1); rect(-2, 2, 2, 1); rect(3, 1, 2, 1);
+  } else if (_fac === 'persia') {
+    // Ornate scale armor pattern — blue/gold
+    fill(106, 42, 138);
+    rect(-6, -5, 12, 7);
+    // Scale pattern — alternating gold dots
+    fill(212, 160, 48, 140);
+    for (let sy = -4; sy <= 0; sy += 2)
+      for (let sx = -5; sx <= 4; sx += 2) rect(sx, sy, 1, 1);
+    // Gold trim lines
+    fill(212, 160, 48);
+    rect(-6, -5, 12, 1); rect(-6, 1, 12, 1);
+  } else if (_fac === 'phoenicia') {
+    // Merchant sash — diagonal purple
+    fill(138, 16, 80, 180);
+    rect(-6, -5, 6, 3); rect(-4, -3, 6, 3); rect(-2, -1, 6, 3);
+    // Gold trim on tunic
+    fill(212, 160, 48);
+    rect(-7, -5, 14, 1);
+  } else if (_fac === 'gaul') {
+    // Plaid/checkered pattern — alternating colored rects
+    let gBase = _ft;
+    fill(gBase[0] + 30, gBase[1] + 30, gBase[2] + 15, 100);
+    for (let gy = -4; gy <= 10; gy += 3)
+      rect(-6, gy, 12, 1);
+    for (let gx = -5; gx <= 4; gx += 3)
+      rect(gx, -4, 1, 14);
+    // Torque necklace — gold arc at neck
+    fill(200, 160, 32);
+    rect(-4, -5, 2, 1); rect(2, -5, 2, 1);
+    fill(220, 180, 45);
+    rect(-2, -6, 4, 1);
+  } else {
+    // Generic armor bands fallback
+    fill(_fh[0], _fh[1], _fh[2]);
+    rect(-6, -5, 12, 3);
+    fill(_fh[0] - 16, _fh[1] - 14, _fh[2] - 8);
+    rect(-6, -2, 12, 3);
+  }
 
   // Belt/sash — faction sash color
   fill(_fs[0], _fs[1], _fs[2]);
@@ -921,15 +1043,68 @@ function drawPlayerTool(fDir, hs, toolSwingTimer) {
     fill(100, 160, 200);
     rect(toolX + 2 * tw, -8 + swingOff, 1 * tw, 3);
   } else {
-    // Gladius — steel blade + gold guard + leather grip
-    fill(152, 152, 160);
-    rect(toolX, -8 + swingOff, 2 * tw, 7);
-    fill(180, 180, 190);
-    rect(toolX, -8 + swingOff, 2 * tw, 2); // blade tip highlight
-    fill(200, 170, 60);
-    rect(toolX - tw, 0 + swingOff, 4 * tw, 2); // guard
-    fill(100, 70, 35);
-    rect(toolX, 2 + swingOff, 2 * tw, 2); // grip
+    // Faction weapon — based on getFactionMilitary().weapon
+    let _wFac = state.faction || 'rome';
+    let _wMil = (typeof getFactionMilitary === 'function') ? getFactionMilitary() : {};
+    let _wType = _wMil.weapon || 'gladius';
+    if (_wType === 'curved_sword' || _wType === 'scimitar') {
+      // Curved sword (falcata/scimitar) — curved blade
+      fill(152, 152, 160);
+      rect(toolX, -7 + swingOff, 2 * tw, 5);
+      rect(toolX + tw, -8 + swingOff, 2 * tw, 3); // curved tip
+      fill(180, 180, 190);
+      rect(toolX + tw, -8 + swingOff, 1 * tw, 2);
+      fill(200, 170, 60);
+      rect(toolX - tw, -1 + swingOff, 4 * tw, 2);
+      fill(100, 70, 35);
+      rect(toolX, 1 + swingOff, 2 * tw, 2);
+    } else if (_wType === 'khopesh') {
+      // Khopesh — hooked Egyptian sword
+      fill(152, 152, 160);
+      rect(toolX, -6 + swingOff, 2 * tw, 5);
+      rect(toolX + tw, -8 + swingOff, 2 * tw, 3);
+      rect(toolX + 2 * tw, -7 + swingOff, 1 * tw, 2); // hook
+      fill(200, 170, 40);
+      rect(toolX - tw, 0 + swingOff, 4 * tw, 2);
+      fill(100, 70, 35);
+      rect(toolX, 2 + swingOff, 2 * tw, 2);
+    } else if (_wType === 'spear') {
+      // Spear — long shaft + small tip
+      fill(100, 75, 35);
+      rect(toolX, -12 + swingOff, 2 * tw, 14);
+      fill(180, 180, 190);
+      rect(toolX, -14 + swingOff, 2 * tw, 3);
+      fill(195, 195, 205);
+      rect(toolX, -14 + swingOff, 1 * tw, 2);
+    } else if (_wType === 'axe') {
+      // Battle axe
+      fill(100, 75, 35);
+      rect(toolX, -6 + swingOff, 2 * tw, 10);
+      fill(160, 160, 170);
+      rect(toolX - tw, -8 + swingOff, 4 * tw, 4);
+      fill(180, 180, 190);
+      rect(toolX - tw, -8 + swingOff, 2 * tw, 2);
+    } else if (_wType === 'longsword') {
+      // Longsword — longer blade
+      fill(152, 152, 160);
+      rect(toolX, -10 + swingOff, 2 * tw, 9);
+      fill(180, 180, 190);
+      rect(toolX, -10 + swingOff, 2 * tw, 2);
+      fill(200, 170, 60);
+      rect(toolX - tw, 0 + swingOff, 4 * tw, 2);
+      fill(100, 70, 35);
+      rect(toolX, 2 + swingOff, 2 * tw, 3);
+    } else {
+      // Gladius (Rome default) — steel blade + gold guard + leather grip
+      fill(152, 152, 160);
+      rect(toolX, -8 + swingOff, 2 * tw, 7);
+      fill(180, 180, 190);
+      rect(toolX, -8 + swingOff, 2 * tw, 2);
+      fill(200, 170, 60);
+      rect(toolX - tw, 0 + swingOff, 4 * tw, 2);
+      fill(100, 70, 35);
+      rect(toolX, 2 + swingOff, 2 * tw, 2);
+    }
   }
   // Tool swing arc trail (semicircle) — visible on tool slots 0-2
   if (toolSwingTimer > 0 && hs <= 2) {
@@ -1015,24 +1190,119 @@ function drawPlayerHead(fDir, facingUp, anim, isRoman) {
     rect(5, -14, 1, 2);
     }
   } else {
-    // Helmet — faction-colored
+    // Helmet — faction-specific style
     let _fhc = (typeof getFactionData === 'function' ? getFactionData().player : null) || {};
     let _helmC = _fhc.helm || [196, 162, 70];
     let _capeC = _fhc.cape || [180, 30, 20];
-    fill(_helmC[0], _helmC[1], _helmC[2]);
-    rect(-6, -16, 12, 5);
-    fill(_helmC[0] - 26, _helmC[1] - 22, _helmC[2] - 10);
-    rect(-6, -13, 2, 3);
-    rect(4, -13, 2, 3);
-    // Crest plume — faction cape color
-    fill(_capeC[0], _capeC[1], _capeC[2]);
-    rect(-4, -20, 8, 4);
-    rect(-2, -22, 4, 2);
+    let _hFac = state.faction || 'rome';
     let cf = floor(sin(frameCount * 0.08) * 1);
-    rect(-3, -21 + cf, 2, 3);
-    rect(2, -21 - cf, 2, 3);
-    fill(_helmC[0], _helmC[1], _helmC[2]);
-    rect(3, -19, 1, 1);
+
+    if (_hFac === 'rome') {
+      // Galea — with red plume
+      fill(_helmC[0], _helmC[1], _helmC[2]);
+      rect(-6, -16, 12, 5);
+      fill(_helmC[0] - 26, _helmC[1] - 22, _helmC[2] - 10);
+      rect(-6, -13, 2, 3); rect(4, -13, 2, 3);
+      // Red plume
+      fill(200, 35, 25);
+      rect(-4, -20, 8, 4); rect(-2, -22, 4, 2);
+      rect(-3, -21 + cf, 2, 3); rect(2, -21 - cf, 2, 3);
+    } else if (_hFac === 'carthage') {
+      // Bronze helm with nose guard
+      fill(_helmC[0], _helmC[1], _helmC[2]);
+      rect(-6, -16, 12, 5);
+      fill(_helmC[0] - 20, _helmC[1] - 20, _helmC[2] - 15);
+      rect(-6, -13, 2, 3); rect(4, -13, 2, 3);
+      // Nose guard
+      fill(_helmC[0] - 10, _helmC[1] - 10, _helmC[2] - 10);
+      rect(-1, -13, 2, 4);
+      // Purple plume — smaller
+      fill(120, 50, 160);
+      rect(-3, -19, 6, 3); rect(-2, -20, 4, 1);
+      rect(-2, -19 + cf, 2, 2);
+    } else if (_hFac === 'egypt') {
+      // Nemes headdress — striped gold/blue
+      fill(200, 170, 40);
+      rect(-6, -16, 12, 5);
+      // Blue stripes
+      fill(58, 58, 74);
+      rect(-5, -15, 2, 3); rect(-1, -15, 2, 3); rect(3, -15, 2, 3);
+      // Lappets hanging down sides
+      fill(200, 170, 40);
+      rect(-7, -12, 2, 5); rect(5, -12, 2, 5);
+      // Gold cobra uraeus
+      fill(200, 170, 40);
+      rect(-1, -18, 2, 2);
+      fill(64, 176, 160);
+      rect(0, -18, 1, 1);
+    } else if (_hFac === 'greece') {
+      // Corinthian helm with blue crest
+      fill(_helmC[0], _helmC[1], _helmC[2]);
+      rect(-6, -16, 12, 5);
+      // Cheek guards
+      fill(_helmC[0] - 15, _helmC[1] - 15, _helmC[2] - 10);
+      rect(-6, -12, 2, 4); rect(4, -12, 2, 4);
+      // Nasal guard
+      fill(_helmC[0], _helmC[1], _helmC[2]);
+      rect(-1, -12, 2, 3);
+      // Blue horsehair crest
+      fill(80, 144, 192);
+      rect(-3, -19, 6, 3); rect(-2 + cf, -21, 4, 2);
+      fill(65, 125, 175);
+      rect(-2 + cf, -19, 2, 1);
+    } else if (_hFac === 'seapeople') {
+      // Horned helm
+      fill(_helmC[0], _helmC[1], _helmC[2]);
+      rect(-6, -16, 12, 5);
+      fill(_helmC[0] - 20, _helmC[1] - 15, _helmC[2] - 10);
+      rect(-6, -13, 2, 3); rect(4, -13, 2, 3);
+      // Horns — curving outward
+      fill(_helmC[0] + 10, _helmC[1] + 10, _helmC[2] + 5);
+      rect(-7, -19, 2, 4); rect(5, -19, 2, 4);
+      rect(-8, -21, 2, 3); rect(6, -21, 2, 3);
+      rect(-8, -22, 1, 1); rect(7, -22, 1, 1);
+    } else if (_hFac === 'persia') {
+      // Tall hat (tiara/kulah)
+      fill(_helmC[0], _helmC[1], _helmC[2]);
+      rect(-5, -16, 10, 5);
+      // Tall crown
+      fill(_helmC[0], _helmC[1], _helmC[2]);
+      rect(-4, -22, 8, 6);
+      fill(_helmC[0] + 15, _helmC[1] + 10, _helmC[2] + 5, 80);
+      rect(-3, -21, 2, 4);
+      // Purple band
+      fill(106, 42, 138);
+      rect(-5, -16, 10, 1);
+    } else if (_hFac === 'phoenicia') {
+      // Naval cap — rounded
+      fill(_helmC[0], _helmC[1], _helmC[2]);
+      rect(-5, -16, 10, 4);
+      rect(-4, -18, 8, 2);
+      fill(_helmC[0] - 15, _helmC[1] - 10, _helmC[2] - 8);
+      rect(-5, -13, 10, 1);
+      // Tyrian purple band
+      fill(138, 16, 80);
+      rect(-5, -14, 10, 1);
+    } else if (_hFac === 'gaul') {
+      // Iron helm with wild hair poking out
+      fill(_helmC[0], _helmC[1], _helmC[2]);
+      rect(-6, -16, 12, 5);
+      fill(_helmC[0] - 15, _helmC[1] - 12, _helmC[2] - 8);
+      rect(-6, -13, 2, 3); rect(4, -13, 2, 3);
+      // Wild hair poking from under helm
+      fill(80, 55, 30);
+      rect(-7, -14, 2, 3); rect(5, -14, 2, 3);
+      rect(-6, -12, 1, 3); rect(5, -12, 1, 3);
+      // Yellow crest
+      fill(200, 160, 32);
+      rect(-3, -18, 6, 2); rect(-2, -19 + cf, 4, 1);
+    } else {
+      // Generic fallback
+      fill(_helmC[0], _helmC[1], _helmC[2]);
+      rect(-6, -16, 12, 5);
+      fill(_capeC[0], _capeC[1], _capeC[2]);
+      rect(-4, -20, 8, 4); rect(-2, -22, 4, 2);
+    }
   }
 
   // Wardrobe headwear override
@@ -1145,6 +1415,12 @@ function drawPlayerHead(fDir, facingUp, anim, isRoman) {
     fill(190, 145, 105, 80);
     rect(2, -10, 1, 1);
     rect(3, -9, 1, 1);
+    // Gaul: long mustache (two small lines drooping from nose)
+    if ((state.faction || 'rome') === 'gaul' && state.progression && state.progression.homeIslandReached) {
+      fill(80, 55, 30);
+      rect(-3, -9, 2, 1); rect(1, -9, 2, 1);
+      rect(-4, -8, 1, 1); rect(3, -8, 1, 1);
+    }
   }
 }
 

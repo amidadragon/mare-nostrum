@@ -1015,7 +1015,8 @@ function drawLegiaUI() {
   let garrison = hasArmy && typeof getGarrisonCount === 'function' ? getGarrisonCount() : 0;
   let deployed = hasArmy && typeof getDeployedCount === 'function' ? getDeployedCount() : 0;
   let morale = lg.morale || 100;
-  let castrumName = (typeof CASTRUM_LEVELS !== 'undefined' && CASTRUM_LEVELS[lg.castrumLevel]) ? CASTRUM_LEVELS[lg.castrumLevel].name : 'Barracks';
+  let _legiaFt = (typeof getFactionTerms === 'function') ? getFactionTerms() : { barracks: 'Castrum', army: 'Legion' };
+  let castrumName = (typeof getCastrumLevelName === 'function') ? getCastrumLevelName(lg.castrumLevel) : _legiaFt.barracks;
 
   // Dynamic height based on unlocked units
   let trainRows = unlockedTypes.length;
@@ -1028,7 +1029,7 @@ function drawLegiaUI() {
   // Title + banner
   textFont('Cinzel, Georgia, serif');
   fill(210, 180, 80); textAlign(CENTER, TOP); textSize(14);
-  text('LEGIO NOSTRA', px + pw / 2, py + 10);
+  text(_legiaFt.army.toUpperCase(), px + pw / 2, py + 10);
   textFont('monospace');
   fill(140, 110, 70); textSize(9);
   text(castrumName + ' (Level ' + lg.castrumLevel + '/' + 5 + ')', px + pw / 2, py + 26);
@@ -1059,7 +1060,8 @@ function drawLegiaUI() {
   // Unit counts by type
   if (armyCount > 0 && hasArmy) {
     fill(160, 140, 100); textSize(9);
-    let typeNames = { legionary: 'Legionary', archer: 'Archer', cavalry: 'Cavalry', siege_ram: 'Siege Ram', centurion: 'Centurion' };
+    let _ft = (typeof getFactionTerms === 'function') ? getFactionTerms() : { soldier: 'Legionary', elite: 'Centurion' };
+    let typeNames = { legionary: _ft.soldier, archer: 'Archer', cavalry: 'Cavalry', siege_ram: 'Siege Ram', centurion: _ft.elite };
     for (let t of unlockedTypes) {
       let cnt = typeof getArmyCountByType === 'function' ? getArmyCountByType(t) : 0;
       if (cnt > 0) {
@@ -1086,6 +1088,8 @@ function drawLegiaUI() {
     let def = unitCosts[t];
     let costStr = def ? def.cost + 'g' : '?g';
     let nameStr = def ? def.name : t;
+    if (t === 'legionary') nameStr = _ft.soldier;
+    else if (t === 'centurion') nameStr = 'Elite ' + _ft.elite;
     fill(armyCount < maxSoldiers ? color(180, 160, 120) : color(100, 80, 60));
     textSize(10);
     text('[' + k + '] ' + nameStr + ' (' + costStr + ')', px + 20, sy);
@@ -1107,7 +1111,8 @@ function drawLegiaUI() {
       costStr = parts.join(' + ');
     }
     fill(200, 170, 100); textSize(10);
-    text('[2] Upgrade to ' + (nextLvData ? nextLvData.name : 'next') + ' (' + costStr + ')', px + 14, sy);
+    let nextName = (typeof getCastrumLevelName === 'function') ? getCastrumLevelName(lg.castrumLevel + 1) : (nextLvData ? nextLvData.name : 'next');
+    text('[2] Upgrade to ' + nextName + ' (' + costStr + ')', px + 14, sy);
     sy += 16;
   }
 
