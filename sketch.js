@@ -2496,7 +2496,7 @@ function s2wY(sy) {
 
 // Surface radii match the drawn grass ellipse
 function getSurfaceRX() { return state.islandRX * 0.90; }
-function getSurfaceRY() { return state.islandRY * 0.62; }
+function getSurfaceRY() { return state.islandRY * 0.36; }
 
 // Dynamic farm center — scales with island size so farm doesn't crowd temple
 function getFarmCenterX() { return WORLD.islandCX - 340; }
@@ -5464,7 +5464,7 @@ function checkHeartMilestones(newHearts) {
 function drawGameVignette() {
   // Subtle screen-edge darkening for atmosphere
   let bright = getSkyBrightness();
-  let vigA = bright > 0.5 ? 12 : lerp(30, 12, bright * 2); // darker at night
+  let vigA = bright > 0.5 ? 12 : lerp(20, 12, bright * 2); // slightly darker at night
   // Combat vignette — darken edges more when enemies are nearby
   if (_juiceCombatVignette > 0) {
     vigA += _juiceCombatVignette * 25;
@@ -7752,12 +7752,12 @@ function drawWindowGlow() {
       if (sx5 < -30 || sx5 > width + 30 || sy5 < -30 || sy5 > height + 30) return;
       noStroke();
       // 2-3 small warm rectangles per building — windows/doorways
-      fill(255, 195, 80, 50 * nightStr);
+      fill(255, 195, 80, 70 * nightStr);
       rect(floor(sx5 - b.w * 0.15), floor(sy5 - b.h * 0.25), 5, 4);
       rect(floor(sx5 + b.w * 0.1), floor(sy5 - b.h * 0.25), 5, 4);
       // Soft bloom
-      fill(255, 175, 60, 18 * nightStr);
-      ellipse(sx5, sy5 - b.h * 0.1, b.w * 0.5, b.h * 0.3);
+      fill(255, 175, 60, 30 * nightStr);
+      ellipse(sx5, sy5 - b.h * 0.1, b.w * 0.7, b.h * 0.45);
     }
   });
 
@@ -7773,11 +7773,11 @@ function drawWindowGlow() {
       if (gx < -30 || gx > width + 30 || gy < -30 || gy > height + 30) return;
       noStroke();
       // Outer soft falloff
-      fill(255, 160, 50, 12 * nightStr);
-      ellipse(gx, gy + 2, 20, 10);
+      fill(255, 160, 50, 18 * nightStr);
+      ellipse(gx, gy + 2, 30, 15);
       // Inner warm core
-      fill(255, 180, 70, 25 * nightStr);
-      ellipse(gx, gy + 2, 10, 5);
+      fill(255, 180, 70, 35 * nightStr);
+      ellipse(gx, gy + 2, 14, 7);
     }
   });
 }
@@ -13757,8 +13757,8 @@ function spawnSeasonFanfare(seasonIdx) {
 function drawNightOverlay() {
   let bright = getSkyBrightness(); // 0 = deep night, 1 = full day
   if (bright >= 1) return; // no overlay needed during day
-  // Max darkness at night: ~65% opacity dark blue
-  let darkness = (1 - bright) * 0.65;
+  // Max darkness at night: ~40% opacity dark blue (moonlit feel)
+  let darkness = (1 - bright) * 0.40;
   noStroke();
   fill(10, 12, 40, darkness * 255);
   rect(0, 0, width, height);
@@ -13801,11 +13801,11 @@ function drawColorGrading() {
     // Dusk: deep purple settling
     let t = map(h, 19, 20.5, 0, 1);
     r = lerp(120, 15, t); g = lerp(50, 12, t); b = lerp(100, 50, t);
-    a = lerp(30, 45, t);
+    a = lerp(25, 30, t);
   } else if (h >= 20.5 || h < 5) {
-    // Night: deep indigo-blue
+    // Night: deep indigo-blue (subtle tint, not darkening)
     r = 8; g = 8; b = 30;
-    a = 42;
+    a = 22;
   }
 
   // Seasonal tint modifier
@@ -13821,7 +13821,7 @@ function drawColorGrading() {
   }
 
   // Vignette — darker edges for cinematic feel (always subtle)
-  let vigA = 18 + (h >= 20 || h < 6 ? 12 : 0);
+  let vigA = 18 + (h >= 20 || h < 6 ? 6 : 0);
   let vigW = width * 0.35, vigH = height * 0.35;
   // Top-left corner
   fill(0, 0, 0, vigA * 0.5);

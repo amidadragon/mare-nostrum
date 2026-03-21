@@ -852,16 +852,43 @@ function drawIsland() {
     }
   }
 
-  // Sandy beach ring — warm golden sand (organic coastline)
-  fill(210, 190, 145);
-  drawCoastlineShape(ix, iy, iw * 0.465, ih * 0.195, -14);
-  // Wet sand (darker warm inner ring — tide line)
-  fill(180, 158, 115);
-  drawCoastlineShape(ix, iy, iw * 0.4575, ih * 0.1875, -16);
-  // Wet sand shimmer — subtle water sheen on wet zone
+  // ─── BEACH — layered sand strip between water and cliff ───
+  // Wet sand at waterline (darkest, simulates wave-lapped sand)
+  fill(190, 170, 140);
+  drawCoastlineShape(ix, iy, iw * 0.475, ih * 0.205, -13);
+  // Wet sand shimmer — subtle water sheen
   let wetShimmer = sin(frameCount * 0.03) * 0.3 + 0.5;
-  fill(160, 185, 200, 18 * wetShimmer * dayMix);
-  drawCoastlineShape(ix, iy, iw * 0.4625, ih * 0.1925, -15);
+  fill(160, 185, 200, 22 * wetShimmer * dayMix);
+  drawCoastlineShape(ix, iy, iw * 0.473, ih * 0.203, -13);
+  // Main sand — warm golden beach
+  fill(225, 205, 165);
+  drawCoastlineShape(ix, iy, iw * 0.470, ih * 0.200, -14);
+  // Inner dry sand — lighter, closer to cliff
+  fill(235, 218, 178);
+  drawCoastlineShape(ix, iy, iw * 0.465, ih * 0.195, -15);
+  // Sand-to-grass transition — intermediate earthy tone
+  fill(200, 185, 145, 120);
+  drawCoastlineShape(ix, iy, iw * 0.456, ih * 0.188, -16);
+
+  // South beach widening — extra sand arc on the south side (port side)
+  fill(230, 212, 172, 180);
+  for (let ba = PI * 0.3; ba < PI * 0.7; ba += 0.15) {
+    let bx = ix + cos(ba) * iw * 0.478;
+    let by = (iy - 12) + sin(ba) * ih * 0.210;
+    ellipse(bx, by, 12 + sin(ba * 3.7) * 4, 5);
+  }
+
+  // Pebbles scattered along beach (sparse)
+  {
+    let pebSeeds = [0.3, 1.2, 2.5, 3.8, 5.1];
+    let pRX = iw * 0.468, pRY = ih * 0.198;
+    pebSeeds.forEach(pa => {
+      let px2 = floor(ix + cos(pa) * pRX + sin(pa * 7.3) * 3);
+      let py2 = floor((iy - 14) + sin(pa) * pRY + cos(pa * 5.1) * 2);
+      fill(120, 108, 88, 70 + sin(pa * 11) * 20);
+      rect(px2, py2, 2, 1);
+    });
+  }
 
   // ─── COASTAL VARIETY ───
   // North rocky headland (angle PI+0.3 to TWO_PI-0.3)
@@ -926,18 +953,23 @@ function drawIsland() {
       }
     }
   }
-  // Beach debris — driftwood, shells, seaweed
+  // Beach debris — driftwood, shells, seaweed, pebbles
   {
     let debrisSeeds = [
       { a: PI * 0.35, type: 'driftwood' },
+      { a: PI * 0.45, type: 'shell' },
       { a: PI * 0.55, type: 'shell' },
+      { a: PI * 0.63, type: 'pebble' },
       { a: PI * 0.70, type: 'seaweed' },
       { a: PI * 0.20, type: 'shell' },
       { a: PI * 0.85, type: 'driftwood' },
+      { a: PI * 0.12, type: 'pebble' },
       { a: 0.15, type: 'seaweed' },
+      { a: PI * 1.3, type: 'shell' },
+      { a: PI * 1.6, type: 'pebble' },
     ];
-    let dRX = iw * 0.458;
-    let dRY = ih * 0.192;
+    let dRX = iw * 0.466;
+    let dRY = ih * 0.197;
     debrisSeeds.forEach(d => {
       let dx = floor(ix + cos(d.a) * dRX + sin(d.a * 5.3) * 3);
       let dy = floor((iy - 15) + sin(d.a) * dRY);
@@ -947,10 +979,15 @@ function drawIsland() {
         fill(140, 115, 78, 70);
         rect(dx - 4, dy, 8, 1);
       } else if (d.type === 'shell') {
-        fill(210, 200, 180, 100);
-        ellipse(dx, dy, 3, 2);
-        fill(220, 215, 200, 80);
+        fill(230, 220, 195, 110);
+        ellipse(dx, dy, 4, 2.5);
+        fill(240, 232, 210, 80);
         rect(floor(dx), floor(dy) - 1, 1, 1);
+      } else if (d.type === 'pebble') {
+        fill(105, 95, 78, 80);
+        rect(floor(dx), floor(dy), 3, 2);
+        fill(90, 82, 68, 60);
+        rect(floor(dx) + 1, floor(dy) + 1, 2, 1);
       } else {
         // Seaweed strand
         fill(40, 75, 45, 80);
@@ -2965,12 +3002,12 @@ function drawNightLighting() {
       let sx = w2sX(b.x);
       let sy = w2sY(b.y);
       if (sx < -40 || sx > width + 40 || sy < -40 || sy > height + 40) return;
-      fill(ng[0], ng[1], ng[2], 12 * nightAlpha);
-      ellipse(sx, sy, nr * 2.5, nr * 1.5);
-      fill(ng[0], ng[1], ng[2], 25 * nightAlpha);
-      ellipse(sx, sy, nr * 1.2, nr * 0.8);
-      fill(ng[0], ng[1], ng[2], 40 * nightAlpha);
-      ellipse(sx, sy, nr * 0.5, nr * 0.35);
+      fill(ng[0], ng[1], ng[2], 18 * nightAlpha);
+      ellipse(sx, sy, nr * 3.5, nr * 2.2);
+      fill(ng[0], ng[1], ng[2], 35 * nightAlpha);
+      ellipse(sx, sy, nr * 1.8, nr * 1.1);
+      fill(ng[0], ng[1], ng[2], 55 * nightAlpha);
+      ellipse(sx, sy, nr * 0.7, nr * 0.5);
     });
   }
   if (state.crystalNodes) {
