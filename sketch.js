@@ -1011,49 +1011,117 @@ const CITY_SLOTS = [
 
 // Blueprint types — cost wood, stone, crystals
 const BLUEPRINTS = {
-  floor:  { name: 'Tile',     w: 32, h: 32, cost: { wood: 2 },                  key: '1', blocks: false },
-  wall:   { name: 'Wall',     w: 32, h: 8,  cost: { stone: 2 },                 key: '2', blocks: true },
-  door:   { name: 'Arch',     w: 32, h: 8,  cost: { wood: 3 },                  key: '3', blocks: false },
-  chest:  { name: 'Arca',     w: 24, h: 20, cost: { wood: 3, crystals: 1 },     key: '4', blocks: true },
-  bridge: { name: 'Bridge',   w: 32, h: 32, cost: { wood: 4 },                  key: '5', blocks: false },
-  fence:  { name: 'Baluster', w: 32, h: 6,  cost: { wood: 1 },                  key: '6', blocks: true },
-  torch:  { name: 'Brazier',  w: 8,  h: 8,  cost: { wood: 1, crystals: 1 },    key: '7', blocks: false },
-  flower: { name: 'Roses',    w: 8,  h: 8,  cost: { seeds: 1 },               key: '8', blocks: false },
-  lantern:{ name: 'Lucerna',  w: 10, h: 10, cost: { wood: 2, crystals: 1 },   key: '9', blocks: false },
-  mosaic: { name: 'Mosaic',   w: 32, h: 32, cost: { stone: 3, crystals: 1 },key: '0', blocks: false },
-  aqueduct:{ name: 'Aqueduct',w: 32, h: 12, cost: { stone: 4, wood: 2 },    key: '-', blocks: true },
-  bath:    { name: 'Balneum', w: 70, h: 52, cost: { stone: 8, wood: 4, crystals: 3 }, key: '=', blocks: true },
+  floor:  { name: 'Tile',     w: 32, h: 32, cost: { wood: 2 },                  key: '1', blocks: false, upkeep: 0 },
+  wall:   { name: 'Wall',     w: 32, h: 8,  cost: { stone: 2 },                 key: '2', blocks: true, upkeep: 2 },
+  door:   { name: 'Arch',     w: 32, h: 8,  cost: { wood: 3 },                  key: '3', blocks: false, upkeep: 0 },
+  chest:  { name: 'Arca',     w: 24, h: 20, cost: { wood: 3, crystals: 1 },     key: '4', blocks: true, upkeep: 0 },
+  bridge: { name: 'Bridge',   w: 32, h: 32, cost: { wood: 4 },                  key: '5', blocks: false, upkeep: 0 },
+  fence:  { name: 'Baluster', w: 32, h: 6,  cost: { wood: 1 },                  key: '6', blocks: true, upkeep: 0 },
+  torch:  { name: 'Brazier',  w: 8,  h: 8,  cost: { wood: 1, crystals: 1 },    key: '7', blocks: false, upkeep: 0 },
+  flower: { name: 'Roses',    w: 8,  h: 8,  cost: { seeds: 1 },               key: '8', blocks: false, upkeep: 0 },
+  lantern:{ name: 'Lucerna',  w: 10, h: 10, cost: { wood: 2, crystals: 1 },   key: '9', blocks: false, upkeep: 0 },
+  mosaic: { name: 'Mosaic',   w: 32, h: 32, cost: { stone: 3, crystals: 1 },key: '0', blocks: false, upkeep: 0 },
+  aqueduct:{ name: 'Aqueduct',w: 32, h: 12, cost: { stone: 4, wood: 2 },    key: '-', blocks: true, upkeep: 1 },
+  bath:    { name: 'Balneum', w: 70, h: 52, cost: { stone: 8, wood: 4, crystals: 3 }, key: '=', blocks: true, upkeep: 2 },
   // Level 5+ (Governor)
-  granary: { name: 'Granary',  w: 58, h: 44, cost: { stone: 6, wood: 4 },              key: '', blocks: true,  minLevel: 5 },
-  well:    { name: 'Well',     w: 24, h: 24, cost: { stone: 4 },                        key: '', blocks: true,  minLevel: 5 },
+  granary: { name: 'Granary',  w: 58, h: 44, cost: { stone: 6, wood: 4 },              key: '', blocks: true,  minLevel: 5, upkeep: 1 },
+  well:    { name: 'Well',     w: 24, h: 24, cost: { stone: 4 },                        key: '', blocks: true,  minLevel: 5, upkeep: 0 },
   // Level 10+ (Senator)
-  temple:  { name: 'Temple',   w: 70, h: 50, cost: { stone: 10, crystals: 5, gold: 20 },key: '', blocks: true,  minLevel: 10 },
-  market:  { name: 'Market',   w: 44, h: 34, cost: { wood: 6, stone: 3 },               key: '', blocks: true,  minLevel: 10 },
+  temple:  { name: 'Temple',   w: 70, h: 50, cost: { stone: 10, crystals: 5, gold: 20 },key: '', blocks: true,  minLevel: 10, upkeep: 3 },
+  market:  { name: 'Market',   w: 44, h: 34, cost: { wood: 6, stone: 3 },               key: '', blocks: true,  minLevel: 10, upkeep: 2 },
   // Level 15+ (Consul)
-  forum:   { name: 'Forum',    w: 80, h: 60, cost: { stone: 15, gold: 50 },             key: '', blocks: true,  minLevel: 15 },
-  watchtower:{ name: 'Tower',  w: 24, h: 56, cost: { stone: 8, ironOre: 4 },            key: '', blocks: true,  minLevel: 15 },
+  forum:   { name: 'Forum',    w: 80, h: 60, cost: { stone: 15, gold: 50 },             key: '', blocks: true,  minLevel: 15, upkeep: 3 },
+  watchtower:{ name: 'Tower',  w: 24, h: 56, cost: { stone: 8, ironOre: 4 },            key: '', blocks: true,  minLevel: 15, upkeep: 2 },
   // Level 20+ (Consul->Imperator)
-  arch:    { name: 'Arch',     w: 48, h: 52, cost: { stone: 20, gold: 100, crystals: 10 }, key: '', blocks: false, minLevel: 20 },
-  villa:   { name: 'Villa',    w: 72, h: 52, cost: { stone: 15, wood: 10, gold: 75 },   key: '', blocks: true,  minLevel: 20 },
+  arch:    { name: 'Arch',     w: 48, h: 52, cost: { stone: 20, gold: 100, crystals: 10 }, key: '', blocks: false, minLevel: 20, upkeep: 0 },
+  villa:   { name: 'Villa',    w: 72, h: 52, cost: { stone: 15, wood: 10, gold: 75 },   key: '', blocks: true,  minLevel: 20, upkeep: 4 },
   // New building types
-  shrine:  { name: 'Sacellum', w: 32, h: 28, cost: { stone: 5, crystals: 3 },           key: '', blocks: true,  minLevel: 3 },
-  house:   { name: 'Domus',    w: 44, h: 34, cost: { wood: 4, stone: 3 },                key: '', blocks: true,  minLevel: 6 },
-  library: { name: 'Biblioth', w: 72, h: 52, cost: { stone: 8, wood: 4, crystals: 2 },   key: '', blocks: true,  minLevel: 12 },
-  arena:   { name: 'Arena',    w: 84, h: 64, cost: { stone: 12, wood: 6, gold: 30 },     key: '', blocks: true,  minLevel: 15 },
-  campfire:{ name: 'Focus',    w: 16, h: 16, cost: { wood: 1 },                           key: '', blocks: false },
+  shrine:  { name: 'Sacellum', w: 32, h: 28, cost: { stone: 5, crystals: 3 },           key: '', blocks: true,  minLevel: 3, upkeep: 1 },
+  house:   { name: 'Domus',    w: 44, h: 34, cost: { wood: 4, stone: 3 },                key: '', blocks: true,  minLevel: 6, upkeep: 1 },
+  library: { name: 'Biblioth', w: 72, h: 52, cost: { stone: 8, wood: 4, crystals: 2 },   key: '', blocks: true,  minLevel: 12, upkeep: 2 },
+  arena:   { name: 'Arena',    w: 84, h: 64, cost: { stone: 12, wood: 6, gold: 30 },     key: '', blocks: true,  minLevel: 15, upkeep: 3 },
+  campfire:{ name: 'Focus',    w: 16, h: 16, cost: { wood: 1 },                           key: '', blocks: false, upkeep: 0 },
   // Level 8+ (auto-spawned, not player-buildable)
-  castrum: { name: 'Castrum',  w: 130, h: 100, cost: { stone: 10, wood: 8, ironOre: 5, gold: 50 }, key: '', blocks: true, minLevel: 8 },
+  castrum: { name: 'Castrum',  w: 130, h: 100, cost: { stone: 10, wood: 8, ironOre: 5, gold: 50 }, key: '', blocks: true, minLevel: 8, upkeep: 2 },
   // ─── NEW BUILDING TYPES ───────────────────────────────────────────────
-  altar:      { name: 'Altar',      w: 28, h: 24, cost: { gold: 20, stone: 5 },                      key: '', blocks: true,  minLevel: 2 },
-  bakery:     { name: 'Pistrinum',  w: 44, h: 36, cost: { gold: 40, wood: 10 },                      key: '', blocks: true,  minLevel: 3 },
-  marketplace:{ name: 'Emporium',   w: 52, h: 38, cost: { gold: 50, wood: 10 },                      key: '', blocks: true,  minLevel: 4 },
-  vineyard:   { name: 'Vinea',      w: 60, h: 40, cost: { gold: 60, wood: 15 },                      key: '', blocks: true,  minLevel: 5 },
-  bathhouse:  { name: 'Thermae',    w: 64, h: 48, cost: { gold: 80, stone: 20 },                     key: '', blocks: true,  minLevel: 6 },
-  guardtower: { name: 'Specula',    w: 22, h: 52, cost: { gold: 70, stone: 25 },                     key: '', blocks: true,  minLevel: 7 },
-  lighthouse: { name: 'Pharos',     w: 26, h: 60, cost: { gold: 100, stone: 30 },                    key: '', blocks: true,  minLevel: 8 },
-  sculptor:   { name: 'Sculptor',   w: 50, h: 40, cost: { gold: 120, stone: 40, ironOre: 10 },       key: '', blocks: true,  minLevel: 9 },
-  crystal_collector: { name: 'Crystal Collector', w: 40, h: 30, cost: { stone: 15, gold: 30 }, key: '', blocks: true, minLevel: 5, desc: 'Automatically harvests nearby crystal nodes' },
+  altar:      { name: 'Altar',      w: 28, h: 24, cost: { gold: 20, stone: 5 },                      key: '', blocks: true,  minLevel: 2, upkeep: 1 },
+  bakery:     { name: 'Pistrinum',  w: 44, h: 36, cost: { gold: 40, wood: 10 },                      key: '', blocks: true,  minLevel: 3, upkeep: 1 },
+  marketplace:{ name: 'Emporium',   w: 52, h: 38, cost: { gold: 50, wood: 10 },                      key: '', blocks: true,  minLevel: 4, upkeep: 2 },
+  vineyard:   { name: 'Vinea',      w: 60, h: 40, cost: { gold: 60, wood: 15 },                      key: '', blocks: true,  minLevel: 5, upkeep: 1 },
+  bathhouse:  { name: 'Thermae',    w: 64, h: 48, cost: { gold: 80, stone: 20 },                     key: '', blocks: true,  minLevel: 6, upkeep: 2 },
+  guardtower: { name: 'Specula',    w: 22, h: 52, cost: { gold: 70, stone: 25 },                     key: '', blocks: true,  minLevel: 7, upkeep: 2 },
+  lighthouse: { name: 'Pharos',     w: 26, h: 60, cost: { gold: 100, stone: 30 },                    key: '', blocks: true,  minLevel: 8, upkeep: 4 },
+  sculptor:   { name: 'Sculptor',   w: 50, h: 40, cost: { gold: 120, stone: 40, ironOre: 10 },       key: '', blocks: true,  minLevel: 9, upkeep: 4 },
+  crystal_collector: { name: 'Crystal Collector', w: 40, h: 30, cost: { stone: 15, gold: 30 }, key: '', blocks: true, minLevel: 5, desc: 'Automatically harvests nearby crystal nodes', upkeep: 1 },
 };
+
+// ─── BUILDING MAINTENANCE ────────────────────────────────────────────────────────
+function calculateBuildingMaintenance() {
+  let total = 0;
+  for (let b of (state.buildings || [])) {
+    if (b.ruined) continue;
+    let bp = BLUEPRINTS[b.type];
+    if (bp && bp.upkeep) total += bp.upkeep;
+  }
+  return total;
+}
+
+function processBuildingMaintenance() {
+  let cost = calculateBuildingMaintenance();
+  if (cost <= 0) return;
+  if (state.gold >= cost) {
+    state.gold -= cost;
+    if (state.treasury) state.treasury.dailyExpense += cost;
+    addNotification('Building upkeep: -' + cost + 'g', '#cc8844');
+    // Restore durability on paid buildings
+    for (let b of (state.buildings || [])) {
+      if (b.durability !== undefined && b.durability < 100 && !b.ruined) {
+        b.durability = min(100, b.durability + 10);
+      }
+    }
+  } else {
+    // Partial pay -- spend what we have, but buildings decay
+    let paid = state.gold;
+    state.gold = 0;
+    if (state.treasury) state.treasury.dailyExpense += paid;
+    addFloatingText(width / 2, height * 0.25, 'Buildings deteriorating! Pay maintenance!', '#ff4444');
+    addNotification('Cannot afford ' + cost + 'g upkeep! Buildings losing durability.', '#ff4444');
+    for (let b of (state.buildings || [])) {
+      let bp = BLUEPRINTS[b.type];
+      if (!bp || !bp.upkeep || bp.upkeep <= 0) continue;
+      if (b.ruined) continue;
+      if (b.durability === undefined) b.durability = 100;
+      b.durability -= 5;
+      if (b.durability <= 0) {
+        b.durability = 0;
+        b.ruined = true;
+        addFloatingText(w2sX(b.x), w2sY(b.y) - 20, bp.name + ' ruined!', '#ff4444');
+      }
+    }
+  }
+}
+
+function getBuildingRepairCost(b) {
+  let bp = BLUEPRINTS[b.type];
+  if (!bp) return 0;
+  let goldCost = (bp.cost && bp.cost.gold) || 0;
+  return max(5, floor(goldCost * 0.5));
+}
+
+function repairBuilding(b) {
+  if (!b.ruined) return false;
+  let cost = getBuildingRepairCost(b);
+  if (state.gold < cost) {
+    addFloatingText(width / 2, height * 0.3, 'Need ' + cost + 'g to repair', '#ff6644');
+    return false;
+  }
+  state.gold -= cost;
+  b.ruined = false;
+  b.durability = 100;
+  let bp = BLUEPRINTS[b.type];
+  addFloatingText(w2sX(b.x), w2sY(b.y) - 20, (bp ? bp.name : 'Building') + ' repaired!', '#44ff44');
+  return true;
+}
 
 // ─── TECH TREE ──────────────────────────────────────────────────────────────
 const TECH_TREE = {
@@ -1067,7 +1135,7 @@ const TECH_TREE = {
   celestial_navigation:    { name: 'Celestial Navigation',    cost: 50,  branch: 'maritime',    requires: null,                     tier: 0, desc: '+15% sailing speed' },
   advanced_hulls:          { name: 'Advanced Hulls',          cost: 100, branch: 'maritime',    requires: 'celestial_navigation',   tier: 1, desc: 'Trade ships carry more' },
   deep_sea_fishing:        { name: 'Deep Sea Fishing',        cost: 200, branch: 'maritime',    requires: 'advanced_hulls',         tier: 2, desc: 'Unlock rare deep fish' },
-  naval_warfare:           { name: 'Naval Warfare',           cost: 400, branch: 'maritime',    requires: 'deep_sea_fishing',       tier: 3, desc: 'Warships defend routes' },
+  naval_warfare:           { name: 'Naval Warfare',           cost: 400, branch: 'maritime',    requires: 'deep_sea_fishing',       tier: 3, desc: '-50% trade raid chance' },
   mare_nostrum_dominion:   { name: 'Mare Nostrum Dominion',   cost: 600, branch: 'maritime',    requires: 'naval_warfare',          tier: 4, desc: 'RESEARCH VICTORY 2/4', capstone: true },
   // ENGINEERING branch
   masonry:                 { name: 'Masonry',                 cost: 50,  branch: 'engineering',  requires: null,                     tier: 0, desc: '-15% building cost' },
@@ -1978,6 +2046,9 @@ function initState() {
 
     _expedSummary: null, // expedition victory overlay { timer, kills, gold, loot, soldiersStart, soldiersLost, isDeath }
     arenaHighWave: 0,    // all-time best wave across arena sessions
+
+    // Food consumption
+    foodShortage: 0,     // consecutive days without enough food
 
     isInitialized: false,
   };
@@ -3523,6 +3594,77 @@ function drawInner() {
   // Debug console — drawn by draw() wrapper, not here
 }
 
+// ─── FOOD CONSUMPTION (daily) ─────────────────────────────────────────────
+function updateFoodConsumption() {
+  // Only active at island level 3+ (give early game time to set up farms)
+  if ((state.islandLevel || 1) < 3) return;
+
+  let pop = state.citizens ? state.citizens.length : 0;
+  let soldiers = state.legia ? state.legia.recruits : 0;
+  let totalMouths = pop + soldiers;
+  if (totalMouths <= 0) return;
+
+  let foodNeeded = totalMouths; // 1 food per person per day
+
+  // Bakery reduces consumption by 20% per bakery (max 60%)
+  let bakeryCount = state.buildings.filter(b => b.type === 'bakery').length;
+  let reduction = min(bakeryCount * 0.2, 0.6);
+  foodNeeded = max(1, Math.ceil(foodNeeded * (1 - reduction)));
+
+  // Consume from harvest first, then fish, then meals
+  let consumed = 0;
+  let remaining = foodNeeded;
+
+  // Harvest
+  let fromHarvest = min(state.harvest, remaining);
+  state.harvest -= fromHarvest;
+  consumed += fromHarvest;
+  remaining -= fromHarvest;
+
+  // Fish backup
+  if (remaining > 0 && state.fish > 0) {
+    let fromFish = min(state.fish, remaining);
+    state.fish -= fromFish;
+    consumed += fromFish;
+    remaining -= fromFish;
+  }
+
+  // Meals as last resort
+  if (remaining > 0 && (state.meals || 0) > 0) {
+    let fromMeals = min(state.meals, remaining);
+    state.meals -= fromMeals;
+    consumed += fromMeals;
+    remaining -= fromMeals;
+  }
+
+  // Store daily consumption for HUD display
+  state._dailyFoodNeeded = foodNeeded;
+  state._dailyFoodFed = consumed;
+
+  if (consumed < foodNeeded) {
+    state.foodShortage = (state.foodShortage || 0) + 1;
+    addFloatingText(width / 2, height * 0.26, 'Food shortage! Citizens hungry.', '#ff6644');
+    addNotification('Day ' + state.day + ': Not enough food! (' + consumed + '/' + foodNeeded + ')', '#ff6644');
+
+    // After 5 consecutive days of shortage, citizens start leaving
+    if (state.foodShortage >= 5 && pop > 2) {
+      state.citizens.pop();
+      addFloatingText(WORLD.islandCX, WORLD.islandCY - 50, 'A citizen has left!', '#ff5544');
+      addNotification('A citizen left due to famine!', '#ff4433');
+    }
+    // Army morale drops from hunger
+    if (state.legia && state.legia.morale > 0) {
+      state.legia.morale = max(0, state.legia.morale - 5);
+    }
+  } else {
+    state.foodShortage = 0;
+    // Well-fed bonus: +1 morale
+    if (state.legia && state.legia.recruits > 0) {
+      state.legia.morale = min(100, state.legia.morale + 1);
+    }
+  }
+}
+
 // ─── TIME ─────────────────────────────────────────────────────────────────
 function updateTime(dt) {
   state.time += 0.18 * dt;
@@ -3622,17 +3764,19 @@ function updateTime(dt) {
       state.god.blessingTimer = max(0, state.god.blessingTimer - 1440);
       if (state.god.blessingTimer <= 0) state.god.blessingActive = null;
     }
-    // Bakery: +2 food (harvest) per bakery
-    let bakeries = state.buildings.filter(b2 => b2.type === 'bakery');
+    // Bakery: +2 food (harvest) per bakery (skip ruined)
+    let bakeries = state.buildings.filter(b2 => b2.type === 'bakery' && !b2.ruined);
     if (bakeries.length > 0) {
       let breadAmt = bakeries.length * 2;
       state.harvest += breadAmt;
       addFloatingText(width / 2, height * 0.32, 'Bakery: +' + breadAmt + ' bread', '#dda844');
     }
+    // Food consumption — citizens and soldiers eat daily
+    updateFoodConsumption();
     // Vineyard: +30% trade income mult (handled via vineyard count check in economy)
     // Lighthouse: +20% fishing yield flag
     // Bathhouse: +1 NPC heart every 3 days
-    let bathhouses = state.buildings.filter(b2 => b2.type === 'bathhouse');
+    let bathhouses = state.buildings.filter(b2 => b2.type === 'bathhouse' && !b2.ruined);
     if (bathhouses.length > 0 && state.npc && state.day % 3 === 0) {
       state.npc.hearts = min(10, state.npc.hearts + 1);
       if (state.livia) state.livia.hearts = min(10, state.livia.hearts + 1);
@@ -3642,7 +3786,7 @@ function updateTime(dt) {
       addFloatingText(width / 2, height * 0.28, 'Thermae: NPCs feel happy', '#88ccff');
     }
     // Sculptor: +1 gold/day per sculptor (statue commissions)
-    let sculptors = state.buildings.filter(b2 => b2.type === 'sculptor');
+    let sculptors = state.buildings.filter(b2 => b2.type === 'sculptor' && !b2.ruined);
     if (sculptors.length > 0) {
       let statueGold = sculptors.length * 1;
       state.gold += statueGold;
@@ -3651,7 +3795,7 @@ function updateTime(dt) {
     // ─── RESEARCH DAILY TICK ────────────────────────────────────────────
     if (state.research) {
       // Update library level from building count
-      state.research.libraryLevel = (state.buildings || []).filter(b => b.type === 'library').length;
+      state.research.libraryLevel = (state.buildings || []).filter(b => b.type === 'library' && !b.ruined).length;
       // Advance current research
       if (state.research.current) advanceResearch();
       // Auto-harvest from agricultural_revolution tech
@@ -3666,6 +3810,8 @@ function updateTime(dt) {
         });
       }
     }
+    // ─── BUILDING MAINTENANCE ──────────────────────────────────────────
+    processBuildingMaintenance();
     // Military upkeep (army pay)
     if (typeof processArmyUpkeep === 'function') processArmyUpkeep();
     // Vassal tribute collection
@@ -10742,6 +10888,21 @@ function drawOneBuilding(b) {
         ellipse(0, -6, 30, 20);
         break;
       }
+    }
+    // Ruined building overlay — darkened + X marker
+    if (b.ruined) {
+      noStroke();
+      fill(0, 0, 0, 140);
+      rect(-bw / 2, -bh, bw, bh);
+      stroke(200, 60, 40, 180); strokeWeight(2);
+      line(-bw / 4, -bh * 0.75, bw / 4, -bh * 0.25);
+      line(bw / 4, -bh * 0.75, -bw / 4, -bh * 0.25);
+      noStroke();
+    } else if (b.durability !== undefined && b.durability < 50) {
+      // Damaged overlay — slight darkening
+      noStroke();
+      fill(0, 0, 0, map(b.durability, 0, 50, 80, 0));
+      rect(-bw / 2, -bh, bw, bh);
     }
     if (_building) drawingContext.globalAlpha = 1;
     pop();
@@ -18175,25 +18336,121 @@ function updateNationDaily(key) {
   let rv = state.nations[key];
   if (!rv || rv.defeated) return;
   let pers = NATION_PERSONALITIES[rv.personality] || NATION_PERSONALITIES.balanced;
-  rv.gold += floor((8 + rv.level * 4) * pers.goldMult);
-  if (random() < pers.buildChance && rv.gold >= 20) {
-    let bType = NATION_BUILDING_TYPES[floor(random(NATION_BUILDING_TYPES.length))];
-    rv.buildings.push(bType); rv.gold -= 20;
+  let name = getNationName(key);
+
+  // --- ECONOMIC AI ---
+  let baseIncome = 5 + rv.population * 2;
+  let tradeBonus = rv.tradeActive ? 10 : 0;
+  let buildingIncome = floor(rv.buildings.length * 0.5);
+  rv.gold += floor((baseIncome + tradeBonus + buildingIncome) * pers.goldMult);
+
+  // Vassal tribute income
+  let otherKeys = Object.keys(state.nations).filter(k2 => k2 !== key);
+  for (let k2 of otherKeys) {
+    let other = state.nations[k2];
+    if (other && other.vassal && other._vassalOf === key) rv.gold += 5 + other.level;
+  }
+
+  // Strategic building
+  let buildCost = 30 + rv.level * 5;
+  if (random() < pers.buildChance * 0.5 && rv.gold >= buildCost) {
+    let bType = _pickNationBuilding(rv, key);
+    rv.buildings.push(bType); rv.gold -= buildCost;
     rv.population += floor(random(1, 3));
-    if (rv.buildings.length % 5 === 0) {
+    if (rv.buildings.length % 3 === 0) {
+      let bNames = { hut: 'settlement', market: 'grand market', wall: 'fortification', barracks: 'barracks', tower: 'watchtower', temple: 'temple', harbor: 'harbor', forge: 'forge', granary: 'granary' };
+      addNotification(name + ' has built a ' + (bNames[bType] || bType) + '!', '#cc9944');
+    }
+    if (rv.buildings.length % 5 === 0 && rv.level < 15) {
       rv.level++;
-      addNotification(getNationName(key) + ' grows stronger — Level ' + rv.level, '#cc6644');
+      addNotification(name + ' grows to ' + _getNationSettlementTier(rv.level) + '! (Level ' + rv.level + ')', '#cc6644');
     }
   }
-  if (random() < pers.militaryChance && rv.gold >= 15) { rv.military++; rv.gold -= 15; }
+
+  // --- MILITARY AI ---
+  let atWar = rv.wars && rv.wars.length > 0;
+  let recruitChance = pers.militaryChance * (atWar ? 0.8 : 0.4);
+  if (random() < recruitChance && rv.gold >= 15) {
+    let recruits = atWar ? floor(random(1, 3)) : 1;
+    rv.military += recruits; rv.gold -= 15 * recruits;
+  }
+
+  // AI war declarations based on relations
+  for (let k2 of otherKeys) {
+    let other = state.nations[k2];
+    if (!other || other.defeated || other.vassal) continue;
+    let rel = rv.relations[k2] || 0;
+    if (rel < -30 && rv.military > 5 && !(rv.wars && rv.wars.includes(k2)) && random() < 0.03 * rv.aggression) {
+      if (!rv.wars) rv.wars = [];
+      rv.wars.push(k2);
+      if (!other.wars) other.wars = [];
+      if (!other.wars.includes(key)) other.wars.push(key);
+      rv.relations[k2] = -80; other.relations[key] = max(-80, (other.relations[key] || 0) - 40);
+      addNotification(name + ' declares war on ' + getNationName(k2) + '!', '#ff6644');
+      state.worldEvents.push({ type: 'war', text: name + ' declares war on ' + getNationName(k2) + '!', day: state.day, factionA: key, factionB: k2 });
+      if (state.worldEvents.length > 30) state.worldEvents.shift();
+    }
+  }
+
+  // --- WAR RESOLUTION (AI vs AI) ---
+  if (rv.wars) {
+    for (let i = rv.wars.length - 1; i >= 0; i--) {
+      let warKey = rv.wars[i];
+      let enemy = state.nations[warKey];
+      if (!enemy || enemy.defeated) { rv.wars.splice(i, 1); continue; }
+      // Attrition
+      if (random() < 0.3) {
+        rv.military = max(0, rv.military - 1);
+        enemy.military = max(0, enemy.military - 1);
+      }
+      // Skirmish
+      if (random() < 0.15) {
+        let rvStr = rv.military + rv.level * 0.5;
+        let enStr = enemy.military + enemy.level * 0.5;
+        if (rvStr > enStr && random() < 0.6) {
+          let loot = min(enemy.gold, floor(random(5, 15 + rv.level)));
+          enemy.gold -= loot; rv.gold += loot;
+          if (random() < 0.2 && enemy.population > 2) { enemy.population--; rv.population++; }
+        } else if (enStr > rvStr && random() < 0.6) {
+          let loot = min(rv.gold, floor(random(5, 15 + enemy.level)));
+          rv.gold -= loot; enemy.gold += loot;
+          if (random() < 0.2 && rv.population > 2) { rv.population--; enemy.population++; }
+        }
+      }
+      // Weak nations sue for peace
+      if (rv.military <= 1 && random() < 0.15) {
+        rv.wars.splice(i, 1);
+        enemy.wars = (enemy.wars || []).filter(w => w !== key);
+        rv.relations[warKey] = 0; enemy.relations[key] = 0;
+        addNotification(name + ' and ' + getNationName(warKey) + ' sign a peace treaty.', '#88cc88');
+        state.worldEvents.push({ type: 'peace', text: name + ' and ' + getNationName(warKey) + ' sign a peace treaty.', day: state.day, factionA: key, factionB: warKey });
+        if (state.worldEvents.length > 30) state.worldEvents.shift();
+        continue;
+      }
+      // Vassalization
+      if (enemy.military <= 0 && rv.military >= 5 && enemy.population <= 3 && random() < 0.1) {
+        rv.wars.splice(i, 1);
+        enemy.wars = (enemy.wars || []).filter(w => w !== key);
+        enemy.vassal = true; enemy._vassalOf = key;
+        enemy.relations[key] = 20; rv.relations[warKey] = 10;
+        addNotification(getNationName(warKey) + ' becomes a vassal of ' + name + '!', '#ddaa44');
+        state.worldEvents.push({ type: 'vassal', text: getNationName(warKey) + ' becomes a vassal of ' + name + '!', day: state.day, factionA: key, factionB: warKey });
+        if (state.worldEvents.length > 30) state.worldEvents.shift();
+      }
+    }
+  }
+
+  // --- DIPLOMACY & RELATIONS ---
   rv.stance = getNationStance(rv);
   if (rv.tradeActive) { rv.aggression = max(0.1, rv.aggression - 0.02); }
   else if (rv.reputation < 0) { rv.aggression = min(1.0, rv.aggression + 0.01); }
+
   if (rv.allied) {
     let income = 3 + floor(rv.level * 0.5);
     state.gold += income; rv.gold += 3;
-    if (state.day % 3 === 0) addNotification('Alliance trade: +' + income + 'g from ' + getNationName(key), '#88cc88');
+    if (state.day % 3 === 0) addNotification('Alliance trade: +' + income + 'g from ' + name, '#88cc88');
   }
+
   if (!rv.allied && rv.reputation < pers.raidThreshold && rv.raidParty.length === 0) {
     let daysSinceRaid = state.day - rv.lastRaid;
     let raidChance = constrain(map(rv.reputation, pers.raidThreshold, -100, 0.05, 0.3), 0.05, 0.3);
@@ -18201,13 +18458,40 @@ function updateNationDaily(key) {
     if (rv.personality === 'trader') raidChance *= 0.4;
     if (daysSinceRaid >= 3 && random() < raidChance && rv.military >= 2) startNationRaid(key);
   }
-  let otherKeys = Object.keys(state.nations).filter(k2 => k2 !== key);
+
+  // Relation drift
   for (let k2 of otherKeys) {
     let other = state.nations[k2];
     if (!other || other.defeated) continue;
-    if (rv.personality === 'trader') rv.relations[k2] = min(100, (rv.relations[k2] || 0) + 0.3);
-    if (rv.personality === 'aggressive') rv.relations[k2] = max(-100, (rv.relations[k2] || 0) - 0.1);
+    let rel = rv.relations[k2] || 0;
+    if (rv.personality === 'trader') rv.relations[k2] = min(100, rel + 0.3);
+    else if (rv.personality === 'aggressive') rv.relations[k2] = max(-100, rel - 0.15);
+    // Shared enemies bring nations closer
+    if (rv.wars && other.wars) {
+      for (let wk of rv.wars) {
+        if (other.wars.includes(wk)) rv.relations[k2] = min(100, (rv.relations[k2] || 0) + 0.5);
+      }
+    }
+    // AI-to-AI trade
+    if (rv.personality === 'trader' && rel > 10 && random() < 0.05) {
+      rv.gold += 5; other.gold += 5;
+      rv.relations[k2] = min(100, (rv.relations[k2] || 0) + 1);
+    }
+    // AI-to-AI alliance
+    if (rel > 50 && !(rv.allies && rv.allies.includes(k2)) && random() < 0.02) {
+      if (!rv.allies) rv.allies = [];
+      if (!other.allies) other.allies = [];
+      rv.allies.push(k2);
+      if (!other.allies.includes(key)) other.allies.push(key);
+      addNotification(name + ' and ' + getNationName(k2) + ' form an alliance!', '#88cc88');
+    }
   }
+
+  // Population growth (capped by level)
+  let popCap = rv.level * 5 + 10;
+  if (random() < 0.1 && rv.population < popCap) rv.population++;
+  if (atWar && random() < 0.05 && rv.population > 2) rv.population--;
+
   // Spy intel expiry
   if (rv._intelRevealedDays > 0) rv._intelRevealedDays--;
   // Trade agreement expiry
@@ -18215,6 +18499,32 @@ function updateNationDaily(key) {
     rv._tradeBonusDays--;
     if (rv._tradeBonusDays <= 0) rv._tradeBonus = 0;
   }
+}
+
+function _pickNationBuilding(rv, key) {
+  let atWar = rv.wars && rv.wars.length > 0;
+  let lowMilitary = rv.military < rv.level * 2;
+  if (atWar && lowMilitary && random() < 0.6) return random() < 0.5 ? 'barracks' : 'wall';
+  if (rv.personality === 'trader' && random() < 0.4) return random() < 0.5 ? 'market' : 'harbor';
+  if (rv.personality === 'aggressive' && random() < 0.4) return random() < 0.5 ? 'barracks' : 'tower';
+  if (rv.gold > 100 + rv.level * 20 && random() < 0.3) return 'temple';
+  if (rv.population > rv.level * 4 && random() < 0.3) return 'granary';
+  return NATION_BUILDING_TYPES[floor(random(NATION_BUILDING_TYPES.length))];
+}
+
+function _getNationSettlementTier(level) {
+  if (level >= 12) return 'Metropolis';
+  if (level >= 8) return 'City';
+  if (level >= 4) return 'Town';
+  return 'Village';
+}
+
+function _getNationMilitaryLabel(military) {
+  if (military >= 20) return 'Formidable';
+  if (military >= 12) return 'Strong';
+  if (military >= 6) return 'Moderate';
+  if (military >= 2) return 'Weak';
+  return 'Defenseless';
 }
 
 function startNationRaid(key) {
@@ -18851,7 +19161,9 @@ function drawNationDiplomacyUI() {
   // Stats
   let sy = py + 90;
   fill(180, 170, 140); textSize(10); textAlign(LEFT, TOP);
-  text('Level: ' + rv.level + '  |  Pop: ' + rv.population + '  |  Military: ' + rv.military + '  |  Gold: ' + rv.gold, px + 15, sy); sy += 14;
+  let _dTier = (typeof _getNationSettlementTier === 'function') ? _getNationSettlementTier(rv.level) : '';
+  let _dMil = (typeof _getNationMilitaryLabel === 'function') ? _getNationMilitaryLabel(rv.military) : '';
+  text(_dTier + ' (Lv.' + rv.level + ')  |  Pop: ' + rv.population + '  |  Military: ' + rv.military + ' (' + _dMil + ')  |  Gold: ' + rv.gold, px + 15, sy); sy += 14;
   // Reputation bar
   let repBarW = pw - 30, repBarH = 10;
   fill(40, 35, 30); rect(px + 15, sy, repBarW, repBarH, 3);
@@ -18873,7 +19185,16 @@ function drawNationDiplomacyUI() {
     relText += getNationName(k2) + ': ' + relLabel + '  ';
   }
   if (relText) { fill(140, 130, 110); textSize(8); text('Relations: ' + relText, px + 15, sy); sy += 12; }
-  if (rv.allied) { fill(100, 200, 100); textSize(10); text('ALLIED — Shared defense, +' + (5 + rv.level) + 'g/day', px + 15, sy); sy += 14; }
+  if (rv.vassal && rv._vassalOf) { fill(180, 150, 60); textSize(10); text('VASSAL of ' + getNationName(rv._vassalOf), px + 15, sy); sy += 14; }
+  if (rv.wars && rv.wars.length > 0) {
+    let _warList = rv.wars.map(function(wk) { return getNationName(wk); }).join(', ');
+    fill(255, 100, 80); textSize(10); text('AT WAR with: ' + _warList, px + 15, sy); sy += 14;
+  }
+  if (rv.allies && rv.allies.length > 0) {
+    let _allyList = rv.allies.map(function(ak) { return getNationName(ak); }).join(', ');
+    fill(100, 180, 100); textSize(10); text('Allied with: ' + _allyList, px + 15, sy); sy += 14;
+  }
+  if (rv.allied) { fill(100, 200, 100); textSize(10); text('ALLIED WITH YOU — Shared defense, +' + (5 + rv.level) + 'g/day', px + 15, sy); sy += 14; }
   sy += 8;
   // Action buttons
   let btnW = pw - 30, btnH = 32;
@@ -19131,14 +19452,24 @@ function drawSingleNationIsleDistant(key) {
   // Sword icon
   fill(getNationStanceColor(rv)); textSize(12); textAlign(CENTER);
   text('\u2694', sx, fsy - floor(ry * 0.7));
-  // Name — color-coded by stance
+  // Name - color-coded by stance
   textSize(11); textStyle(ITALIC);
   text(getNationName(key), sx, fsy + ry + 14); textStyle(NORMAL);
-  // Status + danger
+  // Settlement tier + military strength
+  let _tier = (typeof _getNationSettlementTier === 'function') ? _getNationSettlementTier(lv) : 'Lv.' + lv;
+  let _milLabel = (typeof _getNationMilitaryLabel === 'function') ? _getNationMilitaryLabel(rv.military) : '';
   let _stanceLabel = getNationStanceLabel(rv);
   let _dangerIcon = (rv.reputation <= -20) ? '\u2620 ' : (rv.allied ? '\u262E ' : '');
   fill(getNationStanceColor(rv)); textSize(9);
-  text(_dangerIcon + _stanceLabel + ' (Lv.' + lv + ')', sx, fsy + ry + 24);
+  text(_dangerIcon + _stanceLabel + ' - ' + _tier, sx, fsy + ry + 24);
+  // Military + vassal status
+  let _extraInfo = _milLabel ? ('Military: ' + _milLabel) : '';
+  if (rv.vassal && rv._vassalOf) _extraInfo = 'Vassal of ' + getNationName(rv._vassalOf);
+  if (rv.wars && rv.wars.length > 0) {
+    let warNames = rv.wars.map(function(wk) { return getNationName(wk); }).slice(0, 2).join(', ');
+    _extraInfo += (_extraInfo ? ' | ' : '') + 'At war: ' + warNames;
+  }
+  if (_extraInfo) { fill(180, 160, 130, 160); textSize(7); text(_extraInfo, sx, fsy + ry + 33); }
   // Distance
   if (typeof _getIslandDist === 'function') {
     let _nd = _getIslandDist(rv.isleX, rv.isleY);
@@ -19773,26 +20104,44 @@ function generateWorldEvent(keys) {
   if (!a || !b) return;
   let na = state.nations[a], nb = state.nations[b];
   if (!na || !nb || na.defeated || nb.defeated) return;
+  let nameA = getNationName(a), nameB = getNationName(b);
   let events = [];
   if ((na.relations[b] || 0) < -30 && na.wars.indexOf(b) < 0) {
-    events.push({ type: 'war', text: getNationName(a) + ' declares war on ' + getNationName(b) + '!', factionA: a, factionB: b });
+    events.push({ type: 'war', text: nameA + ' declares war on ' + nameB + '!', factionA: a, factionB: b });
   }
   if (na.personality === 'trader' || nb.personality === 'trader') {
-    events.push({ type: 'trade', text: getNationName(a) + ' offers trade alliance to all nations', factionA: a, factionB: null });
+    events.push({ type: 'trade', text: nameA + ' offers trade alliance to all nations', factionA: a, factionB: null });
   }
   if (na.military > 5) {
-    events.push({ type: 'fleet', text: getNationName(a) + ' fleet spotted near your waters', factionA: a, factionB: null });
+    events.push({ type: 'fleet', text: nameA + ' fleet spotted near your waters', factionA: a, factionB: null });
   }
   if (na.wars.indexOf(b) >= 0 && random() < 0.3) {
-    events.push({ type: 'peace', text: getNationName(a) + ' and ' + getNationName(b) + ' sign peace treaty', factionA: a, factionB: b });
+    events.push({ type: 'peace', text: nameA + ' and ' + nameB + ' sign peace treaty', factionA: a, factionB: b });
+  }
+  // AI raids AI
+  if (na.wars.indexOf(b) >= 0 && na.military >= 3 && random() < 0.25) {
+    events.push({ type: 'ai_raid', text: nameA + ' raids ' + nameB + '!', factionA: a, factionB: b });
+  }
+  // Famine or plague
+  if (na.population > 15 && random() < 0.1) {
+    events.push({ type: 'famine', text: 'Famine strikes ' + nameA + '!', factionA: a, factionB: null });
+  }
+  // Trade boom
+  if (na.personality === 'trader' && na.gold > 200 && random() < 0.15) {
+    events.push({ type: 'boom', text: nameA + ' enters a golden age of trade!', factionA: a, factionB: null });
+  }
+  // Military parade
+  if (na.military >= 15 && random() < 0.1) {
+    events.push({ type: 'parade', text: nameA + ' holds a grand military parade (' + na.military + ' troops)', factionA: a, factionB: null });
   }
   if (events.length === 0) return;
   let evt = events[floor(random(events.length))];
   evt.day = state.day;
   state.worldEvents.push(evt);
-  if (state.worldEvents.length > 20) state.worldEvents.shift();
+  if (state.worldEvents.length > 30) state.worldEvents.shift();
   if (evt.type === 'war') {
-    na.wars.push(b); nb.wars.push(a);
+    if (!na.wars.includes(b)) na.wars.push(b);
+    if (!nb.wars.includes(a)) nb.wars.push(a);
     na.relations[b] = -80; nb.relations[a] = -80;
     addNotification(evt.text, '#ff6644');
   } else if (evt.type === 'peace') {
@@ -19804,6 +20153,23 @@ function generateWorldEvent(keys) {
   } else if (evt.type === 'fleet') {
     addNotification(evt.text, '#ff8844');
     if (na.reputation < -10) na.reputation = max(-100, na.reputation - 3);
+  } else if (evt.type === 'ai_raid') {
+    let loot = min(nb.gold, floor(random(10, 25 + na.level)));
+    nb.gold -= loot; na.gold += loot;
+    na.military = max(0, na.military - 1);
+    nb.military = max(0, nb.military - 1);
+    if (random() < 0.3 && nb.population > 2) { nb.population--; na.population++; }
+    addNotification(evt.text, '#ff8844');
+  } else if (evt.type === 'famine') {
+    na.population = max(2, na.population - floor(random(1, 3)));
+    na.gold = max(0, na.gold - 20);
+    addNotification(evt.text, '#cc8844');
+  } else if (evt.type === 'boom') {
+    na.gold += 50; na.population += 1;
+    addNotification(evt.text, '#ddcc44');
+  } else if (evt.type === 'parade') {
+    addNotification(evt.text, '#aaaadd');
+    na.aggression = min(1.0, na.aggression + 0.05);
   }
 }
 
@@ -21755,8 +22121,11 @@ function mousePressed() {
     return;
   }
   if (state.cutscene) { skipCutscene(); return; }
-  // Block clicks during army battle
-  if (typeof _armyBattle !== 'undefined' && _armyBattle) return;
+  // Army battle — allow clicks during deploy for formation picker
+  if (typeof _armyBattle !== 'undefined' && _armyBattle) {
+    if (typeof handleArmyBattleClick === 'function') handleArmyBattleClick(mouseX, mouseY);
+    return;
+  }
   if (dismissIslandMilestone()) return;
   // Screenshot capture on click
   if (screenshotMode) {
@@ -21923,6 +22292,11 @@ function mousePressed() {
         let b = state.buildings[i];
         if (landmark.includes(b.type)) continue;
         if (abs(wx - b.x) < (b.w || 24) * 0.7 && abs(wy - b.y) < (b.h || 24) * 0.7) {
+          // Ruined buildings: repair instead of demolish
+          if (b.ruined) {
+            repairBuilding(b);
+            return;
+          }
           state.buildings.splice(i, 1);
           addFloatingText(w2sX(wx), w2sY(wy) - 20, 'Demolished', '#ff6644');
           spawnParticles(wx, wy, 'chop', 6);
@@ -23841,6 +24215,7 @@ function saveGame() {
     flaxSeeds: state.flaxSeeds, pomegranateSeeds: state.pomegranateSeeds, lotusSeeds: state.lotusSeeds,
     meals: state.meals, wine: state.wine, oil: state.oil,
     stew: state.stew, garum: state.garum, honeyedFigs: state.honeyedFigs, ambrosia: state.ambrosia,
+    foodShortage: state.foodShortage || 0,
     weather: state.weather, daysSinceRain: state.daysSinceRain || 0, heartRewards: state.heartRewards,
     marcusHearts: state.marcus ? state.marcus.hearts : 0,
     vestaHearts: state.vesta ? state.vesta.hearts : 0,
@@ -23914,7 +24289,7 @@ function saveGame() {
     // Colony specialization
     colonySpec: state.colonySpec,
     // Trade routes
-    tradeRoutes: (state.tradeRoutes || []).map(r => ({ id: r.id, from: r.from, to: r.to, good: r.good, amount: r.amount, active: r.active, goldEarned: r.goldEarned || 0, tripPhase: r.tripPhase || 'outbound' })),
+    tradeRoutes: (state.tradeRoutes || []).map(r => ({ id: r.id, from: r.from, to: r.to, good: r.good, amount: r.amount, active: r.active, goldEarned: r.goldEarned || 0, tripPhase: r.tripPhase || 'outbound', raided: r.raided || false })),
     // Nations (multi-rival system)
     nations: (function() {
       let saved = {};
@@ -23928,7 +24303,7 @@ function saveGame() {
           defeated: n.defeated, allied: n.allied, personality: n.personality,
           isleX: n.isleX, isleY: n.isleY, isleRX: n.isleRX, isleRY: n.isleRY,
           relations: n.relations, wars: n.wars || [], allies: n.allies || [],
-          vassal: n.vassal || false, tributePerDay: n.tributePerDay || 0,
+          vassal: n.vassal || false, _vassalOf: n._vassalOf || null, tributePerDay: n.tributePerDay || 0,
         };
       }
       return saved;
@@ -24294,6 +24669,7 @@ function loadGame() {
     state.flaxSeeds = d.flaxSeeds || 0; state.pomegranateSeeds = d.pomegranateSeeds || 0; state.lotusSeeds = d.lotusSeeds || 0;
     state.meals = d.meals || 0; state.wine = d.wine || 0; state.oil = d.oil || 0;
     state.stew = d.stew || 0; state.garum = d.garum || 0; state.honeyedFigs = d.honeyedFigs || 0; state.ambrosia = d.ambrosia || 0;
+    state.foodShortage = d.foodShortage || 0;
     state.heartRewards = Array.isArray(d.heartRewards) ? d.heartRewards : [];
     if (d.weather && typeof d.weather === 'object') state.weather = { type: d.weather.type || 'clear', timer: d.weather.timer || 0, intensity: d.weather.intensity || 0 };
     state.daysSinceRain = d.daysSinceRain || 0;
@@ -24403,7 +24779,7 @@ function loadGame() {
     if (d.tradeRoutes && Array.isArray(d.tradeRoutes)) {
       let _trHP = getPortPosition();
       let _trCP = { x: state.conquest.isleX + state.conquest.isleRX * 0.9, y: state.conquest.isleY + state.conquest.isleRY * 0.7 };
-      state.tradeRoutes = d.tradeRoutes.map(function(r) { return { id: r.id || 1, from: r.from || { x: _trHP.x, y: _trHP.y, name: 'Home' }, to: r.to || { x: _trCP.x, y: _trCP.y, name: 'Terra Nova' }, good: r.good, amount: r.amount || 1, shipX: _trHP.x, shipY: _trHP.y, shipAngle: 0, active: r.active !== false, tripTimer: 0, tripPhase: r.tripPhase || 'outbound', goldEarned: r.goldEarned || 0 }; });
+      state.tradeRoutes = d.tradeRoutes.map(function(r) { return { id: r.id || 1, from: r.from || { x: _trHP.x, y: _trHP.y, name: 'Home' }, to: r.to || { x: _trCP.x, y: _trCP.y, name: 'Terra Nova' }, good: r.good, amount: r.amount || 1, shipX: _trHP.x, shipY: _trHP.y, shipAngle: 0, active: r.active !== false, tripTimer: 0, tripPhase: r.tripPhase || 'outbound', goldEarned: r.goldEarned || 0, raided: r.raided || false, raidTimer: 0, raidSmokeParticles: [] }; });
       if (typeof _nextRouteId !== 'undefined' && state.tradeRoutes.length > 0) _nextRouteId = Math.max.apply(null, state.tradeRoutes.map(function(r) { return r.id; })) + 1;
     }
     if (d.colonySpec) state.colonySpec = d.colonySpec;
@@ -24440,7 +24816,7 @@ function loadGame() {
         // Nation positions always use compass layout from NATION_DEFAULTS (not old saves)
         if (sn.isleRX) n.isleRX = sn.isleRX; if (sn.isleRY) n.isleRY = sn.isleRY;
         n.relations = sn.relations || {}; n.wars = sn.wars || []; n.allies = sn.allies || [];
-        n.vassal = sn.vassal || false; n.tributePerDay = sn.tributePerDay || 0;
+        n.vassal = sn.vassal || false; n._vassalOf = sn._vassalOf || null; n.tributePerDay = sn.tributePerDay || 0;
         n.raidParty = []; n.raidWarning = 0;
         state.nations[nk] = n;
       }

@@ -1112,11 +1112,11 @@ function drawArenaSummaryOverlay() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 const UNIT_TYPES = {
-  legionary:  { name: 'Legionary',       hp: 20, damage: 5,  speed: 1.0, cost: 10, minLevel: 1, ranged: false, desc: 'Sturdy infantry' },
-  archer:     { name: 'Archer',          hp: 12, damage: 8,  speed: 1.0, cost: 15, minLevel: 2, ranged: true,  desc: 'Ranged attacker' },
-  cavalry:    { name: 'Cavalry',         hp: 30, damage: 7,  speed: 2.0, cost: 25, minLevel: 3, ranged: false, desc: 'Fast charger' },
-  siege_ram:  { name: 'Siege Ram',       hp: 50, damage: 15, speed: 0.4, cost: 40, minLevel: 4, ranged: false, desc: 'Destroys buildings', vsBuildingMult: 3 },
-  centurion:  { name: 'Elite Centurion', hp: 40, damage: 12, speed: 1.2, cost: 50, minLevel: 5, ranged: false, desc: 'Buffs nearby +20%', aura: 0.2 },
+  legionary:  { name: 'Legionary',       hp: 20, damage: 5,  speed: 1.0, cost: 10, minLevel: 1, ranged: false, desc: 'Sturdy infantry', upkeep: 2 },
+  archer:     { name: 'Archer',          hp: 12, damage: 8,  speed: 1.0, cost: 15, minLevel: 2, ranged: true,  desc: 'Ranged attacker', upkeep: 3 },
+  cavalry:    { name: 'Cavalry',         hp: 30, damage: 7,  speed: 2.0, cost: 25, minLevel: 3, ranged: false, desc: 'Fast charger', upkeep: 4 },
+  siege_ram:  { name: 'Siege Ram',       hp: 50, damage: 15, speed: 0.4, cost: 40, minLevel: 4, ranged: false, desc: 'Destroys buildings', vsBuildingMult: 3, upkeep: 5 },
+  centurion:  { name: 'Elite Centurion', hp: 40, damage: 12, speed: 1.2, cost: 50, minLevel: 5, ranged: false, desc: 'Buffs nearby +20%', aura: 0.2, upkeep: 6 },
 };
 
 function getUnitDisplayName(type) {
@@ -1177,8 +1177,13 @@ function getArmyCountByType(type) {
 }
 
 function getArmyUpkeep() {
-  let count = getArmyCount();
-  return ceil(count * 2); // 2g per soldier
+  if (!state.legia || !state.legia.army) return 0;
+  let total = 0;
+  for (let u of state.legia.army) {
+    let def = UNIT_TYPES[u.type];
+    total += (def && def.upkeep) ? def.upkeep : 2;
+  }
+  return total;
 }
 
 function trainUnit(type) {
@@ -1251,14 +1256,117 @@ function processArmyUpkeep() {
 
 // ─── ARMY BATTLE SYSTEM ─────────────────────────────────────────────────
 
+// Counter multiplier — rock/paper/scissors between unit types
+function getCounterMultiplier(attackerType, defenderType) {
+  if (attackerType === 'cavalry' && defenderType === 'archer') return 1.5;
+  if (attackerType === 'archer' && defenderType === 'legionary') return 1.5;
+  if (attackerType === 'legionary' && defenderType === 'cavalry') return 1.5;
+  if (attackerType === 'cavalry' && defenderType === 'siege_ram') return 2.0;
+  if (attackerType === 'centurion') return 1.15;
+  return 1.0;
+}
+
+// Counter info for recruitment UI
+const UNIT_COUNTER_INFO = {
+  legionary: { strong: 'Cavalry', weak: 'Archers', color: '#88ccff' },
+  archer:    { strong: 'Infantry', weak: 'Cavalry', color: '#88ff88' },
+  cavalry:   { strong: 'Archers, Siege', weak: 'Infantry', color: '#ffcc66' },
+  siege_ram: { strong: 'Buildings', weak: 'Cavalry', color: '#ff8866' },
+  centurion: { strong: 'All (+15%)', weak: 'None', color: '#ddaaff' },
+};
+
+// Floating damage numbers for army battles (screen-space, not world-space)
+var _battleDamageNumbers = [];
+function _spawnBattleDamageNumber(sx, sy, amount, col, big) {
+  _battleDamageNumbers.push({
+    x: sx, y: sy,
+    ox: random(-6, 6),
+    drift: 0,
+    text: '-' + amount,
+    col: col || '#ff4444',
+    life: 40,
+    vy: -1.0,
+    big: big || false,
+  });
+}
+
+// Formation definitions
+const FORMATIONS = {
+  line:      { name: 'Battle Line',   desc: 'Balanced formation',        defBonus: 1.0, atkBonus: 1.0, speedBonus: 1.0 },
+  shield:    { name: 'Shield Wall',   desc: '+30% defense, -20% speed',  defBonus: 1.3, atkBonus: 1.0, speedBonus: 0.8 },
+  wedge:     { name: 'Wedge',         desc: '+30% attack, -15% defense', defBonus: 0.85, atkBonus: 1.3, speedBonus: 1.1 },
+  skirmish:  { name: 'Skirmish',      desc: '+20% speed, spread out',    defBonus: 1.0, atkBonus: 0.9, speedBonus: 1.2 },
+  testudo:   { name: 'Testudo',       desc: '+50% defense, -40% speed',  defBonus: 1.5, atkBonus: 0.8, speedBonus: 0.6 },
+};
+const FORMATION_KEYS = ['line', 'shield', 'wedge', 'skirmish', 'testudo'];
+
 var _armyBattle = null; // active battle state or null
+
+function _getFormationPositions(formationKey, count, side) {
+  let positions = [];
+  let baseX = side === 'left' ? 80 : width - 80;
+  let centerY = height / 2;
+  let dir = side === 'left' ? 1 : -1;
+
+  switch (formationKey) {
+    case 'shield': // tight rows, packed
+      for (let i = 0; i < count; i++) {
+        let row = floor(i / 6);
+        let col = i % 6;
+        positions.push({ x: baseX + dir * row * 15, y: centerY - 45 + col * 15 });
+      }
+      break;
+    case 'wedge': // V-shape pointing at enemy
+      for (let i = 0; i < count; i++) {
+        let row = floor(i / 2);
+        let odd = i % 2;
+        let spread = row * 12;
+        positions.push({ x: baseX + dir * row * 18, y: centerY + (odd ? spread : -spread) });
+      }
+      break;
+    case 'skirmish': // spread far apart
+      for (let i = 0; i < count; i++) {
+        let row = floor(i / 3);
+        let col = i % 3;
+        positions.push({ x: baseX + dir * row * 30 + random(-5, 5), y: centerY - 60 + col * 40 + random(-5, 5) });
+      }
+      break;
+    case 'testudo': // tight block
+      for (let i = 0; i < count; i++) {
+        let row = floor(i / 4);
+        let col = i % 4;
+        positions.push({ x: baseX + dir * row * 12, y: centerY - 24 + col * 12 });
+      }
+      break;
+    default: // 'line' — spread evenly horizontal
+      for (let i = 0; i < count; i++) {
+        let row = floor(i / 5);
+        let col = i % 5;
+        positions.push({ x: baseX + dir * row * 20, y: centerY - 60 + col * 30 });
+      }
+      break;
+  }
+  return positions;
+}
+
+function _applyFormationToUnits(units, formationKey, side) {
+  let positions = _getFormationPositions(formationKey, units.length, side);
+  for (let i = 0; i < units.length; i++) {
+    if (positions[i]) {
+      units[i].x = positions[i].x;
+      units[i].y = positions[i].y;
+    }
+  }
+}
 
 function startArmyBattle(attackers, defenders, context) {
   // context: { type: 'raid'|'invade'|'defend', nationKey, onVictory, onDefeat }
   // attackers/defenders: arrays of { type, hp, maxHp, damage, speed }
+  _battleDamageNumbers = [];
   let battle = {
     phase: 'deploy', // deploy -> fighting -> result
     timer: 0,
+    formation: 'line', // player-selected formation
     attackers: attackers.map((u, i) => ({
       ...u,
       x: 80 + (i % 5) * 20,
@@ -1284,7 +1392,10 @@ function startArmyBattle(attackers, defenders, context) {
     result: null, // 'victory' | 'defeat'
     projectiles: [], // archer arrows during battle
     log: [],
+    chargeReady: false, // set true when player clicks CHARGE
   };
+  // Apply default formation positions
+  _applyFormationToUnits(battle.attackers, 'line', 'left');
   _armyBattle = battle;
 }
 
@@ -1295,7 +1406,7 @@ function updateArmyBattle(dt) {
   b.timer += dt;
 
   if (b.phase === 'deploy') {
-    if (b.timer > 90) { b.phase = 'fighting'; b.timer = 0; }
+    if (b.chargeReady) { b.phase = 'fighting'; b.timer = 0; }
     return;
   }
 
@@ -1340,11 +1451,15 @@ function updateArmyBattle(dt) {
     if (pr.life <= 0) { b.projectiles.splice(i, 1); continue; }
     // Check hit
     let targets = pr.side === 'left' ? b.defenders : b.attackers;
+    let form = b.formation ? FORMATIONS[b.formation] : null;
     for (let t of targets) {
       if (!t.alive) continue;
       if (abs(t.x - pr.x) < 12 && abs(t.y - pr.y) < 12) {
-        t.hp -= pr.damage;
+        let defMult = (form && t.side === 'left') ? form.defBonus : 1.0;
+        let finalDmg = max(1, floor(pr.damage / defMult));
+        t.hp -= finalDmg;
         t.flashTimer = 8;
+        _spawnBattleDamageNumber(t.x, t.y, finalDmg, pr.isCounter ? '#ffdd44' : '#ff4444', pr.isCounter);
         if (t.hp <= 0) { t.alive = false; t.hp = 0; }
         b.projectiles.splice(i, 1);
         break;
@@ -1356,6 +1471,12 @@ function updateArmyBattle(dt) {
 function _updateBattleSide(units, enemies, dt, auraMult, battle) {
   let aliveEnemies = enemies.filter(e => e.alive);
   if (aliveEnemies.length === 0) return;
+
+  // Formation bonuses (only for player's attackers in army battles)
+  let form = battle.formation ? FORMATIONS[battle.formation] : null;
+  let isPlayerSide = (units === battle.attackers);
+  let fAtkMult = (form && isPlayerSide) ? form.atkBonus : 1.0;
+  let fSpdMult = (form && isPlayerSide) ? form.speedBonus : 1.0;
 
   for (let u of units) {
     if (!u.alive) continue;
@@ -1377,24 +1498,37 @@ function _updateBattleSide(units, enemies, dt, auraMult, battle) {
       // Move toward enemy
       let dx = nearest.x - u.x, dy = nearest.y - u.y;
       let d = max(1, sqrt(dx * dx + dy * dy));
-      let spd = (u.speed || 1) * 1.5 * dt;
+      let spd = (u.speed || 1) * 1.5 * fSpdMult * dt;
       u.x += (dx / d) * spd;
       u.y += (dy / d) * spd;
     } else if (u.attackTimer <= 0) {
-      // Attack
-      let dmg = floor((u.damage || 5) * auraMult);
+      // Counter multiplier
+      let counterMult = getCounterMultiplier(u.type, nearest.type);
+      let isCounter = counterMult > 1.0;
+      // Attack with formation + counter bonuses
+      let dmg = floor((u.damage || 5) * auraMult * fAtkMult * counterMult);
+      // Formation defense bonus reduces incoming damage on player side
+      if (form && !isPlayerSide) {
+        // Enemies hitting player units — apply player's defense bonus
+        // (handled on the receiving end below)
+      }
       if (isRanged) {
-        // Shoot projectile
         let dx = nearest.x - u.x, dy = nearest.y - u.y;
         let d = max(1, sqrt(dx * dx + dy * dy));
         battle.projectiles.push({
           x: u.x, y: u.y,
           vx: (dx / d) * 4, vy: (dy / d) * 4,
           damage: dmg, life: 60, side: u.side,
+          isCounter: isCounter, attackerType: u.type,
         });
       } else {
-        nearest.hp -= dmg;
+        // Apply formation defense bonus to target
+        let defMult = 1.0;
+        if (form && nearest.side === 'left') defMult = form.defBonus;
+        let finalDmg = max(1, floor(dmg / defMult));
+        nearest.hp -= finalDmg;
         nearest.flashTimer = 8;
+        _spawnBattleDamageNumber(nearest.x, nearest.y, finalDmg, isCounter ? '#ffdd44' : '#ff4444', isCounter);
         if (nearest.hp <= 0) { nearest.alive = false; nearest.hp = 0; }
       }
       u.attackTimer = isRanged ? 45 : 30;
@@ -1428,9 +1562,7 @@ function drawArmyBattle() {
   text(titleText, width / 2, 10);
 
   if (b.phase === 'deploy') {
-    fill(180, 160, 120, 150 + sin(frameCount * 0.1) * 50);
-    textSize(12); textAlign(CENTER, CENTER);
-    text('Deploying forces...', width / 2, height / 2);
+    _drawFormationPicker(b);
   }
 
   // Draw ground — faction-tinted if nation battle
@@ -1473,6 +1605,28 @@ function drawArmyBattle() {
   fill(80, 130, 200); textAlign(RIGHT, TOP);
   text('Enemy: ' + defAlive + '/' + b.defenders.length, width - 10, 30);
 
+  // Battle damage numbers
+  for (let i = _battleDamageNumbers.length - 1; i >= 0; i--) {
+    let dn = _battleDamageNumbers[i];
+    dn.drift += dn.vy;
+    dn.life -= 1;
+    if (dn.life <= 0) { _battleDamageNumbers.splice(i, 1); continue; }
+    let alpha = map(dn.life, 0, 40, 0, 255);
+    let c = color(dn.col);
+    fill(red(c), green(c), blue(c), alpha);
+    noStroke();
+    textAlign(CENTER, CENTER);
+    textSize(dn.big ? 12 : 9);
+    text(dn.text, dn.x + dn.ox, dn.y - 15 + dn.drift);
+  }
+
+  // Active formation label during fighting
+  if (b.phase === 'fighting' && b.formation && b.formation !== 'line') {
+    let form = FORMATIONS[b.formation];
+    fill(220, 185, 80, 150); textSize(9); textAlign(LEFT, TOP);
+    text('Formation: ' + form.name, 10, 46);
+  }
+
   // Result screen
   if (b.phase === 'result') {
     fill(0, 0, 0, min(180, b.resultTimer * 3));
@@ -1493,6 +1647,147 @@ function drawArmyBattle() {
   }
 
   pop();
+}
+
+// Formation picker UI during deploy phase
+function _drawFormationPicker(b) {
+  let panelX = 10, panelY = 50;
+  let panelW = 145, btnH = 42;
+  let selected = b.formation || 'line';
+
+  // Panel background
+  fill(20, 15, 10, 220); stroke(100, 80, 50, 150); strokeWeight(1);
+  rect(panelX, panelY, panelW, FORMATION_KEYS.length * (btnH + 4) + 60, 4);
+  noStroke();
+
+  // Title
+  fill(220, 185, 80); textAlign(CENTER, TOP); textSize(11);
+  textFont('Cinzel, Georgia, serif');
+  text('FORMATION', panelX + panelW / 2, panelY + 6);
+  textFont('monospace');
+
+  let by = panelY + 24;
+  // Store button rects for click handling
+  b._formationBtns = [];
+
+  for (let key of FORMATION_KEYS) {
+    let form = FORMATIONS[key];
+    let isSelected = (key === selected);
+    let bx = panelX + 6, bw = panelW - 12;
+
+    // Button background
+    if (isSelected) {
+      stroke(220, 185, 80); strokeWeight(2);
+      fill(50, 40, 25, 200);
+    } else {
+      stroke(80, 65, 40, 100); strokeWeight(1);
+      fill(30, 25, 15, 180);
+    }
+    rect(bx, by, bw, btnH, 3);
+    noStroke();
+
+    // Formation mini-diagram
+    _drawFormationIcon(bx + 12, by + btnH / 2, key, isSelected);
+
+    // Name
+    fill(isSelected ? color(240, 210, 100) : color(170, 150, 110));
+    textSize(10); textAlign(LEFT, TOP);
+    text(form.name, bx + 28, by + 5);
+
+    // Description
+    fill(isSelected ? color(180, 170, 140) : color(120, 110, 90));
+    textSize(8);
+    text(form.desc, bx + 28, by + 18);
+
+    // Bonus numbers
+    if (form.atkBonus !== 1.0 || form.defBonus !== 1.0 || form.speedBonus !== 1.0) {
+      let parts = [];
+      if (form.atkBonus !== 1.0) parts.push('ATK:' + floor(form.atkBonus * 100) + '%');
+      if (form.defBonus !== 1.0) parts.push('DEF:' + floor(form.defBonus * 100) + '%');
+      if (form.speedBonus !== 1.0) parts.push('SPD:' + floor(form.speedBonus * 100) + '%');
+      fill(isSelected ? color(160, 180, 120) : color(100, 110, 80));
+      textSize(7);
+      text(parts.join(' '), bx + 28, by + 30);
+    }
+
+    b._formationBtns.push({ key: key, x: bx, y: by, w: bw, h: btnH });
+    by += btnH + 4;
+  }
+
+  // CHARGE button
+  let chargeY = by + 4;
+  let chargeW = panelW - 12, chargeH = 28;
+  let chargeX = panelX + 6;
+  let pulse = sin(frameCount * 0.08) * 20;
+  fill(160 + pulse, 60, 30); stroke(220, 185, 80); strokeWeight(2);
+  rect(chargeX, chargeY, chargeW, chargeH, 4);
+  noStroke();
+  fill(255, 240, 200); textSize(13); textAlign(CENTER, CENTER);
+  textFont('Cinzel, Georgia, serif');
+  text('CHARGE!', chargeX + chargeW / 2, chargeY + chargeH / 2);
+  textFont('monospace');
+
+  b._chargeBtn = { x: chargeX, y: chargeY, w: chargeW, h: chargeH };
+
+  // Hint text
+  fill(100, 90, 70); textSize(8); textAlign(CENTER, TOP);
+  text('Choose formation, then charge', panelX + panelW / 2, chargeY + chargeH + 6);
+}
+
+function _drawFormationIcon(cx, cy, key, selected) {
+  let col = selected ? color(220, 200, 120) : color(120, 110, 90);
+  fill(col); noStroke();
+  let dots;
+  switch (key) {
+    case 'line':
+      dots = [[-6,0],[-3,0],[0,0],[3,0],[6,0]];
+      break;
+    case 'shield':
+      dots = [[-4,-3],[0,-3],[4,-3],[-4,0],[0,0],[4,0],[-4,3],[0,3],[4,3]];
+      break;
+    case 'wedge':
+      dots = [[6,0],[3,-3],[3,3],[0,-6],[0,6]];
+      break;
+    case 'skirmish':
+      dots = [[-6,-5],[0,0],[6,-5],[-6,5],[6,5]];
+      break;
+    case 'testudo':
+      dots = [[-3,-3],[0,-3],[3,-3],[-3,0],[0,0],[3,0],[-3,3],[0,3],[3,3]];
+      break;
+    default:
+      dots = [[0,0]];
+  }
+  for (let d of dots) ellipse(cx + d[0], cy + d[1], 3, 3);
+}
+
+// Handle clicks during army battle deploy phase
+function handleArmyBattleClick(mx, my) {
+  let b = _armyBattle;
+  if (!b || b.phase !== 'deploy') return false;
+
+  // Check formation buttons
+  if (b._formationBtns) {
+    for (let btn of b._formationBtns) {
+      if (mx >= btn.x && mx <= btn.x + btn.w && my >= btn.y && my <= btn.y + btn.h) {
+        b.formation = btn.key;
+        _applyFormationToUnits(b.attackers, btn.key, 'left');
+        if (typeof snd !== 'undefined' && snd) snd.playSFX('click');
+        return true;
+      }
+    }
+  }
+
+  // Check charge button
+  if (b._chargeBtn) {
+    let c = b._chargeBtn;
+    if (mx >= c.x && mx <= c.x + c.w && my >= c.y && my <= c.y + c.h) {
+      b.chargeReady = true;
+      if (typeof snd !== 'undefined' && snd) snd.playSFX('battle_cry');
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function _drawNationBattleBackground(nKey, battle) {

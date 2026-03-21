@@ -76,6 +76,9 @@ function createTradeRoute(good) {
     tripTimer: 0,
     tripPhase: 'outbound', // outbound | returning
     goldEarned: 0,
+    raided: false,
+    raidTimer: 0,
+    raidSmokeParticles: [],
   };
   state.tradeRoutes.push(route);
   addFloatingText(width / 2, height * 0.25, 'Trade route created: ' + TRADE_GOODS[good].name, '#ddaa44');
@@ -96,6 +99,24 @@ function removeTradeRoute(routeId) {
 function updateTradeRoutes(dt) {
   for (let route of state.tradeRoutes) {
     if (!route.active) continue;
+
+    // Tick down raid timer — ship pauses while being raided
+    if (route.raidTimer > 0) {
+      route.raidTimer -= dt * 60; // dt is in seconds, timer is in frames
+      // Spawn smoke particles during raid
+      if (!route.raidSmokeParticles) route.raidSmokeParticles = [];
+      if (route.raidSmokeParticles.length < 8 && random() < 0.3) {
+        route.raidSmokeParticles.push({ x: random(-10, 10), y: random(-15, 5), life: 60, alpha: 200 });
+      }
+      for (let sp = route.raidSmokeParticles.length - 1; sp >= 0; sp--) {
+        let p = route.raidSmokeParticles[sp];
+        p.y -= 0.3; p.alpha -= 3; p.life--;
+        if (p.life <= 0 || p.alpha <= 0) route.raidSmokeParticles.splice(sp, 1);
+      }
+      if (route.raidTimer <= 0) { route.raidTimer = 0; route.raidSmokeParticles = []; }
+      continue; // skip movement while raided
+    }
+
     route.tripTimer += dt;
 
     let targetX, targetY;
@@ -121,28 +142,114 @@ function updateTradeRoutes(dt) {
       } else {
         // Completed a round trip
         route.tripPhase = 'outbound';
-        let goldGain = TRADE_GOODS[route.good].goldPerTrip;
-        // Faction bonus: Carthage +15% trade income
-        if (typeof getFactionData === 'function') goldGain = floor(goldGain * (getFactionData().tradeIncomeMult || 1));
-        // Vineyard bonus: +30% trade value per vineyard
-        if (state.buildings) {
-          let vineyards = state.buildings.filter(b => b.type === 'vineyard').length;
-          if (vineyards > 0) goldGain = floor(goldGain * (1 + 0.3 * vineyards));
+        let wasRaided = route.raided;
+        // Reset raid state for next trip
+        route.raided = false;
+        route.raidTimer = 0;
+        if (wasRaided) {
+          // Gold already lost during raid — no income this trip
+          addFloatingText(width / 2, height * 0.35, 'Trade cargo lost to raiders!', '#ff6644');
+        } else {
+          let goldGain = TRADE_GOODS[route.good].goldPerTrip;
+          // Faction bonus: Carthage +15% trade income
+          if (typeof getFactionData === 'function') goldGain = floor(goldGain * (getFactionData().tradeIncomeMult || 1));
+          // Vineyard bonus: +30% trade value per vineyard
+          if (state.buildings) {
+            let vineyards = state.buildings.filter(b => b.type === 'vineyard').length;
+            if (vineyards > 0) goldGain = floor(goldGain * (1 + 0.3 * vineyards));
+          }
+          // Trading spec doubles gold
+          if (state.colonySpec['conquest'] === 'trading') goldGain *= 2;
+          // Tech: mathematics +15% trade profits
+          if (typeof hasTech === 'function' && hasTech('mathematics')) goldGain = floor(goldGain * 1.15);
+          // Tech: advanced_hulls — trade ships carry more (+25%)
+          if (typeof hasTech === 'function' && hasTech('advanced_hulls')) goldGain = floor(goldGain * 1.25);
+          // Demand bonus: +50% if this good is in demand
+          let demandMult = getDemandBonus(route.good);
+          goldGain = floor(goldGain * demandMult);
+          state.gold += goldGain;
+          route.goldEarned += goldGain;
+          let demandTag = demandMult > 1 ? ' (DEMAND!)' : '';
+          addFloatingText(width / 2, height * 0.35, '+' + goldGain + 'g from ' + TRADE_GOODS[route.good].name + ' trade' + demandTag, demandMult > 1 ? '#ffdd44' : '#ddcc44');
         }
-        // Trading spec doubles gold
-        if (state.colonySpec['conquest'] === 'trading') goldGain *= 2;
-        // Tech: mathematics +15% trade profits
-        if (typeof hasTech === 'function' && hasTech('mathematics')) goldGain = floor(goldGain * 1.15);
-        // Tech: advanced_hulls — trade ships carry more (+25%)
-        if (typeof hasTech === 'function' && hasTech('advanced_hulls')) goldGain = floor(goldGain * 1.25);
-        // Demand bonus: +50% if this good is in demand
-        let demandMult = getDemandBonus(route.good);
-        goldGain = floor(goldGain * demandMult);
-        state.gold += goldGain;
-        route.goldEarned += goldGain;
-        let demandTag = demandMult > 1 ? ' (DEMAND!)' : '';
-        addFloatingText(width / 2, height * 0.35, '+' + goldGain + 'g from ' + TRADE_GOODS[route.good].name + ' trade' + demandTag, demandMult > 1 ? '#ffdd44' : '#ddcc44');
       }
+    }
+  }
+}
+
+// ─── TRADE ROUTE RAIDING ─────────────────────────────────────────────────────
+
+function checkTradeRouteRaids() {
+  if (!state.tradeRoutes || state.tradeRoutes.length === 0) return;
+  if (state.faction === 'seapeople') return; // Sea People don't raid their own
+
+  for (let route of state.tradeRoutes) {
+    if (!route.active) continue;
+    if (route.raided) continue; // already raided this trip
+
+    // Base raid chance: 3% per day (Sea People always a threat)
+    let raidChance = 0.03;
+
+    // Hostile nations increase raid chance (+2% per hostile nation)
+    let hostileNames = [];
+    let allyCount = 0;
+    if (state.nations) {
+      let nKeys = Object.keys(state.nations);
+      for (let k of nKeys) {
+        let n = state.nations[k];
+        if (!n || n.defeated) continue;
+        if (n.allied) { allyCount++; continue; }
+        if (n.reputation <= -30) {
+          raidChance += 0.02;
+          hostileNames.push(k);
+        }
+      }
+    }
+
+    // Naval Warfare tech: -50% raid chance
+    if (typeof hasTech === 'function' && hasTech('naval_warfare')) raidChance *= 0.5;
+
+    // Watchtowers reduce raids by 10% each (up to 50%)
+    if (state.buildings) {
+      let towers = state.buildings.filter(b => b.type === 'watchtower').length;
+      raidChance *= (1 - min(0.5, towers * 0.1));
+    }
+
+    // Allies reduce raids: -10% per ally
+    raidChance *= (1 - min(0.3, allyCount * 0.1));
+
+    // Watchtower automation provides additional -15%
+    if (state.automation && state.automation.watchtowerAuto) raidChance *= 0.85;
+
+    raidChance = max(0.005, raidChance); // minimum 0.5% floor
+
+    if (random() < raidChance) {
+      // Raided!
+      route.raided = true;
+      route.raidTimer = 300; // ~5 seconds at 60fps
+      route.raidShipX = route.shipX + random(-40, 40);
+      route.raidShipY = route.shipY + random(-30, 30);
+      route.raidSmokeParticles = [];
+
+      let lostGold = TRADE_GOODS[route.good] ? TRADE_GOODS[route.good].goldPerTrip : 15;
+      // Faction bonus still applies to loss calculation
+      if (typeof getFactionData === 'function') lostGold = floor(lostGold * (getFactionData().tradeIncomeMult || 1));
+      route.raidLostGold = lostGold;
+
+      // Deduct gold (can't go below 0)
+      state.gold = max(0, state.gold - lostGold);
+
+      // Pick raider name
+      let raiderName = 'Sea People';
+      if (hostileNames.length > 0 && random() < 0.5) {
+        let rk = hostileNames[floor(random(hostileNames.length))];
+        raiderName = (typeof getNationName === 'function') ? getNationName(rk) : rk;
+      }
+      route.raiderName = raiderName;
+
+      addNotification('Trade ship raided by ' + raiderName + '! Lost ' + lostGold + ' gold.', '#ff4444');
+      addFloatingText(route.shipX, route.shipY, '-' + lostGold + 'g RAIDED!', '#ff3c3c');
+      if (typeof snd !== 'undefined' && snd && snd.playSFX) snd.playSFX('hit');
     }
   }
 }
@@ -190,12 +297,59 @@ function drawTradeShips() {
       fill(gc.icon);
       ellipse(0, -1, 4, 4);
     }
-    // Wake
-    fill(180, 210, 230, 30);
-    ellipse(-14, 2, 8, 3);
-    ellipse(-18, 2, 6, 2);
+    // Wake (only when not raided/paused)
+    if (!route.raided || route.raidTimer <= 0) {
+      fill(180, 210, 230, 30);
+      ellipse(-14, 2, 8, 3);
+      ellipse(-18, 2, 6, 2);
+    }
 
     pop();
+
+    // Raid visual overlay (drawn in screen space, not rotated)
+    if (route.raided && route.raidTimer > 0) {
+      push();
+      // Red flash on trade ship
+      let flashAlpha = 60 + sin(frameCount * 0.15) * 40;
+      fill(255, 40, 40, flashAlpha);
+      noStroke();
+      ellipse(sx, sy, 30, 20);
+
+      // Raider ship nearby
+      let rsx = w2sX(route.raidShipX || route.shipX + 30);
+      let rsy = w2sY(route.raidShipY || route.shipY + 20);
+      // Dark raider hull
+      fill(40, 30, 25);
+      beginShape();
+      vertex(rsx - 10, rsy - 1); vertex(rsx - 8, rsy + 3); vertex(rsx + 8, rsy + 3); vertex(rsx + 10, rsy - 1);
+      vertex(rsx + 6, rsy - 3); vertex(rsx - 6, rsy - 3);
+      endShape(CLOSE);
+      // Dark sail
+      fill(80, 30, 30, 200);
+      beginShape();
+      vertex(rsx, rsy - 10); vertex(rsx + 6, rsy - 5); vertex(rsx, rsy - 1);
+      endShape(CLOSE);
+      // Skull on sail
+      fill(200, 180, 160, 180);
+      ellipse(rsx + 2, rsy - 6, 3, 3);
+
+      // Smoke particles
+      if (route.raidSmokeParticles) {
+        for (let p of route.raidSmokeParticles) {
+          fill(80, 70, 60, p.alpha);
+          ellipse(sx + p.x, sy + p.y, 6, 5);
+        }
+      }
+
+      // "RAIDED!" text
+      if (route.raidTimer > 150) {
+        fill(255, 60, 60, min(255, route.raidTimer));
+        textSize(10); textAlign(CENTER, CENTER);
+        text('RAIDED!', sx, sy - 22);
+        textAlign(LEFT, TOP);
+      }
+      pop();
+    }
   }
 }
 
@@ -258,6 +412,9 @@ function onDayTransitionEconomy() {
     if (c.colonyLevel >= 5) state.ironOre = (state.ironOre || 0) + floor(c.colonyLevel * 0.5);
   }
 
+  // Check for trade route raids (daily)
+  checkTradeRouteRaids();
+
   // Trade ships earn gold on each completed round trip (in updateTradeRoutes).
   // Daily upkeep is deducted here; income shown is an estimate for display only.
   if (trade.upkeep > 0) {
@@ -277,7 +434,7 @@ function drawTradeRouteUI() {
   if (!state.tradeRouteUI) return;
   push();
 
-  let pw = 320, ph = 260;
+  let pw = 320, ph = 290;
   let px = width / 2 - pw / 2, py = height / 2 - ph / 2;
 
   // Panel background
@@ -321,16 +478,19 @@ function drawTradeRouteUI() {
       let r = state.tradeRoutes[i];
       let g = TRADE_GOODS[r.good];
       // Route row
-      fill(40, 35, 28, 180);
+      let rIsRaided = r.raided && r.raidTimer > 0;
+      fill(rIsRaided ? color(60, 25, 20, 200) : color(40, 35, 28, 180));
       rect(px + 10, ry, pw - 20, 28, 4);
+      if (rIsRaided) { stroke(255, 60, 40, 100); strokeWeight(1); noFill(); rect(px + 10, ry, pw - 20, 28, 4); noStroke(); }
       // Good color dot
       fill(g.icon);
       ellipse(px + 24, ry + 14, 8, 8);
       // Text
-      fill(220, 200, 150);
+      fill(rIsRaided ? color(255, 120, 100) : color(220, 200, 150));
       textSize(9);
-      text(g.name + ' route  |  Earned: ' + r.goldEarned + 'g', px + 34, ry + 4);
-      fill(160, 140, 110);
+      let statusTag = rIsRaided ? '  \u2620 RAIDED' : '';
+      text(g.name + ' route  |  Earned: ' + r.goldEarned + 'g' + statusTag, px + 34, ry + 4);
+      fill(rIsRaided ? color(200, 100, 80) : color(160, 140, 110));
       textSize(8);
       text(r.from.name + ' -> ' + r.to.name + '  |  ' + g.goldPerTrip + 'g/trip', px + 34, ry + 16);
       // Cancel button area hint
@@ -340,6 +500,26 @@ function drawTradeRouteUI() {
       textAlign(LEFT, TOP);
       ry += 34;
     }
+  }
+
+  // Raid protection summary
+  if (state.tradeRoutes.length > 0) {
+    ry += 4;
+    let protections = [];
+    if (typeof hasTech === 'function' && hasTech('naval_warfare')) protections.push('Naval Warfare -50%');
+    if (state.buildings) {
+      let tw = state.buildings.filter(b => b.type === 'watchtower').length;
+      if (tw > 0) protections.push(tw + ' Watchtower' + (tw > 1 ? 's' : '') + ' -' + min(50, tw * 10) + '%');
+    }
+    if (state.automation && state.automation.watchtowerAuto) protections.push('Auto-Defense -15%');
+    if (state.nations) {
+      let allies = Object.keys(state.nations).filter(k => state.nations[k] && state.nations[k].allied).length;
+      if (allies > 0) protections.push(allies + ' Ally -' + min(30, allies * 10) + '%');
+    }
+    fill(120, 140, 130);
+    textSize(7);
+    text('Raid protection: ' + (protections.length > 0 ? protections.join(', ') : 'NONE — build watchtowers or research Naval Warfare'), px + 15, ry);
+    ry += 12;
   }
 
   // Create new route section

@@ -1020,7 +1020,7 @@ function drawLegiaUI() {
 
   // Dynamic height based on unlocked units
   let trainRows = unlockedTypes.length;
-  let pw = min(320, width - 20), ph = min(200 + trainRows * 16 + (armyCount > 0 ? 50 : 0), height - 20);
+  let pw = min(320, width - 20), ph = min(200 + trainRows * 26 + (armyCount > 0 ? 50 : 0), height - 20);
   let px = max(10, width / 2 - pw / 2), py = max(10, height / 2 - ph / 2);
 
   // Dark panel background
@@ -1054,8 +1054,15 @@ function drawLegiaUI() {
 
   // Upkeep
   fill(180, 140, 80); textSize(9); textAlign(LEFT, TOP);
-  text('Daily Upkeep: ' + upkeep + 'g/day', px + 14, sy);
-  sy += 16;
+  text('Army Upkeep: ' + upkeep + 'g/day', px + 14, sy);
+  sy += 12;
+  let _bldUp = (typeof calculateBuildingMaintenance === 'function') ? calculateBuildingMaintenance() : 0;
+  if (_bldUp > 0) {
+    fill(160, 120, 70);
+    text('Building Upkeep: ' + _bldUp + 'g/day', px + 14, sy);
+    sy += 12;
+  }
+  sy += 4;
 
   // Unit counts by type
   if (armyCount > 0 && hasArmy) {
@@ -1093,7 +1100,18 @@ function drawLegiaUI() {
     fill(armyCount < maxSoldiers ? color(180, 160, 120) : color(100, 80, 60));
     textSize(10);
     text('[' + k + '] ' + nameStr + ' (' + costStr + ')', px + 20, sy);
-    sy += 15;
+    sy += 13;
+    // Counter info line
+    let cInfo = (typeof UNIT_COUNTER_INFO !== 'undefined') ? UNIT_COUNTER_INFO[t] : null;
+    if (cInfo) {
+      let c = color(cInfo.color);
+      fill(red(c), green(c), blue(c), 180);
+      textSize(7);
+      text('Strong vs ' + cInfo.strong, px + 30, sy);
+      sy += 11;
+    } else {
+      sy += 2;
+    }
   }
 
   // Upgrade castrum
@@ -1712,6 +1730,7 @@ function drawHUD() {
   if (state.meals > 0) hudH += 12;
   if (state.wine > 0) hudH += 12;
   if (state.oil > 0) hudH += 12;
+  if ((state.islandLevel || 1) >= 3 && state._dailyFoodNeeded > 0) hudH += 12;
   if (state.blessing && state.blessing.type) hudH += 12;
   if (state.quest) hudH += 12;
   if (state.weather && state.weather.type !== 'clear') hudH += 12;
@@ -1732,8 +1751,26 @@ function drawHUD() {
   drawHudResource(22, resY, 'STONE    ', state.stone, color(C.stoneLight), 'stone'); resY += 11;
   drawHudResource(22, resY, 'CRYSTALS ', state.crystals, color(C.crystalGlow), 'crystals'); resY += 11;
   // Conditional resources — only when player has them
-  drawHudResource(22, resY, 'GOLD     ', state.gold, color(C.solarBright), 'gold'); resY += 11;
+  drawHudResource(22, resY, 'GOLD     ', state.gold, color(C.solarBright), 'gold');
+  // Show daily upkeep next to gold
+  let _bldUpkeep = (typeof calculateBuildingMaintenance === 'function') ? calculateBuildingMaintenance() : 0;
+  let _armUpkeep = (typeof getArmyUpkeep === 'function') ? getArmyUpkeep() : 0;
+  let _totalUpkeep = _bldUpkeep + _armUpkeep;
+  if (_totalUpkeep > 0) {
+    fill(200, 80, 60); textSize(8);
+    text(' -' + _totalUpkeep + '/d', 120, resY);
+  }
+  resY += 11;
   if (state.fish > 0) { drawHudResource(22, resY, 'FISH     ', state.fish, color(100, 180, 255), 'fish'); resY += 11; }
+  // Food consumption indicator (level 3+)
+  if ((state.islandLevel || 1) >= 3 && state._dailyFoodNeeded > 0) {
+    let needed = state._dailyFoodNeeded;
+    let totalFood = (state.harvest || 0) + (state.fish || 0) + (state.meals || 0);
+    let daysLeft = needed > 0 ? floor(totalFood / needed) : 99;
+    let foodCol = daysLeft >= 5 ? color(80, 180, 80) : daysLeft >= 2 ? color(220, 180, 40) : color(255, 80, 60);
+    fill(foodCol); textSize(10);
+    text('FOOD -' + needed + '/day (' + daysLeft + 'd)', 22, resY); resY += 11;
+  }
   // Expedition resources
   let expResY = resY;
   if (state.ironOre > 0 || state.rareHide > 0 || state.ancientRelic > 0 || state.titanBone > 0) {
@@ -3724,13 +3761,22 @@ function drawWorldMap() {
       let fromY = mapPY(route.from ? route.from.y : WORLD.islandCY);
       let toX = mapPX(route.to ? route.to.x : state.conquest.isleX);
       let toY = mapPY(route.to ? route.to.y : state.conquest.isleY);
-      stroke(220, 200, 100, 100); strokeWeight(1.5);
+      let isRaided = route.raided && route.raidTimer > 0;
+      stroke(isRaided ? color(255, 80, 60, 140) : color(220, 200, 100, 100)); strokeWeight(1.5);
       drawingContext.setLineDash([4, 4]);
       line(fromX, fromY, toX, toY);
       drawingContext.setLineDash([]); noStroke();
       let prog = (frameCount % 200) / 200;
-      fill(220, 200, 100, 200);
+      fill(isRaided ? color(255, 80, 60, 220) : color(220, 200, 100, 200));
       ellipse(lerp(fromX, toX, prog), lerp(fromY, toY, prog), 4, 4);
+      if (isRaided) {
+        let raidProg = 0.5;
+        if (route.shipX && route.from) raidProg = constrain(dist(route.from.x, route.from.y, route.shipX, route.shipY) / max(1, dist(route.from.x, route.from.y, route.to.x, route.to.y)), 0, 1);
+        let skX = lerp(fromX, toX, raidProg), skY = lerp(fromY, toY, raidProg);
+        fill(255, 60, 50, 200); textSize(10); textAlign(CENTER, CENTER);
+        text('\u2620', skX, skY);
+        textAlign(LEFT, TOP);
+      }
     }
   }
   for (let isle of allIslands) {
