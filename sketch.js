@@ -5101,6 +5101,16 @@ function drawDailySummary() {
     text('No wreath today. Do 3+ activities!', width / 2, ly);
   }
 
+  // Tomorrow teaser — "one more day" hook
+  ly += 16;
+  fill(170, 155, 100);
+  textAlign(CENTER, TOP);
+  textSize(9);
+  let _tomorrowHint = _getTomorrowHint();
+  if (_tomorrowHint) {
+    text('Tomorrow: ' + _tomorrowHint, width / 2, ly);
+  }
+
   textAlign(LEFT, TOP);
 
   fill(120, 100, 70);
@@ -5108,6 +5118,38 @@ function drawDailySummary() {
   textSize(10);
   text('[ click to dismiss ]', width / 2, py + ph - 16);
   textAlign(LEFT, TOP);
+}
+
+function _getTomorrowHint() {
+  let hints = [];
+  // Check for crops about to ripen
+  let nearRipe = 0;
+  if (state.plots) {
+    for (let p of state.plots) {
+      if (p.planted && p.growth >= 0.75 && p.growth < 1.0) nearRipe++;
+    }
+  }
+  if (nearRipe > 0) hints.push(nearRipe + ' crop' + (nearRipe > 1 ? 's' : '') + ' nearly ripe');
+  // Check for day milestones
+  if (typeof DAY_MILESTONES !== 'undefined') {
+    for (let m of DAY_MILESTONES) {
+      if (state.day + 1 === m.day && !(state.milestonesClaimed || []).includes(m.id)) {
+        hints.push('a milestone awaits');
+        break;
+      }
+    }
+  }
+  // Season change check
+  let curSeason = getSeason();
+  let _tmpDay = state.day + 1;
+  let nextSeason = floor((_tmpDay % 120) / 30);
+  if (nextSeason !== curSeason) {
+    let names = ['Spring', 'Summer', 'Autumn', 'Winter'];
+    hints.push(names[nextSeason] + ' begins');
+  }
+  // Fallback tease
+  if (hints.length === 0) hints.push('the stars shift');
+  return hints[floor(random(min(hints.length, 3)))];
 }
 
 function resetDailyActivities() {
@@ -18599,7 +18641,9 @@ function updateConquest(dt) {
   // Player death — retreat with 50% loot
   if (p.hp <= 0) {
     p.hp = floor(p.maxHp * 0.5);
+    addFloatingText(width / 2, height * 0.35, 'Forced retreat!', '#ff6644');
     triggerScreenShake(8, 20);
+    if (snd) snd.playSFX('player_hurt');
     exitConquest(true);
   }
 }
@@ -20649,8 +20693,8 @@ function keyPressed() {
   // Debug console intercepts all keys when open
   if (typeof Debug !== 'undefined' && Debug.handleKey(key, keyCode)) return;
   if (gameScreen !== 'game') {
-    // ESC from settings/credits back to menu
-    if (keyCode === 27 && (gameScreen === 'settings' || gameScreen === 'credits')) {
+    // ESC from settings/credits/howtoplay back to menu
+    if (keyCode === 27 && (gameScreen === 'settings' || gameScreen === 'credits' || gameScreen === 'howtoplay')) {
       gameScreen = 'menu';
     }
     if (keyCode === 27 && gameScreen === 'multiplayer') {
@@ -20677,7 +20721,7 @@ function keyPressed() {
     // Menu keyboard navigation
     if (gameScreen === 'menu') {
       let hasSave = !!localStorage.getItem('sunlitIsles_save');
-      let btnCount = hasSave ? 5 : 4;
+      let btnCount = hasSave ? 6 : 5;
       if (keyCode === DOWN_ARROW || keyCode === 83) { // down or S
         menuKeyIdx = (menuKeyIdx + 1) % btnCount;
         menuHover = menuKeyIdx;

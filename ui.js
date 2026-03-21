@@ -1727,7 +1727,7 @@ function drawHUD() {
   drawHudResource(22, resY, 'STONE    ', state.stone, color(C.stoneLight), 'stone'); resY += 11;
   drawHudResource(22, resY, 'CRYSTALS ', state.crystals, color(C.crystalGlow), 'crystals'); resY += 11;
   // Conditional resources — only when player has them
-  if (state.gold > 0) { drawHudResource(22, resY, 'GOLD     ', state.gold, color(C.solarBright), 'gold'); resY += 11; }
+  drawHudResource(22, resY, 'GOLD     ', state.gold, color(C.solarBright), 'gold'); resY += 11;
   if (state.fish > 0) { drawHudResource(22, resY, 'FISH     ', state.fish, color(100, 180, 255), 'fish'); resY += 11; }
   // Expedition resources
   let expResY = resY;
