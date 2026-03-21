@@ -17,6 +17,7 @@ function _initTouchButtons() {
     { key: 'e', label: 'USE',   x: rx, y: by, w: sz, h: sz, col: [60, 160, 120] },
     { key: 'SHIFT', label: 'DASH', x: rx - sz - pad, y: by, w: sz, h: sz, col: [60, 120, 200] },
     { key: 'b', label: 'BUILD', x: rx, y: by + sz + pad, w: sz, h: sz, col: [180, 160, 60] },
+    { key: 'f', label: 'FISH',  x: rx - (sz + pad) * 2, y: by + sz + pad, w: sz, h: sz, col: [60, 140, 200] },
   ];
 }
 

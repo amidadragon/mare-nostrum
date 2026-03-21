@@ -389,7 +389,7 @@ const EVENT_DEFS = [
         addFloatingText(width / 2, height * 0.25, 'Pirates defeated! +50 gold bounty!', '#ffcc44');
       } else if (d.spawned) {
         let loss = floor(state.gold * 0.25);
-        state.gold -= loss;
+        state.gold = max(0, state.gold - loss);
         addFloatingText(width / 2, height * 0.25, 'Pirates escaped with ' + loss + ' gold!', '#ff6644');
       } else {
         addFloatingText(width / 2, height * 0.25, 'The pirates sailed away.', '#888888');
@@ -490,7 +490,285 @@ const EVENT_DEFS = [
     },
     onEnd() {},
   },
+  // ─── NEW EVENTS ─────────────────────────────────────────────────────
+  {
+    id: 'earthquake',
+    name: 'EARTHQUAKE',
+    desc: 'The ground shakes! Buildings may crack, but ores surface.',
+    duration: 600,     // brief tremor ~10 seconds
+    cooldown: 12,
+    oneShot: false,
+    eligible() { return (state.islandLevel || 1) >= 3; },
+    onStart() {
+      triggerScreenShake(8, 60);
+      addFloatingText(width / 2, height * 0.22, 'Earthquake! The island trembles!', '#ff6633');
+      if (snd) snd.playSFX('crystal_charge');
+      // Damage: random building loses some durability visual; reward: free ores
+      let oreGain = 3 + floor(random(5));
+      state.stone = (state.stone || 0) + oreGain;
+      state.ironOre = (state.ironOre || 0) + floor(oreGain / 2);
+      addFloatingText(width / 2, height * 0.28, '+' + oreGain + ' Stone, +' + floor(oreGain / 2) + ' Iron Ore surfaced!', '#ccaa66');
+      // Crops can be damaged — 30% chance each growing crop wilts back one stage
+      let damaged = 0;
+      if (state.plots) {
+        state.plots.forEach(p => {
+          if (p.planted && !p.ripe && p.stage > 0 && random() < 0.3) {
+            p.stage = max(0, p.stage - 1);
+            p.timer = 0;
+            damaged++;
+          }
+        });
+      }
+      if (damaged > 0) addFloatingText(width / 2, height * 0.34, damaged + ' crops shaken back!', '#ff8866');
+      // Chain: earthquake can trigger aftershock
+      state.activeEvent.data.chainAfterShock = random() < 0.35;
+      spawnParticles(state.player.x, state.player.y, 'hit', 15);
+    },
+    onEnd() {
+      if (state.activeEvent && state.activeEvent.data.chainAfterShock) {
+        _pendingChainEvent = 'aftershock';
+        _pendingChainDelay = 300; // ~5 seconds later
+      }
+    },
+  },
+  {
+    id: 'aftershock',
+    name: 'AFTERSHOCK',
+    desc: 'A second tremor! Crystal nodes crack open.',
+    duration: 300,
+    cooldown: 20,
+    oneShot: false,
+    eligible() { return false; }, // only triggered by chain, never random
+    onStart() {
+      triggerScreenShake(5, 40);
+      addFloatingText(width / 2, height * 0.22, 'Aftershock! Crystal veins split open!', '#66ddff');
+      let crystalGain = 3 + floor(random(4));
+      state.crystals = (state.crystals || 0) + crystalGain;
+      addFloatingText(width / 2, height * 0.28, '+' + crystalGain + ' Crystals!', '#44ffdd');
+      spawnParticles(state.player.x, state.player.y, 'divine', 12);
+    },
+    onEnd() {},
+  },
+  {
+    id: 'whale_sighting',
+    name: 'WHALE SIGHTING',
+    desc: 'A great whale breaches! Fish flock to shore for 1 day.',
+    duration: 8000,
+    cooldown: 10,
+    oneShot: false,
+    onStart() {
+      addFloatingText(width / 2, height * 0.22, 'A great whale breaches off the coast!', '#55aadd');
+      state.activeEvent.data.whaleX = WORLD.islandCX + random(-100, 100);
+      state.activeEvent.data.whaleY = WORLD.islandCY + (state.islandRY || WORLD.islandRY) + 60;
+      state.activeEvent.data.bonusFishGiven = 0;
+      if (snd) snd.playSFX('visitor_arrive');
+      spawnParticles(state.activeEvent.data.whaleX, state.activeEvent.data.whaleY, 'burst', 20);
+    },
+    onEnd() {
+      let bonus = state.activeEvent ? state.activeEvent.data.bonusFishGiven || 0 : 0;
+      if (bonus > 0) addFloatingText(width / 2, height * 0.25, 'The whale departs. ' + bonus + ' bonus fish caught!', '#55aadd');
+    },
+  },
+  {
+    id: 'merchant_caravan',
+    name: 'MERCHANT CARAVAN',
+    desc: 'A trade fleet arrives! All shop prices halved today.',
+    duration: 8000,
+    cooldown: 14,
+    oneShot: false,
+    eligible() { return state.day >= 10; },
+    onStart() {
+      addFloatingText(width / 2, height * 0.22, 'A merchant caravan arrives! Prices halved!', '#ffaa33');
+      // Gift some free gold and resources
+      state.gold = (state.gold || 0) + 25;
+      state.seeds = (state.seeds || 0) + 5;
+      addFloatingText(width / 2, height * 0.28, '+25 Gold, +5 Seeds as gifts!', '#ffcc44');
+      if (snd) snd.playSFX('festival_start');
+      spawnParticles(state.player.x, state.player.y, 'harvest', 18);
+      // Chain: merchant caravan can attract bandits
+      state.activeEvent.data.chainBandit = random() < 0.25;
+    },
+    onEnd() {
+      if (state.activeEvent && state.activeEvent.data.chainBandit) {
+        _pendingChainEvent = 'bandit_raid';
+        _pendingChainDelay = 600; // ~10 seconds after caravan leaves
+      }
+    },
+  },
+  {
+    id: 'bandit_raid',
+    name: 'BANDIT RAID',
+    desc: 'Bandits ambush the island! Defend your stores!',
+    duration: 6000,
+    cooldown: 8,
+    oneShot: false,
+    eligible() { return state.day >= 15 && (state.gold || 0) >= 50; },
+    onStart() {
+      addFloatingText(width / 2, height * 0.22, 'Bandits raid the island!', '#ff4444');
+      triggerScreenShake(4, 15);
+      if (snd) snd.playSFX('visitor_arrive');
+      state.activeEvent.data.bandits = [];
+      state.activeEvent.data.defeated = 0;
+      state.activeEvent.data.spawned = false;
+      // Bandits spawn from the forest edge (north side)
+      let spawnX = WORLD.islandCX + random(-150, 150);
+      let spawnY = WORLD.islandCY - (state.islandRY || WORLD.islandRY) * 0.6;
+      state.activeEvent.data.spawnX = spawnX;
+      state.activeEvent.data.spawnY = spawnY;
+      // Spawn 3 bandits immediately
+      for (let i = 0; i < 3; i++) {
+        state.activeEvent.data.bandits.push({
+          x: spawnX + random(-40, 40),
+          y: spawnY + random(-20, 20),
+          hp: 30, maxHp: 30,
+          vx: 0, vy: 0,
+          speed: 1.2 + random(0.3),
+          damage: 8,
+          size: 12,
+          facing: 1,
+          flashTimer: 0,
+          attackCooldown: 0,
+          targetType: 'player', // bandits target player or steal from buildings
+        });
+      }
+      state.activeEvent.data.spawned = true;
+      state.activeEvent.data.stolenGold = 0;
+    },
+    onEnd() {
+      let d = state.activeEvent ? state.activeEvent.data : {};
+      if (d.defeated >= 3) {
+        state.gold = (state.gold || 0) + 30;
+        addFloatingText(width / 2, height * 0.25, 'Bandits routed! +30 gold recovered!', '#ffcc44');
+      } else {
+        let stolen = min(floor((state.gold || 0) * 0.15), 40);
+        state.gold = max(0, (state.gold || 0) - stolen);
+        addFloatingText(width / 2, height * 0.25, 'Bandits escaped with ' + stolen + ' gold!', '#ff6644');
+      }
+    },
+  },
+  // ─── SEASONAL EVENTS (one per season, triggered by season check) ────
+  {
+    id: 'spring_bloom',
+    name: 'SPRING BLOOM',
+    desc: 'Wildflowers erupt! All crops advance one growth stage.',
+    duration: 4000,
+    cooldown: 40, // once per year basically
+    oneShot: false,
+    seasonal: 0, // spring only
+    eligible() { return getSeason() === 0; },
+    onStart() {
+      addFloatingText(width / 2, height * 0.22, 'Spring Bloom! Nature surges forward!', '#ff88cc');
+      if (state.plots) {
+        state.plots.forEach(p => {
+          if (p.planted && !p.ripe && p.stage < 3) {
+            p.stage++;
+            p.timer = 0;
+          }
+        });
+      }
+      addFloatingText(width / 2, height * 0.28, 'All growing crops advanced a stage!', '#88ff88');
+      if (snd) snd.playSFX('festival_start');
+      spawnParticles(state.player.x, state.player.y, 'harvest', 20);
+    },
+    onEnd() {},
+  },
+  {
+    id: 'summer_drought',
+    name: 'SUMMER DROUGHT',
+    desc: 'Scorching heat! Crops wilt without water, but solar doubles.',
+    duration: 8000,
+    cooldown: 40,
+    oneShot: false,
+    seasonal: 1,
+    eligible() { return getSeason() === 1; },
+    onStart() {
+      addFloatingText(width / 2, height * 0.22, 'Summer Drought! Sol burns bright!', '#ffaa00');
+      // Dry out crops that aren't near aqueducts
+      if (state.plots) {
+        state.plots.forEach(p => {
+          if (p.planted && !p.ripe && p.stage > 0) {
+            let nearAqueduct = state.buildings && state.buildings.some(b => b.type === 'aqueduct' && dist(b.x, b.y, p.x, p.y) < 80);
+            if (!nearAqueduct && random() < 0.4) {
+              p.stage = max(0, p.stage - 1);
+              p.timer = 0;
+            }
+          }
+        });
+      }
+      addFloatingText(width / 2, height * 0.28, 'Unwatered crops wilt! Build aqueducts!', '#ff8844');
+      spawnParticles(state.player.x, state.player.y, 'burst', 10);
+    },
+    onEnd() {},
+  },
+  {
+    id: 'autumn_bounty',
+    name: 'AUTUMN BOUNTY',
+    desc: 'Ceres blesses the harvest! All ripe crops yield triple.',
+    duration: 8000,
+    cooldown: 40,
+    oneShot: false,
+    seasonal: 2,
+    eligible() { return getSeason() === 2; },
+    onStart() {
+      addFloatingText(width / 2, height * 0.22, 'Autumn Bounty! Ceres smiles upon you!', '#dd7722');
+      if (snd) snd.playSFX('festival_start');
+      spawnParticles(state.player.x, state.player.y, 'harvest', 25);
+    },
+    onEnd() {},
+  },
+  {
+    id: 'winter_frost',
+    name: 'WINTER FROST',
+    desc: 'Deep frost! Non-winter crops freeze, but crystals form.',
+    duration: 6000,
+    cooldown: 40,
+    oneShot: false,
+    seasonal: 3,
+    eligible() { return getSeason() === 3; },
+    onStart() {
+      addFloatingText(width / 2, height * 0.22, 'Winter Frost descends!', '#88ddff');
+      // Kill non-frostherb crops that are still growing
+      let frozen = 0;
+      if (state.plots) {
+        state.plots.forEach(p => {
+          if (p.planted && !p.ripe && p.cropType !== 'frostherb') {
+            if (random() < 0.5) {
+              p.planted = false; p.stage = 0; p.timer = 0; p.ripe = false;
+              frozen++;
+            }
+          }
+        });
+      }
+      if (frozen > 0) addFloatingText(width / 2, height * 0.28, frozen + ' crops frozen solid!', '#aaddff');
+      // Reward: crystal formation
+      let crystalGain = 2 + floor(random(4));
+      state.crystals = (state.crystals || 0) + crystalGain;
+      addFloatingText(width / 2, height * 0.34, '+' + crystalGain + ' Crystals formed from frost!', '#44ffdd');
+      spawnParticles(state.player.x, state.player.y, 'divine', 15);
+    },
+    onEnd() {},
+  },
 ];
+
+// ─── EVENT CHAIN SYSTEM ─────────────────────────────────────────────────
+let _pendingChainEvent = null;
+let _pendingChainDelay = 0;
+
+function updateEventChain(dt) {
+  if (!_pendingChainEvent) return;
+  if (state.activeEvent) return; // wait for current event to fully clear
+  _pendingChainDelay -= dt;
+  if (_pendingChainDelay <= 0) {
+    let chainId = _pendingChainEvent;
+    _pendingChainEvent = null;
+    let def = EVENT_DEFS.find(d => d.id === chainId);
+    if (def) {
+      state.activeEvent = { id: def.id, timer: def.duration, data: {} };
+      if (!def.oneShot) state.eventCooldown[def.id] = def.cooldown;
+      def.onStart();
+    }
+  }
+}
 
 function isEventEligible(def) {
   if (def.oneShot && state.eventHistory.includes(def.id)) return false;
@@ -502,22 +780,41 @@ function isEventEligible(def) {
 
 function checkRandomEvent() {
   if (state.activeEvent) return;
-  if (random() > 0.20) return; // 20% chance per day
+  // Balanced frequency: 30% base, +10% if no event in 3+ days
+  let chance = 0.30;
+  let daysSince = state._daysSinceLastEvent || 0;
+  if (daysSince >= 3) chance += 0.10;
+  if (daysSince >= 5) chance += 0.15; // catch-up if player hasn't seen anything
+  if (random() > chance) {
+    state._daysSinceLastEvent = (state._daysSinceLastEvent || 0) + 1;
+    return;
+  }
+  // Prioritize seasonal events if season just changed
+  let seasonDay = state.day % 10; // day within season
   let eligible = EVENT_DEFS.filter(isEventEligible);
   if (!eligible.length) return;
-  let def = eligible[floor(random(eligible.length))];
-  state.activeEvent = { id: def.id, timer: def.duration, data: {} };
+  // Weight seasonal events higher on first 2 days of season
+  let picked;
+  let seasonalEligible = eligible.filter(d => d.seasonal !== undefined && d.seasonal === getSeason());
+  if (seasonDay <= 1 && seasonalEligible.length > 0 && random() < 0.6) {
+    picked = seasonalEligible[floor(random(seasonalEligible.length))];
+  } else {
+    picked = eligible[floor(random(eligible.length))];
+  }
+  state.activeEvent = { id: picked.id, timer: picked.duration, data: {} };
+  state._daysSinceLastEvent = 0;
   // Tick down other cooldowns by 1 day
   EVENT_DEFS.forEach(d => {
     if (state.eventCooldown[d.id] > 0) state.eventCooldown[d.id]--;
   });
   // Set cooldown for this event
-  if (!def.oneShot) state.eventCooldown[def.id] = def.cooldown;
-  if (def.oneShot) state.eventHistory.push(def.id);
-  def.onStart();
+  if (!picked.oneShot) state.eventCooldown[picked.id] = picked.cooldown;
+  if (picked.oneShot) state.eventHistory.push(picked.id);
+  picked.onStart();
 }
 
 function updateActiveEvent(dt) {
+  updateEventChain(dt);
   if (!state.activeEvent) {
     // Tick cooldowns even when no event is active (catch-all in case checkRandomEvent skips)
     return;
@@ -641,6 +938,75 @@ function updateActiveEvent(dt) {
     }
   }
 
+  // Whale sighting — bonus fish when player fishes during event
+  if (def.id === 'whale_sighting') {
+    let d = state.activeEvent.data;
+    // Animate whale bob
+    d.whalePhase = (d.whalePhase || 0) + 0.02;
+    // Periodic free fish splash near shore
+    if (frameCount % 300 === 0) {
+      let bonusFish = 1 + floor(random(2));
+      state.fish = (state.fish || 0) + bonusFish;
+      d.bonusFishGiven = (d.bonusFishGiven || 0) + bonusFish;
+      let rx = d.whaleX + random(-80, 80);
+      let ry = d.whaleY - random(20, 50);
+      addFloatingText(w2sX(rx), w2sY(ry), '+' + bonusFish + ' Fish!', '#55aadd');
+      spawnParticles(rx, ry, 'burst', 4);
+    }
+  }
+
+  // Bandit raid — bandits chase player and try to steal
+  if (def.id === 'bandit_raid') {
+    let d = state.activeEvent.data;
+    if (d.bandits) {
+      for (let i = d.bandits.length - 1; i >= 0; i--) {
+        let b = d.bandits[i];
+        if (b.flashTimer > 0) b.flashTimer--;
+        if (b.attackCooldown > 0) b.attackCooldown--;
+        let dx = state.player.x - b.x, dy = state.player.y - b.y;
+        let dd = sqrt(dx * dx + dy * dy);
+        if (dd > 25) {
+          b.x += (dx / dd) * b.speed;
+          b.y += (dy / dd) * b.speed;
+          b.facing = dx > 0 ? 1 : -1;
+        } else if (b.attackCooldown <= 0) {
+          if (state.player.invincTimer <= 0) {
+            let armor = state.player.armor || 0;
+            let dmgReduce = armor === 1 ? 2 : armor === 2 ? 5 : armor === 3 ? 8 : 0;
+            state.player.hp -= max(1, b.damage - dmgReduce);
+            state.player.invincTimer = 30;
+            b.attackCooldown = 45;
+          }
+        }
+        // Player can kill bandits with attacks
+        if (state.player.slashPhase > 0 && dd < (state.player.attackRange || 30) + 8) {
+          b.hp -= state.player.attackDamage || 15;
+          b.flashTimer = 6;
+          if (b.hp <= 0) {
+            d.defeated++;
+            d.bandits.splice(i, 1);
+            spawnParticles(b.x, b.y, 'hit', 6);
+            if (d.defeated >= 3) {
+              state.activeEvent.timer = 1;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Merchant caravan — golden particles near docks
+  if (def.id === 'merchant_caravan') {
+    if (frameCount % 90 === 0) {
+      let rx = WORLD.islandCX + WORLD.islandRX - 60 + random(-30, 30);
+      let ry = WORLD.islandCY + 40 + random(-20, 20);
+      spawnParticles(rx, ry, 'harvest', 2);
+    }
+  }
+
+  // Summer drought — solar energy bonus (handled by getEventSolarMult)
+  // Autumn bounty — harvest triple (handled by getEventHarvestMult)
+
   if (state.activeEvent.timer <= 0) {
     def.onEnd();
     state.activeEvent = null;
@@ -654,6 +1020,7 @@ function getEventHarvestMult() {
   if (id === 'festival_day') return 1.5;
   if (id === 'harvest_moon') return 2.0;
   if (id === 'harvest_windfall') return 2.0;
+  if (id === 'autumn_bounty') return 3.0;
   return 1;
 }
 
@@ -664,6 +1031,7 @@ function getEventCrystalMult() {
   if (id === 'storm_surge') return 2;
   if (id === 'solar_eclipse') return 2;
   if (id === 'crystal_surge') return 2;
+  if (id === 'winter_frost') return 1.5;
   return 1;
 }
 
@@ -672,6 +1040,28 @@ function getEventCropGrowthMult() {
   if (!state.activeEvent) return 1;
   let id = state.activeEvent.id;
   if (id === 'harvest_moon') return 0.5; // 2x speed = half the timer
+  if (id === 'spring_bloom') return 0.5;
+  return 1;
+}
+
+// Returns shop price multiplier from active events
+function getEventShopPriceMult() {
+  if (!state.activeEvent) return 1;
+  if (state.activeEvent.id === 'merchant_caravan') return 0.5;
+  return 1;
+}
+
+// Returns solar energy multiplier from active events
+function getEventSolarMult() {
+  if (!state.activeEvent) return 1;
+  if (state.activeEvent.id === 'summer_drought') return 2.0;
+  return 1;
+}
+
+// Returns fishing catch multiplier from active events
+function getEventFishMult() {
+  if (!state.activeEvent) return 1;
+  if (state.activeEvent.id === 'whale_sighting') return 2.0;
   return 1;
 }
 
@@ -972,6 +1362,105 @@ function drawEventBanner() {
       text('[E] Speak with ' + d.name, ssx, ssy - 36 + floatOffset);
       pop();
     }
+  }
+
+  // Whale sighting — draw whale sprite offshore
+  if (def.id === 'whale_sighting') {
+    let d = state.activeEvent.data;
+    let wx = w2sX(d.whaleX), wy = w2sY(d.whaleY) + floatOffset;
+    let phase = d.whalePhase || 0;
+    let bob = sin(phase) * 6;
+    let breach = sin(phase * 0.3) * 0.5 + 0.5;
+    push();
+    translate(wx, wy + bob);
+    noStroke();
+    // Body — deep blue-grey
+    fill(50, 60, 80);
+    ellipse(0, 0, 50 * breach + 20, 14);
+    // Belly lighter
+    fill(80, 90, 110);
+    ellipse(0, 2, 40 * breach + 16, 8);
+    // Tail fluke
+    fill(45, 55, 75);
+    beginShape();
+    vertex(22, -2); vertex(32, -8); vertex(30, 0); vertex(32, 8); vertex(22, 2);
+    endShape(CLOSE);
+    // Water spray
+    if (breach > 0.7) {
+      fill(180, 220, 255, floor((breach - 0.7) * 600));
+      for (let i = 0; i < 5; i++) {
+        let sx2 = -5 + i * 3;
+        let sy2 = -10 - i * 2 - sin(phase * 2 + i) * 4;
+        rect(sx2, sy2, 2, 2);
+      }
+    }
+    pop();
+  }
+
+  // Bandit raid — draw bandit enemies
+  if (def.id === 'bandit_raid') {
+    let d = state.activeEvent.data;
+    if (d.bandits) {
+      for (let b of d.bandits) {
+        let bx = w2sX(b.x), by = w2sY(b.y) + floatOffset;
+        push();
+        translate(bx, by);
+        noStroke();
+        fill(0, 0, 0, 30);
+        ellipse(0, 2, 10, 4);
+        // Dark cloak
+        fill(b.flashTimer > 0 ? 255 : 50, 40, 35);
+        rect(-4, -9, 8, 11);
+        // Hood
+        fill(40, 35, 30);
+        rect(-3, -14, 6, 5);
+        rect(-4, -12, 8, 2);
+        // Eyes — menacing
+        fill(200, 80, 40);
+        rect(-2, -12, 1, 1);
+        rect(1, -12, 1, 1);
+        // Dagger
+        fill(170, 170, 180);
+        rect(b.facing * 5, -8, 1, 6);
+        fill(120, 90, 50);
+        rect(b.facing * 5 - 1, -3, 3, 2);
+        // HP bar
+        if (b.hp < b.maxHp) {
+          fill(40, 0, 0, 180);
+          rect(-8, -18, 16, 3);
+          fill(220, 50, 30);
+          rect(-8, -18, 16 * (b.hp / b.maxHp), 3);
+        }
+        pop();
+      }
+    }
+  }
+
+  // Earthquake/aftershock — screen dust particles (already handled by screen shake)
+
+  // Seasonal visual overlays
+  if (def.id === 'spring_bloom' && frameCount % 4 === 0) {
+    push();
+    noStroke();
+    let sa = sin(frameCount * 0.03) * 30 + 60;
+    fill(255, 180, 200, sa);
+    for (let i = 0; i < 3; i++) {
+      let px = random(width), py = random(height);
+      ellipse(px, py, 3, 2);
+    }
+    pop();
+  }
+  if (def.id === 'winter_frost') {
+    push();
+    noStroke();
+    for (let i = 0; i < 2; i++) {
+      let seed = (frameCount + i * 200) % 1000;
+      let fx = (seed * 1.7) % width;
+      let fy = (frameCount * 0.3 + seed * 3.1) % height;
+      fill(200, 230, 255, 100);
+      rect(floor(fx), floor(fy), 2, 2);
+    }
+    pop();
   }
 }
 

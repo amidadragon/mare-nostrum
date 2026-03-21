@@ -303,7 +303,7 @@ function getGiftResponse(npcName, giftType) {
 // ─── NPC DAILY WANTS — seeded per real-world day ───
 const DAILY_WANTS = {
   livia: [
-    { type: 'gift', resource: 'flower', label: 'Livia wants flowers today' },
+    { type: 'gift', resource: 'harvest', label: 'Livia wants fresh produce today' },
     { type: 'gift', resource: 'fish', label: 'Livia craves fresh fish' },
     { type: 'gift', resource: 'harvest', label: 'Livia needs grain for bread' },
     { type: 'favor', zone: 'temple', label: 'Livia asks you to pray at the temple' },
@@ -325,7 +325,7 @@ const DAILY_WANTS = {
   vesta: [
     { type: 'gift', resource: 'harvest', label: 'Vesta wants fresh vegetables' },
     { type: 'gift', resource: 'seeds', label: 'Vesta needs seeds for the garden' },
-    { type: 'gift', resource: 'flower', label: 'Vesta seeks wildflowers for offerings' },
+    { type: 'gift', resource: 'harvest', label: 'Vesta seeks an offering of grain' },
     { type: 'favor', zone: 'farm', label: 'Vesta asks you to tend the crops' },
     { type: 'favor', zone: 'shrine', label: 'Vesta wants you to visit the crystal shrine' },
     { type: 'activity', action: 'cook', label: 'Vesta wants to cook together' },
@@ -856,6 +856,13 @@ function updateMainQuest() {
     }
     state.mainQuest.chapter = ch + 1;
     state.mainQuest.step = 0;
+    if (state.score) state.score.questsCompleted++;
+    // Quest completion grants research points
+    if (typeof grantResearchPoints === 'function') {
+      let rpBonus = 5 + ch * 3; // 5-20 RP scaling with chapter
+      grantResearchPoints(rpBonus);
+      addFloatingText(width / 2, height * 0.28, '+' + rpBonus + ' RP (quest)', '#88ccff');
+    }
     if (ch + 1 >= 2) trackMilestone('chapter_' + (ch + 1));
     // Quest compass nudges — stored as pending floats, shown after a delay
     if (!state.mainQuest.pendingNudges) state.mainQuest.pendingNudges = [];
@@ -1006,7 +1013,7 @@ function drawLoreTablets() {
     fill(220, 190, 80, floor(40 * pulse)); rect(sx - 6, sy - 14, 12, 16);
     pop();
     if (dist(state.player.x, state.player.y, lt.wx, lt.wy) < 40) {
-      fill(220, 190, 80); textAlign(CENTER, CENTER); textSize(8);
+      fill(220, 190, 80); textAlign(CENTER, CENTER); textSize(11);
       text('[E] Read tablet', sx, sy - 20); textAlign(LEFT, TOP);
     }
   }
@@ -1022,14 +1029,14 @@ function drawLoreTabletPopup() {
   noStroke(); fill(40, 32, 20, alpha); rect(px, py, pw, ph, 6);
   stroke(180, 150, 80, alpha); strokeWeight(1); noFill(); rect(px + 3, py + 3, pw - 6, ph - 6, 4); noStroke();
   fill(220, 190, 80, alpha); textAlign(CENTER, TOP); textSize(10); text(t.title, width / 2, py + 10);
-  fill(200, 180, 140, alpha); textSize(7);
+  fill(200, 180, 140, alpha); textSize(10);
   let words = t.text.split(' '), line = '', ly = py + 28, maxW = pw - 30;
   for (let w of words) {
     let test = line + (line ? ' ' : '') + w;
     if (textWidth(test) > maxW) { text(line, width / 2, ly); ly += 11; line = w; } else line = test;
   }
   if (line) text(line, width / 2, ly);
-  fill(150, 130, 90, alpha); textSize(7); text('[ click to dismiss ]', width / 2, py + ph - 14);
+  fill(150, 130, 90, alpha); textSize(10); text('[ click to dismiss ]', width / 2, py + ph - 14);
   textAlign(LEFT, TOP);
 }
 
@@ -1038,14 +1045,14 @@ function drawQuestTracker() {
   if (!state.mainQuest) return;
   let ch = state.mainQuest.chapter;
   if (ch >= MAIN_QUEST_CHAPTERS.length) {
-    fill(255, 215, 0, 180); textAlign(RIGHT, TOP); textSize(8);
+    fill(255, 215, 0, 180); textAlign(RIGHT, TOP); textSize(11);
     text('IMPERATOR — Legacy Complete', width - 16, 16); textAlign(LEFT, TOP); return;
   }
   let chapter = MAIN_QUEST_CHAPTERS[ch];
   if (!chapter) return;
   let rx = width - 240, ry = 12, rw = 228, rh = 18 + chapter.objectives.length * 13;
   drawHUDPanel(rx, ry, rw, rh);
-  fill(220, 190, 80); textAlign(LEFT, TOP); textSize(8);
+  fill(220, 190, 80); textAlign(LEFT, TOP); textSize(11);
   text(chapter.title, rx + 8, ry + 5);
   let oy = ry + 19;
   for (let obj of chapter.objectives) {
@@ -1055,7 +1062,7 @@ function drawQuestTracker() {
     else if (obj.interact) done = !!state.narrativeFlags[obj.interact];
     let pt = '';
     if (obj.counter && !done) pt = ' (' + (state.mainQuest.counters[obj.counter] || 0) + '/' + obj.target + ')';
-    fill(done ? color(120, 200, 80) : color(180, 170, 140)); textSize(7);
+    fill(done ? color(120, 200, 80) : color(180, 170, 140)); textSize(10);
     let objStr = (done ? '[x] ' : '[ ] ') + obj.desc + pt;
     let maxW = rw - 20;
     while (objStr.length > 10 && textWidth(objStr) > maxW) objStr = objStr.slice(0, -1);
@@ -1071,7 +1078,7 @@ function drawQuestTracker() {
     if (!quest) continue;
     let nqH = 16 + quest.objectives.length * 12;
     drawHUDPanel(rx, nqY, rw, nqH);
-    fill(140, 180, 220); textSize(7);
+    fill(140, 180, 220); textSize(10);
     text(npcName.charAt(0).toUpperCase() + npcName.slice(1) + ': ' + quest.title, rx + 8, nqY + 4);
     let objY = nqY + 16;
     for (let obj of quest.objectives) {
@@ -1081,7 +1088,7 @@ function drawQuestTracker() {
       else if (obj.interact) done = !!state.narrativeFlags[obj.interact];
       let pt = '';
       if (obj.counter && !done) pt = ' (' + (state.npcQuests.counters[obj.counter] || 0) + '/' + obj.target + ')';
-      fill(done ? color(120, 200, 80) : color(160, 150, 120)); textSize(6);
+      fill(done ? color(120, 200, 80) : color(160, 150, 120)); textSize(9);
       let npcStr = (done ? '[x] ' : '[ ] ') + obj.desc + pt;
       let npcMaxW = rw - 20;
       while (npcStr.length > 10 && textWidth(npcStr) > npcMaxW) npcStr = npcStr.slice(0, -1);
@@ -1115,7 +1122,7 @@ function drawNarrativeDialogue() {
     d.npc === 'vesta' ? color(180, 140, 255, alpha) : color(140, 200, 140, alpha);
   fill(nc); textAlign(LEFT, TOP); textSize(9);
   text(d.npc.charAt(0).toUpperCase() + d.npc.slice(1), px + 10, py + 8);
-  fill(210, 200, 175, alpha); textSize(7);
+  fill(210, 200, 175, alpha); textSize(10);
   let words = d.line.split(' '), line = '', ly = py + 24, maxW = pw - 24;
   for (let w of words) {
     let test = line + (line ? ' ' : '') + w;

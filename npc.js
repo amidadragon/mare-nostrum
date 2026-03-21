@@ -80,7 +80,12 @@ const FELIX_LINES_HIGH = [
   "Read this key. Inside is everything I know about this island.",
 ];
 
-function getNPCDialogue(npc, lines, linesMid, linesHigh) {
+function getNPCDialogue(npc, lines, linesMid, linesHigh, npcName) {
+  // Check for memory-based greeting (30% chance if memory exists)
+  if (npcName && typeof random === 'function' && random() < 0.3) {
+    let memLine = getMemoryGreeting(npcName);
+    if (memLine) return memLine;
+  }
   if (npc.hearts >= 7) {
     let idx = npc.lineIndex % linesHigh.length;
     npc.lineIndex++;
@@ -144,7 +149,13 @@ function checkNPCWantSatisfied(npcName) {
     let currentFavor = state.npcFavor[npcName] || 0;
     let atMax = currentFavor >= 30;
     if (!atMax) {
-      state.npcFavor[npcName] = Math.min(30, currentFavor + 1);
+      let favorAmt = 1;
+      // Tech: rhetoric +20% NPC favor gain (rounds to extra point on every 5th gift)
+      if (typeof hasTech === 'function' && hasTech('rhetoric')) favorAmt += (Math.random() < 0.2 ? 1 : 0);
+      // Faction NPC favor bonus
+      let _nfm = (typeof getFactionData === 'function') ? (getFactionData().npcFavorMult || 1) : 1;
+      if (_nfm > 1 && Math.random() < (_nfm - 1)) favorAmt += 1;
+      state.npcFavor[npcName] = Math.min(30, currentFavor + favorAmt);
       if (typeof snd !== 'undefined' && snd) snd.playSFX('favor_up');
       addFloatingText(width / 2, height * 0.3, npcName.charAt(0).toUpperCase() + npcName.slice(1) + ' is pleased! +1 Favor', '#ffdd44');
     } else {
@@ -573,7 +584,7 @@ function drawNPC() {
   // Relationship tier label
   if (typeof getRelationshipTier === 'function' && n.hearts > 0) {
     let tier = getRelationshipTier(n.hearts);
-    fill(color(tier.color)); textAlign(CENTER, CENTER); textSize(5);
+    fill(color(tier.color)); textAlign(CENTER, CENTER); textSize(9);
     text(tier.title, 0, -34 - (n.currentLine !== -1 && n.currentLine !== null ? 28 : 0));
     textAlign(LEFT, TOP);
   }
@@ -721,30 +732,13 @@ function updateCitizens(dt) {
 function initCitizens() {
   state.citizens = [];
   let cap = state.islandLevel <= 4 ? 0 : min(floor(state.islandLevel * 1.2), 30);
+  // Tech: democratic_governance +50% population
+  if (typeof hasTech === 'function' && hasTech('democratic_governance')) cap = floor(cap * 1.5);
   for (let i = 0; i < cap; i++) spawnCitizen();
 }
 
 function spawnCitizen() {
-  let waypoints = getCitizenWaypoints();
-  let wp = waypoints[floor(random(waypoints.length))];
-  let x = wp.x + random(-12, 12);
-  let y = wp.y + random(-8, 8);
-  if (!isOnIsland(x, y)) { x = wp.x; y = wp.y; }
-  let variants = ['farmer', 'merchant', 'soldier', 'priest'];
-  let weights = state.islandLevel <= 8 ? [4,2,1,1] : state.islandLevel <= 17 ? [2,3,2,1] : [1,2,3,2];
-  let totalW = weights.reduce((a,b) => a+b, 0);
-  let roll = floor(random(totalW));
-  let vi = 0, acc = 0;
-  for (let i = 0; i < weights.length; i++) { acc += weights[i]; if (roll < acc) { vi = i; break; } }
-  state.citizens.push({
-    x: x, y: y, vx: 0, vy: 0,
-    variant: variants[vi],
-    facing: random() > 0.5 ? 1 : -1,
-    state: 'idle',
-    timer: floor(random(60, 300)),
-    speed: 0.4 + random(0.3),
-    targetX: x, targetY: y,
-  });
+  spawnVariedCitizen();
 }
 
 function drawOneCitizen(c) {
@@ -757,10 +751,22 @@ function drawOneCitizen(c) {
   noStroke();
 
   let lvl = state.islandLevel;
-  let colors = getCitizenColors(c.variant, lvl);
+  let colors = getCitizenColors(c.variant, lvl, c);
   let walking = c.state === 'walking';
-  let step = sin(frameCount * 0.15 + c.x) * 2;
-  let bob = walking ? abs(sin(frameCount * 0.15 + c.x)) * 0.5 : 0;
+  let phase = c.walkBobPhase || 0;
+  let step = sin(frameCount * 0.15 + phase) * 2;
+  let bob = walking ? abs(sin(frameCount * 0.15 + phase)) * 0.5 : 0;
+
+  // Idle animation variety
+  if (!walking && c.idleAnim !== undefined) {
+    if (c.idleAnim === 1) {
+      // Look around — subtle head turn
+      let lookDir = sin(frameCount * 0.02 + phase) * 0.5;
+      translate(lookDir, 0);
+    } else if (c.idleAnim === 2) {
+      // Arms crossed — handled in arm drawing below via flag
+    }
+  }
 
   // Shadow
   fill(0, 0, 0, 30);
@@ -799,9 +805,16 @@ function drawOneCitizen(c) {
 
   // Arms — skin, with simple swing when walking
   fill(colors.skin[0], colors.skin[1], colors.skin[2]);
-  let armSwing = walking ? floor(sin(frameCount * 0.15 + c.x) * 1.5) : 0;
-  rect(-5, -7 + armSwing, 1, 4);
-  rect(4, -7 - armSwing, 1, 4);
+  let armSwing = walking ? floor(sin(frameCount * 0.15 + (c.walkBobPhase || 0)) * 1.5) : 0;
+  if (!walking && c.idleAnim === 2) {
+    // Arms crossed pose
+    rect(-4, -6, 1, 3);
+    rect(3, -6, 1, 3);
+    rect(-3, -5, 6, 1);
+  } else {
+    rect(-5, -7 + armSwing, 1, 4);
+    rect(4, -7 - armSwing, 1, 4);
+  }
 
   // Neck
   fill(colors.skin[0], colors.skin[1], colors.skin[2]);
@@ -864,7 +877,11 @@ function drawOneCitizen(c) {
   pop();
 }
 
-function getCitizenColors(variant, lvl) {
+function getCitizenColors(variant, lvl, citizen) {
+  // Use per-citizen variety if available
+  if (citizen && citizen.skinTone) {
+    return { skin: citizen.skinTone, tunic: citizen.tunicColor || [150, 140, 120], hair: citizen.hairColor || [70, 60, 45] };
+  }
   let skin = [195, 165, 130];
 
   if (lvl <= 8) {
@@ -899,14 +916,21 @@ function updateNPCAnim(npc) {
   if (a.blinkFrame > 0) a.blinkFrame--;
 }
 
-// Vesta auto-collects crystals from nearby nodes every ~10 seconds
+// Vesta auto-collects crystals — scales with hearts
 function updateVestaCrystalGathering(dt) {
   if (!state.vesta || !state.crystalNodes) return;
   let v = state.vesta;
+  let h = v.hearts || 0;
+  // Scale interval and max crystals with favor
+  let interval, maxCrystals;
+  if (h >= 4)      { interval = 240; maxCrystals = 8; }
+  else if (h >= 2) { interval = 300; maxCrystals = 5; }
+  else             { interval = 360; maxCrystals = 3; }
+
   if (!v._crystalTimer) v._crystalTimer = 0;
   v._crystalTimer -= dt;
   if (v._crystalTimer > 0) return;
-  v._crystalTimer = 600; // ~10 seconds at 60fps
+  v._crystalTimer = interval;
 
   // Find nearest charged crystal node — island-wide range (Vesta walks to them)
   let best = null, bestD = 9999;
@@ -917,11 +941,12 @@ function updateVestaCrystalGathering(dt) {
   });
 
   if (best) {
-    let amount = min(best.charge, 3);
+    let amount = min(best.charge, maxCrystals);
     best.charge -= amount;
     state.crystals += amount;
-    addFloatingText(w2sX(v.x), w2sY(v.y) - 25, '+' + amount + ' Crystal', '#88ddff');
-    spawnParticles(v.x, v.y - 10, 'harvest', 4);
+    addFloatingText(w2sX(v.x), w2sY(v.y) - 25, '+' + amount + ' Crystal', '#88ffff');
+    spawnParticles(v.x, v.y - 10, 'harvest', 6 + h);
+    spawnParticles(v.x, v.y - 14, 'sundust', 3);
     if (best.charge <= 0) best.respawnTimer = 1800; // 30 second respawn
   }
 }
@@ -1305,7 +1330,7 @@ function drawNewNPC(npc, type) {
   // Relationship tier label
   if (typeof getRelationshipTier === 'function' && npc.hearts > 0) {
     let _tier = getRelationshipTier(npc.hearts);
-    fill(color(_tier.color)); textAlign(CENTER, CENTER); textSize(5);
+    fill(color(_tier.color)); textAlign(CENTER, CENTER); textSize(9);
     text(_tier.title, 0, -28);
     textAlign(LEFT, TOP);
   }
@@ -1320,17 +1345,31 @@ function drawNewNPC(npc, type) {
     fill(0, 0, 0, 160);
     rect(-70, -52, 140, 22, 4);
     fill(255);
-    textSize(6);
+    textSize(9);
     textAlign(CENTER, CENTER);
     let line = npc.currentLine >= 0 ? npc.currentLine : '';
     text(line, 0, -41);
     textAlign(LEFT, TOP);
   }
 
+  // Ambient idle chatter — NPC mutters when player is at medium range
+  if (npc.dialogTimer <= 0 && pd > 80 && pd < 200) {
+    if (!npc._ambientTimer) npc._ambientTimer = floor(random(300, 600));
+    npc._ambientTimer--;
+    if (npc._ambientTimer <= 0) {
+      npc._ambientTimer = floor(random(400, 900));
+      let ambLine = getAmbientLine(type);
+      if (ambLine) {
+        npc.currentLine = ambLine;
+        npc.dialogTimer = 150;
+      }
+    }
+  }
+
   // [E] prompt when player is near — with warm glow
   if (pd < 80 && npc.dialogTimer <= 0 && !(type === 'marcus' && !npc.present)) {
     fill(255, 230, 180, 180);
-    textSize(7);
+    textSize(10);
     textAlign(CENTER, CENTER);
     text('[E]', 0, -27);
     textAlign(LEFT, TOP);
@@ -1405,4 +1444,411 @@ function updateAllNPCSchedules(dt) {
   if (state.marcus && state.marcus.present !== false) updateNPCSchedule(state.marcus, 'marcus', dt);
   if (state.vesta) updateNPCSchedule(state.vesta, 'vesta', dt);
   if (state.felix) updateNPCSchedule(state.felix, 'felix', dt);
+}
+
+// ─── NPC AMBIENT DIALOGUE ────────────────────────────────────────────────
+// Time-of-day / weather / season sensitive idle chatter per NPC.
+// Returns a string. Called by drawNewNPC idle-bubble system.
+
+const NPC_AMBIENT_LINES = {
+  livia: {
+    morning: [
+      "The soil smells rich today. Good for planting.",
+      "I like the quiet before the forum fills up.",
+      "Morning dew on the olives... perfect harvest weather.",
+      "Did you sleep well? The island was restless last night.",
+    ],
+    noon: [
+      "The forum is lively. I traded honey for cloth earlier.",
+      "Sun's high. The crops are drinking deep.",
+      "Have you eaten? I made bread this morning.",
+      "Everyone seems in good spirits today.",
+    ],
+    evening: [
+      "The sunset colors remind me of the mainland. Almost.",
+      "Time to bring the tools in. A good day's work.",
+      "The cats always gather at dusk. They know something we don't.",
+      "I can smell someone cooking fish. Jealous.",
+    ],
+    night: [
+      "The stars here are brighter than anywhere I've lived.",
+      "Rest well. Tomorrow the fields need us again.",
+      "I hear the waves... soothing, isn't it?",
+      "Quiet nights like this make it all worth it.",
+    ],
+    rain: [
+      "Rain! The crops will love this.",
+      "I don't mind getting wet. The plants need it more than I need dry hair.",
+    ],
+    storm: [
+      "Stay safe... the wind is fierce tonight.",
+      "Storms pass. They always do.",
+    ],
+    winter: [
+      "Brr. I miss the summer warmth already.",
+      "The frost makes the island look like crystal.",
+    ],
+    summer: [
+      "The heat! I could drink the whole well dry.",
+      "Summer grapes are coming in beautifully.",
+    ],
+  },
+  marcus: {
+    morning: [
+      "Another day, another shipment to check.",
+      "The harbor looks clear. Good sailing weather.",
+      "I counted the inventory twice. Old habit.",
+      "Morning drills keep the mind sharp.",
+    ],
+    noon: [
+      "Midday trade is the busiest. Everyone wants something.",
+      "The merchants from the east had interesting wares today.",
+      "I've seen three new faces at the port already.",
+      "Market prices are holding steady. For now.",
+    ],
+    evening: [
+      "The port quiets down at dusk. I like it.",
+      "A drink wouldn't hurt. Don't look at me like that.",
+      "Ships look beautiful heading into the sunset.",
+      "I'm recounting the day's trades. Give me a moment.",
+    ],
+    night: [
+      "Guard duty used to be my life. Some habits stay.",
+      "The sea at night... you can hear it thinking.",
+      "I should sleep. I won't, but I should.",
+      "Quiet. Good. I don't trust quiet, but good.",
+    ],
+    rain: [
+      "Rain keeps the amateur sailors in port. Fine by me.",
+      "Wet wood warps. I'll need to check the crates.",
+    ],
+    storm: [
+      "I've sailed through worse. Not by much though.",
+      "Storms remind me of Fortuna's last night. Forget I said that.",
+    ],
+    winter: [
+      "Cold makes the joints ache. Getting old is a battle.",
+      "Trade slows in winter. Time to repair gear.",
+    ],
+    summer: [
+      "Hot enough to cook fish on the dock stones.",
+      "Summer winds are good for trade routes.",
+    ],
+  },
+  vesta: {
+    morning: [
+      "The flame burned steady all night. A blessing.",
+      "Morning prayers are the sweetest. The island listens.",
+      "I gathered herbs at dawn. The dew makes them potent.",
+      "The crystals hum louder in the morning. Do you hear it?",
+    ],
+    noon: [
+      "The sun feeds the sacred flame. They are sisters.",
+      "I walked the garden. Every plant is a small prayer.",
+      "The temple steps are warm. Sit with me a moment.",
+      "Midday is for contemplation. The soul needs stillness.",
+    ],
+    evening: [
+      "The twilight hour is sacred. Between light and dark.",
+      "I'll tend the flame through dusk. It needs me most now.",
+      "The stars are waking. I greet each one by name.",
+      "Evening blessings for the island. And for you.",
+    ],
+    night: [
+      "The flame never sleeps. Neither do I, some nights.",
+      "Night is when the island dreams. I guard those dreams.",
+      "The crystals glow brightest in darkness. Like hope.",
+      "Sleep, little one. The gods keep watch.",
+    ],
+    rain: [
+      "Rain is the sky weeping with joy. Or sadness. Both are sacred.",
+      "The flame dances differently in the rain. Watch closely.",
+    ],
+    storm: [
+      "Even storms are blessings, if you know where to look.",
+      "The temple has stood through worse. Faith is stronger than stone.",
+    ],
+    winter: [
+      "Winter teaches patience. The earth rests. So should we.",
+      "I keep the flame higher in winter. The island needs warmth.",
+    ],
+    summer: [
+      "The island is most alive in summer. Can you feel it breathing?",
+      "Summer festivals honor the gods of abundance.",
+    ],
+  },
+  felix: {
+    morning: [
+      "I found a new inscription near the ruins. Fascinating!",
+      "Minerva brought me a mouse this morning. Charming.",
+      "Morning light reveals details the afternoon hides.",
+      "I've been cataloguing since dawn. Three new entries!",
+    ],
+    noon: [
+      "Lunch? Oh. I forgot again. Thank you for reminding me.",
+      "The forum has interesting acoustics. I measured them.",
+      "Did you know the island tilts 0.3 degrees eastward at noon?",
+      "I'm cross-referencing two texts. They contradict beautifully.",
+    ],
+    evening: [
+      "The sunset casts long shadows on the ruins. Perfect for measuring.",
+      "I should organize my scrolls. Tomorrow. Definitely tomorrow.",
+      "The cats have claimed my reading chair again.",
+      "Evening is when the best ideas arrive uninvited.",
+    ],
+    night: [
+      "I can't sleep when there's a puzzle unsolved.",
+      "The stars are a map. I'm still learning to read them.",
+      "Minerva is nocturnal. She keeps me company.",
+      "One more chapter... I've been saying that for three hours.",
+    ],
+    rain: [
+      "Perfect weather for reading! The ink stays wet longer too.",
+      "Rain on old stone makes the carvings easier to trace.",
+    ],
+    storm: [
+      "I hope my scrolls are covered! ...They're not, are they.",
+      "Storms erode the ruins. I document what I can before it's lost.",
+    ],
+    winter: [
+      "Cold hands make poor writing. I need fingerless gloves.",
+      "The library is warmest in winter. Come visit.",
+    ],
+    summer: [
+      "Summer heat warps parchment. I keep the scrolls in shade.",
+      "I found a beetle in my manuscript. New species? Probably not.",
+    ],
+  },
+};
+
+function getAmbientLine(npcName) {
+  let lines = NPC_AMBIENT_LINES[npcName];
+  if (!lines) return null;
+
+  let hour = (state.time || 0) / 60;
+  let weather = (state.weather && state.weather.type) ? state.weather.type : 'clear';
+  let season = (typeof getSeason === 'function') ? getSeason() : 0;
+
+  // Weather-specific lines take priority sometimes
+  if ((weather === 'rain' || weather === 'storm') && lines[weather] && random() < 0.4) {
+    let pool = lines[weather];
+    return pool[floor(random(pool.length))];
+  }
+
+  // Season-specific lines sometimes
+  let seasonKey = ['spring', 'summer', 'autumn', 'winter'][season];
+  if (lines[seasonKey] && random() < 0.25) {
+    let pool = lines[seasonKey];
+    return pool[floor(random(pool.length))];
+  }
+
+  // Time-of-day lines
+  let timeKey;
+  if (hour >= 6 && hour < 12) timeKey = 'morning';
+  else if (hour >= 12 && hour < 18) timeKey = 'noon';
+  else if (hour >= 18 && hour < 22) timeKey = 'evening';
+  else timeKey = 'night';
+
+  let pool = lines[timeKey];
+  if (!pool || pool.length === 0) return null;
+  return pool[floor(random(pool.length))];
+}
+
+// ─── NPC REACTION TRIGGERS ───────────────────────────────────────────────
+// Call these from sketch.js hooks (placeBuilding, harvest, combat return).
+// They make nearby NPCs comment on player actions.
+
+function triggerNPCReaction(eventType, wx, wy) {
+  if (typeof state === 'undefined') return;
+  let npcs = [];
+  if (state.npc) npcs.push({ npc: state.npc, name: 'livia' });
+  if (state.marcus && state.marcus.present !== false) npcs.push({ npc: state.marcus, name: 'marcus' });
+  if (state.vesta) npcs.push({ npc: state.vesta, name: 'vesta' });
+  if (state.felix) npcs.push({ npc: state.felix, name: 'felix' });
+
+  npcs.forEach(entry => {
+    let n = entry.npc;
+    if (n.dialogTimer > 0) return; // already talking
+    let d = dist(n.x, n.y, wx || state.player.x, wy || state.player.y);
+    if (d > 150) return; // too far to notice
+    let line = getNPCReactionLine(entry.name, eventType);
+    if (!line) return;
+    n.currentLine = line;
+    n.dialogTimer = 180;
+  });
+}
+
+const NPC_REACTIONS = {
+  livia: {
+    build:   ["Another building! The island grows.", "Good placement. I like it.", "You're shaping this place into a real home."],
+    harvest: ["A fine harvest! The soil loves you.", "Look at that yield! Well done.", "The crops are thriving under your care."],
+    combat:  ["You're back safe. That's what matters.", "Rest now. The farm can wait.", "I worried. Don't make a habit of it."],
+    fish:    ["Fresh catch? I'll cook tonight!", "The sea provides. As always."],
+  },
+  marcus: {
+    build:   ["Sturdy work. I approve.", "Infrastructure. Smart investment.", "That'll hold. I've seen worse on the mainland."],
+    harvest: ["Good. We can trade the surplus.", "The colonies need food. This helps.", "Not bad for a farmer."],
+    combat:  ["How were the odds? ...You look intact.", "Victory looks good on you, soldier.", "Report. How many? Never mind, you're alive."],
+    fish:    ["Bring it to market. I know buyers.", "Fish means trade. Trade means gold."],
+  },
+  vesta: {
+    build:   ["The island welcomes new structures. I feel it.", "You build with purpose. The gods notice.", "A blessing on this new creation."],
+    harvest: ["The earth gives freely to those who tend it.", "A bountiful harvest. The island rewards faith.", "Each seed planted is a prayer answered."],
+    combat:  ["The flame flickered while you fought. It sensed danger.", "You returned. The island still needs you.", "I prayed for your safety. It seems it worked."],
+    fish:    ["The sea offered a gift. Accept it with gratitude.", "Poseidon smiles today."],
+  },
+  felix: {
+    build:   ["Interesting architecture! Can I document the design?", "Another data point for my urban development chapter.", "The cats need more structures to lounge on. This helps."],
+    harvest: ["Fascinating growth patterns this season.", "I should note the yield in my agricultural appendix.", "Minerva approves. She was eyeing the grain."],
+    combat:  ["You survived! Excellent. I have questions about the terrain.", "Welcome back! Did you find any inscriptions out there?", "Combat data is hard to gather firsthand. Thank you for... surviving."],
+    fish:    ["Is that a new species? Let me see! ...No, just a bass.", "I'm writing a fish taxonomy chapter. May I sketch it?"],
+  },
+};
+
+function getNPCReactionLine(npcName, eventType) {
+  let reactions = NPC_REACTIONS[npcName];
+  if (!reactions || !reactions[eventType]) return null;
+  let pool = reactions[eventType];
+  return pool[floor(random(pool.length))];
+}
+
+// ─── NPC MEMORY ──────────────────────────────────────────────────────────
+// NPCs remember recent interactions and reference them in dialogue.
+// Stored in state.npcMemory = { livia: [{type, day, detail}], ... }
+
+function initNPCMemory() {
+  if (!state.npcMemory) state.npcMemory = {};
+  ['livia', 'marcus', 'vesta', 'felix'].forEach(name => {
+    if (!state.npcMemory[name]) state.npcMemory[name] = [];
+  });
+}
+
+function addNPCMemory(npcName, type, detail) {
+  initNPCMemory();
+  let mem = state.npcMemory[npcName];
+  if (!mem) return;
+  mem.push({ type: type, day: state.day || 0, detail: detail || '' });
+  // Keep only last 10 memories per NPC
+  if (mem.length > 10) mem.shift();
+}
+
+function getMemoryGreeting(npcName) {
+  initNPCMemory();
+  let mem = state.npcMemory[npcName];
+  if (!mem || mem.length === 0) return null;
+  let today = state.day || 0;
+
+  // Check most recent memory first
+  for (let i = mem.length - 1; i >= 0; i--) {
+    let m = mem[i];
+    let daysAgo = today - m.day;
+    if (daysAgo < 0 || daysAgo > 3) continue; // only reference last 3 days
+
+    let when = daysAgo === 0 ? 'earlier' : daysAgo === 1 ? 'yesterday' : 'the other day';
+
+    if (m.type === 'gift') {
+      return NPC_MEMORY_LINES[npcName] && NPC_MEMORY_LINES[npcName].gift
+        ? NPC_MEMORY_LINES[npcName].gift.replace('{when}', when)
+        : null;
+    }
+    if (m.type === 'chat') {
+      return NPC_MEMORY_LINES[npcName] && NPC_MEMORY_LINES[npcName].chat
+        ? NPC_MEMORY_LINES[npcName].chat.replace('{when}', when)
+        : null;
+    }
+    if (m.type === 'quest') {
+      return NPC_MEMORY_LINES[npcName] && NPC_MEMORY_LINES[npcName].quest
+        ? NPC_MEMORY_LINES[npcName].quest.replace('{when}', when)
+        : null;
+    }
+  }
+  return null;
+}
+
+const NPC_MEMORY_LINES = {
+  livia: {
+    gift: "That gift you brought {when}... it made my day. Truly.",
+    chat: "I was thinking about what we talked about {when}.",
+    quest: "You helped me {when}. I haven't forgotten.",
+  },
+  marcus: {
+    gift: "That thing you gave me {when}. Not bad. ...Don't let it go to your head.",
+    chat: "About what you said {when}... I've been mulling it over.",
+    quest: "You came through {when}. Respect.",
+  },
+  vesta: {
+    gift: "The offering you brought {when} pleased the spirits. I could feel it.",
+    chat: "Our conversation {when} stayed with me. The island listened too.",
+    quest: "Your devotion {when} was noted by the gods. And by me.",
+  },
+  felix: {
+    gift: "I catalogued that gift from {when}. Page 47, subsection C. I'm joking. Page 48.",
+    chat: "I wrote down our discussion from {when}. Fascinating insights!",
+    quest: "That task you completed {when}... I'm still analyzing the implications.",
+  },
+};
+
+// ─── AMBIENT CITIZEN VARIETY ─────────────────────────────────────────────
+// Adds skin tone, clothing color, and speed variation to citizens.
+
+const CITIZEN_SKIN_TONES = [
+  [225, 195, 160],  // fair
+  [195, 165, 130],  // olive (original)
+  [175, 140, 100],  // tan
+  [150, 115, 80],   // bronze
+  [120, 85, 60],    // dark
+  [210, 180, 145],  // warm light
+];
+
+const CITIZEN_TUNIC_HUES = [
+  [140, 120, 80],   // earthy brown
+  [120, 90, 70],    // dark brown
+  [160, 140, 100],  // sand
+  [100, 120, 90],   // olive green
+  [130, 100, 110],  // muted plum
+  [110, 110, 130],  // dusty blue
+  [150, 130, 90],   // wheat
+  [140, 80, 70],    // terracotta
+];
+
+const CITIZEN_HAIR_COLORS = [
+  [80, 60, 40],     // brown
+  [50, 35, 25],     // dark brown
+  [110, 85, 55],    // light brown
+  [40, 30, 20],     // near-black
+  [160, 130, 80],   // sandy blonde
+  [90, 65, 45],     // auburn
+];
+
+function spawnVariedCitizen() {
+  let waypoints = getCitizenWaypoints();
+  let wp = waypoints[floor(random(waypoints.length))];
+  let x = wp.x + random(-12, 12);
+  let y = wp.y + random(-8, 8);
+  if (!isOnIsland(x, y)) { x = wp.x; y = wp.y; }
+  let variants = ['farmer', 'merchant', 'soldier', 'priest'];
+  let weights = state.islandLevel <= 8 ? [4,2,1,1] : state.islandLevel <= 17 ? [2,3,2,1] : [1,2,3,2];
+  let totalW = weights.reduce((a,b) => a+b, 0);
+  let roll = floor(random(totalW));
+  let vi = 0, acc = 0;
+  for (let i = 0; i < weights.length; i++) { acc += weights[i]; if (roll < acc) { vi = i; break; } }
+
+  let skinIdx = floor(random(CITIZEN_SKIN_TONES.length));
+  let tunicIdx = floor(random(CITIZEN_TUNIC_HUES.length));
+  let hairIdx = floor(random(CITIZEN_HAIR_COLORS.length));
+
+  state.citizens.push({
+    x: x, y: y, vx: 0, vy: 0,
+    variant: variants[vi],
+    facing: random() > 0.5 ? 1 : -1,
+    state: 'idle',
+    timer: floor(random(60, 300)),
+    speed: 0.3 + random(0.4),
+    targetX: x, targetY: y,
+    skinTone: CITIZEN_SKIN_TONES[skinIdx],
+    tunicColor: CITIZEN_TUNIC_HUES[tunicIdx],
+    hairColor: CITIZEN_HAIR_COLORS[hairIdx],
+    idleAnim: floor(random(3)), // 0=stand, 1=look around, 2=arms crossed
+    walkBobPhase: random(TWO_PI),
+  });
 }

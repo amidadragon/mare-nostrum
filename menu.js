@@ -75,6 +75,7 @@ function drawMenuScreen() {
   // ─── SUB-SCREENS ───
   if (gameScreen === 'settings') { drawSettingsPanel(1); return; }
   if (gameScreen === 'credits') { drawCreditsPanel(1); return; }
+  if (gameScreen === 'howtoplay') { drawHowToPlayPanel(1); return; }
 
   // ═══════════════════════════════════════════════════════════════════════
   // ─── ANIMATED SCENE OVERLAY — brings the background art to life ───
@@ -462,6 +463,7 @@ function drawMenuScreen() {
   let items = [];
   if (hasSave) items.push('CONTINUE VOYAGE');
   items.push('NEW VOYAGE');
+  items.push('HOW TO PLAY');
   items.push('SETTINGS', 'CREDITS');
   let itemCount = items.length;
 
@@ -531,9 +533,17 @@ function drawMenuScreen() {
   textSize(8);
   // Parchment strip behind version
   fill(20, 15, 10, floor(100 * botAlpha));
-  rect(w / 2 - 100, h - 26, 200, 16, 2);
+  rect(w / 2 - 120, h - 28, 240, 20, 2);
+  // Version number — prominent
+  fill(170, 145, 100, floor(160 * botAlpha));
+  text('v1.0.0', w / 2 - 85, h - 18);
+  // Tagline
   fill(130, 115, 85, floor(100 * botAlpha));
-  text('v1.0  -  Shipwrecked. Sunlit. Reborn.', w / 2, h - 18);
+  text('Shipwrecked.  Sunlit.  Reborn.', w / 2 + 10, h - 18);
+  // Copyright line
+  fill(90, 80, 60, floor(70 * botAlpha));
+  textSize(7);
+  text('Aurelian Forge Studio  2025', w / 2, h - 8);
 
   // ─── FADES ───
   if (aF < 1) { fill(0, 0, 0, floor(255 * (1 - aF))); rect(0, 0, w, h); }
@@ -587,8 +597,8 @@ function _drawSectionDivider(cx, y, divW) {
 
 function drawSettingsPanel(fadeA) {
   let w = width, h = height;
-  let panW = 280, panH = 480;
-  let px = floor(w / 2 - panW / 2), py = floor(h * 0.18);
+  let panW = 280, panH = 540;
+  let px = floor(w / 2 - panW / 2), py = floor(h * 0.14);
 
   fill(0, 0, 0, 170); rect(0, 0, w, h);
 
@@ -651,10 +661,29 @@ function drawSettingsPanel(fadeA) {
     }
   }
 
-  _drawSectionDivider(w / 2, py + 210, panW - 50);
+  // Music source toggle: Lyre / Recorded
+  if (snd) {
+    let msY = py + 196;
+    let isRec = typeof gameSettings !== 'undefined' && gameSettings.musicSource === 'recorded';
+    fill(190, 170, 130, 220); textSize(10);
+    textAlign(RIGHT, CENTER);
+    text('Music', w / 2 + 12, msY);
+    textAlign(CENTER, CENTER);
+    let msbx = floor(w / 2 + 24);
+    // Lyre button
+    fill(isRec ? 35 : 65, isRec ? 30 : 55, isRec ? 22 : 35); rect(msbx, msY - 7, 32, 14, 2);
+    fill(isRec ? 130 : 220, isRec ? 115 : 200, isRec ? 85 : 120); textSize(8);
+    text('Lyre', msbx + 16, msY);
+    // Recorded button
+    fill(isRec ? 65 : 35, isRec ? 55 : 30, isRec ? 35 : 22); rect(msbx + 36, msY - 7, 46, 14, 2);
+    fill(isRec ? 220 : 130, isRec ? 200 : 115, isRec ? 120 : 85); textSize(8);
+    text('Recorded', msbx + 59, msY);
+  }
+
+  _drawSectionDivider(w / 2, py + 218, panW - 50);
 
   // ─── ACCESSIBILITY ───
-  let accY = py + 228;
+  let accY = py + 236;
 
   // Screen Shake toggle
   let shakeOn = gameSettings.screenShake;
@@ -704,6 +733,20 @@ function drawSettingsPanel(fadeA) {
 
   _drawSectionDivider(w / 2, accY + 16, panW - 50);
 
+  // High Contrast toggle
+  accY += 28;
+  let hcOn = gameSettings.highContrast || false;
+  fill(190, 170, 130, 220); textSize(10);
+  textAlign(RIGHT, CENTER);
+  text('High Contrast', w / 2 + 12, accY);
+  textAlign(CENTER, CENTER);
+  let hcbx = floor(w / 2 + 40), hcby = accY - 7;
+  fill(30, 25, 18); rect(hcbx, hcby, 28, 14, 2);
+  fill(hcOn ? 75 : 40, hcOn ? 120 : 50, hcOn ? 45 : 35, 230);
+  rect(hcbx + 1, hcby + 1, 26, 12, 2);
+  fill(220, 210, 180); rect(hcbx + (hcOn ? 16 : 2), hcby + 2, 10, 10, 1);
+  fill(240, 230, 200, 80); rect(hcbx + (hcOn ? 17 : 3), hcby + 3, 8, 2);
+
   // Delete save — red tinted with hover
   let delY = accY + 36;
   let delHover = mouseX > w/2 - 60 && mouseX < w/2 + 60 && mouseY > delY - 10 && mouseY < delY + 12;
@@ -747,6 +790,7 @@ function drawCreditsPanel(fadeA) {
   let sections = [
     { type: 'title', text: 'MARE NOSTRUM' },
     { type: 'sub', text: 'Shipwrecked. Sunlit. Reborn.' },
+    { type: 'sub', text: 'v1.0.0' },
     { type: 'gap' },
     { type: 'divider' },
     { type: 'gap' },
@@ -756,10 +800,12 @@ function drawCreditsPanel(fadeA) {
     { type: 'divider' },
     { type: 'gap' },
     { type: 'heading', text: 'CODE' },
-    { type: 'line', text: 'Game Engine & Systems' },
-    { type: 'line', text: 'Narrative Engine' },
-    { type: 'line', text: 'Combat & Economy' },
-    { type: 'line', text: 'Procedural Audio' },
+    { type: 'line', text: 'Game Engine & State Machine' },
+    { type: 'line', text: 'Narrative & Quest Engine' },
+    { type: 'line', text: 'Combat System & Skill Trees' },
+    { type: 'line', text: 'Economy & Trade Routes' },
+    { type: 'line', text: 'Procedural Audio Engine' },
+    { type: 'line', text: 'Island Generation & Terrain' },
     { type: 'gap' },
     { type: 'divider' },
     { type: 'gap' },
@@ -767,30 +813,56 @@ function drawCreditsPanel(fadeA) {
     { type: 'line', text: 'Hand-placed pixel primitives' },
     { type: 'line', text: 'Every tree, tile and toga' },
     { type: 'line', text: 'drawn with rect() and ellipse()' },
+    { type: 'line', text: 'No sprites. No textures. Just code.' },
     { type: 'gap' },
     { type: 'divider' },
     { type: 'gap' },
     { type: 'heading', text: 'AUDIO' },
-    { type: 'line', text: 'Procedural lyre system' },
-    { type: 'line', text: 'Ambient wind & waves' },
-    { type: 'line', text: 'All synthesized — zero samples' },
+    { type: 'line', text: 'Procedural lyre — 6 musical modes' },
+    { type: 'line', text: '25+ synthesized sound effects' },
+    { type: 'line', text: 'Dynamic ambient soundscapes' },
+    { type: 'line', text: 'All generated in real-time' },
+    { type: 'line', text: 'Zero audio files. Pure synthesis.' },
+    { type: 'gap' },
+    { type: 'divider' },
+    { type: 'gap' },
+    { type: 'heading', text: 'NARRATIVE' },
+    { type: 'line', text: '10-chapter quest chain' },
+    { type: 'line', text: '4 unique companions' },
+    { type: 'line', text: '4 NPC storylines' },
+    { type: 'line', text: 'Seasonal festivals & events' },
     { type: 'gap' },
     { type: 'divider' },
     { type: 'gap' },
     { type: 'heading', text: 'ENGINE' },
     { type: 'line', text: 'p5.js — Processing for the web' },
     { type: 'line', text: 'p5.sound — Web Audio API' },
+    { type: 'line', text: 'PWA — plays offline' },
+    { type: 'gap' },
+    { type: 'divider' },
+    { type: 'gap' },
+    { type: 'heading', text: 'BUILT WITH' },
+    { type: 'line', text: 'Claude by Anthropic' },
+    { type: 'line', text: 'Boundless stubbornness' },
+    { type: 'line', text: 'Far too much coffee' },
     { type: 'gap' },
     { type: 'divider' },
     { type: 'gap' },
     { type: 'heading', text: 'SPECIAL THANKS' },
     { type: 'line', text: 'The p5.js community' },
-    { type: 'line', text: 'Ancient Rome, for the inspiration' },
+    { type: 'line', text: 'Ancient Rome, for the vibes' },
+    { type: 'line', text: 'The Mediterranean Sea' },
+    { type: 'line', text: 'Everyone who believed' },
     { type: 'line', text: 'You, for playing' },
     { type: 'gap' },
     { type: 'gap' },
+    { type: 'divider' },
+    { type: 'gap' },
     { type: 'thanks', text: 'Thank you for playing' },
     { type: 'sub', text: 'Mare Nostrum endures.' },
+    { type: 'gap' },
+    { type: 'gap' },
+    { type: 'gap' },
   ];
 
   textAlign(CENTER, CENTER);
@@ -890,11 +962,130 @@ function drawCreditsPanel(fadeA) {
   textAlign(LEFT, TOP);
 }
 
+// ─── HOW TO PLAY PANEL ──────────────────────────────────────────────────
+function drawHowToPlayPanel(fadeA) {
+  let w = width, h = height;
+  let panW = 340, panH = 440;
+  let px = floor(w / 2 - panW / 2), py = floor(h / 2 - panH / 2);
+
+  fill(0, 0, 0, 185); rect(0, 0, w, h);
+
+  _drawPanelFrame(px, py, panW, panH);
+
+  // Title
+  textAlign(CENTER, CENTER);
+  textFont('Cinzel, Georgia, serif');
+  fill(255, 210, 80, 18); textSize(14);
+  text('HOW TO PLAY', w / 2, py + 18);
+  fill(244, 213, 141); textSize(13);
+  text('HOW TO PLAY', w / 2, py + 18);
+
+  stroke(180, 150, 55, 80); strokeWeight(1);
+  line(w / 2 - 50, py + 30, w / 2 + 50, py + 30);
+  noStroke();
+
+  let cy = py + 48;
+  let leftX = px + 18;
+  let rightX = px + panW - 18;
+  textAlign(LEFT, TOP); textStyle(NORMAL);
+
+  // Helper for section headers
+  let drawHead = function(label, y) {
+    textSize(10); textStyle(BOLD);
+    fill(220, 195, 60);
+    text(label, leftX, y);
+    textStyle(NORMAL);
+    return y + 16;
+  };
+
+  // Helper for key-action pairs
+  let drawKey = function(key, action, y) {
+    textSize(9);
+    fill(200, 185, 140);
+    text(key, leftX + 4, y);
+    fill(160, 150, 120);
+    text(action, leftX + 85, y);
+    return y + 14;
+  };
+
+  cy = drawHead('MOVEMENT', cy);
+  cy = drawKey('WASD / Arrows', 'Move around', cy);
+  cy = drawKey('Click on ground', 'Move to location', cy);
+  cy += 6;
+
+  cy = drawHead('INTERACTION', cy);
+  cy = drawKey('E', 'Interact / Gather / Talk', cy);
+  cy = drawKey('F', 'Fish (near water)', cy);
+  cy = drawKey('B', 'Open build menu', cy);
+  cy = drawKey('J', 'Open journal', cy);
+  cy = drawKey('TAB', 'Open codex', cy);
+  cy = drawKey('1-5', 'Hotbar shortcuts', cy);
+  cy += 6;
+
+  cy = drawHead('COMBAT', cy);
+  cy = drawKey('Click', 'Attack (when enemies near)', cy);
+  cy = drawKey('1-3', 'Combat skills (unlockable)', cy);
+  cy = drawKey('SPACE', 'Dodge roll', cy);
+  cy += 6;
+
+  cy = drawHead('GENERAL', cy);
+  cy = drawKey('ESC', 'Pause / Menu', cy);
+  cy = drawKey('M', 'Toggle music', cy);
+  cy = drawKey('P', 'Screenshot mode', cy);
+  cy += 10;
+
+  _drawSectionDivider(w / 2, cy, panW - 60);
+  cy += 14;
+
+  // Tips section
+  cy = drawHead('TIPS', cy);
+  textSize(8); fill(170, 155, 125);
+  let tips = [
+    'Explore the wreck beach for supplies before sailing.',
+    'Talk to NPCs daily — they have quests and gifts.',
+    'Build farms early. Food is life.',
+    'The cat brings gifts. Be patient.',
+    'Repair the trireme to explore distant islands.',
+    'Check the journal for your current objectives.',
+  ];
+  for (let tip of tips) {
+    fill(140, 120, 70, 120);
+    text('\u2022', leftX + 2, cy);
+    fill(170, 155, 125);
+    text(tip, leftX + 12, cy);
+    cy += 13;
+  }
+
+  // Back button
+  let backY = py + panH - 22;
+  let bkH = mouseX > w/2 - 40 && mouseX < w/2 + 40 && mouseY > backY - 8 && mouseY < backY + 10;
+  textAlign(CENTER, CENTER);
+  if (bkH) {
+    fill(255, 220, 100, 15); rect(w/2 - 45, backY - 10, 90, 22, 2);
+    fill(244, 220, 140);
+    stroke(244, 213, 141, 80); strokeWeight(1);
+    line(w/2 - 25, backY + 8, w/2 + 25, backY + 8);
+    noStroke();
+  } else {
+    fill(180, 165, 120);
+  }
+  textSize(11); text('[ BACK ]', w / 2, backY);
+  textAlign(LEFT, TOP);
+}
+
 // ─── MENU CLICK HANDLER ─────────────────────────────────────────────────
 function handleMenuClick() {
+  if (gameScreen === 'howtoplay') {
+    let panH = 440, py = floor(height / 2 - panH / 2);
+    let backY = py + panH - 22;
+    if (mouseX > width/2 - 40 && mouseX < width/2 + 40 && mouseY > backY - 8 && mouseY < backY + 10) {
+      gameScreen = 'menu'; return;
+    }
+    return;
+  }
   if (gameScreen === 'settings') {
-    let py = floor(height * 0.18);
-    let panH = 480;
+    let py = floor(height * 0.14);
+    let panH = 540;
     let fsY = py + 50;
     let tbx = floor(width / 2 + 40), tby = fsY - 7;
     if (mouseX > tbx && mouseX < tbx + 28 && mouseY > tby && mouseY < tby + 14) {
@@ -903,18 +1094,27 @@ function handleMenuClick() {
       return;
     }
     if (snd) {
-      let sliderY = py + 80, sliderW = 120, slX = floor(width / 2 + 10);
+      let sliderY = py + 88, sliderW = 120, slX = floor(width / 2 + 10);
       let keys = ['master', 'sfx', 'ambient', 'music'];
       for (let k of keys) {
         if (mouseX >= slX - 4 && mouseX <= slX + sliderW + 4 && mouseY >= sliderY - 10 && mouseY <= sliderY + 10) {
           snd.setVolume(k, constrain((mouseX - slX) / sliderW, 0, 1));
           return;
         }
-        sliderY += 24;
+        sliderY += 28;
       }
+    // Music source toggle
+    let msY = py + 196;
+    let msbx = floor(width / 2 + 24);
+    if (mouseX > msbx && mouseX < msbx + 32 && mouseY > msY - 8 && mouseY < msY + 8) {
+      gameSettings.musicSource = 'lyre'; _saveSettings(); return;
+    }
+    if (mouseX > msbx + 36 && mouseX < msbx + 82 && mouseY > msY - 8 && mouseY < msY + 8) {
+      gameSettings.musicSource = 'recorded'; _saveSettings(); return;
+    }
     }
     // Screen Shake toggle
-    let accY = py + 228;
+    let accY = py + 236;
     let stbx = floor(width / 2 + 40), stby = accY - 7;
     if (mouseX > stbx && mouseX < stbx + 28 && mouseY > stby && mouseY < stby + 14) {
       gameSettings.screenShake = !gameSettings.screenShake;
@@ -929,6 +1129,13 @@ function handleMenuClick() {
     }
     if (mouseX > fsbx + 40 && mouseX < fsbx + 76 && mouseY > accY - 8 && mouseY < accY + 8) {
       gameSettings.fontScale = 1.25; _saveSettings(); return;
+    }
+    // High Contrast toggle
+    accY += 28;
+    let hcbx = floor(width / 2 + 40), hcby = accY - 7;
+    if (mouseX > hcbx && mouseX < hcbx + 28 && mouseY > hcby && mouseY < hcby + 14) {
+      gameSettings.highContrast = !gameSettings.highContrast;
+      _saveSettings(); return;
     }
     // Delete save
     accY += 28;
@@ -955,8 +1162,9 @@ function handleMenuClick() {
   let hasSave = !!localStorage.getItem('sunlitIsles_save');
   let btns = [];
   if (hasSave) btns.push('load');
-  btns.push('new', 'settings', 'credits');
+  btns.push('new', 'howtoplay', 'settings', 'credits');
   let action = btns[menuHover];
+  if (action === 'howtoplay') { gameScreen = 'howtoplay'; return; }
   if (action === 'settings') { gameScreen = 'settings'; return; }
   if (action === 'credits') { gameScreen = 'credits'; return; }
   // Fade to black, then execute action

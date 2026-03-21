@@ -169,12 +169,12 @@ function drawVulcanEntities() {
     let hasMats = (state.ironOre || 0) >= 10 && (state.titanBone || 0) >= 5;
     let altarSX = w2sX(v.isleX), altarSY = w2sY(v.isleY);
     fill(hasMats ? 255 : 180, hasMats ? 200 : 120, 80, 200);
-    textAlign(CENTER); textSize(7);
+    textAlign(CENTER); textSize(10);
     text(hasMats ? '[E] Forge Blade of Vulcan' : '[E] Forge (10 iron + 5 titan bone)', altarSX, altarSY - 52);
     textAlign(LEFT);
   }
   for (let hs of v.hotSprings) { let hx = w2sX(hs.x), hy = w2sY(hs.y); fill(40, 140, 120, 150); ellipse(hx, hy, 40, 28); fill(60, 180, 150, 100); ellipse(hx, hy, 28, 18); fill(200, 220, 220, 30 + sin(frameCount * 0.08 + hs.healTimer) * 15); for (let s = 0; s < 3; s++) { let sy = hy - 10 - s * 8 - (frameCount * 0.3 + s * 20) % 25, sx = hx + sin(frameCount * 0.05 + s) * 5; ellipse(sx, sy, 10 + s * 3, 6 + s * 2); } }
-  for (let n of v.obsidianNodes) { if (n.collected) continue; let nx = w2sX(n.x), ny = w2sY(n.y); fill(15, 12, 20); rect(floor(nx) - 5, floor(ny) - 8, 10, 12); fill(30, 25, 40); rect(floor(nx) - 3, floor(ny) - 6, 6, 8); fill(80, 70, 120, 150); rect(floor(nx) - 1, floor(ny) - 5, 2, 3); if (dist(p.x, p.y, n.x, n.y) < 30) { fill(255, 200, 150, 180); textAlign(CENTER); textSize(7); text('[E] Mine Obsidian', nx, ny - 14); } }
+  for (let n of v.obsidianNodes) { if (n.collected) continue; let nx = w2sX(n.x), ny = w2sY(n.y); fill(15, 12, 20); rect(floor(nx) - 5, floor(ny) - 8, 10, 12); fill(30, 25, 40); rect(floor(nx) - 3, floor(ny) - 6, 6, 8); fill(80, 70, 120, 150); rect(floor(nx) - 1, floor(ny) - 5, 2, 3); if (dist(p.x, p.y, n.x, n.y) < 30) { fill(255, 200, 150, 180); textAlign(CENTER); textSize(10); text('[E] Mine Obsidian', nx, ny - 14); } }
   for (let sv of v.smokeVents) { let sx = w2sX(sv.x), sy = w2sY(sv.y); for (let s = 0; s < 4; s++) { let t = (frameCount * 0.5 + sv.phase * 60 + s * 15) % 60, al = max(0, 40 - t); fill(100, 90, 80, al); ellipse(sx + sin(t * 0.1 + sv.phase) * 4, sy - t * 0.6, 8 + t * 0.3, 5 + t * 0.2); } }
   for (let a of v.ambientAsh) { let al = min(100, a.life); fill(120, 100, 80, al); rect(floor(w2sX(a.x)), floor(w2sY(a.y)), floor(a.size), floor(a.size)); }
   // Volcano Heart — subtle glowing crack in the ground (no label)
@@ -196,10 +196,10 @@ function drawVulcanDistantLabel() {
   if (state.vulcan.active) return; let v = state.vulcan, sx = w2sX(v.isleX), sy = w2sY(v.isleY);
   let minY = max(height * 0.06, height * 0.25 - horizonOffset) + 10; sy = max(sy, minY);
   if (sx < -400 || sx > width + 400 || sy < -400 || sy > height + 400) return;
-  push(); noStroke(); fill(255, 100, 60, 140 + sin(frameCount * 0.03) * 30); textSize(9); textAlign(CENTER); textStyle(ITALIC); text('Isle of Vulcan', sx, sy + v.isleRY + 18); textStyle(NORMAL); fill(200, 120, 80, 100); textSize(6); text('Volcanic Forge', sx, sy + v.isleRY + 28); pop();
+  push(); noStroke(); fill(255, 100, 60, 140 + sin(frameCount * 0.03) * 30); textSize(9); textAlign(CENTER); textStyle(ITALIC); text('Isle of Vulcan', sx, sy + v.isleRY + 18); textStyle(NORMAL); fill(200, 120, 80, 100); textSize(9); text('Volcanic Forge', sx, sy + v.isleRY + 28); pop();
 }
 function drawVulcanHUD() {
-  if (!state.vulcan.active) return; push(); fill(20, 16, 12, 220); noStroke(); rect(8, 8, 160, 50, 4); fill(255, 100, 50); textSize(10); textAlign(LEFT); text('ISLE OF VULCAN', 16, 24); fill(200, 180, 150); textSize(8); text('HP: ' + state.player.hp + '/' + state.player.maxHp, 16, 38); fill(80, 60, 120); text('Obsidian: ' + state.obsidian, 16, 50); fill(180, 160, 120, 150); textSize(7); textAlign(CENTER); text('Walk south to dock', width / 2, height - 20); pop();
+  if (!state.vulcan.active) return; push(); fill(20, 16, 12, 220); noStroke(); rect(8, 8, 160, 50, 4); fill(255, 100, 50); textSize(10); textAlign(LEFT); text('ISLE OF VULCAN', 16, 24); fill(200, 180, 150); textSize(11); text('HP: ' + state.player.hp + '/' + state.player.maxHp, 16, 38); fill(80, 60, 120); text('Obsidian: ' + state.obsidian, 16, 50); fill(180, 160, 120, 150); textSize(10); textAlign(CENTER); text('Walk south to dock', width / 2, height - 20); pop();
 }
 
 // ======================================================================
@@ -344,8 +344,8 @@ function drawHyperboreIsland() {
 }
 function drawHyperboreEntities() {
   let h = state.hyperborea; if (!h.active) return; let p = state.player; noStroke();
-  for (let r of h.frozenRuins) { let rx = w2sX(r.x), ry = w2sY(r.y); fill(r.looted ? 120 : 160, r.looted ? 130 : 165, r.looted ? 140 : 180); rect(floor(rx) - 12, floor(ry) - 8, 24, 14); fill(180, 220, 245, 120); rect(floor(rx) - 10, floor(ry) - 10, 20, 4); fill(170, 180, 195); rect(floor(rx) - 10, floor(ry) - 16, 3, 10); rect(floor(rx) + 7, floor(ry) - 16, 3, 10); if (!r.looted && dist(p.x, p.y, r.x, r.y) < 35) { fill(200, 230, 255, 180); textAlign(CENTER); textSize(7); text('[E] Search Ruins', rx, ry - 22); } }
-  for (let n of h.frostNodes) { if (n.collected) continue; let nx = w2sX(n.x), ny = w2sY(n.y); let shimmer = sin(frameCount * 0.08 + n.x * 0.1) * 30; fill(120, 200, 255, 200); triangle(nx, ny - 12, nx - 5, ny + 4, nx + 5, ny + 4); fill(160, 230, 255, 150 + shimmer); triangle(nx + 1, ny - 8, nx - 3, ny + 2, nx + 4, ny + 2); fill(140, 220, 255, 30 + shimmer * 0.3); ellipse(nx, ny, 18, 18); if (dist(p.x, p.y, n.x, n.y) < 28) { fill(200, 240, 255, 180); textAlign(CENTER); textSize(7); text('[E] Harvest Frost Crystal', nx, ny - 18); } }
+  for (let r of h.frozenRuins) { let rx = w2sX(r.x), ry = w2sY(r.y); fill(r.looted ? 120 : 160, r.looted ? 130 : 165, r.looted ? 140 : 180); rect(floor(rx) - 12, floor(ry) - 8, 24, 14); fill(180, 220, 245, 120); rect(floor(rx) - 10, floor(ry) - 10, 20, 4); fill(170, 180, 195); rect(floor(rx) - 10, floor(ry) - 16, 3, 10); rect(floor(rx) + 7, floor(ry) - 16, 3, 10); if (!r.looted && dist(p.x, p.y, r.x, r.y) < 35) { fill(200, 230, 255, 180); textAlign(CENTER); textSize(10); text('[E] Search Ruins', rx, ry - 22); } }
+  for (let n of h.frostNodes) { if (n.collected) continue; let nx = w2sX(n.x), ny = w2sY(n.y); let shimmer = sin(frameCount * 0.08 + n.x * 0.1) * 30; fill(120, 200, 255, 200); triangle(nx, ny - 12, nx - 5, ny + 4, nx + 5, ny + 4); fill(160, 230, 255, 150 + shimmer); triangle(nx + 1, ny - 8, nx - 3, ny + 2, nx + 4, ny + 2); fill(140, 220, 255, 30 + shimmer * 0.3); ellipse(nx, ny, 18, 18); if (dist(p.x, p.y, n.x, n.y) < 28) { fill(200, 240, 255, 180); textAlign(CENTER); textSize(10); text('[E] Harvest Frost Crystal', nx, ny - 18); } }
   for (let pg of h.penguins) { let px = w2sX(pg.x), py = w2sY(pg.y); let wobble = pg.state === 'waddle' ? sin(frameCount * 0.2) * 1 : 0; fill(20, 22, 30); rect(floor(px + wobble) - 4, floor(py) - 6, 8, 10); fill(230, 240, 250); rect(floor(px + wobble) - 2, floor(py) - 4, 4, 7); fill(20, 22, 30); rect(floor(px + wobble) - 3, floor(py) - 9, 6, 5); fill(255); rect(floor(px + wobble) - 2, floor(py) - 8, 1, 1); rect(floor(px + wobble) + 1, floor(py) - 8, 1, 1); fill(230, 160, 40); rect(floor(px + wobble) - 1, floor(py) - 7, 2, 1); }
   for (let s of h.snowflakes) { let al = min(180, s.life); fill(240, 248, 255, al); rect(floor(w2sX(s.x)), floor(w2sY(s.y)), floor(s.size), floor(s.size)); }
   // Frozen obelisk
@@ -372,13 +372,13 @@ function drawHyperboreEntities() {
       ellipse(ox, oy - 24, 40 + iceGlow * 10, 80 + iceGlow * 20);
       if (dist(p.x, p.y, h.frozenObelisk.x, h.frozenObelisk.y) < 60) {
         fill(200, 240, 255, 180);
-        textAlign(CENTER); textSize(7);
+        textAlign(CENTER); textSize(10);
         text('[E] Study the Obelisk', ox, oy - 72);
         textAlign(LEFT);
       }
     } else if (!allLooted && !ritualDone && dist(p.x, p.y, h.frozenObelisk.x, h.frozenObelisk.y) < 40) {
       fill(160, 210, 255, 160);
-      textAlign(CENTER); textSize(7);
+      textAlign(CENTER); textSize(10);
       text('Search all frozen ruins first', ox, oy - 72);
       textAlign(LEFT);
     }
@@ -398,10 +398,10 @@ function drawHyperboreEntities() {
 function drawHyperboreDistantLabel() {
   if (state.hyperborea.active) return; let h = state.hyperborea, sx = w2sX(h.isleX), sy = w2sY(h.isleY); let minY = max(height * 0.06, height * 0.25 - horizonOffset) + 10; sy = max(sy, minY);
   if (sx < -400 || sx > width + 400 || sy < -400 || sy > height + 400) return;
-  push(); noStroke(); fill(140, 200, 240, 140 + sin(frameCount * 0.03) * 30); textSize(9); textAlign(CENTER); textStyle(ITALIC); text('Hyperborea', sx, sy + h.isleRY + 18); textStyle(NORMAL); fill(120, 180, 220, 100); textSize(6); text('Frozen Wastes', sx, sy + h.isleRY + 28); pop();
+  push(); noStroke(); fill(140, 200, 240, 140 + sin(frameCount * 0.03) * 30); textSize(9); textAlign(CENTER); textStyle(ITALIC); text('Hyperborea', sx, sy + h.isleRY + 18); textStyle(NORMAL); fill(120, 180, 220, 100); textSize(9); text('Frozen Wastes', sx, sy + h.isleRY + 28); pop();
 }
 function drawHyperboreHUD() {
-  if (!state.hyperborea.active) return; push(); fill(20, 30, 45, 220); noStroke(); rect(8, 8, 160, 50, 4); fill(140, 200, 255); textSize(10); textAlign(LEFT); text('HYPERBOREA', 16, 24); fill(200, 220, 240); textSize(8); text('HP: ' + state.player.hp + '/' + state.player.maxHp, 16, 38); fill(120, 200, 255); text('Frost Crystals: ' + state.frostCrystal, 16, 50); fill(180, 210, 240, 150); textSize(7); textAlign(CENTER); text('Walk south to dock', width / 2, height - 20); pop();
+  if (!state.hyperborea.active) return; push(); fill(20, 30, 45, 220); noStroke(); rect(8, 8, 160, 50, 4); fill(140, 200, 255); textSize(10); textAlign(LEFT); text('HYPERBOREA', 16, 24); fill(200, 220, 240); textSize(11); text('HP: ' + state.player.hp + '/' + state.player.maxHp, 16, 38); fill(120, 200, 255); text('Frost Crystals: ' + state.frostCrystal, 16, 50); fill(180, 210, 240, 150); textSize(10); textAlign(CENTER); text('Walk south to dock', width / 2, height - 20); pop();
 }
 
 // ======================================================================
@@ -410,7 +410,7 @@ function drawHyperboreHUD() {
 function isOnPlentyIsland(wx, wy) { let pl = state.plenty; let ex = (wx - pl.isleX) / (pl.isleRX - 20); let ey = (wy - pl.isleY) / (pl.isleRY - 20); return ex * ex + ey * ey < 1; }
 function enterPlenty() {
   let pl = state.plenty, p = state.player; pl.active = true; pl.returnX = p.x; pl.returnY = p.y;
-  state.rowing.active = false; p.x = pl.isleX; p.y = pl.isleY + pl.isleRY * 0.85 - 20; p.vx = 0; p.vy = 0; p.hp = p.maxHp;
+  state.rowing.active = false; p.x = pl.isleX; p.y = pl.isleY + pl.isleRY * 0.85 - 20; p.vx = 0; p.vy = 0; p.hp = p.maxHp; p.invincTimer = 60;
   cam.x = p.x; cam.y = p.y; camSmooth.x = p.x; camSmooth.y = p.y;
   if (pl.phase === 'unexplored') { pl.phase = 'explored';
     let treeTypes = ['mango', 'banana', 'coconut', 'fig'];
@@ -538,8 +538,8 @@ function drawPlentyIsland() {
 }
 function drawPlentyEntities() {
   let pl = state.plenty; if (!pl.active) return; let p = state.player; noStroke();
-  for (let t of pl.fruitTrees) { let tx = w2sX(t.x), ty = w2sY(t.y); fill(90, 60, 30); rect(floor(tx) - 3, floor(ty) - 4, 6, 16); let sway = sin(frameCount * 0.02 + t.x * 0.01) * 2; fill(30, 140, 50); ellipse(tx + sway, ty - 12, 22, 18); fill(40, 160, 60, 180); ellipse(tx + sway - 3, ty - 14, 14, 12); if (t.fruit) { let fCol = t.type === 'mango' ? [255, 180, 40] : t.type === 'banana' ? [255, 230, 50] : t.type === 'coconut' ? [160, 120, 70] : [100, 50, 120]; fill(fCol[0], fCol[1], fCol[2]); rect(floor(tx + sway) - 2, floor(ty) - 8, 4, 4); rect(floor(tx + sway) + 4, floor(ty) - 10, 3, 3); } if (t.fruit && dist(p.x, p.y, t.x, t.y) < 28) { fill(200, 255, 200, 180); textAlign(CENTER); textSize(7); text('[E] Pick ' + t.type, tx, ty - 24); } }
-  for (let n of pl.spiceNodes) { if (n.collected) continue; let nx = w2sX(n.x), ny = w2sY(n.y); fill(40, 100, 35); ellipse(nx, ny, 14, 10); fill(200, 50, 30); rect(floor(nx) - 2, floor(ny) - 3, 2, 2); rect(floor(nx) + 1, floor(ny) - 2, 2, 2); rect(floor(nx) - 1, floor(ny) - 5, 2, 2); if (dist(p.x, p.y, n.x, n.y) < 25) { fill(255, 220, 150, 180); textAlign(CENTER); textSize(7); text('[E] Gather Exotic Spices', nx, ny - 14); } }
+  for (let t of pl.fruitTrees) { let tx = w2sX(t.x), ty = w2sY(t.y); fill(90, 60, 30); rect(floor(tx) - 3, floor(ty) - 4, 6, 16); let sway = sin(frameCount * 0.02 + t.x * 0.01) * 2; fill(30, 140, 50); ellipse(tx + sway, ty - 12, 22, 18); fill(40, 160, 60, 180); ellipse(tx + sway - 3, ty - 14, 14, 12); if (t.fruit) { let fCol = t.type === 'mango' ? [255, 180, 40] : t.type === 'banana' ? [255, 230, 50] : t.type === 'coconut' ? [160, 120, 70] : [100, 50, 120]; fill(fCol[0], fCol[1], fCol[2]); rect(floor(tx + sway) - 2, floor(ty) - 8, 4, 4); rect(floor(tx + sway) + 4, floor(ty) - 10, 3, 3); } if (t.fruit && dist(p.x, p.y, t.x, t.y) < 28) { fill(200, 255, 200, 180); textAlign(CENTER); textSize(10); text('[E] Pick ' + t.type, tx, ty - 24); } }
+  for (let n of pl.spiceNodes) { if (n.collected) continue; let nx = w2sX(n.x), ny = w2sY(n.y); fill(40, 100, 35); ellipse(nx, ny, 14, 10); fill(200, 50, 30); rect(floor(nx) - 2, floor(ny) - 3, 2, 2); rect(floor(nx) + 1, floor(ny) - 2, 2, 2); rect(floor(nx) - 1, floor(ny) - 5, 2, 2); if (dist(p.x, p.y, n.x, n.y) < 25) { fill(255, 220, 150, 180); textAlign(CENTER); textSize(10); text('[E] Gather Exotic Spices', nx, ny - 14); } }
   for (let pr of pl.parrots) { let px = w2sX(pr.x), py = w2sY(pr.y); let wing = sin(frameCount * 0.15 + pr.x) * 3; fill(pr.color); rect(floor(px) - 3, floor(py) - 2, 6, 4); rect(floor(px) - 5 - abs(wing), floor(py) - 1, 3, 2); rect(floor(px) + 3 + abs(wing), floor(py) - 1, 3, 2); rect(floor(px) - 2, floor(py) - 4, 4, 3); fill(0); rect(floor(px), floor(py) - 3, 1, 1); fill(255, 200, 50); rect(floor(px) + 2, floor(py) - 3, 2, 1); }
   for (let wf of pl.waterfalls) { let wx = w2sX(wf.x), wy = w2sY(wf.y); for (let i = 0; i < wf.h; i += 3) { let shimmer = sin(frameCount * 0.12 + i * 0.3) * 2; fill(120, 210, 230, 150); rect(floor(wx + shimmer) - 3, floor(wy) + i, 6, 3); } fill(80, 180, 200, 80); ellipse(wx, wy + wf.h + 5, 20, 10); }
   for (let l of pl.fallingLeaves) { let al = min(150, l.life); let cols = [[60, 140, 40], [80, 160, 50], [50, 120, 30]]; let c = cols[floor(l.rot * 10) % 3]; fill(c[0], c[1], c[2], al); push(); translate(w2sX(l.x), w2sY(l.y)); rotate(l.rot); rect(-floor(l.size / 2), -1, floor(l.size), 2); pop(); }
@@ -548,10 +548,10 @@ function drawPlentyEntities() {
 function drawPlentyDistantLabel() {
   if (state.plenty.active) return; let pl = state.plenty, sx = w2sX(pl.isleX), sy = w2sY(pl.isleY); let minY = max(height * 0.06, height * 0.25 - horizonOffset) + 10; sy = max(sy, minY);
   if (sx < -400 || sx > width + 400 || sy < -400 || sy > height + 400) return;
-  push(); noStroke(); fill(60, 200, 80, 140 + sin(frameCount * 0.03) * 30); textSize(9); textAlign(CENTER); textStyle(ITALIC); text('Isle of Plenty', sx, sy + pl.isleRY + 18); textStyle(NORMAL); fill(80, 180, 60, 100); textSize(6); text('Tropical Paradise', sx, sy + pl.isleRY + 28); pop();
+  push(); noStroke(); fill(60, 200, 80, 140 + sin(frameCount * 0.03) * 30); textSize(9); textAlign(CENTER); textStyle(ITALIC); text('Isle of Plenty', sx, sy + pl.isleRY + 18); textStyle(NORMAL); fill(80, 180, 60, 100); textSize(9); text('Tropical Paradise', sx, sy + pl.isleRY + 28); pop();
 }
 function drawPlentyHUD() {
-  if (!state.plenty.active) return; push(); fill(15, 30, 12, 220); noStroke(); rect(8, 8, 160, 50, 4); fill(80, 220, 80); textSize(10); textAlign(LEFT); text('ISLE OF PLENTY', 16, 24); fill(200, 230, 180); textSize(8); text('HP: ' + state.player.hp + '/' + state.player.maxHp, 16, 38); fill(200, 160, 60); text('Exotic Spices: ' + state.exoticSpices, 16, 50); fill(150, 200, 120, 150); textSize(7); textAlign(CENTER); text('Walk south to dock', width / 2, height - 20); pop();
+  if (!state.plenty.active) return; push(); fill(15, 30, 12, 220); noStroke(); rect(8, 8, 160, 50, 4); fill(80, 220, 80); textSize(10); textAlign(LEFT); text('ISLE OF PLENTY', 16, 24); fill(200, 230, 180); textSize(11); text('HP: ' + state.player.hp + '/' + state.player.maxHp, 16, 38); fill(200, 160, 60); text('Exotic Spices: ' + state.exoticSpices, 16, 50); fill(150, 200, 120, 150); textSize(10); textAlign(CENTER); text('Walk south to dock', width / 2, height - 20); pop();
 }
 
 // ======================================================================
@@ -694,10 +694,10 @@ function drawNecropolisIsland() {
 }
 function drawNecropolisEntities() {
   let n = state.necropolis; if (!n.active) return; let p = state.player; noStroke();
-  for (let t of n.tombs) { let tx = w2sX(t.x), ty = w2sY(t.y); fill(t.looted ? 60 : 80, t.looted ? 55 : 72, t.looted ? 65 : 85); rect(floor(tx) - 12, floor(ty) - 6, 24, 12); fill(t.looted ? 70 : 90, t.looted ? 65 : 82, t.looted ? 75 : 95); rect(floor(tx) - 10, floor(ty) - 8, 20, 4); fill(100, 90, 110); rect(floor(tx) - 1, floor(ty) - 5, 2, 6); rect(floor(tx) - 3, floor(ty) - 3, 6, 2); if (t.trapped && !t.looted) { fill(180, 60, 60, 100 + sin(frameCount * 0.1) * 30); rect(floor(tx) + 8, floor(ty) - 4, 3, 3); } if (!t.looted && dist(p.x, p.y, t.x, t.y) < 30) { fill(200, 180, 220, 180); textAlign(CENTER); textSize(7); text('[E] Open Tomb', tx, ty - 14); } }
+  for (let t of n.tombs) { let tx = w2sX(t.x), ty = w2sY(t.y); fill(t.looted ? 60 : 80, t.looted ? 55 : 72, t.looted ? 65 : 85); rect(floor(tx) - 12, floor(ty) - 6, 24, 12); fill(t.looted ? 70 : 90, t.looted ? 65 : 82, t.looted ? 75 : 95); rect(floor(tx) - 10, floor(ty) - 8, 20, 4); fill(100, 90, 110); rect(floor(tx) - 1, floor(ty) - 5, 2, 6); rect(floor(tx) - 3, floor(ty) - 3, 6, 2); if (t.trapped && !t.looted) { fill(180, 60, 60, 100 + sin(frameCount * 0.1) * 30); rect(floor(tx) + 8, floor(ty) - 4, 3, 3); } if (!t.looted && dist(p.x, p.y, t.x, t.y) < 30) { fill(200, 180, 220, 180); textAlign(CENTER); textSize(10); text('[E] Open Tomb', tx, ty - 14); } }
   for (let sk of n.skeletons) { if (sk.hp <= 0) continue; let sx = w2sX(sk.x), sy = w2sY(sk.y); let flash = sk.flashTimer > 0; fill(flash ? 255 : 200, flash ? 200 : 190, flash ? 180 : 170); rect(floor(sx) - 4, floor(sy) - 3, 8, 8); fill(flash ? 240 : 180, flash ? 180 : 170, flash ? 160 : 150); for (let r = 0; r < 3; r++) rect(floor(sx) - 3, floor(sy) - 1 + r * 2, 6, 1); fill(flash ? 255 : 220, flash ? 220 : 210, flash ? 200 : 195); rect(floor(sx) - 4, floor(sy) - 9, 8, 7); fill(180, 60, 255, 150 + sin(frameCount * 0.1 + sk.x) * 50); rect(floor(sx) - 3, floor(sy) - 7, 2, 2); rect(floor(sx) + 1, floor(sy) - 7, 2, 2); fill(190, 180, 170); rect(floor(sx) - 3, floor(sy) - 3, 6, 2); fill(200, 190, 175); rect(floor(sx) - 6, floor(sy) - 2, 2, 6); rect(floor(sx) + 4, floor(sy) - 2, 2, 6); if (sk.hp < sk.maxHp) { fill(40, 40, 40, 180); rect(floor(sx) - 10, floor(sy) - 14, 20, 3); fill(180, 60, 60); rect(floor(sx) - 10, floor(sy) - 14, floor(20 * sk.hp / sk.maxHp), 3); } }
-  for (let g of n.ghostNPCs) { let gx = w2sX(g.x), gy = w2sY(g.y); let hover = sin(frameCount * 0.04 + g.x * 0.1) * 3; fill(140, 120, 200, 60 + sin(frameCount * 0.05 + g.x) * 20); ellipse(gx, gy + hover - 4, 14, 18); fill(180, 160, 230, 80); ellipse(gx, gy + hover - 10, 10, 10); fill(200, 200, 255, 100); rect(floor(gx) - 2, floor(gy + hover) - 11, 1, 1); rect(floor(gx) + 1, floor(gy + hover) - 11, 1, 1); fill(180, 160, 220, 120); textAlign(CENTER); textSize(6); text(g.name, gx, gy + hover - 18); if (dist(p.x, p.y, g.x, g.y) < 35) { fill(200, 180, 240, 180); textSize(7); text('[E] Speak', gx, gy + hover - 24); } }
-  for (let sn of n.soulNodes) { if (sn.collected) continue; let sx = w2sX(sn.x), sy = w2sY(sn.y); let pulse = sin(frameCount * 0.06 + sn.x * 0.1) * 0.3 + 0.7; fill(140, 60, 200, 80 * pulse); ellipse(sx, sy, 16, 16); fill(180, 100, 255, 120 * pulse); ellipse(sx, sy, 8, 8); fill(220, 180, 255, 60 * pulse); ellipse(sx, sy, 4, 4); if (dist(p.x, p.y, sn.x, sn.y) < 25) { fill(200, 160, 255, 180); textAlign(CENTER); textSize(7); text('[E] Absorb Soul Essence', sx, sy - 14); } }
+  for (let g of n.ghostNPCs) { let gx = w2sX(g.x), gy = w2sY(g.y); let hover = sin(frameCount * 0.04 + g.x * 0.1) * 3; fill(140, 120, 200, 60 + sin(frameCount * 0.05 + g.x) * 20); ellipse(gx, gy + hover - 4, 14, 18); fill(180, 160, 230, 80); ellipse(gx, gy + hover - 10, 10, 10); fill(200, 200, 255, 100); rect(floor(gx) - 2, floor(gy + hover) - 11, 1, 1); rect(floor(gx) + 1, floor(gy + hover) - 11, 1, 1); fill(180, 160, 220, 120); textAlign(CENTER); textSize(9); text(g.name, gx, gy + hover - 18); if (dist(p.x, p.y, g.x, g.y) < 35) { fill(200, 180, 240, 180); textSize(10); text('[E] Speak', gx, gy + hover - 24); } }
+  for (let sn of n.soulNodes) { if (sn.collected) continue; let sx = w2sX(sn.x), sy = w2sY(sn.y); let pulse = sin(frameCount * 0.06 + sn.x * 0.1) * 0.3 + 0.7; fill(140, 60, 200, 80 * pulse); ellipse(sx, sy, 16, 16); fill(180, 100, 255, 120 * pulse); ellipse(sx, sy, 8, 8); fill(220, 180, 255, 60 * pulse); ellipse(sx, sy, 4, 4); if (dist(p.x, p.y, sn.x, sn.y) < 25) { fill(200, 160, 255, 180); textAlign(CENTER); textSize(10); text('[E] Absorb Soul Essence', sx, sy - 14); } }
   for (let w of n.wisps) { let al = min(80, w.life * 0.5); fill(140, 100, 200, al); ellipse(w2sX(w.x), w2sY(w.y), w.size, w.size); fill(180, 140, 240, al * 0.5); ellipse(w2sX(w.x), w2sY(w.y), w.size * 1.5, w.size * 1.5); }
   // Room 13 — faint XIII scratched into the mausoleum floor (barely visible)
   let r13X = w2sX(n.isleX), r13Y = w2sY(n.isleY - 5);
@@ -707,7 +707,7 @@ function drawNecropolisEntities() {
     // Tiny XIII scratched near mausoleum entrance — only visible up close
     if (dist(p.x, p.y, n.isleX, n.isleY - 5) < 60) {
       fill(120, 80, 160, floor(25 * r13Pulse));
-      textAlign(CENTER); textSize(5);
+      textAlign(CENTER); textSize(9);
       text('XIII', r13X, r13Y + 8);
       textAlign(LEFT);
     }
@@ -719,10 +719,10 @@ function drawNecropolisEntities() {
 function drawNecropolisDistantLabel() {
   if (state.necropolis.active) return; let n = state.necropolis, sx = w2sX(n.isleX), sy = w2sY(n.isleY); let minY = max(height * 0.06, height * 0.25 - horizonOffset) + 10; sy = max(sy, minY);
   if (sx < -400 || sx > width + 400 || sy < -400 || sy > height + 400) return;
-  push(); noStroke(); fill(160, 100, 200, 140 + sin(frameCount * 0.03) * 30); textSize(9); textAlign(CENTER); textStyle(ITALIC); text('Necropolis', sx, sy + n.isleRY + 18); textStyle(NORMAL); fill(130, 80, 170, 100); textSize(6); text('City of the Dead', sx, sy + n.isleRY + 28); pop();
+  push(); noStroke(); fill(160, 100, 200, 140 + sin(frameCount * 0.03) * 30); textSize(9); textAlign(CENTER); textStyle(ITALIC); text('Necropolis', sx, sy + n.isleRY + 18); textStyle(NORMAL); fill(130, 80, 170, 100); textSize(9); text('City of the Dead', sx, sy + n.isleRY + 28); pop();
 }
 function drawNecropolisHUD() {
-  if (!state.necropolis.active) return; push(); fill(20, 12, 30, 220); noStroke(); rect(8, 8, 160, 60, 4); fill(180, 100, 240); textSize(10); textAlign(LEFT); text('NECROPOLIS', 16, 24); fill(200, 180, 210); textSize(8); text('HP: ' + state.player.hp + '/' + state.player.maxHp, 16, 38); fill(160, 100, 220); text('Soul Essence: ' + state.soulEssence, 16, 50); let alive = state.necropolis.skeletons.filter(s => s.hp > 0).length; fill(200, 80, 80); text('Skeletons: ' + alive, 16, 62); fill(160, 140, 180, 150); textSize(7); textAlign(CENTER); text('Walk south to dock', width / 2, height - 20); pop();
+  if (!state.necropolis.active) return; push(); fill(20, 12, 30, 220); noStroke(); rect(8, 8, 160, 60, 4); fill(180, 100, 240); textSize(10); textAlign(LEFT); text('NECROPOLIS', 16, 24); fill(200, 180, 210); textSize(11); text('HP: ' + state.player.hp + '/' + state.player.maxHp, 16, 38); fill(160, 100, 220); text('Soul Essence: ' + state.soulEssence, 16, 50); let alive = state.necropolis.skeletons.filter(s => s.hp > 0).length; fill(200, 80, 80); text('Skeletons: ' + alive, 16, 62); fill(160, 140, 180, 150); textSize(10); textAlign(CENTER); text('Walk south to dock', width / 2, height - 20); pop();
 }
 
 // ======================================================================
@@ -1079,7 +1079,7 @@ function drawIceMirrorOverlay() {
 
   // Subtitle
   fill(120, 180, 220, floor(160 * alpha));
-  textSize(7);
+  textSize(10);
   text('Your reflection speaks truths frozen in time', cx, cy - poolH / 2 + 44);
 
   // Journey stats — poetic format
@@ -1125,11 +1125,11 @@ function drawIceMirrorOverlay() {
   let endAlpha = max(0, min(1, (t - 320) / 60)) * alpha;
   if (endAlpha > 0) {
     fill(160, 210, 240, floor(120 * endAlpha));
-    textSize(7); textStyle(ITALIC);
+    textSize(10); textStyle(ITALIC);
     text('The ice remembers what the living forget.', cx, cy + poolH / 2 - 40);
     textStyle(NORMAL);
     fill(100, 160, 200, floor(80 * endAlpha));
-    textSize(6);
+    textSize(9);
     text('SECRET FOUND: Ice Mirror of Hyperborea', cx, cy + poolH / 2 - 22);
   }
 
@@ -1176,7 +1176,7 @@ function drawRoom13Overlay() {
   textStyle(NORMAL);
 
   // Lore tablet text — revealed line by line
-  textSize(8);
+  textSize(11);
   let lore = [
     'Here lies the secret of the Thirteenth',
     'Tomb of the Necropolis — a chamber',
@@ -1205,10 +1205,10 @@ function drawRoom13Overlay() {
     textSize(9);
     text('Obtained: Death Shroud', cx, cy + 110);
     fill(180, 120, 255, floor(160 * rewardAlpha));
-    textSize(7);
+    textSize(10);
     text('+5 Soul Essence', cx, cy + 126);
     fill(120, 100, 160, floor(100 * rewardAlpha));
-    textSize(6);
+    textSize(9);
     text('SECRET FOUND: Room XIII of the Necropolis', cx, cy + 142);
   }
 
@@ -1258,7 +1258,7 @@ function drawVolcanoHeartOverlay() {
   textStyle(NORMAL);
 
   // Description
-  textSize(8);
+  textSize(11);
   let desc = [
     'Deep beneath the crater,',
     'where obsidian meets frost,',
@@ -1283,7 +1283,7 @@ function drawVolcanoHeartOverlay() {
     textSize(9);
     text('+10 Max HP  |  +3 Crystals', cx, cy + 100);
     fill(200, 120, 60, floor(100 * rewardAlpha));
-    textSize(6);
+    textSize(9);
     text('SECRET FOUND: Heart of Vulcan', cx, cy + 118);
   }
 

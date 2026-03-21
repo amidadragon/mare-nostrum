@@ -825,18 +825,91 @@ function drawIsland() {
       fill(88, 78, 62);
       rect(hx - 3, hy - 2, 5 + floor(sin(ha * 5.3) * 2), 3);
       rect(hx, hy - 4, 3, 2);
+      // Barnacle clusters on headland rocks
+      if (sin(ha * 7.7) > 0.3) {
+        fill(105, 98, 82, 90);
+        rect(hx + 1, hy, 2, 1);
+        rect(hx - 1, hy + 1, 1, 1);
+      }
     }
   }
-  // East tide pools (angle -0.3 to PI/4)
+  // East tide pools (angle -0.3 to PI/4) — expanded with organisms
   {
     let tRX = iw * 0.455;
     let tRY = ih * 0.190;
-    for (let ta = -0.3; ta < PI / 4; ta += 0.22) {
+    for (let ta = -0.3; ta < PI / 4; ta += 0.18) {
       let tx = ix + cos(ta) * tRX + sin(ta * 4.1) * 3;
       let ty = (iy - 14) + sin(ta) * tRY + cos(ta * 3.3) * 2;
-      fill(45, 100, 110, 80);
+      // Pool water — animated shimmer
+      let poolShimmer = sin(frameCount * 0.04 + ta * 5) * 0.3 + 0.7;
+      fill(35, 90, 105, 80 * poolShimmer);
+      ellipse(tx, ty, 9 + sin(ta * 7) * 2, 4);
+      fill(45, 100, 110, 70);
       ellipse(tx, ty, 7 + sin(ta * 7) * 2, 3);
+      // Tiny starfish / anemone in pools
+      if (sin(ta * 11.3) > 0.2) {
+        fill(180, 80, 60, 100);
+        rect(floor(tx) - 1, floor(ty), 2, 2);
+      }
+      // Sea urchin
+      if (cos(ta * 9.1) > 0.6) {
+        fill(30, 25, 40, 90);
+        ellipse(tx + 2, ty - 1, 3, 2);
+      }
     }
+  }
+  // South beach — sea foam patches (animated wash)
+  {
+    let sfRX = iw * 0.468;
+    let sfRY = ih * 0.198;
+    let foamT = frameCount * 0.015;
+    for (let sa = PI * 0.3; sa < PI * 0.8; sa += 0.12) {
+      let wave = sin(foamT + sa * 6) * 0.5 + 0.5;
+      let sfx = ix + cos(sa) * (sfRX + wave * 4);
+      let sfy = (iy - 14) + sin(sa) * (sfRY + wave * 2);
+      fill(255, 255, 255, 20 + wave * 25);
+      ellipse(sfx, sfy, 6 + wave * 4, 2);
+      // Bubble dots in foam
+      if (wave > 0.6) {
+        fill(255, 255, 255, 35);
+        rect(floor(sfx) + 2, floor(sfy), 1, 1);
+        rect(floor(sfx) - 1, floor(sfy) - 1, 1, 1);
+      }
+    }
+  }
+  // Beach debris — driftwood, shells, seaweed
+  {
+    let debrisSeeds = [
+      { a: PI * 0.35, type: 'driftwood' },
+      { a: PI * 0.55, type: 'shell' },
+      { a: PI * 0.70, type: 'seaweed' },
+      { a: PI * 0.20, type: 'shell' },
+      { a: PI * 0.85, type: 'driftwood' },
+      { a: 0.15, type: 'seaweed' },
+    ];
+    let dRX = iw * 0.458;
+    let dRY = ih * 0.192;
+    debrisSeeds.forEach(d => {
+      let dx = floor(ix + cos(d.a) * dRX + sin(d.a * 5.3) * 3);
+      let dy = floor((iy - 15) + sin(d.a) * dRY);
+      if (d.type === 'driftwood') {
+        fill(130, 105, 70, 90);
+        rect(dx - 5, dy, 10, 2, 1);
+        fill(140, 115, 78, 70);
+        rect(dx - 4, dy, 8, 1);
+      } else if (d.type === 'shell') {
+        fill(210, 200, 180, 100);
+        ellipse(dx, dy, 3, 2);
+        fill(220, 215, 200, 80);
+        rect(floor(dx), floor(dy) - 1, 1, 1);
+      } else {
+        // Seaweed strand
+        fill(40, 75, 45, 80);
+        rect(dx, dy - 1, 2, 4);
+        fill(50, 85, 50, 60);
+        rect(dx + 1, dy + 2, 2, 3);
+      }
+    });
   }
 
   // ─── CLIFF EDGE — layered bands below grass surface ───
@@ -932,6 +1005,45 @@ function drawIsland() {
     ellipse(ix - iw * 0.08, iy - 16, iw * 0.16, ih * 0.06);
     fill(sg.r - 14, sg.g - 12, sg.b - 8, 28 * bright2);
     ellipse(ix + iw * 0.14, iy - 14, iw * 0.13, ih * 0.05);
+
+    // Contour lines — subtle elevation rings on hills
+    let contourAlpha = 18 * bright2;
+    // H1 contours — concentric rings suggesting height
+    noFill();
+    stroke(sg.r - 10, sg.g - 8, sg.b - 5, contourAlpha);
+    strokeWeight(0.6);
+    for (let ci = 1; ci <= 3; ci++) {
+      let cFrac = ci * 0.3;
+      ellipse(ix + iw * 0.03, iy - 18 - cFrac * 3, iw * 0.14 * (1 - cFrac * 0.3), ih * 0.065 * (1 - cFrac * 0.25));
+    }
+    // H2 contours
+    for (let ci = 1; ci <= 2; ci++) {
+      let cFrac = ci * 0.35;
+      ellipse(ix - iw * 0.22, iy - 18 - cFrac * 2, iw * 0.09 * (1 - cFrac * 0.3), ih * 0.05 * (1 - cFrac * 0.25));
+    }
+    // H3 contours
+    for (let ci = 1; ci <= 2; ci++) {
+      let cFrac = ci * 0.35;
+      ellipse(ix + iw * 0.24, iy - 18 - cFrac * 2, iw * 0.08 * (1 - cFrac * 0.3), ih * 0.04 * (1 - cFrac * 0.25));
+    }
+    noStroke();
+
+    // Ridge grass — lighter strip on hill crests catching sunlight
+    fill(sg.r + 30, sg.g + 36, sg.b + 14, hillAlpha * 0.3);
+    ellipse(ix + iw * 0.03, iy - 26, iw * 0.10, ih * 0.015);
+    fill(sg.r + 26, sg.g + 30, sg.b + 12, hillAlpha * 0.25);
+    ellipse(ix - iw * 0.22, iy - 24, iw * 0.06, ih * 0.012);
+    ellipse(ix + iw * 0.24, iy - 24, iw * 0.05, ih * 0.010);
+
+    // Erosion gullies — thin dark lines on shadow faces
+    stroke(sg.r - 25, sg.g - 20, sg.b - 15, 20 * bright2);
+    strokeWeight(0.5);
+    // H1 gullies
+    line(ix + iw * 0.01, iy - 8, ix + iw * 0.03, iy + 2);
+    line(ix + iw * 0.05, iy - 6, ix + iw * 0.06, iy + 4);
+    // H2 gully
+    line(ix - iw * 0.23, iy - 6, ix - iw * 0.21, iy + 3);
+    noStroke();
   }
 
   // ─── VEGETATION ZONES ───
@@ -1249,6 +1361,62 @@ function drawPort() {
     }
   }
 
+  // --- Fishing nets draped over pier edge ---
+  stroke(120, 105, 75, 70);
+  strokeWeight(0.5);
+  for (let ni = 0; ni < 6; ni++) {
+    let nx = 40 + ni * 16;
+    // Horizontal net lines drooping off pier
+    let droop = 4 + sin(ni * 1.7) * 2;
+    line(nx, 9, nx + 8, 9 + droop);
+    line(nx + 4, 9, nx + 10, 9 + droop - 1);
+    // Vertical threads
+    for (let nj = 0; nj < 3; nj++) {
+      let tx = nx + nj * 4;
+      line(tx, 9, tx + 1, 9 + droop * 0.7);
+    }
+  }
+  // Net weight (cork floats)
+  noStroke();
+  fill(180, 150, 100, 90);
+  for (let fi = 0; fi < 4; fi++) {
+    ellipse(44 + fi * 16, 10, 3, 3);
+  }
+
+  // --- Small fishing dinghy moored alongside ---
+  {
+    let dinghyX = 50, dinghyY = 20;
+    let dinghyBob = sin(frameCount * 0.035 + 1.5) * 1.5;
+    push();
+    translate(dinghyX, dinghyY + dinghyBob);
+    noStroke();
+    // Water lap
+    fill(180, 210, 230, 15 + sin(frameCount * 0.04) * 6);
+    rect(-12, 4, 24, 2);
+    // Hull
+    fill(100, 65, 30);
+    beginShape();
+    vertex(-10, -1); vertex(-8, 4); vertex(8, 4);
+    vertex(10, -1); vertex(8, -3); vertex(-8, -3);
+    endShape(CLOSE);
+    // Plank lines
+    stroke(85, 55, 22, 50); strokeWeight(0.4);
+    line(-7, 0, 7, 0); line(-6, 2, 6, 2);
+    noStroke();
+    // Bench
+    fill(110, 75, 35);
+    rect(-5, -2, 10, 2);
+    // Oar resting inside
+    stroke(90, 65, 30); strokeWeight(0.8);
+    line(-9, -2, 9, 3);
+    noStroke();
+    // Mooring rope to pier
+    stroke(140, 120, 80, 70); strokeWeight(0.6);
+    bezier(-8, -3, -10, -6, -14, -12, -12, -15);
+    noStroke();
+    pop();
+  }
+
   // --- Crates, barrels, amphorae --- pixel
   // Barrel
   fill(110, 80, 45);
@@ -1271,6 +1439,21 @@ function drawPort() {
     rect(ax + 1, -11, 4, 3); // neck
     fill(145, 98, 58);
     rect(ax - 1, -11, 8, 2); // handles/rim
+  }
+  // Rope coil on pier
+  fill(140, 115, 75, 80);
+  ellipse(15, -5, 7, 7);
+  fill(155, 130, 85, 60);
+  ellipse(15, -5, 4, 4);
+  fill(125, 100, 65, 50);
+  ellipse(15, -5, 2, 2);
+
+  // --- Pier edge wear — water stains and algae ---
+  fill(50, 80, 60, 25);
+  rect(-28, 6, 170, 3); // algae line at waterline
+  fill(90, 105, 80, 20);
+  for (let wi = 0; wi < 8; wi++) {
+    rect(-20 + wi * 22, 4, 10, 2);
   }
 
   // --- Player's trireme (NAVIS PARVA) docked — side-view ---
@@ -1698,7 +1881,7 @@ function drawMerchantPort() {
         let coinY = -38 - age * 0.4;
         circle(-31 + sin(age * 0.1) * 4, coinY, 5);
         fill(220, 180, 40, alpha);
-        textSize(5); textAlign(CENTER);
+        textSize(9); textAlign(CENTER);
         text('+' + e.gold + 'g', -31 + sin(age * 0.1) * 4, coinY - 6);
       }
     }
@@ -1977,9 +2160,17 @@ function drawDistrictGrounds(ix, iy) {
   drawingContext.ellipse(ix, iy - 18, _clipRX, _clipRY, 0, 0, Math.PI * 2);
   drawingContext.clip();
 
+  // Faction ground tint overlay
+  let _fgt = (typeof getFactionBuildingColors === 'function') ? getFactionBuildingColors().groundTint : null;
+  if (_fgt) {
+    fill(_fgt[0], _fgt[1], _fgt[2], 35);
+    ellipse(ix, iy - 18, _clipRX * 2, _clipRY * 2);
+  }
+
   // Era 1 (Lv 5-8): Small packed-earth plaza — rectangular, not elliptical
   if (ep.era === 1) {
-    let pr = lerp(160, 175, dayMix), pg = lerp(140, 155, dayMix), pb = lerp(110, 125, dayMix);
+    let _gt = _fgt || [175, 155, 125];
+    let pr = lerp(_gt[0] - 15, _gt[0], dayMix), pg = lerp(_gt[1] - 15, _gt[1], dayMix), pb = lerp(_gt[2] - 15, _gt[2], dayMix);
     let pw = iw * 0.18, ph = ih * 0.10;
     _drawInsula(ix + iw * 0.02 - pw / 2, iy - 20 - ph / 2, pw, ph, pr, pg, pb, 100);
     return;
@@ -2482,6 +2673,179 @@ function drawNightLighting() {
     } else {
       fill(ng[0], ng[1], ng[2], 15 * nightAlpha);
       ellipse(sx, sy - 10, glowR * 1.8, glowR * 0.9);
+    }
+  }
+}
+
+// ─── AMBIENT OCEAN WILDLIFE — distant sea life on the water ─────────────
+let _oceanWildlife = null;
+
+function initOceanWildlife() {
+  _oceanWildlife = {
+    whaleSpouts: [],
+    seabirds: [],
+    dolphins: [],
+  };
+  // Seed 3-5 seabirds
+  for (let i = 0; i < 4; i++) {
+    _oceanWildlife.seabirds.push({
+      x: Math.random() * 1.2, y: 0.02 + Math.random() * 0.18,
+      vx: (Math.random() * 0.0008 + 0.0003) * (Math.random() > 0.5 ? 1 : -1),
+      wingPhase: Math.random() * Math.PI * 2,
+      size: 2 + Math.random() * 2,
+    });
+  }
+}
+
+function drawOceanWildlife() {
+  if (!_oceanWildlife) initOceanWildlife();
+  let bright = getSkyBrightness();
+  let dayMix = max(0.15, bright);
+  let oceanTop = max(height * 0.06, height * 0.25 - (typeof horizonOffset !== 'undefined' ? horizonOffset : 0));
+
+  // ── Whale spouts — rare distant plumes ──
+  if (frameCount % 600 === 0 && _oceanWildlife.whaleSpouts.length < 2 && bright > 0.2) {
+    _oceanWildlife.whaleSpouts.push({
+      x: Math.random() * 0.7 + 0.15,
+      y: oceanTop + 15 + Math.random() * 40,
+      life: 90, maxLife: 90,
+      height: 12 + Math.random() * 8,
+    });
+  }
+  noStroke();
+  for (let i = _oceanWildlife.whaleSpouts.length - 1; i >= 0; i--) {
+    let ws = _oceanWildlife.whaleSpouts[i];
+    let t = ws.life / ws.maxLife;
+    let sx = ws.x * width;
+    let sy = ws.y;
+    // Whale back — dark arc briefly visible
+    if (t > 0.7) {
+      let backT = (t - 0.7) / 0.3;
+      fill(30, 45, 60, 40 * backT * dayMix);
+      ellipse(sx, sy + 2, 18, 5);
+      // Tail fluke on dive (late phase)
+      if (backT < 0.3) {
+        fill(25, 40, 55, 30 * dayMix);
+        triangle(sx - 6, sy, sx, sy - 4, sx + 6, sy);
+      }
+    }
+    // Spout plume — white spray
+    let spoutH = ws.height * sin(t * PI) * (t > 0.5 ? 1 : t * 2);
+    let spoutAlpha = 60 * sin(t * PI) * dayMix;
+    // V-shaped spray
+    for (let s = 0; s < spoutH; s += 2) {
+      let spread = s * 0.2;
+      let dropAlpha = spoutAlpha * (1 - s / spoutH);
+      fill(220, 235, 245, dropAlpha);
+      rect(floor(sx - spread), floor(sy - s), 1, 2);
+      rect(floor(sx + spread), floor(sy - s), 1, 2);
+    }
+    // Mist at base
+    fill(200, 220, 235, spoutAlpha * 0.4);
+    ellipse(sx, sy - 1, 8 + spoutH * 0.3, 3);
+    ws.life--;
+    if (ws.life <= 0) _oceanWildlife.whaleSpouts.splice(i, 1);
+  }
+
+  // ── Seabirds — small V shapes gliding ──
+  for (let b of _oceanWildlife.seabirds) {
+    b.x += b.vx;
+    b.wingPhase += 0.06;
+    if (b.x > 1.15) b.x = -0.1;
+    if (b.x < -0.15) b.x = 1.1;
+    let bx = floor(b.x * width);
+    let by = floor(b.y * height + sin(frameCount * 0.008 + b.wingPhase) * 3);
+    let wingY = sin(b.wingPhase) * 2.5;
+    // Atmospheric fade — birds are distant and slightly blue
+    let distFade = 0.5 + b.y * 1.5;
+    let birdR = lerp(40, 100, min(1, distFade));
+    let birdG = lerp(35, 110, min(1, distFade));
+    let birdB = lerp(30, 125, min(1, distFade));
+    fill(birdR, birdG, birdB, 140 * dayMix);
+    // Wing left
+    rect(bx - floor(b.size), by + floor(wingY), floor(b.size), 1);
+    // Body
+    rect(bx, by, 1, 1);
+    // Wing right
+    rect(bx + 1, by - floor(wingY), floor(b.size), 1);
+  }
+
+  // ── Dolphins — occasional arcing leaps ──
+  if (frameCount % 420 === 0 && _oceanWildlife.dolphins.length < 2 && bright > 0.3) {
+    let startX = Math.random() * 0.6 + 0.2;
+    let dir = Math.random() > 0.5 ? 1 : -1;
+    _oceanWildlife.dolphins.push({
+      x: startX, y: oceanTop + 20 + Math.random() * 30,
+      phase: 0, dir: dir,
+      speed: 0.0015 + Math.random() * 0.001,
+    });
+  }
+  for (let i = _oceanWildlife.dolphins.length - 1; i >= 0; i--) {
+    let d = _oceanWildlife.dolphins[i];
+    d.phase += 0.05;
+    d.x += d.dir * d.speed;
+    if (d.phase > PI) { _oceanWildlife.dolphins.splice(i, 1); continue; }
+    let dx = floor(d.x * width);
+    let jumpArc = -sin(d.phase) * 14;
+    let dy = floor(d.y + jumpArc);
+    let bodyAlpha = 150 * dayMix;
+    // Body
+    fill(70, 90, 115, bodyAlpha);
+    rect(dx - 4 * d.dir, dy, 8, 3);
+    // Head
+    fill(80, 100, 125, bodyAlpha);
+    rect(dx + 4 * d.dir, dy, 3, 2);
+    // Dorsal fin
+    fill(60, 80, 105, bodyAlpha);
+    triangle(dx, dy - 1, dx + 1, dy - 4, dx + 2, dy);
+    // Tail
+    fill(65, 85, 110, bodyAlpha);
+    rect(dx - 5 * d.dir, dy + 1, 3, 2);
+    // Splash on entry/exit
+    if (d.phase < 0.4 || d.phase > PI - 0.4) {
+      let splashA = d.phase < 0.4 ? (0.4 - d.phase) * 200 : (d.phase - PI + 0.4) * 200;
+      fill(200, 225, 240, splashA * dayMix);
+      rect(dx - 3, floor(d.y), 6, 2);
+      fill(230, 240, 248, splashA * 0.5 * dayMix);
+      rect(dx - 5, floor(d.y) + 1, 10, 1);
+    }
+  }
+}
+
+// ─── ATMOSPHERIC PERSPECTIVE — distant objects fade toward blue ──────────
+function applyAtmosphericPerspective(screenY) {
+  // Returns alpha multiplier and blue tint based on distance from viewer
+  // Objects near horizon (top) are more faded/blue
+  let oceanTop = max(height * 0.06, height * 0.25 - (typeof horizonOffset !== 'undefined' ? horizonOffset : 0));
+  let distFromHorizon = max(0, screenY - oceanTop);
+  let maxDist = height - oceanTop;
+  let nearness = constrain(distFromHorizon / maxDist, 0, 1);
+  return {
+    alpha: 0.35 + nearness * 0.65,
+    blueShift: (1 - nearness) * 0.4,
+  };
+}
+
+function drawAtmosphericHaze() {
+  let bright = getSkyBrightness();
+  if (bright < 0.1) return;
+  let oceanTop = max(height * 0.06, height * 0.25 - (typeof horizonOffset !== 'undefined' ? horizonOffset : 0));
+  let hazeH = 40;
+  noStroke();
+  for (let y = 0; y < hazeH; y += 2) {
+    let t = 1 - y / hazeH;
+    let hazeAlpha = t * t * 18 * bright;
+    fill(160, 190, 220, hazeAlpha);
+    rect(0, oceanTop + y, width, 2);
+  }
+  // Warm haze during golden hour
+  let h = state.time / 60;
+  if ((h >= 5 && h < 7) || (h >= 16.5 && h < 19)) {
+    let warmT = h < 7 ? map(h, 5, 7, 0.5, 0) : map(h, 16.5, 19, 0, 0.5);
+    for (let y = 0; y < hazeH * 0.6; y += 2) {
+      let t2 = 1 - y / (hazeH * 0.6);
+      fill(255, 180, 100, t2 * t2 * 8 * warmT * bright);
+      rect(0, oceanTop + y, width, 2);
     }
   }
 }

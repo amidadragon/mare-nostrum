@@ -20,7 +20,26 @@ const FISH_TYPES = [
   { name: "Poseidon's Catch",weight: 8, color: '#55aaff', minH: 0,  maxH: 24, season: -1, stormOnly: true },
   { name: 'Silver Eel',     weight: 5, color: '#c0d0e0', minH: 0,  maxH: 24, season: -1, stormOnly: true },
   { name: 'Fog Crab',       weight: 5, color: '#8899aa', minH: 0,  maxH: 24, season: -1, fogOnly: true },
+  // --- New fish types ---
+  { name: 'Moon Jellyfish',  weight: 3, color: '#ccaaff', minH: 20, maxH: 5,  season: -1 },  // night
+  { name: 'Imperial Sturgeon',weight:6, color: '#7799aa', minH: 5,  maxH: 9,  season: 2  },  // autumn dawn — very rare
+  { name: 'Volcanic Snapper', weight: 4, color: '#ff6633', minH: 10, maxH: 20, season: 1  },  // summer day
+  { name: 'Phantom Squid',   weight: 7, color: '#5544aa', minH: 22, maxH: 4,  season: -1, stormOnly: true },  // storm night — legendary
+  { name: 'Bronze Wrasse',   weight: 2, color: '#cc9944', minH: 6,  maxH: 18, season: 0  },  // spring day
 ];
+
+// Returns true if current hour is dawn (5-7) or dusk (17-19) — "golden hour"
+function isGoldenHour() {
+  let h = state.time / 60;
+  return (h >= 5 && h <= 7) || (h >= 17 && h <= 19);
+}
+
+// Weather catch rate multiplier: rain = 1.5x rare chance, storm = 2x
+function getWeatherFishingMult() {
+  if (stormActive || state.weather.type === 'storm') return 2.0;
+  if (state.weather.type === 'rain') return 1.5;
+  return 1.0;
+}
 
 function rollFishType() {
   let h = state.time / 60;
@@ -41,6 +60,9 @@ function rollFishType() {
   // Weighted random — rarer fish less likely, prophecy boosts rare
   let rareMult = (state.prophecy && state.prophecy.type === 'rarefish') ? 3 : 1;
   if (typeof getFishingLuckBonus === 'function') rareMult *= getFishingLuckBonus();
+  // Weather and golden hour boost rare fish chances
+  rareMult *= getWeatherFishingMult();
+  if (isGoldenHour()) rareMult *= 1.8;
   let weights = eligible.map(f => f.weight > 2 ? (1 / f.weight) * rareMult : 1 / f.weight);
   let total = weights.reduce((a, b) => a + b, 0);
   let r = random() * total;
@@ -70,6 +92,11 @@ const NAT_FISH_DATA = {
   "poseidon's catch": { label: "Poseidon's Catch",  rarity: 'Legendary',desc: 'Only the storm-tossed sea yields this ancient beast.', season: 'Storm',    time: 'Any' },
   'silver eel':       { label: 'Silver Eel',        rarity: 'Rare',     desc: 'A shimmering eel drawn to the surface by storm currents.', season: 'Storm', time: 'Any' },
   'fog crab':         { label: 'Fog Crab',           rarity: 'Rare',     desc: 'Emerges only when the sea mist is thickest.',            season: 'Fog',   time: 'Any' },
+  'moon jellyfish':   { label: 'Moon Jellyfish',     rarity: 'Uncommon', desc: 'Drifts like a ghost beneath the moonlit surface.',       season: 'All Year', time: 'Night' },
+  'imperial sturgeon':{ label: 'Imperial Sturgeon',  rarity: 'Rare',     desc: 'Once reserved for Caesar\'s table alone.',               season: 'Autumn',   time: 'Dawn' },
+  'volcanic snapper': { label: 'Volcanic Snapper',   rarity: 'Rare',     desc: 'Its red scales recall the fires of Vesuvius.',           season: 'Summer',   time: 'Day' },
+  'phantom squid':    { label: 'Phantom Squid',      rarity: 'Legendary',desc: 'A deep-sea horror surfaced only by violent storms.',     season: 'Storm',    time: 'Night' },
+  'bronze wrasse':    { label: 'Bronze Wrasse',      rarity: 'Uncommon', desc: 'Its metallic sheen earned it the name of bronze.',       season: 'Spring',   time: 'Day' },
 };
 
 function updateFishing(dt) {
@@ -82,7 +109,11 @@ function updateFishing(dt) {
       f.phase = 'wait';
       let rodBonus = state.tools.ironRod ? 0.7 : state.tools.copperRod ? 0.85 : 1.0;
       let _natFishBonus = typeof getNatFishingSpeedBonus === 'function' ? getNatFishingSpeedBonus() : 1.0;
-      f.waitDuration = floor(random(90, 300) * rodBonus / _natFishBonus);
+      let weatherBonus = (state.weather.type === 'rain' || state.weather.type === 'storm') ? 0.7 : 1.0;
+      let goldenBonus = isGoldenHour() ? 0.8 : 1.0;
+      f.waitDuration = floor(random(90, 300) * rodBonus / _natFishBonus * weatherBonus * goldenBonus);
+      // Day 1 first fish: guaranteed quick bite
+      if (typeof shouldGuaranteeFish === 'function' && shouldGuaranteeFish()) f.waitDuration = floor(f.waitDuration * 0.3);
       f.phaseTimer = f.waitDuration;
       f.nibbleTimer = floor(random(25, 45));
       f.splashRings = [{r: 0, a: 200}, {r: 0, a: 150}]; // expanding water rings on plop
@@ -104,14 +135,17 @@ function updateFishing(dt) {
     // Net auto-catches at strike
     if (f.phaseTimer <= 0) {
       f.phase = 'strike';
-      f.phaseTimer = 72; // 1.2 second window
+      let _strikeWindow = 72; // 1.2 second window
+      // Day 1 first fish: much wider strike window
+      if (typeof shouldGuaranteeFish === 'function' && shouldGuaranteeFish()) _strikeWindow = 180;
+      f.phaseTimer = _strikeWindow;
       f.bobberDip = -12;
       f.bite = true;
-      f.strikeWindowEnd = frameCount + 72;
-      f.splashRings = [{r: 0, a: 255}, {r: 0, a: 200}, {r: 0, a: 150}]; // big splash on bite
+      f.strikeWindowEnd = frameCount + _strikeWindow;
+      f.splashRings = [{r: 0, a: 255}, {r: 0, a: 220}, {r: 0, a: 180}, {r: 0, a: 140}, {r: 0, a: 100}]; // dramatic splash on bite
       if (snd) snd.playSFX('fish_bite');
-      triggerScreenShake(2, 4);
-      spawnParticles(f.bobberX, f.bobberY, 'build', 4);
+      triggerScreenShake(3, 6);
+      spawnParticles(f.bobberX, f.bobberY, 'build', 8);
       if (state.tools.net) {
         reelFish();
         return;
@@ -175,6 +209,8 @@ function startFishing() {
     state.player.targetX = null;
     state.player.targetY = null;
     addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 30, 'Casting line...', '#66ccff');
+    if (isGoldenHour()) addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 48, 'Golden hour!', '#ffcc33');
+    if (state.weather.type === 'rain') addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 60, 'Rain bonus!', '#88bbdd');
   } else {
     addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 30, 'Go to island edge to fish!', C.buildInvalid);
   }
@@ -186,19 +222,38 @@ function reelFish() {
     f.streak = (f.streak || 0) + 1;
     let fishType = rollFishType();
     let amt = fishType.weight >= 3 ? 2 : 1;
+
+    // Perfect catch — reel within first 12 frames of strike for 2x value
+    let isPerfect = false;
+    if (f.strikeWindowEnd && (f.strikeWindowEnd - frameCount) > 60) {
+      isPerfect = true;
+      amt *= 2;
+    }
+
     // Storm fishing bonus: double yield
     if (stormActive || state.weather.type === 'storm' || state.weather.type === 'rain') amt *= 2;
+    // Event fish multiplier (whale sighting = 2x)
+    if (typeof getEventFishMult === 'function') amt = floor(amt * getEventFishMult());
     if (state.heartRewards.includes('golden')) amt *= 2;
     if (state.prophecy && state.prophecy.type === 'fish') amt += 1;
     let fest = getFestival();
     if (fest && fest.effect.fish) amt *= fest.effect.fish;
     // Streak bonus: +1 fish at streak 3+
     if (f.streak >= 3) amt += 1;
+    // Lighthouse bonus: +20% fishing yield
+    if (state.buildings && state.buildings.some(b => b.type === 'lighthouse')) amt = floor(amt * 1.2);
+    // Faction fishing bonus
+    if (typeof getFactionData === 'function') amt = floor(amt * (getFactionData().fishYieldMult || 1));
     state.fish += amt;
+    if (state.score) state.score.fishCaught += amt;
     if (snd) snd.playSFX('fish_catch');
     state.dailyActivities.fished += amt;
+    if (typeof trackStat === 'function') trackStat('fishCaught', amt);
+    if (typeof checkDailyQuestProgress === 'function') checkDailyQuestProgress('fish', amt);
+    if (typeof stormActive !== 'undefined' && stormActive && typeof unlockAchievement === 'function') unlockAchievement('storm_fisher');
     checkQuestProgress('fish', amt);
-    if (typeof grantXP === 'function') grantXP(fishType.weight * 5); // rare fish = more XP
+    if (typeof triggerNPCReaction === 'function') triggerNPCReaction('fish', state.player.x, state.player.y);
+    if (typeof grantXP === 'function') grantXP(fishType.weight * (isPerfect ? 10 : 5));
     state.codex.fishCaught[fishType.name.toLowerCase()] = true;
     let _fk = fishType.name.toLowerCase();
     let _isFirstCatch = !state.codex.fish[_fk];
@@ -212,6 +267,15 @@ function reelFish() {
     unlockJournal('first_fish');
     let _fishSx = w2sX(state.player.x), _fishSy = w2sY(state.player.y);
     addFloatingText(_fishSx, _fishSy - 40, '+' + amt + ' ' + fishType.name + '!', fishType.color);
+    if (isPerfect) {
+      addFloatingText(_fishSx, _fishSy - 72, 'PERFECT CATCH!', '#ffee00');
+      triggerScreenShake(5, 8);
+      spawnParticles(state.player.x, state.player.y, 'build', 14);
+      // Burst of golden sparkles for perfect catch
+      for (let s = 0; s < 8; s++) {
+        spawnParticles(state.player.x + random(-15, 15), state.player.y + random(-15, 15), 'build', 2);
+      }
+    }
     // Arc fish reward to HUD
     if (typeof spawnHarvestArc === 'function') spawnHarvestArc(_fishSx, _fishSy - 40, '+' + amt, fishType.color, 'fish');
     if (f.streak >= 3) {
@@ -353,18 +417,29 @@ function drawFishing() {
     textSize(10);
     textAlign(CENTER, BOTTOM);
     text('PRESS F', floor(px), floor(py) - 50);
-    // Splash pixels — more vigorous
-    fill(100, 180, 255, 140);
-    for (let s = 0; s < 5; s++) {
-      let sx = floor(bx) + floor(random(-8, 8));
-      let sy = floor(by) + floor(random(-6, 3));
+    // Splash pixels — dramatic burst
+    fill(100, 180, 255, 160);
+    for (let s = 0; s < 10; s++) {
+      let sx = floor(bx) + floor(random(-12, 12));
+      let sy = floor(by) + floor(random(-8, 4));
       rect(sx, sy, 2, 2);
     }
-    // Water spray upward
-    for (let s = 0; s < 3; s++) {
-      fill(180, 220, 255, 100 + sin(frameCount * 0.2 + s) * 40);
-      let sprayY = floor(by) - 4 - floor(random(2, 8));
-      rect(floor(bx) + floor(random(-5, 5)), sprayY, 1, 2);
+    // Water spray upward — tall arcing droplets
+    for (let s = 0; s < 7; s++) {
+      let sprayPhase = (frameCount * 0.15 + s * 1.2);
+      let sprayAlpha = 120 + sin(sprayPhase) * 50;
+      fill(180, 230, 255, sprayAlpha);
+      let sprayX = floor(bx) + floor(random(-8, 8));
+      let sprayY = floor(by) - 6 - floor(random(4, 16));
+      rect(sprayX, sprayY, 2, 3);
+    }
+    // White foam at base
+    fill(255, 255, 255, 60 + sin(frameCount * 0.25) * 30);
+    rect(floor(bx) - 6, floor(by) + 1, 12, 2);
+    // Perfect catch window indicator — bright gold flash in first 12 frames
+    if (f.strikeWindowEnd && (f.strikeWindowEnd - frameCount) > 60) {
+      fill(255, 240, 80, 100 + sin(frameCount * 0.4) * 60);
+      rect(floor(bx) - 10, floor(by) - 10, 20, 20);
     }
   }
   noStroke();

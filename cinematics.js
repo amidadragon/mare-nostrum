@@ -301,6 +301,24 @@ function drawIntroCinematic(dt) {
   textAlign(CENTER, CENTER);
   noStroke();
 
+  // Story crawl — brief "story so far" before the action text
+  if (t > FADE_IN + 10 && t < TEXT_START + 30) {
+    let crawlAlpha = min(255, (t - FADE_IN - 10) * 4);
+    if (t > TEXT_START) crawlAlpha = max(0, crawlAlpha - (t - TEXT_START) * 8);
+    let crawlLines = [
+      'The year is 146 BC.',
+      'Exiled from Rome, you sailed west',
+      'seeking a new life beyond the horizon...',
+    ];
+    for (let ci = 0; ci < crawlLines.length; ci++) {
+      let lineDelay = ci * 30;
+      let lineAlpha = min(crawlAlpha, max(0, (t - FADE_IN - 10 - lineDelay) * 4));
+      if (lineAlpha > 2) {
+        _drawCinematicText(w / 2, h * 0.12 + ci * 20, crawlLines[ci], 9, 160, 150, 120, lineAlpha);
+      }
+    }
+  }
+
   // Title text — fades in during wreckage phase (character-by-character reveal)
   if (t > TEXT_START && t < DONE) {
     let textAlpha = min(255, (t - TEXT_START) * 3);
@@ -318,6 +336,12 @@ function drawIntroCinematic(dt) {
       let charsShown2 = min(line2.length, floor((t - TEXT_START - 60) / 2));
       let shown2 = line2.substring(0, charsShown2);
       _drawCinematicText(w / 2, h * 0.2 + 24, shown2, 10, 180, 160, 120, subAlpha);
+    }
+
+    // Objective hint at wake
+    if (t > WAKE - 30) {
+      let objAlpha = min(180, (t - WAKE + 30) * 3);
+      _drawCinematicText(w / 2, h * 0.2 + 50, 'Gather materials. Repair the raft. Escape.', 8, 140, 180, 140, objAlpha);
     }
   }
 
@@ -1137,9 +1161,33 @@ function completeSailToHome() {
     addFloatingText(width / 2, height * 0.42, 'The stray cat followed you!', '#ffaa66');
   }
 
-  // Begin sunrise cinematic before player gets control
-  state.cutscene = 'home_sunrise';
-  state.cutsceneTimer = 0;
+  // Marcus welcome dialog — special greeting on arrival
+  if (typeof openDialog === 'function') {
+    setTimeout(function() {
+      if (state.progression.homeIslandReached && !state.progression.tutorialsSeen._marcusWelcome) {
+        state.progression.tutorialsSeen._marcusWelcome = true;
+        openDialog('Marcus', 'marcus',
+          'Salve, exile! By the gods, another survivor! I am Marcus — a legionary like yourself. ' +
+          'This island has ruins, fields, fresh water... everything we need to rebuild. ' +
+          'Explore the island. Find the farm to the west, the crystal shrine... ' +
+          'and come find me near the barracks when you are ready.',
+          null, null);
+      }
+    }, 3000);
+  }
+
+  // WASD tutorial hint after arrival
+  if (typeof showTutorialHintOnce === 'function') {
+    setTimeout(function() {
+      if (typeof showTutorialHintOnce === 'function') {
+        showTutorialHintOnce('wasd', 'WASD to move', state.player.x, state.player.y - 40);
+      }
+    }, 6000);
+  }
+
+  // Show faction selection before sunrise cinematic
+  factionSelectActive = true;
+  factionSelectFade = 0;
 }
 
 // ─── HOME ISLAND SUNRISE — held emotional moment ──────────────────────────

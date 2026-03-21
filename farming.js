@@ -23,6 +23,99 @@ function getSeasonalCropData(cropType) {
   return SEASONAL_CROPS.find(c => c.id === cropType);
 }
 
+// ─── NEW CROP TYPES ─────────────────────────────────────────────────────
+// Flax: grows in 2 stages (fast), yields fiber for crafting. Grows best in spring.
+// Pomegranate: grows slowly through 5 stages (extra visual detail), huge payoff. Best in autumn.
+// Lotus: sacred plant, grows only near water (aqueducts), 3 stages, gives crystals. Any season.
+const NEW_CROPS = [
+  { id: 'flax', name: 'Flax', growthStages: 2, baseGrowTime: 1800, harvestValue: 2, bestSeason: 0,
+    desc: 'Quick-growing fiber plant. Harvests fast, yields cloth.' },
+  { id: 'pomegranate', name: 'Pomegranate', growthStages: 5, baseGrowTime: 6000, harvestValue: 5, bestSeason: 2,
+    desc: 'Sacred fruit of Proserpina. Slow but immensely valuable.' },
+  { id: 'lotus', name: 'Sacred Lotus', growthStages: 3, baseGrowTime: 3600, harvestValue: 3, bestSeason: -1,
+    desc: 'Mystical bloom. Grows near water, yields crystals.' },
+];
+
+function getNewCropData(cropType) {
+  return NEW_CROPS.find(c => c.id === cropType);
+}
+
+function isNewCrop(cropType) {
+  return NEW_CROPS.some(c => c.id === cropType);
+}
+
+// ─── CROP QUALITY SYSTEM ────────────────────────────────────────────────
+// Perfect conditions = gold-star crop worth 2x
+// Conditions: right season, watered (rain or aqueduct), blessed, companion nearby
+function getCropQuality(plot) {
+  let score = 0;
+  let season = getSeason();
+  let cropType = plot.cropType;
+  // Season match
+  let newCrop = getNewCropData(cropType);
+  let seasonalCrop = getSeasonalCropData(cropType);
+  if (newCrop && newCrop.bestSeason === season) score += 2;
+  else if (seasonalCrop && seasonalCrop.season === season) score += 2;
+  else if (season === 0 && cropType === 'grain') score += 1; // grain likes spring
+  else if (season === 2 && cropType === 'grape') score += 1; // grapes like autumn
+  else if (season === 1 && cropType === 'olive') score += 1; // olives like summer
+  // Watered (rain or near aqueduct)
+  if (state.weather && state.weather.type === 'rain') score += 1;
+  let nearAqueduct = state.buildings && state.buildings.some(b => b.type === 'aqueduct' && dist(b.x, b.y, plot.x, plot.y) < 80);
+  if (nearAqueduct) score += 1;
+  // Blessed (mutated)
+  if (plot.blessed) score += 2;
+  // Companion bonus
+  let compBonus = getCompanionCropBonus(plot);
+  if (compBonus > 0) score += 1;
+  // Gold star threshold: 4+ = gold, 2-3 = silver
+  if (score >= 4) return 'gold';
+  if (score >= 2) return 'silver';
+  return 'normal';
+}
+
+function getCropQualityMult(quality) {
+  if (quality === 'gold') return 2.0;
+  if (quality === 'silver') return 1.3;
+  return 1.0;
+}
+
+// ─── COMPANION CROP BONUSES ─────────────────────────────────────────────
+// Lares (companion) boosts herbs and wildflowers — spiritual crops
+// Woodcutter boosts olives — trees
+// Harvester boosts grain — farming crops
+// Centurion boosts grapes — Roman wine tradition
+function getCompanionCropBonus(plot) {
+  let ct = plot.cropType;
+  let bonus = 0;
+  // Check if each companion is awake and near the plot
+  let pg = state.progression || {};
+  let ca = pg.companionsAwakened || {};
+  if (ca.lares && state.companion) {
+    let d = dist(state.companion.x, state.companion.y, plot.x, plot.y);
+    if (d < 100 && (ct === 'herb' || ct === 'wildflower' || ct === 'lotus' || ct === 'frostherb')) bonus += 0.3;
+  }
+  if (ca.woodcutter && state.woodcutter) {
+    let d = dist(state.woodcutter.x, state.woodcutter.y, plot.x, plot.y);
+    if (d < 100 && (ct === 'olive' || ct === 'pomegranate')) bonus += 0.3;
+  }
+  if (ca.harvester && state.harvester) {
+    let d = dist(state.harvester.x, state.harvester.y, plot.x, plot.y);
+    if (d < 100 && (ct === 'grain' || ct === 'flax')) bonus += 0.3;
+  }
+  if (ca.centurion && state.centurion) {
+    let d = dist(state.centurion.x, state.centurion.y, plot.x, plot.y);
+    if (d < 100 && (ct === 'grape' || ct === 'sunfruit')) bonus += 0.3;
+  }
+  return bonus;
+}
+
+// Returns growth speed multiplier for companion proximity
+function getCompanionGrowthBonus(plot) {
+  let bonus = getCompanionCropBonus(plot);
+  return bonus > 0 ? (1 + bonus) : 1; // 30% faster growth when companion matches
+}
+
 // ─── NATURALIST CODEX CROP DATA ──────────────────────────────────────────
 const NAT_CROP_DATA = {
   grain:      { label: 'Grain',      rarity: 'Common',   desc: 'The backbone of Roman civilization. Plant early, harvest often.' },
@@ -32,6 +125,9 @@ const NAT_CROP_DATA = {
   sunfruit:   { label: 'Sunfruit',   rarity: 'Uncommon', desc: 'A mysterious crop that stores the sun\'s energy in radiant flesh.' },
   frostherb:  { label: 'Frostherb',  rarity: 'Uncommon', desc: 'A northern rarity. Its crystalline leaves shimmer in winter light.' },
   wildflower: { label: 'Wildflower', rarity: 'Uncommon', desc: 'Not eaten, but loved. Brightens the island and lifts morale.' },
+  flax:       { label: 'Flax',       rarity: 'Common',   desc: 'Hardy fiber crop. Quick to grow, valued for weaving and trade.' },
+  pomegranate:{ label: 'Pomegranate', rarity: 'Rare',    desc: 'Proserpina\'s sacred fruit. Slow-growing but yields enormous value.' },
+  lotus:      { label: 'Sacred Lotus', rarity: 'Rare',   desc: 'A mystical flower that blooms near water. Yields crystals when harvested.' },
 };
 
 // ─── HARVEST COMBO ───────────────────────────────────────────────────────
@@ -47,35 +143,71 @@ function updateHarvestCombo(dt) {
 function onHarvestCombo(plot, baseYield) {
   let c = state.harvestCombo;
   c.count++;
-  c.timer = (state.prophecy && state.prophecy.type === 'combo') ? 180 : 90;
+  c.timer = (state.prophecy && state.prophecy.type === 'combo') ? 180 : 120; // extended window
   if (c.count > c.best) c.best = c.count;
   if (c.count > c.bestEver) c.bestEver = c.count;
   if (c.count > state.codex.bestCombo) state.codex.bestCombo = c.count;
 
-  let tier = min(floor(c.count / 2), 6);
-  let bonusPct = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6][tier];
-  let finalYield = ceil(baseYield * (1 + bonusPct));
+  // Apply crop quality multiplier
+  let quality = getCropQuality(plot);
+  let qualityMult = getCropQualityMult(quality);
 
-  let comboColors = ['#ffffff','#ffffff','#ffeeaa','#ffdd66','#ffcc33','#ffaa00','#ff8800'];
+  // Apply companion bonus
+  let compBonus = getCompanionCropBonus(plot);
+
+  let tier = min(floor(c.count / 2), 8);
+  let bonusPct = [0, 0.1, 0.2, 0.35, 0.5, 0.65, 0.8, 1.0, 1.2][tier];
+  let finalYield = ceil(baseYield * (1 + bonusPct + compBonus) * qualityMult);
+
+  let comboColors = ['#ffffff','#ffffff','#ffeeaa','#ffdd66','#ffcc33','#ffaa00','#ff8800','#ff6600','#ff4400'];
   let sx = w2sX(plot.x), sy = w2sY(plot.y);
   if (c.count >= 2) {
     addFloatingText(sx + 15, sy - 35, 'x' + c.count + '!', comboColors[tier]);
   }
 
+  // Show quality indicator
+  if (quality === 'gold') {
+    addFloatingText(sx - 15, sy - 45, 'GOLD STAR!', '#ffdd00');
+  } else if (quality === 'silver') {
+    addFloatingText(sx - 15, sy - 45, 'SILVER', '#cccccc');
+  }
+  // Show companion bonus
+  if (compBonus > 0) {
+    addFloatingText(sx + 20, sy - 45, 'Companion +' + floor(compBonus * 100) + '%', '#66ffaa');
+  }
+
   let pCount = min(4 + c.count * 2, 30);
   spawnParticles(plot.x, plot.y, 'harvest', pCount);
 
+  // Tier milestones with escalating rewards
+  if (c.count === 4) {
+    state.screenFlash = { r: 255, g: 220, b: 100, alpha: 30, timer: 15 };
+  }
+  if (c.count === 6) {
+    state.screenFlash = { r: 255, g: 200, b: 50, alpha: 50, timer: 25 };
+    state.seeds = (state.seeds || 0) + 2;
+    addFloatingText(width / 2, height * 0.32, 'Combo Bonus: +2 Seeds!', '#88cc44');
+  }
   if (c.count === 8) {
     state.screenFlash = { r: 255, g: 200, b: 50, alpha: 60, timer: 30 };
+    state.gold = (state.gold || 0) + 10;
+    addFloatingText(width / 2, height * 0.32, 'Combo Bonus: +10 Gold!', '#ffcc44');
+  }
+  if (c.count === 10) {
+    addFloatingText(width / 2, height * 0.28, 'HARVEST FRENZY!', '#ffaa00');
+    state.screenFlash = { r: 255, g: 180, b: 0, alpha: 80, timer: 45 };
+    state.gold = (state.gold || 0) + 25;
+    addFloatingText(width / 2, height * 0.34, '+25 Gold!', '#ffcc44');
   }
   if (c.count >= 12) {
     addFloatingText(width / 2, height * 0.28, 'PERFECT HARVEST!', C.solarBright);
     state.screenFlash = { r: 255, g: 220, b: 0, alpha: 100, timer: 60 };
-    // Rare seed reward
+    // Rare seed reward — better odds at higher combos
     let roll = random();
-    if (roll < 0.25) { state.grapeSeeds++; addFloatingText(width / 2, height * 0.34, '+1 Grape Seed!', '#9040a0'); }
-    else if (roll < 0.5) { state.oliveSeeds++; addFloatingText(width / 2, height * 0.34, '+1 Olive Seed!', '#607030'); }
-    else { state.seeds++; addFloatingText(width / 2, height * 0.34, '+1 Seed!', C.vineLight); }
+    if (roll < 0.20) { state.grapeSeeds = (state.grapeSeeds || 0) + 1; addFloatingText(width / 2, height * 0.34, '+1 Grape Seed!', '#9040a0'); }
+    else if (roll < 0.40) { state.oliveSeeds = (state.oliveSeeds || 0) + 1; addFloatingText(width / 2, height * 0.34, '+1 Olive Seed!', '#607030'); }
+    else if (roll < 0.55) { state.crystals = (state.crystals || 0) + 2; addFloatingText(width / 2, height * 0.34, '+2 Crystals!', '#44ffdd'); }
+    else { state.seeds = (state.seeds || 0) + 3; addFloatingText(width / 2, height * 0.34, '+3 Seeds!', C.vineLight); }
   }
   return finalYield;
 }
@@ -304,7 +436,20 @@ function drawOnePlot(p) {
       let cropDraw = drawGrainSprite;
       if (p.cropType === 'grape') cropDraw = drawGrapeSprite;
       else if (p.cropType === 'olive') cropDraw = drawOliveSprite;
+      else if (p.cropType === 'flax') cropDraw = drawFlaxSprite;
+      else if (p.cropType === 'pomegranate') cropDraw = drawPomegranateSprite;
+      else if (p.cropType === 'lotus') cropDraw = drawLotusSprite;
       else if (isSeasonalCrop(p.cropType)) cropDraw = (x, y, s) => drawSeasonalCropSprite(x, y, s, p.cropType);
+
+      // Crop bob when player walks through
+      let _cropBob = 0;
+      if (state.player.moving) {
+        let _cdist = dist(state.player.x, state.player.y, p.x, p.y);
+        if (_cdist < 18) {
+          _cropBob = sin(frameCount * 0.2 + p.x * 0.5) * 2;
+        }
+      }
+      if (_cropBob !== 0) { px += floor(_cropBob); }
 
       // Blessed crop shimmer
       if (p.blessed) {
@@ -315,30 +460,79 @@ function drawOnePlot(p) {
         if (frameCount % 30 === 0) spawnParticles(p.x, p.y, 'burst', 2);
       }
 
+      // Companion proximity glow — faint green aura when companion is boosting this plot
+      let compB = getCompanionCropBonus(p);
+      if (compB > 0) {
+        let cGlow = sin(frameCount * 0.04 + p.x * 0.2) * 0.3 + 0.5;
+        fill(100, 255, 150, floor(cGlow * 25));
+        ellipse(px, py, 28, 20);
+      }
+
+      // Crop quality star indicator on ripe crops
       if (p.ripe) {
+        let quality = getCropQuality(p);
         let ripePulse = sin(frameCount * 0.06 + p.x * 0.1) * 0.4 + 0.6;
-        // Pixel glow cross
-        fill(255, 210, 60, 15 * ripePulse);
+        // Glow color varies by quality
+        let glowR = quality === 'gold' ? 255 : quality === 'silver' ? 200 : 255;
+        let glowG = quality === 'gold' ? 210 : quality === 'silver' ? 200 : 200;
+        let glowB = quality === 'gold' ? 60 : quality === 'silver' ? 200 : 80;
+        fill(glowR, glowG, glowB, 15 * ripePulse);
         rect(px - 14, py - 1, 28, 2);
         rect(px - 1, py - 14, 2, 28);
-        fill(p.blessed ? color(255, 220, 60, 50 * ripePulse) : color(255, 200, 80, 30 * ripePulse));
+        fill(glowR, glowG, glowB, (p.blessed ? 50 : 30) * ripePulse);
         rect(px - 8, py - 1, 16, 2);
         rect(px - 1, py - 8, 2, 16);
         if (ripePulse > 0.9 && frameCount % 20 < 2) {
           fill(255, 255, 200, 200);
           rect(px + floor(random(-8, 8)), py + floor(random(-8, 4)), 2, 2);
         }
+        // Quality star icon above crop
+        if (quality === 'gold') {
+          fill(255, 220, 40, floor(ripePulse * 200));
+          // Tiny pixel star
+          rect(px - 1, py - 18, 2, 2);
+          rect(px - 2, py - 17, 4, 1);
+          rect(px - 1, py - 16, 2, 1);
+        } else if (quality === 'silver') {
+          fill(200, 200, 210, floor(ripePulse * 150));
+          rect(px - 1, py - 17, 2, 1);
+          rect(px, py - 16, 1, 1);
+        }
         cropDraw(px, py, 1.0);
+      } else if (p.stage >= 3) {
+        // Stage 3 — almost ripe, fuller look
+        cropDraw(px, py, 0.85);
+        // Tiny buds appearing
+        fill(200, 180, 60, 80);
+        rect(px - 2, py - 10, 1, 1);
+        rect(px + 2, py - 9, 1, 1);
       } else if (p.stage >= 2) {
-        cropDraw(px, py, 0.7);
+        cropDraw(px, py, 0.65);
+        // Visible leaves
+        fill(70, 110, 35, 100);
+        rect(px - 4, py - 4, 2, 1);
+        rect(px + 2, py - 5, 2, 1);
       } else if (p.stage >= 1) {
-        cropDraw(px, py, 0.4);
+        // Small sprout with distinct shoot
+        cropDraw(px, py, 0.35);
+        // Root bulge at soil line
+        fill(80, 65, 40, 60);
+        rect(px - 2, py, 4, 2);
       } else {
-        // Pixel seed sprout
-        fill(50, 70, 20);
-        rect(px, py - 4, 1, 4);
-        fill(60, 80, 25, 180);
-        rect(px - 1, py - 5, 3, 2);
+        // Stage 0 — seed just planted, tiny bump in soil
+        fill(70, 55, 35, 80);
+        rect(px - 2, py - 1, 4, 2); // soil mound
+        // Tiny green tip emerging
+        fill(50, 80, 25);
+        rect(px, py - 3, 1, 3);
+        fill(65, 95, 30, 180);
+        rect(px - 1, py - 4, 3, 1);
+        // Moisture dots if watered
+        if (state.weather && state.weather.type === 'rain') {
+          fill(100, 150, 200, 80);
+          rect(px - 3, py + 1, 1, 1);
+          rect(px + 3, py, 1, 1);
+        }
       }
     }
 }
@@ -511,12 +705,128 @@ function drawSeasonalCropSprite(x, y, scale, type) {
   }
 }
 
+// ─── NEW CROP SPRITES ────────────────────────────────────────────────────
+function drawFlaxSprite(x, y, scale) {
+  x = floor(x); y = floor(y);
+  let s = floor(scale * 12);
+  let sway = floor(sin(frameCount * 0.035 + x * 0.12) * 2 * scale);
+  noStroke();
+  // Thin stalks — flax grows in clusters
+  let stalks = scale > 0.5 ? 4 : 2;
+  for (let i = 0; i < stalks; i++) {
+    let sx2 = x + floor((i - (stalks - 1) / 2) * 2.5 * scale);
+    let lean = floor((i - (stalks - 1) / 2) * scale + sway);
+    // Pale green stalk
+    fill(100, 140, 60);
+    rect(sx2 + lean, y - s, 1, s + 1);
+    // Tiny blue flower at top
+    if (scale > 0.6) {
+      fill(100, 140, 220);
+      rect(sx2 + lean - 1, y - s - 2, 3, 2);
+      // White center dot
+      fill(220, 230, 240);
+      rect(sx2 + lean, y - s - 1, 1, 1);
+    } else if (scale > 0.3) {
+      // Bud
+      fill(80, 120, 180, 180);
+      rect(sx2 + lean, y - s - 1, 1, 1);
+    }
+  }
+}
+
+function drawPomegranateSprite(x, y, scale) {
+  x = floor(x); y = floor(y);
+  let s = floor(scale * 16); // taller than most crops
+  let sway = floor(sin(frameCount * 0.02 + x * 0.08) * 1.5 * scale);
+  noStroke();
+  // Woody stem — thicker
+  fill(90, 65, 35);
+  rect(x + sway, y - s, 2, s + 2);
+  // Branches at stages 3+
+  if (scale > 0.5) {
+    fill(80, 60, 30);
+    rect(x + sway - 4, y - floor(s * 0.5), 4, 1);
+    rect(x + sway + 2, y - floor(s * 0.65), 4, 1);
+  }
+  // Leaves — dark green, more at higher stages
+  fill(50, 90, 30);
+  rect(x + sway - 3, y - floor(s * 0.4), 3, 2);
+  rect(x + sway + 1, y - floor(s * 0.6), 3, 2);
+  if (scale > 0.6) {
+    rect(x + sway - 4, y - floor(s * 0.7), 3, 2);
+    rect(x + sway + 2, y - floor(s * 0.3), 2, 2);
+  }
+  // Fruit — deep red, visible at scale > 0.7
+  if (scale > 0.7) {
+    let fx = x + sway - 1, fy = y - floor(s * 0.55);
+    fill(180, 30, 30);
+    rect(fx - 2, fy - 2, 5, 5);
+    // Crown detail on top
+    fill(140, 100, 40);
+    rect(fx - 1, fy - 3, 3, 1);
+    rect(fx, fy - 4, 1, 1);
+    // Highlight
+    fill(220, 60, 50, 80);
+    rect(fx - 1, fy - 1, 2, 2);
+  }
+  if (scale > 0.85) {
+    // Second fruit
+    let fx2 = x + sway + 2, fy2 = y - floor(s * 0.35);
+    fill(170, 25, 25);
+    rect(fx2 - 2, fy2 - 2, 4, 4);
+    fill(130, 90, 35);
+    rect(fx2 - 1, fy2 - 3, 2, 1);
+  }
+}
+
+function drawLotusSprite(x, y, scale) {
+  x = floor(x); y = floor(y);
+  let s = floor(scale * 13);
+  let sway = floor(sin(frameCount * 0.025 + x * 0.15) * 1.5 * scale);
+  noStroke();
+  // Stem — pale green, curves
+  fill(80, 140, 90);
+  rect(x, y - s, 1, s + 1);
+  // Lily pad base
+  fill(50, 120, 60, 150);
+  ellipse(x, y + 1, 10 * scale, 4 * scale);
+  // Large flower at top — pink/white petals in layers
+  if (scale > 0.5) {
+    let fx = x + sway, fy = y - s;
+    // Outer petals — pink
+    fill(240, 150, 180);
+    rect(fx - 4, fy - 1, 8, 2);
+    rect(fx - 1, fy - 4, 2, 8);
+    // Diagonal petals
+    rect(fx - 3, fy - 3, 2, 2);
+    rect(fx + 1, fy - 3, 2, 2);
+    rect(fx - 3, fy + 1, 2, 2);
+    rect(fx + 1, fy + 1, 2, 2);
+    // Inner petals — lighter
+    if (scale > 0.7) {
+      fill(250, 200, 220);
+      rect(fx - 2, fy - 2, 4, 4);
+    }
+    // Sacred golden center
+    fill(255, 220, 60);
+    rect(fx - 1, fy - 1, 2, 2);
+    // Mystical sparkle
+    if (scale > 0.8 && frameCount % 20 < 8) {
+      fill(200, 180, 255, 150);
+      rect(fx + floor(sin(frameCount * 0.1) * 3), fy - 5, 1, 1);
+    }
+  }
+}
+
 // ─── HARVEST BURST PARTICLES ─────────────────────────────────────────────
 function spawnHarvestBurst(wx, wy, cropType) {
   // Golden particle fountain — the Ceres offering
   let baseR = 255, baseG = 200, baseB = 50;
   if (cropType === 'grape') { baseR = 140; baseG = 60; baseB = 160; }
   else if (cropType === 'olive') { baseR = 120; baseG = 160; baseB = 40; }
+  else if (cropType === 'flax') { baseR = 100; baseG = 150; baseB = 220; }
+  else if (cropType === 'pomegranate') { baseR = 200; baseG = 40; baseB = 40; }
+  else if (cropType === 'lotus') { baseR = 240; baseG = 160; baseB = 200; }
   for (let i = 0; i < 12; i++) {
     let angle = random(TWO_PI);
     let speed = random(1.5, 4);
@@ -527,7 +837,7 @@ function spawnHarvestBurst(wx, wy, cropType) {
       life: random(35, 65), maxLife: 65,
       type: 'harvest_burst', size: random(2, 5),
       r: baseR + random(-20, 20), g: baseG + random(-20, 20), b: baseB,
-      gravity: 0.06, world: true,
+      gravity: 0.06, world: true, loot: true,
     });
   }
   // Central golden flash ring
@@ -833,7 +1143,7 @@ function drawHarvester(h_unused) {
     fill(200, 180, 60);
     rect(-2, -22, 4, 4);
     fill(60, 40, 20);
-    textSize(5);
+    textSize(9);
     textAlign(CENTER, CENTER);
     text(h.carryCount, 0, -20);
     textAlign(LEFT, TOP);

@@ -5,6 +5,263 @@
 // unlockJournal, startSailingCutscene, exitDive, getSkyBrightness, etc.
 // ═══════════════════════════════════════════════════════════════════════════
 
+// ─── MINI-GAME STATE — fishing, rock skipping, shells, campfire rest ─────
+let _wreckMiniGames = {
+  // Fishing
+  fishing: false,
+  fishTimer: 0,
+  fishCooldown: 0,
+  fishShadow: null,       // { x, y, windowStart, windowEnd }
+  fishPhase: 'idle',      // idle | waiting | shadow | caught | missed
+  fishCatchCount: 0,
+  // Rock skipping
+  rockSkip: false,
+  rockBounces: 0,
+  rockX: 0, rockY: 0, rockVX: 0, rockVY: 0,
+  rockPhase: 'idle',      // idle | throwing | bouncing | done
+  rockBounceWindow: 0,
+  rockHighScore: 0,
+  // Shell collecting
+  shells: [],
+  shellCount: 0,
+  shellLastRespawn: 0,
+  shellNecklace: false,
+  // Campfire rest
+  campfireResting: false,
+  // Campfire cooking
+  cooking: false,
+  cookTimer: 0,
+  cookPhase: 'idle',      // idle | cooking | done
+};
+
+// ─── TIDE SYSTEM — realistic water level cycle ──────────────────────────
+let _wreckTide = { level: 0, phase: 0 };
+function getWreckTideLevel() {
+  // Slow tide cycle: ~4 min full cycle, range -1 to 1
+  _wreckTide.phase = (frameCount * 0.0008) % TWO_PI;
+  _wreckTide.level = sin(_wreckTide.phase) * 0.6 + sin(_wreckTide.phase * 2.3) * 0.2;
+  return _wreckTide.level;
+}
+
+// ─── SEAGULL SYSTEM — atmospheric bird calls + behavior ─────────────────
+const SEAGULL_CALLS = ['Kree!', 'Kra-aa!', 'Kreee...', 'Kaw!'];
+function updateWreckSeagulls(dt) {
+  let w = state.wreck;
+  if (!w.seagulls) w.seagulls = [];
+  // Spawn seagulls — circle overhead, land on rocks, take off
+  if (w.seagulls.length < 4 && random() < 0.005) {
+    let fromAngle = random(TWO_PI);
+    let r = WRECK.rx * 2;
+    w.seagulls.push({
+      x: WRECK.cx + cos(fromAngle) * r,
+      y: WRECK.cy + sin(fromAngle) * r * 0.5,
+      vx: 0, vy: 0,
+      state: 'circling',
+      circleAngle: fromAngle,
+      circleR: WRECK.rx * (0.6 + random(0.5)),
+      circleSpeed: 0.008 + random(0.006),
+      timer: random(300, 600),
+      callTimer: random(120, 400),
+      wingPhase: random(TWO_PI),
+      altitude: 0.8 + random(0.4), // visual scale for height
+    });
+  }
+  let p = state.player;
+  for (let sg of w.seagulls) {
+    sg.timer -= dt;
+    sg.callTimer -= dt;
+    // Seagull cry
+    if (sg.callTimer <= 0) {
+      sg.callTimer = random(200, 600);
+      if (random() < 0.4) {
+        let msg = SEAGULL_CALLS[floor(random(SEAGULL_CALLS.length))];
+        addFloatingText(w2sX(sg.x), w2sY(sg.y) - 15, msg, '#aaccdd');
+      }
+    }
+    switch (sg.state) {
+      case 'circling':
+        sg.circleAngle += sg.circleSpeed * dt;
+        sg.x = WRECK.cx + cos(sg.circleAngle) * sg.circleR;
+        sg.y = WRECK.cy + sin(sg.circleAngle) * sg.circleR * 0.4 - 30 * sg.altitude;
+        // Occasionally swoop lower
+        if (sg.timer <= 0 && random() < 0.4) {
+          sg.state = 'swooping';
+          sg.timer = random(60, 120);
+          sg.targetX = WRECK.cx + random(-WRECK.rx * 0.5, WRECK.rx * 0.5);
+          sg.targetY = WRECK.cy + random(-10, 15);
+        }
+        if (sg.timer <= 0) sg.timer = random(200, 500);
+        break;
+      case 'swooping':
+        let sdx = sg.targetX - sg.x, sdy = sg.targetY - sg.y;
+        let sd = sqrt(sdx * sdx + sdy * sdy);
+        if (sd > 5) {
+          sg.vx = (sdx / sd) * 2.5;
+          sg.vy = (sdy / sd) * 1.5;
+          sg.x += sg.vx * dt;
+          sg.y += sg.vy * dt;
+        }
+        sg.timer -= dt;
+        if (sg.timer <= 0 || sd < 10) {
+          // Flee if player is near landing spot
+          let pd = dist(p.x, p.y, sg.x, sg.y);
+          if (pd < 60) {
+            sg.state = 'fleeing';
+            sg.timer = 80;
+            let fa = atan2(sg.y - p.y, sg.x - p.x);
+            sg.vx = cos(fa) * 3; sg.vy = sin(fa) * 1.5 - 1;
+          } else {
+            sg.state = 'landed';
+            sg.timer = random(200, 500);
+            sg.vx = 0; sg.vy = 0;
+          }
+        }
+        break;
+      case 'landed':
+        sg.vx = 0; sg.vy = 0;
+        // Scare away if player approaches
+        let lpd = dist(p.x, p.y, sg.x, sg.y);
+        if (lpd < 40) {
+          sg.state = 'fleeing';
+          sg.timer = 80;
+          let fa = atan2(sg.y - p.y, sg.x - p.x);
+          sg.vx = cos(fa) * 3; sg.vy = sin(fa) * 1.5 - 1.5;
+          sg.callTimer = 0; // cry when startled
+        }
+        if (sg.timer <= 0) {
+          sg.state = 'circling';
+          sg.timer = random(300, 600);
+        }
+        break;
+      case 'fleeing':
+        sg.x += sg.vx * dt;
+        sg.y += sg.vy * dt;
+        sg.vy -= 0.02 * dt; // gain altitude
+        if (sg.timer <= 0) {
+          sg.state = 'circling';
+          sg.timer = random(300, 600);
+          sg.circleAngle = atan2(sg.y - WRECK.cy, sg.x - WRECK.cx);
+        }
+        break;
+    }
+  }
+  // Cull distant seagulls
+  w.seagulls = w.seagulls.filter(sg => abs(sg.x - WRECK.cx) < WRECK.rx * 3 && abs(sg.y - WRECK.cy) < WRECK.ry * 3);
+}
+
+// ─── ENVIRONMENTAL STORYTELLING — discoverable lore items ───────────────
+const WRECK_LORE_ITEMS = [
+  {
+    id: 'captains_log',
+    type: 'journal',
+    title: "Captain's Log",
+    text: "Day 47. Storm struck at dawn. The mast snapped like kindling.\nGods forgive me — I steered us onto the rocks to save the crew.\nWe lost Cassius and young Demetrius. The rest made it to shore.\nI pray someone finds this. We head west at first light.",
+    reward: { res: 'wood', qty: 1 },
+  },
+  {
+    id: 'cargo_manifest',
+    type: 'manifest',
+    title: 'Cargo Manifest',
+    text: "TRIREME 'FORTUNA' — Manifest\n  12 amphorae Falernian wine (6 intact)\n  40 bolts Egyptian linen\n  8 crates Iberian copper ingots\n  1 sealed urn — contents: UNKNOWN (for the Senator)\n  NOTE: The sealed urn was taken by the captain.",
+    reward: { res: 'stone', qty: 2 },
+  },
+  {
+    id: 'sailors_prayer',
+    type: 'journal',
+    title: "Sailor's Prayer Tablet",
+    text: "Neptune, lord of the deep,\ncarry these words across your waters.\nI, Lucius, son of Marcus, swear:\nif you return me home to Ostia,\nI will dedicate a white bull at your temple.\nMy wife waits. My son grows without me.",
+    reward: { res: 'seeds', qty: 1 },
+  },
+  {
+    id: 'navigation_chart',
+    type: 'manifest',
+    title: 'Water-Stained Chart',
+    text: "A faded navigation chart, barely readable.\nSeveral islands are marked — one circled in red ink\nwith the note: 'Rich soil. Fresh water. Safe harbor.'\nAn arrow points from the wreck site toward it.\nThis must be where the survivors were heading.",
+    reward: { res: 'wood', qty: 2 },
+  },
+];
+
+function initWreckLoreItems() {
+  if (state.wreck.loreItems) return;
+  state.wreck.loreItems = [];
+  // Place lore items at interesting positions around the wreck
+  let positions = [
+    { x: WRECK.cx - 65, y: WRECK.cy - 10 },  // near the bow
+    { x: WRECK.cx + 50, y: WRECK.cy + 5 },    // near the stern
+    { x: WRECK.cx - 30, y: WRECK.cy + 20 },   // on the beach
+    { x: WRECK.cx + 80, y: WRECK.cy - 5 },     // east rocks
+  ];
+  for (let i = 0; i < WRECK_LORE_ITEMS.length; i++) {
+    let pos = positions[i % positions.length];
+    state.wreck.loreItems.push({
+      id: WRECK_LORE_ITEMS[i].id,
+      x: pos.x + random(-8, 8),
+      y: pos.y + random(-5, 5),
+      found: false,
+    });
+  }
+}
+
+function getNearestLoreItem() {
+  if (!state.wreck.loreItems) return null;
+  let p = state.player;
+  let best = null, bestD = Infinity;
+  for (let li of state.wreck.loreItems) {
+    if (li.found) continue;
+    let d = dist(p.x, p.y, li.x, li.y);
+    if (d < bestD) { bestD = d; best = li; }
+  }
+  return bestD < 30 ? best : null;
+}
+
+function collectLoreItem(item) {
+  item.found = true;
+  let data = WRECK_LORE_ITEMS.find(l => l.id === item.id);
+  if (!data) return;
+  if (snd) snd.playSFX('page_turn');
+  // Show the lore text as a journal popup
+  if (typeof showLorePopup === 'function') {
+    showLorePopup(data.title, data.text);
+  } else {
+    addFloatingText(w2sX(item.x), w2sY(item.y) - 15, 'Found: ' + data.title, '#ddc080');
+  }
+  // Give reward
+  if (data.reward) {
+    state[data.reward.res] = (state[data.reward.res] || 0) + data.reward.qty;
+    addFloatingText(w2sX(item.x), w2sY(item.y) - 28,
+      '+' + data.reward.qty + ' ' + data.reward.res.charAt(0).toUpperCase() + data.reward.res.slice(1),
+      C.solarGold);
+  }
+  // Sparkle effect
+  for (let i = 0; i < 8; i++) {
+    particles.push({
+      x: item.x, y: item.y,
+      vx: random(-1, 1), vy: random(-1.5, -0.3),
+      life: 30, maxLife: 30, size: 2.5, type: 'sparkle',
+      color: [255, 220, 120], world: true,
+    });
+  }
+  unlockJournal('wreck_' + item.id);
+}
+
+// ─── BEACH DEBRIS SYSTEM — atmospheric scattered wreckage ───────────────
+function initWreckDebris() {
+  if (state.wreck.beachDebris) return;
+  state.wreck.beachDebris = [];
+  let types = ['plank_fragment', 'rope_tangle', 'broken_oar', 'torn_net', 'amphora_shard', 'barrel_stave'];
+  for (let i = 0; i < 12; i++) {
+    let ang = random(TWO_PI);
+    let r = random(0.3, 0.8);
+    state.wreck.beachDebris.push({
+      x: WRECK.cx + cos(ang) * WRECK.rx * r * 0.7,
+      y: WRECK.cy + sin(ang) * WRECK.ry * r * 0.3,
+      type: types[i % types.length],
+      rot: random(-0.3, 0.3),
+      size: 0.7 + random(0.6),
+    });
+  }
+}
+
 // Check if world point is on wreck beach (wider, natural shape)
 function isOnWreck(wx, wy) {
   let dx = (wx - WRECK.cx) / (WRECK.rx * 0.9);
@@ -24,8 +281,172 @@ function getWreckDepth(wx, wy) {
   return 4;
 }
 
+// ─── FISHING MINI-GAME — hand-spear from shore ──────────────────────────
+function initWreckShells() {
+  let mg = _wreckMiniGames;
+  if (mg.shells.length > 0 && (state.time / 60) - mg.shellLastRespawn < 1) return;
+  mg.shells = [];
+  mg.shellLastRespawn = state.time / 60;
+  for (let i = 0; i < 10; i++) {
+    let ang = random(-PI * 0.8, PI * 0.8);
+    let r = random(0.2, 0.65);
+    mg.shells.push({
+      x: WRECK.cx + cos(ang) * WRECK.rx * r * 0.7,
+      y: WRECK.cy + sin(ang) * WRECK.ry * r * 0.3 + WRECK.ry * 0.15,
+      collected: false,
+      type: floor(random(3)), // 0=conch 1=scallop 2=spiral
+    });
+  }
+}
+
+function updateWreckFishing(dt) {
+  let mg = _wreckMiniGames;
+  if (mg.fishCooldown > 0) mg.fishCooldown -= dt;
+
+  if (mg.fishPhase === 'waiting') {
+    mg.fishTimer -= dt;
+    if (mg.fishTimer <= 0) {
+      // Spawn fish shadow
+      let px = state.player.x + random(-20, 20);
+      let py = state.player.y + random(5, 20);
+      mg.fishShadow = { x: px, y: py, timer: 90 }; // ~1.5 sec window at 60fps
+      mg.fishPhase = 'shadow';
+    }
+  } else if (mg.fishPhase === 'shadow') {
+    mg.fishShadow.timer -= dt;
+    if (mg.fishShadow.timer <= 0) {
+      mg.fishPhase = 'missed';
+      addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 15, 'Too slow!', '#88aacc');
+      mg.fishCooldown = 600; // 10 sec
+      mg.fishing = false;
+      mg.fishPhase = 'idle';
+    }
+  } else if (mg.fishPhase === 'caught') {
+    mg.fishPhase = 'idle';
+    mg.fishing = false;
+    mg.fishCooldown = 600;
+  }
+}
+
+function handleFishingCatch() {
+  let mg = _wreckMiniGames;
+  if (mg.fishPhase !== 'shadow') return;
+  let roll = random();
+  mg.fishPhase = 'caught';
+  mg.fishing = false;
+  if (roll < 0.2) {
+    addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 15, 'Nothing... it got away!', '#88aacc');
+  } else if (roll < 0.55) {
+    state.wreck.hunger = min(100, state.wreck.hunger + 15);
+    state.fish += 1;
+    mg.fishCatchCount++;
+    addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 15, '+1 Fish (+15 Hunger)', C.solarGold);
+    if (snd) snd.playSFX('scavenge');
+  } else {
+    state.wreck.hunger = min(100, state.wreck.hunger + 20);
+    mg.fishCatchCount++;
+    addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 15, 'Caught a Crab! (+20 Hunger)', C.solarGold);
+    if (snd) snd.playSFX('crab_catch');
+  }
+  // Fish caught count also helps cat befriending
+  mg.fishCooldown = 600;
+}
+
+// ─── ROCK SKIPPING MINI-GAME — near tide pools ─────────────────────────
+function startRockSkip() {
+  let mg = _wreckMiniGames;
+  mg.rockSkip = true;
+  mg.rockPhase = 'throwing';
+  mg.rockBounces = 0;
+  mg.rockX = state.player.x;
+  mg.rockY = state.player.y;
+  mg.rockVX = 2.5;
+  mg.rockVY = 0.3;
+  mg.rockBounceWindow = 40; // frames to press E for next bounce
+  addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 15, 'Skipping...', '#aaddee');
+}
+
+function updateRockSkip(dt) {
+  let mg = _wreckMiniGames;
+  if (!mg.rockSkip || mg.rockPhase === 'idle') return;
+
+  if (mg.rockPhase === 'throwing' || mg.rockPhase === 'bouncing') {
+    mg.rockX += mg.rockVX * dt;
+    mg.rockY += mg.rockVY * dt;
+    mg.rockBounceWindow -= dt;
+
+    if (mg.rockBounceWindow <= 0) {
+      // Sank
+      mg.rockPhase = 'done';
+      let score = mg.rockBounces;
+      if (score > mg.rockHighScore) {
+        mg.rockHighScore = score;
+        addFloatingText(w2sX(mg.rockX), w2sY(mg.rockY) - 10, 'New record! ' + score + ' skips!', '#ffdd66');
+      } else {
+        addFloatingText(w2sX(mg.rockX), w2sY(mg.rockY) - 10, score + ' skips! (best: ' + mg.rockHighScore + ')', '#aaddee');
+      }
+      spawnWreckSplash(mg.rockX, mg.rockY, 4, 5);
+      mg.rockSkip = false;
+      mg.rockPhase = 'idle';
+    }
+  }
+}
+
+function handleRockBounce() {
+  let mg = _wreckMiniGames;
+  if (!mg.rockSkip || mg.rockPhase === 'done' || mg.rockPhase === 'idle') return;
+  mg.rockBounces++;
+  mg.rockBounceWindow = max(15, 40 - mg.rockBounces * 3); // gets harder each bounce
+  mg.rockVX = max(1.0, mg.rockVX - 0.15);
+  spawnWreckSplash(mg.rockX, mg.rockY, 2, 3);
+  addFloatingText(w2sX(mg.rockX), w2sY(mg.rockY) - 8, '' + mg.rockBounces, '#cceeFF');
+  mg.rockPhase = 'bouncing';
+}
+
+// ─── CAMPFIRE COOKING — fish over fire ──────────────────────────────────
+function startCooking() {
+  let mg = _wreckMiniGames;
+  mg.cooking = true;
+  mg.cookTimer = 180; // 3 seconds at 60fps
+  mg.cookPhase = 'cooking';
+  state.fish -= 1;
+  addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 15, 'Cooking...', '#ffaa44');
+}
+
+function updateWreckCooking(dt) {
+  let mg = _wreckMiniGames;
+  if (!mg.cooking || mg.cookPhase !== 'cooking') return;
+  mg.cookTimer -= dt;
+  if (mg.cookTimer <= 0) {
+    mg.cookPhase = 'idle';
+    mg.cooking = false;
+    state.wreck.hunger = min(100, state.wreck.hunger + 30);
+    addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 15, 'Cooked Fish! (+30 Hunger)', C.solarGold);
+    if (snd) snd.playSFX('scavenge');
+    for (let i = 0; i < 4; i++) {
+      particles.push({
+        x: state.player.x, y: state.player.y - 5,
+        vx: random(-0.5, 0.5), vy: random(-1.2, -0.3),
+        life: 25, maxLife: 25, size: 2, type: 'sparkle',
+        color: [255, 200, 80], world: true,
+      });
+    }
+  }
+}
+
 function updateWreckBeach(dt) {
   let p = state.player;
+
+  // ── Auto-save on wreck (every ~90s at 60fps) ──────────────────────────
+  if (!state.wreck._autoSaveTimer) state.wreck._autoSaveTimer = 0;
+  state.wreck._autoSaveTimer += dt;
+  if (state.wreck._autoSaveTimer > 5400) {
+    state.wreck._autoSaveTimer = 0;
+    if (typeof saveGame === 'function') {
+      saveGame();
+      addFloatingText(w2sX(p.x), w2sY(p.y) - 30, 'Auto-saved', C.textDim);
+    }
+  }
 
   // ── Depth calculation ────────────────────────────────────────────────────
   let prevDepth = state.diving.depth || 0;
@@ -108,10 +529,105 @@ function updateWreckBeach(dt) {
     spawnWreckSplash(p.x, p.y, 5, 6);
   }
 
-  // ── Update crabs + ambient + cat ─────────────────────────────────────────
+  // ── Update crabs + ambient + cat + seagulls + lore ──────────────────────
   updateWreckCrabs(dt);
   updateWreckAmbient(dt);
   updateWreckCat(dt);
+  updateWreckSeagulls(dt);
+  initWreckLoreItems();
+  initWreckDebris();
+  initWreckShells();
+
+  // ── Mini-games ─────────────────────────────────────────────────────────
+  updateWreckFishing(dt);
+  updateRockSkip(dt);
+  updateWreckCooking(dt);
+
+  // ── Campfire resting — time passes 3x faster ──────────────────────────
+  if (_wreckMiniGames.campfireResting) {
+    state.time += 1.5 * dt; // extra on top of normal updateTime (~3x total)
+    // Stars come out text once
+    let restHr = state.time / 60;
+    if (restHr >= 19.5 && !w._starsShown) {
+      w._starsShown = true;
+      addFloatingText(w2sX(p.x), w2sY(p.y) - 25, 'The stars emerge...', '#aabbdd');
+    }
+    // Stop resting if player moves
+    if (p.moving) {
+      _wreckMiniGames.campfireResting = false;
+      addFloatingText(w2sX(p.x), w2sY(p.y) - 15, 'Stood up.', '#ccbb88');
+    }
+  }
+
+  // ── SURVIVAL: Hunger/Thirst drain ─────────────────────────────────────
+  let w = state.wreck;
+  // Thirst: 1%/min game time. state.time increments at 0.18*dt per frame.
+  // At 60fps, dt=1, that's 0.18 min/frame. 1%/min = 0.18%/frame = 0.003/frame
+  w.thirst = max(0, w.thirst - 0.003 * dt);
+  w.hunger = max(0, w.hunger - 0.0015 * dt); // 0.5%/min
+
+  // ── SURVIVAL: Night danger (hour 20+) ─────────────────────────────────
+  let hr = state.time / 60;
+  if (hr >= 20 || hr < 6) {
+    // Cold damage without shelter + fire
+    if (!w.shelter && !w.hasFire && frameCount % 120 === 0) {
+      addFloatingText(w2sX(p.x), w2sY(p.y) - 20, 'Cold and exposed!', '#8888ff');
+      w.hunger = max(0, w.hunger - 2);
+      w.thirst = max(0, w.thirst - 1);
+    }
+    // Wolf howls (atmospheric)
+    if (frameCount % 600 === 0) {
+      addFloatingText(w2sX(WRECK.cx - 100), w2sY(WRECK.cy - 40), 'Awooo...', '#666688');
+    }
+  }
+
+  // ── SURVIVAL: Shelter sleep — skip night ──────────────────────────────
+  if (w.sleepingInShelter) {
+    // Fast-forward time by adding extra to state.time (updateTime already adds 0.18/frame)
+    state.time += 3.0 * dt; // speeds up night passage ~18x faster
+    // Check if it's morning now (hr 6-20 range = daytime)
+    // updateTime in sketch.js handles the day rollover at 1440 and resets to 0.
+    // After rollover, time will be near 0 (midnight-ish in game), keep sleeping.
+    // Wake up when time is between 5:30am and 7am (330-420 minutes).
+    let curHr = state.time / 60;
+    if (curHr >= 5.5 && curHr < 8 && state.day > (w._sleepStartDay || 0)) {
+      w.sleepingInShelter = false;
+      w.nightSurvived = true;
+      state.time = 6 * 60; // snap to 6am
+      w.hunger = min(100, w.hunger + 10);
+      w.thirst = min(100, w.thirst + 5);
+      addFloatingText(w2sX(p.x), w2sY(p.y) - 15, 'Dawn breaks. You survived the night.', '#ffdd88');
+    }
+    return; // don't process other updates while sleeping
+  }
+
+  // ── SURVIVAL: Starvation/dehydration effects ─────────────────────────
+  if (w.thirst <= 0 || w.hunger <= 0) {
+    // Slow player, dim screen handled in drawWreckHUD
+    state.player.speed = 1.2; // normally ~2.0
+    if (frameCount % 180 === 0) {
+      let msg = w.thirst <= 0 ? 'Find water!' : 'Find food!';
+      addFloatingText(w2sX(p.x), w2sY(p.y) - 25, msg, '#ff6644');
+    }
+  } else {
+    state.player.speed = 2.0;
+  }
+
+  // ── Tide-driven shore particles ─────────────────────────────────────────
+  let tide = getWreckTideLevel();
+  if (frameCount % 40 === 0 && tide > 0.3) {
+    let wx = WRECK.cx + random(-WRECK.rx * 0.5, WRECK.rx * 0.5);
+    let wy = WRECK.cy + WRECK.ry * 0.35;
+    spawnWreckSplash(wx, wy, 3, 3);
+  }
+
+  // ── Lore item hints ─────────────────────────────────────────────────────
+  let nearLore = getNearestLoreItem();
+  if (nearLore) {
+    let loreData = WRECK_LORE_ITEMS.find(l => l.id === nearLore.id);
+    let label = loreData ? loreData.title : 'Something...';
+    showTutorialHint('Press E to examine: ' + label, nearLore.x, nearLore.y - 20);
+  }
 
   // ── Tutorial hints ────────────────────────────────────────────────────────
   if (state.progression.tutorialsSeen && !state.progression.tutorialsSeen.gather && state.wreck.scavNodes.some(n => !n.collected)) {
@@ -121,14 +637,82 @@ function updateWreckBeach(dt) {
     }
   }
 
-  // ── Raft hints ────────────────────────────────────────────────────────────
-  let raftX = WRECK.cx, raftY = WRECK.cy + 35;
-  if (state.wreck.raftBuilt) {
-    if (dist(p.x, p.y, raftX, raftY) < 55) {
-      showTutorialHint('Press E to launch the raft!', raftX, raftY - 25);
+  // ── Workbench/crafting hints ──────────────────────────────────────────
+  let wbX = WRECK.cx, wbY = WRECK.cy + 35;
+  let inv = w.inventory;
+  if (w.raftBuilt) {
+    if (dist(p.x, p.y, wbX, wbY) < 55) {
+      let daysPassed = state.day - (w.wreckDayStart || 1);
+      if (daysPassed < 1) showTutorialHint('Rest tonight, sail tomorrow.', wbX, wbY - 25);
+      else showTutorialHint('Press E to launch the raft!', wbX, wbY - 25);
     }
-  } else if (dist(p.x, p.y, raftX, raftY) < 55 && (state.wood > 0 || state.seeds > 0)) {
-    showTutorialHint('Press E to add materials to raft', raftX, raftY - 25);
+  } else if (dist(p.x, p.y, wbX, wbY) < 55) {
+    // Show what can be crafted
+    if (!inv.hammer) showTutorialHint('WORKBENCH — Need hammer (search the wreck)', wbX, wbY - 25);
+    else if (!inv.raftFrame && inv.driftwood >= 3 && inv.rope >= 1) showTutorialHint('Press E: Craft Raft Frame (3 driftwood + 1 rope)', wbX, wbY - 25);
+    else if (inv.raftFrame && !inv.seaworthyRaft && inv.sailcloth >= 2) showTutorialHint('Press E: Craft Seaworthy Raft (frame + 2 sailcloth)', wbX, wbY - 25);
+    else if (!w.shelter && inv.driftwood >= 2 && inv.palmFrond >= 1) showTutorialHint('Press E: Build Shelter (2 driftwood + 1 frond)', wbX, wbY - 25);
+    else if (!w.hasFire && inv.driftwood >= 1 && inv.flint) showTutorialHint('Press E: Light Campfire (1 driftwood + flint)', wbX, wbY - 25);
+    else showTutorialHint('WORKBENCH — Gather more materials', wbX, wbY - 25);
+  }
+
+  // ── Shelter hints ─────────────────────────────────────────────────────
+  if (w.shelter && hr >= 16 && hr < 17) {
+    showTutorialHint('Sundown approaches! Press E at your shelter to sleep.', w.shelterX || WRECK.cx + 20, (w.shelterY || WRECK.cy + 5) - 20);
+  }
+
+  // ── Cat fish hint ─────────────────────────────────────────────────────
+  let cat = w.cat;
+  if (cat && cat.state !== 'hidden' && !cat.introduced && state.fish > 0) {
+    if (dist(p.x, p.y, cat.x, cat.y) < 80) {
+      showTutorialHint('Press E to leave fish for the cat (' + w.catFishGiven + '/3)', cat.x, cat.y - 25);
+    }
+  }
+
+  // ── Fishing hint — near south shore (ankle/waist water) ─────────────
+  let mg = _wreckMiniGames;
+  let fishZone = curDepth === 1 || curDepth === 2;
+  if (fishZone && !mg.fishing && mg.fishCooldown <= 0 && !mg.rockSkip && !mg.cooking) {
+    showTutorialHint('Press E to fish', p.x, p.y - 25);
+  }
+  if (mg.fishPhase === 'shadow' && mg.fishShadow) {
+    showTutorialHint('NOW! Press E!', mg.fishShadow.x, mg.fishShadow.y - 15);
+  }
+
+  // ── Rock skipping hint — near tide pools (east side) ────────────────
+  let tidePoolX = WRECK.cx + WRECK.rx * 0.4;
+  let tidePoolY = WRECK.cy + WRECK.ry * 0.15;
+  if (dist(p.x, p.y, tidePoolX, tidePoolY) < 40 && !mg.rockSkip && !mg.fishing && !mg.cooking) {
+    showTutorialHint('Press E to skip rocks' + (mg.rockHighScore > 0 ? ' (best: ' + mg.rockHighScore + ')' : ''), tidePoolX, tidePoolY - 20);
+  }
+  if (mg.rockSkip && mg.rockPhase === 'bouncing') {
+    showTutorialHint('Press E to bounce!', mg.rockX, mg.rockY - 15);
+  }
+
+  // ── Shell collecting hint ───────────────────────────────────────────
+  let nearShell = null, nearShellD = Infinity;
+  for (let sh of mg.shells) {
+    if (sh.collected) continue;
+    let sd = dist(p.x, p.y, sh.x, sh.y);
+    if (sd < nearShellD) { nearShellD = sd; nearShell = sh; }
+  }
+  if (nearShell && nearShellD < 25) {
+    showTutorialHint('Press E to collect shell (' + mg.shellCount + ' collected)', nearShell.x, nearShell.y - 15);
+  }
+
+  // ── Campfire rest hint ──────────────────────────────────────────────
+  let cfX = WRECK.cx + 40, cfY = WRECK.cy + 15;
+  if (w.campfire && dist(p.x, p.y, cfX, cfY) < 30 && !mg.campfireResting && !mg.cooking) {
+    let hints = [];
+    if (state.fish > 0) hints.push('Cook fish');
+    hints.push('Rest by fire');
+    showTutorialHint('Press E: ' + hints.join(' / '), cfX, cfY - 25);
+  }
+  if (mg.campfireResting) {
+    showTutorialHint('Resting... (move to stand up)', cfX, cfY - 25);
+  }
+  if (mg.cooking && mg.cookPhase === 'cooking') {
+    showTutorialHint('Cooking... ' + ceil(mg.cookTimer / 60) + 's', cfX, cfY - 25);
   }
 }
 
@@ -173,107 +757,340 @@ function collectScavNode(node) {
   node.collected = true;
   if (snd) snd.playSFX('scavenge');
   let t = node.type;
+  let inv = state.wreck.inventory;
+  let w = state.wreck;
   let label = '';
-  if (t === 'stick' || t === 'plank') { state.wood += (t === 'plank' ? 2 : 1); label = '+' + (t === 'plank' ? '2' : '1') + ' Wood'; }
-  else if (t === 'stone' || t === 'flint') { state.stone += (t === 'flint' ? 2 : 1); label = '+' + (t === 'flint' ? '2' : '1') + ' Stone'; }
-  else if (t === 'rope') { state.wood += 1; label = '+1 Rope'; }
-  else if (t === 'cloth') { state.seeds += 1; label = '+1 Cloth'; }
-  else if (t === 'coconut') { state.fish += 1; label = '+1 Coconut (Food)'; }
+
+  switch (t) {
+    case 'driftwood':
+      inv.driftwood++; label = '+1 Driftwood (' + inv.driftwood + ')'; break;
+    case 'sailcloth':
+      inv.sailcloth++; label = '+1 Sailcloth (' + inv.sailcloth + ')'; break;
+    case 'rope':
+      inv.rope++; label = '+1 Rope (' + inv.rope + ')'; break;
+    case 'hammer':
+      inv.hammer = 1; label = 'Found Hammer!'; break;
+    case 'flint':
+      inv.flint = 1; label = 'Found Flint!'; break;
+    case 'palmfrond':
+      inv.palmFrond++; label = '+1 Palm Frond'; break;
+    case 'berries':
+      w.hunger = min(100, w.hunger + 15); label = '+15 Hunger (Berries)'; break;
+    case 'coconut':
+      w.thirst = min(100, w.thirst + 20); w.hunger = min(100, w.hunger + 5);
+      label = '+20 Thirst +5 Hunger (Coconut)'; break;
+    case 'fish':
+      state.fish += 1; label = '+1 Fish'; break;
+    case 'freshwater':
+      w.thirst = min(100, w.thirst + 30); label = '+30 Thirst (Rain Puddle)'; break;
+    case 'spring':
+      w.thirst = min(100, w.thirst + 50); label = '+50 Thirst (Fresh Spring!)';
+      if (!w.caveDiscovered) {
+        w.caveDiscovered = true;
+        addFloatingText(w2sX(node.x), w2sY(node.y) - 25, 'Ancient drawings on the cave wall...', '#aaddff');
+        unlockJournal('wreck_cave');
+      }
+      break;
+    // Legacy types from old saves
+    case 'stick': case 'plank':
+      state.wood += (t === 'plank' ? 2 : 1); inv.driftwood++; label = '+' + (t === 'plank' ? '2' : '1') + ' Wood'; break;
+    case 'stone':
+      state.stone += 1; label = '+1 Stone'; break;
+    case 'cloth':
+      inv.sailcloth++; label = '+1 Sailcloth'; break;
+    default:
+      label = 'Found ' + t; break;
+  }
   addFloatingText(w2sX(node.x), w2sY(node.y) - 10, label, C.solarGold);
 
   // Mark tutorial seen
   state.progression.tutorialsSeen.gather = true;
 
-  // Check if enough materials to hint at raft building
-  if (state.wood >= 2 && !state.progression.tutorialsSeen.repair) {
-    showTutorialHint('Head to the south beach to build a raft', WRECK.cx, WRECK.cy + 30);
-    state.progression.tutorialsSeen.repair = true;
+  // Zone discovery
+  let px = node.x - WRECK.cx;
+  let py = node.y - WRECK.cy;
+  if (px > 120 && !w.tidePoolsExplored) {
+    w.tidePoolsExplored = true;
+    addFloatingText(w2sX(node.x), w2sY(node.y) - 25, 'Tide Pools discovered!', '#88ddcc');
+  }
+  if (py < -15 && !w.jungleExplored) {
+    w.jungleExplored = true;
+    addFloatingText(w2sX(node.x), w2sY(node.y) - 25, 'Jungle Edge discovered! Strange sounds...', '#88cc66');
+  }
+
+  // Crafting hint when near workbench with materials
+  if (inv.driftwood >= 3 && inv.rope >= 1 && inv.hammer && !inv.raftFrame) {
+    showTutorialHint('Go to the workbench (south beach) to craft a raft frame!', WRECK.cx, WRECK.cy + 30);
+  }
+  if (inv.driftwood >= 2 && inv.palmFrond >= 1 && !w.shelter) {
+    showTutorialHint('You can build a lean-to shelter for the night!', WRECK.cx + 20, WRECK.cy + 5);
   }
 }
 
-function buildRaft() {
+// Workbench crafting — called when player presses E near workbench
+function handleWorkbenchCraft() {
   let w = state.wreck;
-  if (w.raftBuilt) return;
-  // Add whatever materials the player has, up to the requirements
-  let added = false;
-  let woodNeeded = 8 - w.raftWood;
-  let ropeNeeded = 4 - w.raftRope;
-  let clothNeeded = 2 - w.raftCloth;
+  let inv = w.inventory;
+  let wbX = WRECK.cx, wbY = WRECK.cy + 35;
 
-  // Wood: stored in state.wood (planks give 2, sticks give 1)
-  if (state.wood > 0 && woodNeeded > 0) {
-    let give = min(state.wood, woodNeeded);
-    state.wood -= give; w.raftWood += give; added = true;
-  }
-  // Rope: stored in state.wood too (rope nodes give +1 wood) — we use a heuristic:
-  // Actually rope was collected as wood. We'll just use wood for both wood+rope costs.
-  // Let's simplify: rope needed is tracked separately and also costs from wood pool.
-  if (state.wood > 0 && ropeNeeded > 0) {
-    let give = min(state.wood, ropeNeeded);
-    state.wood -= give; w.raftRope += give; added = true;
-  }
-  // Cloth: stored in state.seeds (cloth nodes give +1 seeds)
-  if (state.seeds > 0 && clothNeeded > 0) {
-    let give = min(state.seeds, clothNeeded);
-    state.seeds -= give; w.raftCloth += give; added = true;
+  if (!inv.hammer) {
+    addFloatingText(w2sX(wbX), w2sY(wbY) - 15, 'Need a hammer to build! (Search the wreck)', C.textDim);
+    return;
   }
 
-  if (added) {
+  // Priority 1: Craft raft frame (3 driftwood + 1 rope)
+  if (!inv.raftFrame && inv.driftwood >= 3 && inv.rope >= 1) {
+    inv.driftwood -= 3; inv.rope -= 1;
+    inv.raftFrame = true;
     if (snd) snd.playSFX('repair');
-    w.raftProgress = floor((w.raftWood / 8 + w.raftRope / 4 + w.raftCloth / 2) / 3 * 100);
-    let raftX = WRECK.cx, raftY = WRECK.cy + 35;
-    addFloatingText(w2sX(raftX), w2sY(raftY) - 15,
-      'RAFT ' + w.raftProgress + '%', w.raftProgress >= 100 ? C.crystalGlow : C.solarGold);
-    if (w.raftWood >= 8 && w.raftRope >= 4 && w.raftCloth >= 2) {
-      w.raftBuilt = true;
-      w.raftProgress = 100;
-      state.progression.triremeRepaired = true; // reuse flag for progression
-      addFloatingText(w2sX(raftX), w2sY(raftY) - 30,
-        'RAFT COMPLETE!', C.crystalGlow);
-      unlockJournal('trireme_repair');
+    addFloatingText(w2sX(wbX), w2sY(wbY) - 15, 'RAFT FRAME CRAFTED!', C.solarGold);
+    w.raftProgress = 50;
+    // Sparkle
+    for (let i = 0; i < 6; i++) {
+      particles.push({ x: WRECK.cx, y: WRECK.cy + 35, vx: random(-1, 1), vy: random(-1.5, -0.3), life: 25, maxLife: 25, size: 2, type: 'sparkle', color: [255, 220, 100], world: true });
     }
-  } else {
-    addFloatingText(w2sX(WRECK.cx), w2sY(WRECK.cy + 35) - 15,
-      'Need more materials!', C.textDim);
+    return;
   }
+
+  // Priority 2: Craft seaworthy raft (raft frame + 2 sailcloth)
+  if (inv.raftFrame && !inv.seaworthyRaft && inv.sailcloth >= 2) {
+    inv.sailcloth -= 2;
+    inv.seaworthyRaft = true;
+    w.raftBuilt = true;
+    w.raftProgress = 100;
+    state.progression.triremeRepaired = true;
+    if (snd) snd.playSFX('repair');
+    addFloatingText(w2sX(wbX), w2sY(wbY) - 15, 'SEAWORTHY RAFT COMPLETE!', C.crystalGlow);
+    unlockJournal('trireme_repair');
+    for (let i = 0; i < 12; i++) {
+      particles.push({ x: WRECK.cx, y: WRECK.cy + 35, vx: random(-1.5, 1.5), vy: random(-2, -0.5), life: 35, maxLife: 35, size: 3, type: 'sparkle', color: [100, 255, 150], world: true });
+    }
+    return;
+  }
+
+  // Priority 3: Shelter (2 driftwood + 1 palm frond)
+  if (!w.shelter && inv.driftwood >= 2 && inv.palmFrond >= 1) {
+    inv.driftwood -= 2; inv.palmFrond -= 1;
+    w.shelter = true;
+    w.shelterX = WRECK.cx + 20; w.shelterY = WRECK.cy + 5;
+    if (snd) snd.playSFX('repair');
+    addFloatingText(w2sX(wbX), w2sY(wbY) - 15, 'LEAN-TO SHELTER BUILT!', C.solarGold);
+    return;
+  }
+
+  // Priority 4: Campfire (1 driftwood + flint)
+  if (!w.hasFire && inv.driftwood >= 1 && inv.flint) {
+    inv.driftwood -= 1;
+    w.hasFire = true;
+    w.campfire = true;
+    if (snd) snd.playSFX('repair');
+    addFloatingText(w2sX(wbX), w2sY(wbY) - 15, 'CAMPFIRE LIT!', C.solarFlare);
+    return;
+  }
+
+  // Show what can be crafted
+  let hints = [];
+  if (!inv.raftFrame) hints.push('Raft Frame: 3 driftwood + 1 rope (have ' + inv.driftwood + '/3 wood, ' + inv.rope + '/1 rope)');
+  else if (!inv.seaworthyRaft) hints.push('Raft: frame + 2 sailcloth (have ' + inv.sailcloth + '/2)');
+  if (!w.shelter) hints.push('Shelter: 2 driftwood + 1 palm frond');
+  if (!w.hasFire) hints.push('Campfire: 1 driftwood + flint');
+  let hint = hints.length > 0 ? hints[0] : 'Nothing left to craft!';
+  addFloatingText(w2sX(wbX), w2sY(wbY) - 15, hint, C.textDim);
 }
+
+// Legacy compat wrapper
+function buildRaft() { handleWorkbenchCraft(); }
 
 function sailToHome() {
-  // Play sailing cutscene — completeSailToHome() called when done
+  // Dramatic departure sequence before sailing cutscene
+  if (snd) snd.playSFX('repair');
+  let raftX = WRECK.cx, raftY = WRECK.cy + 35;
+  // Big splash as raft hits water
+  spawnWreckSplash(raftX, raftY, 20, 18);
+  // Farewell text
+  addFloatingText(w2sX(raftX), w2sY(raftY) - 40,
+    'The sea awaits...', '#88ccff');
+  // Cat meow if present
+  let cat = state.wreck.cat;
+  if (cat && cat.introduced) {
+    addFloatingText(w2sX(cat.x), w2sY(cat.y) - 15, 'Mrrp!', '#ffcc88');
+    particles.push({
+      x: cat.x, y: cat.y - 10,
+      vx: random(-0.2, 0.2), vy: -1.0,
+      life: 40, maxLife: 40,
+      type: 'heart', size: 4,
+      r: 255, g: 120, b: 140, world: true,
+    });
+  }
+  // Seagulls scatter
+  if (state.wreck.seagulls) {
+    for (let sg of state.wreck.seagulls) {
+      sg.state = 'fleeing';
+      sg.timer = 60;
+      sg.vx = random(-2, 2);
+      sg.vy = -2 - random(1);
+      sg.callTimer = 0;
+    }
+  }
+  // Wind particle burst
+  for (let i = 0; i < 15; i++) {
+    particles.push({
+      x: raftX + random(-30, 30), y: raftY + random(-10, 10),
+      vx: random(0.5, 2), vy: random(-0.5, 0.5),
+      life: 40 + random(20), maxLife: 60,
+      type: 'sparkle', size: 2,
+      color: [200, 230, 255], world: true,
+    });
+  }
+  // Start sailing cutscene after brief delay
   startSailingCutscene();
 }
 
 // Handle E key on wreck beach
 function handleWreckInteract() {
   let p = state.player;
+  let w = state.wreck;
 
-  // Collect nearest scavenge node (priority over crabs)
+  let mg = _wreckMiniGames;
+
+  // ── Active mini-game input: fishing catch ──────────────────────────────
+  if (mg.fishPhase === 'shadow') {
+    handleFishingCatch();
+    return;
+  }
+
+  // ── Active mini-game input: rock bounce ────────────────────────────────
+  if (mg.rockSkip && (mg.rockPhase === 'throwing' || mg.rockPhase === 'bouncing')) {
+    handleRockBounce();
+    return;
+  }
+
+  // ── Campfire cooking / resting ─────────────────────────────────────────
+  let cfX = WRECK.cx + 40, cfY = WRECK.cy + 15;
+  if (w.campfire && dist(p.x, p.y, cfX, cfY) < 30 && !mg.cooking) {
+    // Cooking takes priority if player has fish
+    if (state.fish > 0 && !mg.campfireResting) {
+      startCooking();
+      return;
+    }
+    // Otherwise toggle campfire resting
+    if (!mg.campfireResting) {
+      mg.campfireResting = true;
+      w._starsShown = false;
+      addFloatingText(w2sX(p.x), w2sY(p.y) - 15, 'Sitting by the fire...', '#ffcc66');
+      if (snd) snd.playSFX('page_turn');
+      return;
+    } else {
+      mg.campfireResting = false;
+      addFloatingText(w2sX(p.x), w2sY(p.y) - 15, 'Stood up.', '#ccbb88');
+      return;
+    }
+  }
+
+  // ── Shell collecting ───────────────────────────────────────────────────
+  let nearShell = null, nearShellD = Infinity;
+  for (let sh of mg.shells) {
+    if (sh.collected) continue;
+    let sd = dist(p.x, p.y, sh.x, sh.y);
+    if (sd < nearShellD) { nearShellD = sd; nearShell = sh; }
+  }
+  if (nearShell && nearShellD < 25) {
+    nearShell.collected = true;
+    mg.shellCount++;
+    if (snd) snd.playSFX('scavenge');
+    addFloatingText(w2sX(nearShell.x), w2sY(nearShell.y) - 10, 'Shell! (' + mg.shellCount + ')', '#eeddcc');
+    if (mg.shellCount === 10 && !mg.shellNecklace) {
+      mg.shellNecklace = true;
+      addFloatingText(w2sX(p.x), w2sY(p.y) - 25, 'Shell Necklace crafted!', C.crystalGlow);
+      for (let i = 0; i < 6; i++) {
+        particles.push({
+          x: p.x, y: p.y - 5,
+          vx: random(-1, 1), vy: random(-1.5, -0.3),
+          life: 30, maxLife: 30, size: 2.5, type: 'sparkle',
+          color: [255, 220, 200], world: true,
+        });
+      }
+    }
+    if (mg.shellCount === 20) {
+      addFloatingText(w2sX(p.x), w2sY(p.y) - 25, '20 shells! A trader might want these...', '#ddcc88');
+    }
+    return;
+  }
+
+  // ── Rock skipping — near tide pools ────────────────────────────────────
+  let tidePoolX = WRECK.cx + WRECK.rx * 0.4;
+  let tidePoolY = WRECK.cy + WRECK.ry * 0.15;
+  if (dist(p.x, p.y, tidePoolX, tidePoolY) < 40 && !mg.rockSkip && !mg.fishing && !mg.cooking) {
+    startRockSkip();
+    return;
+  }
+
+  // ── Fishing — in ankle/waist water ─────────────────────────────────────
+  let curDepth = getWreckDepth(p.x, p.y);
+  if ((curDepth === 1 || curDepth === 2) && !mg.fishing && mg.fishCooldown <= 0 && !mg.rockSkip && !mg.cooking) {
+    mg.fishing = true;
+    mg.fishPhase = 'waiting';
+    mg.fishTimer = random(60, 180); // 1-3 sec wait for fish shadow
+    addFloatingText(w2sX(p.x), w2sY(p.y) - 15, 'Watching the water...', '#88bbcc');
+    return;
+  }
+
+  // Sleep in shelter (if near shelter and it's sundown+)
+  if (w.shelter && !w.sleepingInShelter) {
+    let hr = state.time / 60;
+    if (dist(p.x, p.y, w.shelterX || WRECK.cx + 20, w.shelterY || WRECK.cy + 5) < 40 && (hr >= 17 || hr < 6)) {
+      w.sleepingInShelter = true;
+      w._sleepStartDay = state.day;
+      addFloatingText(w2sX(p.x), w2sY(p.y) - 15, 'Sleeping until dawn...', '#aaddff');
+      return;
+    }
+  }
+
+  // Drop fish near cat to befriend
+  let cat = w.cat;
+  if (cat && cat.state !== 'hidden' && !cat.introduced && state.fish > 0 && w.catFishGiven < 3) {
+    let catDist = dist(p.x, p.y, cat.x, cat.y);
+    if (catDist < 80) {
+      state.fish -= 1;
+      w.catFishOnGround = { x: p.x, y: p.y };
+      addFloatingText(w2sX(p.x), w2sY(p.y) - 15, 'Left fish for the cat...', '#ffcc88');
+      return;
+    }
+  }
+
+  // Collect nearest lore item (highest priority — story content)
+  let lore = getNearestLoreItem();
+  if (lore) { collectLoreItem(lore); return; }
+
+  // Collect nearest scavenge node
   let node = getNearestScavNode();
   if (node) { collectScavNode(node); return; }
 
-  // Catch nearest crab
+  // Catch nearest crab (gives food for hunger)
   let crab = getNearestCrab();
   if (crab) { catchCrab(crab); return; }
 
-  // Build raft (south shore construction spot)
-  let raftX = WRECK.cx, raftY = WRECK.cy + 35;
-  if (dist(p.x, p.y, raftX, raftY) < 55 && !state.wreck.raftBuilt) {
-    buildRaft(); return;
+  // Workbench / crafting zone (south shore)
+  let wbX = WRECK.cx, wbY = WRECK.cy + 35;
+  if (dist(p.x, p.y, wbX, wbY) < 55 && !w.raftBuilt) {
+    handleWorkbenchCraft(); return;
   }
 
-  // Launch raft to sail home
-  if (state.wreck.raftBuilt && dist(p.x, p.y, raftX, raftY) < 55) {
+  // Launch raft to sail home — must be day 2+ and raft is done
+  if (w.raftBuilt && dist(p.x, p.y, wbX, wbY) < 55) {
+    let daysPassed = state.day - (w.wreckDayStart || 1);
+    if (daysPassed < 1) {
+      addFloatingText(w2sX(wbX), w2sY(wbY) - 15, 'Too exhausted to sail today. Rest first.', '#ffaa66');
+      return;
+    }
     sailToHome(); return;
   }
 
-  // Build campfire (costs 2 wood + 1 stone)
-  if (!state.wreck.campfire && state.wood >= 2 && state.stone >= 1) {
-    let cfX = WRECK.cx + 20, cfY = WRECK.cy + 5;
-    if (dist(p.x, p.y, cfX, cfY) < 60) {
-      state.wreck.campfire = true;
-      state.wood -= 2; state.stone -= 1;
-      addFloatingText(w2sX(cfX), w2sY(cfY) - 10, 'CAMPFIRE BUILT', C.solarFlare);
-    }
+  // Drink from spring (reusable)
+  if (dist(p.x, p.y, WRECK.cx - 160, WRECK.cy - 30) < 35 && w.caveDiscovered) {
+    w.thirst = min(100, w.thirst + 50);
+    addFloatingText(w2sX(p.x), w2sY(p.y) - 10, '+50 Thirst (Spring)', C.solarGold);
+    return;
   }
 }
 
@@ -311,10 +1128,9 @@ function getNearestCrab() {
 function catchCrab(crab) {
   let idx = state.wreck.crabs.indexOf(crab);
   if (idx >= 0) state.wreck.crabs.splice(idx, 1);
-  state.fish += 1; // crab meat as food
-  state.stone += 1; // shell
+  state.wreck.hunger = min(100, state.wreck.hunger + 20);
   if (snd) snd.playSFX('crab_catch');
-  addFloatingText(w2sX(crab.x), w2sY(crab.y) - 10, '+1 Crab Meat +1 Shell', C.solarGold);
+  addFloatingText(w2sX(crab.x), w2sY(crab.y) - 10, '+20 Hunger (Crab)', C.solarGold);
   // Bubble burst particles
   for (let i = 0; i < 4; i++) {
     particles.push({
@@ -432,59 +1248,100 @@ function updateWreckCat(dt) {
   let cat = state.wreck.cat;
   if (!cat) return;
   let p = state.player;
+  let w = state.wreck;
   let pd = dist(p.x, p.y, cat.x, cat.y);
 
   cat.meowTimer -= dt;
   cat.giftTimer -= dt;
 
+  // Handle fish on ground — cat approaches fish
+  if (w.catFishOnGround && !cat.introduced && cat.state !== 'hidden') {
+    let fishDist = dist(cat.x, cat.y, w.catFishOnGround.x, w.catFishOnGround.y);
+    if (fishDist > 10) {
+      // Walk to fish
+      let fdx = w.catFishOnGround.x - cat.x, fdy = w.catFishOnGround.y - cat.y;
+      let fd = sqrt(fdx * fdx + fdy * fdy);
+      cat.vx = (fdx / fd) * 0.6;
+      cat.vy = (fdy / fd) * 0.6;
+      cat.facing = cat.vx > 0 ? 1 : -1;
+      cat.state = 'walking';
+    } else {
+      // Eat the fish
+      cat.vx = 0; cat.vy = 0;
+      w.catFishGiven++;
+      w.catFishOnGround = null;
+      addFloatingText(w2sX(cat.x), w2sY(cat.y) - 15, '*munch munch*', '#ffcc88');
+
+      if (w.catFishGiven >= 3) {
+        // Cat is befriended!
+        cat.introduced = true;
+        cat.state = 'idle';
+        cat.timer = 60;
+        addFloatingText(w2sX(cat.x), w2sY(cat.y) - 25, 'The cat trusts you now!', '#ffaa66');
+        particles.push({ x: cat.x, y: cat.y - 10, vx: random(-0.2, 0.2), vy: -1.0, life: 40, maxLife: 40, type: 'heart', size: 4, r: 255, g: 120, b: 140, world: true });
+        particles.push({ x: cat.x + 5, y: cat.y - 8, vx: random(-0.2, 0.2), vy: -0.8, life: 35, maxLife: 35, type: 'heart', size: 3, r: 255, g: 120, b: 140, world: true });
+      } else if (w.catFishGiven === 1) {
+        addFloatingText(w2sX(cat.x), w2sY(cat.y) - 25, 'The cat watches you from a distance...', '#ffaa66');
+        cat.state = 'wary';
+        cat.timer = 200;
+      } else if (w.catFishGiven === 2) {
+        addFloatingText(w2sX(cat.x), w2sY(cat.y) - 25, 'The cat comes a little closer...', '#ffaa66');
+        cat.state = 'wary';
+        cat.timer = 150;
+      }
+    }
+    cat.x += cat.vx * dt; cat.y += cat.vy * dt;
+    return;
+  }
+
   switch (cat.state) {
     case 'hidden':
       cat.timer -= dt;
       if (cat.timer <= 0) {
-        // Cat appears at edge of beach
         cat.x = WRECK.cx + 180;
         cat.y = WRECK.cy - 8;
-        cat.state = 'approaching';
+        cat.state = 'wary'; // starts wary, not approaching
         cat.timer = 300;
-        addFloatingText(w2sX(cat.x), w2sY(cat.y) - 18, 'A stray cat approaches...', '#ffaa66');
+        addFloatingText(w2sX(cat.x), w2sY(cat.y) - 18, 'A stray cat watches from the rocks...', '#ffaa66');
       }
       return;
 
-    case 'approaching':
-      // Walk toward player
-      let adx = p.x - cat.x, ady = p.y - cat.y;
-      let adist = sqrt(adx * adx + ady * ady);
-      if (adist > 35) {
-        let spd = 0.8;
-        cat.vx = (adx / adist) * spd;
-        cat.vy = (ady / adist) * spd;
+    case 'wary':
+      // Cat is visible but runs away if player gets close
+      cat.timer -= dt;
+      if (pd < 50) {
+        // Flee!
+        let fAng = atan2(cat.y - p.y, cat.x - p.x);
+        cat.vx = cos(fAng) * 1.8;
+        cat.vy = sin(fAng) * 1.2;
         cat.facing = cat.vx > 0 ? 1 : -1;
-      } else {
-        // Arrived near player — introduction moment
-        cat.vx = 0; cat.vy = 0;
-        if (!cat.introduced) {
-          cat.introduced = true;
-          addFloatingText(w2sX(cat.x), w2sY(cat.y) - 20, 'Mrrp?', '#ffcc88');
-          addFloatingText(w2sX(p.x), w2sY(p.y) - 25, 'The cat rubs against your leg', '#ffaa66');
-          spawnParticles(cat.x, cat.y, 'collect', 4);
-          // Heart particle
-          particles.push({
-            x: cat.x, y: cat.y - 10,
-            vx: random(-0.2, 0.2), vy: -1.0,
-            life: 40, maxLife: 40,
-            type: 'heart', size: 4,
-            r: 255, g: 120, b: 140, world: true,
-          });
+        cat.state = 'fleeing';
+        cat.timer = 80;
+        if (cat.meowTimer <= 0) {
+          addFloatingText(w2sX(cat.x), w2sY(cat.y) - 15, 'Hss!', '#ffcc88');
+          cat.meowTimer = 200;
         }
-        cat.state = 'idle';
-        cat.timer = random(80, 200);
-        cat.meowTimer = random(200, 400);
-        cat.giftTimer = random(1800, 3600); // first gift after 30-60s
+      } else {
+        cat.vx *= 0.95; cat.vy *= 0.95;
+        if (cat.timer <= 0) {
+          // Wander a bit
+          cat.vx = random(-0.3, 0.3); cat.vy = random(-0.2, 0.2);
+          cat.facing = cat.vx > 0 ? 1 : -1;
+          cat.timer = random(80, 200);
+        }
+      }
+      break;
+
+    case 'fleeing':
+      cat.timer -= dt;
+      if (cat.timer <= 0) {
+        cat.state = 'wary'; cat.timer = random(100, 250);
+        cat.vx = 0; cat.vy = 0;
       }
       break;
 
     case 'idle':
-      // Drift slowly toward player if far
+      // Only reachable after introduction (3 fish given)
       if (pd > 60) {
         let idx = p.x - cat.x, idy = p.y - cat.y;
         let id = sqrt(idx * idx + idy * idy);
@@ -498,13 +1355,11 @@ function updateWreckCat(dt) {
       if (cat.timer <= 0) {
         let roll = random();
         if (roll < 0.25 && state.wreck.crabs.length > 0) {
-          // Chase a crab
           let ci = floor(random(state.wreck.crabs.length));
           cat.chaseTarget = ci;
           cat.state = 'chasing';
           cat.timer = random(80, 160);
         } else if (roll < 0.5) {
-          // Sit near player
           cat.state = 'sitting';
           cat.timer = random(120, 300);
           cat.vx = 0; cat.vy = 0;
@@ -693,7 +1548,7 @@ function drawWreckCat() {
     rect(-10, -5 + tailUp, 2, 2);
     // Legs
     fill(r - 10, g - 10, b - 10);
-    let walk = (cat.state === 'walking' || cat.state === 'chasing' || cat.state === 'gifting' || cat.state === 'approaching')
+    let walk = (cat.state === 'walking' || cat.state === 'chasing' || cat.state === 'gifting' || cat.state === 'approaching' || cat.state === 'fleeing')
       ? floor(sin(frameCount * 0.15) * 2) : 0;
     rect(-3, 4, 2, 3 + walk);
     rect(1, 4, 2, 3 - walk);
@@ -1231,6 +2086,26 @@ function drawWreckIsland() {
 
   pop();
 
+  // ─── SMOKE WISPS from the wreck (dramatic atmosphere) ───
+  for (let si = 0; si < 4; si++) {
+    let smokeX = triX + sin(t0 * 0.4 + si * 1.8) * 15 - 10 + si * 12;
+    let smokeBaseY = triY - 30 - si * 6;
+    let smokeRise = sin(t0 * 0.7 + si * 2.3) * 8;
+    let smokeAlpha = (25 + sin(t0 + si * 1.5) * 10) * bright;
+    fill(120, 115, 100, smokeAlpha);
+    rect(floor(smokeX - 3), floor(smokeBaseY - 10 + smokeRise), 6, 4);
+    fill(140, 135, 120, smokeAlpha * 0.6);
+    rect(floor(smokeX - 2), floor(smokeBaseY - 18 + smokeRise), 4, 3);
+    fill(160, 155, 140, smokeAlpha * 0.3);
+    rect(floor(smokeX - 1), floor(smokeBaseY - 24 + smokeRise), 3, 2);
+  }
+  // Faint ember glow inside hull
+  let emberFlicker = sin(t0 * 3) * 0.3 + 0.7;
+  fill(200, 80, 20, 15 * emberFlicker * bright);
+  rect(floor(triX - 20), floor(triY - 8), 30, 6);
+  fill(255, 120, 30, 8 * emberFlicker * bright);
+  rect(floor(triX - 12), floor(triY - 10), 18, 4);
+
   // ─── WRECKAGE DEBRIS floating in water ───
   let debrisPositions = [
     [-0.85, 0.4, 0.1], [-0.7, 0.7, -0.05], [0.75, 0.55, 0.15],
@@ -1281,24 +2156,52 @@ function drawWreckIsland() {
   {
     let raftSX = w2sX(cx), raftSY = w2sY(cy + 35);
     let rw = state.wreck;
-    let prog = rw.raftBuilt ? 1 : (rw.raftWood / 8 + rw.raftRope / 4 + rw.raftCloth / 2) / 3;
+    let rwInv = rw.inventory || {};
+    let prog = rw.raftBuilt ? 1 : (rw.raftProgress || 0) / 100;
 
-    // Flat cleared area on sand
+    // Flat cleared area on sand — "workbench" zone
     fill(195 * bright, 178 * bright, 135);
-    ellipse(raftSX, raftSY, 50, 20);
-
-    // Log pile grows with progress
-    let logCount = floor(prog * 6);
-    for (let i = 0; i < logCount; i++) {
-      let lx = raftSX - 15 + i * 5;
-      let ly = raftSY - 2 + (i % 2) * 3;
-      fill(85, 55, 25);
-      rect(floor(lx), floor(ly), 12, 3);
-      fill(70, 45, 20);
-      rect(floor(lx + 1), floor(ly + 1), 10, 1);
+    ellipse(raftSX, raftSY, 55, 22);
+    // Workbench marker
+    if (!rw.raftBuilt) {
+      fill(90, 70, 40, 80);
+      rect(floor(raftSX - 14), floor(raftSY - 8), 28, 4);
+      fill(110, 85, 45, 80);
+      rect(floor(raftSX - 12), floor(raftSY - 8), 24, 2);
+      // "WORKBENCH" label when no raft frame yet
+      if (!rwInv.raftFrame && !rw.raftBuilt) {
+        textSize(7); textAlign(CENTER, BOTTOM);
+        fill(0, 0, 0, 100);
+        text('WORKBENCH', raftSX + 1, raftSY - 10);
+        fill(200, 180, 130, 120);
+        text('WORKBENCH', raftSX, raftSY - 11);
+        textAlign(LEFT, TOP);
+      }
     }
 
-    // Rope coils (appear when rope added)
+    // Raft frame (half-built)
+    if (rwInv.raftFrame && !rw.raftBuilt) {
+      // Frame logs
+      fill(85, 55, 25);
+      rect(floor(raftSX - 16), floor(raftSY - 3), 32, 3);
+      rect(floor(raftSX - 14), floor(raftSY), 28, 3);
+      rect(floor(raftSX - 12), floor(raftSY + 3), 24, 3);
+      // Rope lashing
+      fill(145, 120, 70);
+      rect(floor(raftSX - 10), floor(raftSY - 1), 3, 5);
+      rect(floor(raftSX + 8), floor(raftSY - 1), 3, 5);
+    } else if (!rw.raftBuilt) {
+      // Just loose materials on ground
+      let logCount = min(3, rwInv.driftwood || 0);
+      for (let i = 0; i < logCount; i++) {
+        let lx = raftSX - 12 + i * 8;
+        let ly = raftSY - 2 + (i % 2) * 3;
+        fill(85, 55, 25);
+        rect(floor(lx), floor(ly), 10, 2);
+      }
+    }
+
+    // Rope coils (visual, from old system — show if raftRope > 0)
     if (rw.raftRope > 0) {
       fill(145, 120, 70);
       for (let i = 0; i < min(rw.raftRope, 4); i++) {
@@ -1402,6 +2305,55 @@ function drawWreckIsland() {
       fill(120, 115, 105, smokeA);
       ellipse(smokeX, smokeY, 8 + s * 3, 5 + s * 2);
     }
+  }
+
+  // ─── LEAN-TO SHELTER ───
+  if (state.wreck.shelter) {
+    let shX = w2sX(state.wreck.shelterX || cx + 20), shY = w2sY(state.wreck.shelterY || cy + 5);
+    // Support poles
+    fill(90, 65, 30);
+    rect(floor(shX - 12), floor(shY - 18), 3, 20);
+    rect(floor(shX + 10), floor(shY - 8), 3, 12);
+    // Cross beam
+    fill(80, 55, 25);
+    rect(floor(shX - 13), floor(shY - 18), 28, 2);
+    // Palm frond roof (layered)
+    fill(55, 110, 40, 180);
+    beginShape();
+    vertex(shX - 16, shY - 18); vertex(shX + 18, shY - 8);
+    vertex(shX + 20, shY - 5); vertex(shX - 14, shY - 15);
+    endShape(CLOSE);
+    fill(65, 125, 45, 150);
+    beginShape();
+    vertex(shX - 14, shY - 16); vertex(shX + 16, shY - 6);
+    vertex(shX + 18, shY - 3); vertex(shX - 12, shY - 13);
+    endShape(CLOSE);
+    // Shadow underneath
+    fill(0, 0, 0, 20);
+    rect(floor(shX - 12), floor(shY), 24, 3);
+  }
+
+  // ─── CAVE (north-west, foreshadowing drawings) ───
+  if (state.wreck.caveDiscovered) {
+    let caveX = w2sX(cx - 160), caveY = w2sY(cy - 30);
+    // Dark opening
+    fill(25, 20, 15);
+    ellipse(caveX, caveY + 2, 28, 18);
+    // Rock frame
+    fill(70, 65, 55);
+    rect(floor(caveX - 16), floor(caveY - 8), 32, 4);
+    rect(floor(caveX - 14), floor(caveY - 6), 4, 14);
+    rect(floor(caveX + 10), floor(caveY - 6), 4, 14);
+    // Faint drawing on wall (ancient)
+    fill(120, 80, 50, 40);
+    rect(floor(caveX - 6), floor(caveY - 2), 4, 3);
+    rect(floor(caveX + 2), floor(caveY - 1), 3, 4);
+    fill(100, 60, 35, 30);
+    ellipse(caveX, caveY, 6, 4);
+    // Water drip sparkle
+    let drip = sin(frameCount * 0.05) * 0.5 + 0.5;
+    fill(100, 180, 220, 60 * drip);
+    rect(floor(caveX - 2), floor(caveY + 4), 2, 3);
   }
 
   // ─── AMBIENT MIST over water (atmospheric, layered) ───
@@ -1570,16 +2522,64 @@ function drawWreckEntities() {
       rect(sx - 3, sy + bob, 6, 5);
       fill(100, 70, 30);
       rect(sx - 2, sy + 1 + bob, 4, 3);
-      // Three dots
       fill(60, 40, 20);
       rect(sx - 1, sy + 2 + bob, 1, 1);
       rect(sx + 1, sy + 1 + bob, 1, 1);
+    } else if (n.type === 'driftwood') {
+      fill(100, 70, 35);
+      rect(sx - 8, sy + bob, 16, 3);
+      fill(85, 60, 28);
+      rect(sx - 6, sy + 1 + bob, 12, 1);
+    } else if (n.type === 'sailcloth') {
+      fill(195, 180, 155);
+      rect(sx - 6, sy + bob, 12, 5);
+      fill(155, 40, 30, 100);
+      rect(sx - 4, sy + 1 + bob, 8, 2);
+    } else if (n.type === 'hammer') {
+      fill(130, 125, 115);
+      rect(sx - 2, sy + bob, 4, 6);
+      fill(90, 65, 30);
+      rect(sx - 4, sy - 2 + bob, 8, 3);
+      fill(160, 150, 130);
+      rect(sx - 1, sy + bob, 2, 1);
+    } else if (n.type === 'palmfrond') {
+      fill(60, 120, 40);
+      rect(sx - 8, sy + bob, 16, 2);
+      rect(sx - 6, sy - 1 + bob, 12, 1);
+      fill(50, 100, 35);
+      rect(sx - 10, sy + 1 + bob, 4, 1);
+      rect(sx + 6, sy + 1 + bob, 4, 1);
+    } else if (n.type === 'berries') {
+      fill(45, 80, 35);
+      rect(sx - 4, sy + bob, 8, 5);
+      fill(160, 40, 50);
+      rect(sx - 2, sy + 1 + bob, 2, 2);
+      rect(sx + 1, sy + bob, 2, 2);
+      rect(sx, sy + 3 + bob, 2, 2);
+    } else if (n.type === 'fish') {
+      fill(140, 160, 180);
+      rect(sx - 5, sy + bob, 10, 3);
+      fill(120, 140, 165);
+      rect(sx + 4, sy - 1 + bob, 3, 5);
+      fill(20);
+      rect(sx - 3, sy + bob, 1, 1);
+    } else if (n.type === 'freshwater') {
+      fill(80, 150, 200, 120);
+      ellipse(sx, sy + bob, 12, 8);
+      fill(100, 170, 220, 80);
+      ellipse(sx - 1, sy - 1 + bob, 8, 5);
+    } else if (n.type === 'spring') {
+      fill(60, 130, 180, 140);
+      ellipse(sx, sy + bob, 14, 10);
+      fill(90, 170, 220, 60);
+      rect(sx - 1, sy - 3 + bob, 2, 3);
     }
 
     // Label when very close — outlined for readability
     if (pDist < 30) {
       textSize(11); textAlign(CENTER, BOTTOM);
-      let lbl = n.type === 'coconut' ? 'COCONUT' : n.type.toUpperCase();
+      let typeLabels = { driftwood: 'DRIFTWOOD', sailcloth: 'SAILCLOTH', rope: 'ROPE', hammer: 'HAMMER', flint: 'FLINT', palmfrond: 'PALM FROND', berries: 'BERRIES', coconut: 'COCONUT', fish: 'FISH', freshwater: 'RAIN PUDDLE', spring: 'SPRING' };
+      let lbl = typeLabels[n.type] || n.type.toUpperCase();
       fill(0, 0, 0, 180);
       text(lbl, sx + 1, sy - 5 + bob);
       fill(240, 230, 200);
@@ -1634,15 +2634,28 @@ function drawWreckEntities() {
     }
   }
 
+  // ─── FISH ON GROUND (for cat befriending) ───
+  if (w.catFishOnGround) {
+    let fsx = floor(w2sX(w.catFishOnGround.x)), fsy = floor(w2sY(w.catFishOnGround.y));
+    fill(140, 160, 180);
+    rect(fsx - 5, fsy, 10, 3);
+    fill(120, 140, 165);
+    rect(fsx + 4, fsy - 1, 3, 5);
+    fill(20);
+    rect(fsx - 3, fsy, 1, 1);
+    // Glow
+    fill(255, 220, 100, 20 + sin(frameCount * 0.06) * 10);
+    ellipse(fsx, fsy + 1, 16, 10);
+  }
+
   // ─── STRAY CAT ───
   drawWreckCat();
 
-  // ─── FLYING BIRDS ───
+  // ─── FLYING BIRDS (generic) ───
   for (let b of w.birds) {
     let sx = floor(w2sX(b.x)), sy = floor(w2sY(b.y));
     let wingUp = sin(frameCount * 0.08 + b.phase) > 0;
     fill(60, 55, 50, 120);
-    // Simple bird silhouette — V shape
     if (wingUp) {
       rect(sx - 4, sy - 1, 3, 1);
       rect(sx - 2, sy - 2, 2, 1);
@@ -1656,6 +2669,277 @@ function drawWreckEntities() {
     }
   }
 
+  // ─── SEAGULLS — larger, more detailed, atmospheric ───
+  if (w.seagulls) {
+    for (let sg of w.seagulls) {
+      let sx = floor(w2sX(sg.x)), sy = floor(w2sY(sg.y));
+      if (sg.state === 'landed') {
+        // Standing seagull — white body, grey wings
+        fill(0, 0, 0, 20);
+        rect(sx - 4, sy + 3, 8, 2); // shadow
+        fill(240, 240, 235);
+        rect(sx - 3, sy - 2, 6, 5); // body
+        fill(220, 220, 215);
+        rect(sx - 4, sy - 1, 2, 3); // left wing fold
+        rect(sx + 2, sy - 1, 2, 3); // right wing fold
+        fill(180, 185, 180);
+        rect(sx - 4, sy + 1, 8, 1); // wing tips
+        // Head
+        fill(245, 245, 240);
+        rect(sx - 1, sy - 4, 3, 3);
+        // Beak — orange
+        fill(230, 160, 50);
+        rect(sx + 2, sy - 3, 2, 1);
+        // Eye
+        fill(20);
+        rect(sx + 1, sy - 3, 1, 1);
+        // Legs
+        fill(230, 160, 50);
+        rect(sx - 1, sy + 3, 1, 2);
+        rect(sx + 1, sy + 3, 1, 2);
+      } else {
+        // Flying seagull — larger wingspan
+        let wingPhase = sin(frameCount * 0.06 + sg.wingPhase);
+        let wingY = floor(wingPhase * 4);
+        // Shadow on water (only when low)
+        if (sg.state === 'swooping') {
+          fill(0, 0, 0, 15);
+          ellipse(sx, sy + 20, 14, 4);
+        }
+        // Body — white
+        fill(240, 240, 235);
+        rect(sx - 2, sy - 1, 5, 3);
+        // Head
+        fill(245, 245, 240);
+        rect(sx + 3, sy - 1, 3, 2);
+        // Beak
+        fill(230, 160, 50);
+        rect(sx + 6, sy, 2, 1);
+        // Wings — grey-tipped
+        fill(230, 230, 225);
+        rect(sx - 8, sy - 1 - wingY, 6, 2);
+        rect(sx + 4, sy - 1 + wingY, 6, 2);
+        // Wing tips — dark grey
+        fill(140, 145, 140);
+        rect(sx - 10, sy - wingY, 3, 1);
+        rect(sx + 8, sy + wingY, 3, 1);
+        // Tail
+        fill(220, 220, 215);
+        rect(sx - 3, sy, 2, 2);
+      }
+    }
+  }
+
+  // ─── BEACH DEBRIS — scattered wreckage atmosphere ───
+  if (w.beachDebris) {
+    for (let db of w.beachDebris) {
+      let sx = floor(w2sX(db.x)), sy = floor(w2sY(db.y));
+      let sz = db.size;
+      let bright = typeof getSkyBrightness === 'function' ? getSkyBrightness() : 0.6;
+      if (db.type === 'plank_fragment') {
+        fill(70 * bright, 48 * bright, 22);
+        rect(sx - floor(7 * sz), sy, floor(14 * sz), floor(2 * sz));
+        fill(85 * bright, 58 * bright, 28, 80);
+        rect(sx - floor(5 * sz), sy, floor(10 * sz), 1);
+      } else if (db.type === 'rope_tangle') {
+        fill(135, 112, 62, 100);
+        rect(sx - floor(4 * sz), sy, floor(3 * sz), floor(3 * sz));
+        rect(sx, sy - 1, floor(4 * sz), floor(2 * sz));
+        rect(sx + floor(2 * sz), sy + 1, floor(3 * sz), floor(2 * sz));
+      } else if (db.type === 'broken_oar') {
+        fill(80 * bright, 55 * bright, 25);
+        rect(sx - floor(10 * sz), sy, floor(20 * sz), floor(2 * sz));
+        fill(70 * bright, 48 * bright, 22);
+        rect(sx + floor(8 * sz), sy - 1, floor(5 * sz), floor(4 * sz));
+      } else if (db.type === 'torn_net') {
+        fill(130, 120, 90, 60);
+        for (let nx = 0; nx < 4; nx++) {
+          for (let ny = 0; ny < 3; ny++) {
+            rect(sx + nx * floor(3 * sz), sy + ny * floor(3 * sz), 1, 1);
+          }
+        }
+      } else if (db.type === 'amphora_shard') {
+        fill(160 * bright, 82 * bright, 50);
+        beginShape();
+        vertex(sx, sy); vertex(sx + floor(4 * sz), sy - floor(2 * sz));
+        vertex(sx + floor(6 * sz), sy + floor(3 * sz)); vertex(sx + floor(2 * sz), sy + floor(4 * sz));
+        endShape(CLOSE);
+      } else if (db.type === 'barrel_stave') {
+        fill(65 * bright, 42 * bright, 18);
+        rect(sx - floor(2 * sz), sy - floor(8 * sz), floor(4 * sz), floor(16 * sz));
+        fill(95, 85, 65, 70);
+        rect(sx - floor(3 * sz), sy - floor(3 * sz), floor(6 * sz), 1);
+        rect(sx - floor(3 * sz), sy + floor(3 * sz), floor(6 * sz), 1);
+      }
+    }
+  }
+
+  // ─── LORE ITEMS — discoverable documents, glowing when near ───
+  if (w.loreItems) {
+    let p = state.player;
+    for (let li of w.loreItems) {
+      if (li.found) continue;
+      let sx = floor(w2sX(li.x)), sy = floor(w2sY(li.y));
+      let bob = sin(frameCount * 0.03 + li.x * 0.1) * 1.5;
+      let pDist = dist(p.x, p.y, li.x, li.y);
+      let data = WRECK_LORE_ITEMS.find(l => l.id === li.id);
+      let isJournal = data && data.type === 'journal';
+
+      // Subtle golden glow pulsing
+      let glowA = 15 + sin(frameCount * 0.05 + li.x) * 10;
+      fill(255, 220, 100, glowA);
+      ellipse(sx, sy + bob, 18, 12);
+
+      if (isJournal) {
+        // Scroll / journal appearance
+        fill(210, 195, 160);
+        rect(sx - 5, sy - 3 + bob, 10, 7);
+        fill(190, 175, 140);
+        rect(sx - 4, sy - 2 + bob, 8, 5);
+        // "Writing" lines
+        fill(100, 80, 50, 120);
+        rect(sx - 3, sy - 1 + bob, 6, 1);
+        rect(sx - 3, sy + 1 + bob, 5, 1);
+        // Wax seal
+        fill(160, 40, 30);
+        rect(sx + 3, sy + 2 + bob, 2, 2);
+      } else {
+        // Cargo manifest / chart — larger, folded
+        fill(220, 208, 175);
+        rect(sx - 6, sy - 4 + bob, 12, 8);
+        fill(200, 188, 155);
+        rect(sx - 5, sy - 3 + bob, 10, 6);
+        // Grid lines (manifest)
+        fill(90, 70, 40, 80);
+        rect(sx - 4, sy - 2 + bob, 8, 1);
+        rect(sx - 4, sy + bob, 7, 1);
+        rect(sx - 4, sy + 2 + bob, 6, 1);
+        // Ink blot
+        fill(40, 30, 20, 60);
+        rect(sx + 2, sy - 1 + bob, 2, 2);
+      }
+
+      // Highlight when near
+      if (pDist < 35) {
+        fill(255, 230, 140, 40 + sin(frameCount * 0.08) * 20);
+        rect(sx - 8, sy - 2 + bob, 16, 3);
+        rect(sx - 1, sy - 7 + bob, 3, 10);
+        // Label
+        textSize(11); textAlign(CENTER, BOTTOM);
+        let lbl = data ? data.title : 'EXAMINE';
+        fill(0, 0, 0, 180);
+        text(lbl, sx + 1, sy - 8 + bob);
+        fill(255, 230, 160);
+        text(lbl, sx, sy - 9 + bob);
+      }
+    }
+  }
+
+  // ─── SHELLS on beach (collectible) ───
+  let mg = _wreckMiniGames;
+  for (let sh of mg.shells) {
+    if (sh.collected) continue;
+    let ssx = floor(w2sX(sh.x)), ssy = floor(w2sY(sh.y));
+    let bob = sin(frameCount * 0.03 + sh.x * 0.2) * 0.5;
+    let pDist = dist(state.player.x, state.player.y, sh.x, sh.y);
+    // Glow when near
+    if (pDist < 30) {
+      fill(255, 240, 200, 25 + sin(frameCount * 0.06) * 12);
+      ellipse(ssx, ssy + bob, 14, 10);
+    }
+    if (sh.type === 0) { // conch
+      fill(235, 215, 185); rect(ssx - 3, ssy + bob, 6, 4);
+      fill(245, 228, 200); rect(ssx - 2, ssy + bob, 4, 2);
+      fill(210, 170, 140); rect(ssx + 2, ssy + 1 + bob, 2, 2);
+    } else if (sh.type === 1) { // scallop
+      fill(240, 225, 205); rect(ssx - 3, ssy + bob, 6, 3);
+      fill(220, 200, 175); rect(ssx - 2, ssy - 1 + bob, 4, 2);
+      fill(200, 180, 155); rect(ssx - 1, ssy + 2 + bob, 2, 1);
+    } else { // spiral
+      fill(225, 210, 195); rect(ssx - 2, ssy + bob, 4, 4);
+      fill(210, 190, 170); rect(ssx - 1, ssy + 1 + bob, 2, 2);
+    }
+  }
+
+  // ─── ROCK SKIP rock in flight ───
+  if (mg.rockSkip && mg.rockPhase !== 'idle') {
+    let rsx = floor(w2sX(mg.rockX)), rsy = floor(w2sY(mg.rockY));
+    let rockBob = sin(frameCount * 0.3) * 3;
+    fill(130, 125, 115);
+    rect(rsx - 2, rsy - 3 + rockBob, 4, 3);
+    fill(150, 145, 135);
+    rect(rsx - 1, rsy - 3 + rockBob, 2, 2);
+  }
+
+  // ─── FISH SHADOW during fishing ───
+  if (mg.fishPhase === 'shadow' && mg.fishShadow) {
+    let fsx = floor(w2sX(mg.fishShadow.x)), fsy = floor(w2sY(mg.fishShadow.y));
+    let wobble = sin(frameCount * 0.15) * 3;
+    fill(30, 50, 70, 80);
+    ellipse(fsx + wobble, fsy, 14, 8);
+    fill(40, 65, 90, 50);
+    ellipse(fsx + wobble + 5, fsy, 5, 3); // tail
+    // Exclamation when shadow appears
+    let flashA = 180 + sin(frameCount * 0.2) * 75;
+    fill(255, 240, 80, flashA);
+    textSize(14); textAlign(CENTER, BOTTOM);
+    text('!', fsx, fsy - 12);
+    textAlign(LEFT, TOP);
+  }
+
+  // ─── CAMPFIRE COOKING visual ───
+  if (mg.cooking && mg.cookPhase === 'cooking') {
+    let ccfX = w2sX(WRECK.cx + 40), ccfY = w2sY(WRECK.cy + 15);
+    // Fish on stick
+    fill(100, 70, 35);
+    rect(floor(ccfX - 1), floor(ccfY - 22), 2, 14); // stick
+    fill(140, 160, 180);
+    rect(floor(ccfX - 4), floor(ccfY - 25), 8, 4); // fish
+    fill(120, 140, 165);
+    rect(floor(ccfX + 3), floor(ccfY - 26), 3, 6); // tail
+    // Sizzle particles
+    if (frameCount % 12 === 0) {
+      particles.push({
+        x: WRECK.cx + 40, y: WRECK.cy + 10,
+        vx: random(-0.3, 0.3), vy: random(-0.8, -0.3),
+        life: 15, maxLife: 15, size: 1.5, type: 'sparkle',
+        color: [255, 200, 100], world: true,
+      });
+    }
+  }
+
+  // ─── CAMPFIRE REST visual — sitting player glow ───
+  if (mg.campfireResting) {
+    let cfSX = w2sX(WRECK.cx + 40), cfSY = w2sY(WRECK.cy + 15);
+    // Warm glow around campfire area
+    fill(255, 180, 60, 8 + sin(frameCount * 0.04) * 4);
+    ellipse(cfSX, cfSY, 90, 55);
+    // Crackling text occasionally
+    if (frameCount % 180 === 0) {
+      addFloatingText(cfSX + random(-10, 10), cfSY - 20, '*crackle*', '#ff9944');
+    }
+  }
+
+  // ─── TIDE WATERLINE — animated tide overlay on beach edge ───
+  let tide = getWreckTideLevel();
+  let tideSX = w2sX(WRECK.cx), tideSY = w2sY(WRECK.cy);
+  let tideRX = WRECK.rx * 0.88, tideRY = WRECK.ry * 0.50;
+  let tideOffset = tide * 5; // pixels of tide rise
+  for (let i = -tideRX * 0.8; i < tideRX * 0.8; i += 3) {
+    let t = i / tideRX;
+    let edgeY = tideRY * 0.82 * sqrt(max(0, 1 - t * t));
+    let wave = sin(frameCount * 0.03 + i * 0.06) * 2;
+    let foamA = 30 + sin(frameCount * 0.04 + i * 0.08) * 15;
+    // Tide foam line shifts with tide level
+    fill(230, 245, 255, foamA);
+    rect(floor(tideSX + i), floor(tideSY + edgeY - tideOffset + wave), 3, 2);
+    // Wet sand behind foam
+    if (tide > 0) {
+      fill(155, 140, 105, 20 * tide);
+      rect(floor(tideSX + i), floor(tideSY + edgeY - tideOffset + wave - 3), 3, 3);
+    }
+  }
+
   textAlign(LEFT, TOP);
 }
 
@@ -1663,19 +2947,68 @@ function drawWreckHUD() {
   noStroke();
   let hx = 12, hy = 12;
   let w = state.wreck;
-  let panelH = 95;
+  let inv = w.inventory || {};
+  let panelH = 190;
+
+  // Starvation/dehydration screen dim
+  if (w.thirst <= 0 || w.hunger <= 0) {
+    let dimAlpha = 80 + sin(frameCount * 0.04) * 30;
+    fill(0, 0, 0, dimAlpha);
+    rect(0, 0, width, height);
+    // Warning text
+    textSize(16); textAlign(CENTER, CENTER);
+    let warnMsg = w.thirst <= 0 ? 'FIND WATER!' : 'FIND FOOD!';
+    let warnBob = sin(frameCount * 0.06) * 5;
+    fill(255, 80, 60, 200 + sin(frameCount * 0.08) * 55);
+    text(warnMsg, width / 2, height / 2 - 60 + warnBob);
+    textAlign(LEFT, TOP);
+  }
+
+  // Night darkness overlay
+  let hr = state.time / 60;
+  if (hr >= 20 || hr < 6) {
+    let nightAlpha = 100;
+    if (hr >= 20) nightAlpha = min(180, (hr - 20) * 45);
+    else nightAlpha = max(0, (6 - hr) * 30);
+    // Reduce darkness near fire
+    if (w.hasFire) nightAlpha = floor(nightAlpha * 0.4);
+    fill(5, 5, 20, nightAlpha);
+    rect(0, 0, width, height);
+  }
+
+  // Campfire resting overlay — warm dim, not full sleep
+  if (_wreckMiniGames.campfireResting) {
+    let restDim = 40 + sin(frameCount * 0.02) * 10;
+    fill(10, 5, 0, restDim);
+    rect(0, 0, width, height);
+    // Warm fire glow center
+    let fGlowA = 15 + sin(frameCount * 0.04) * 8;
+    fill(255, 160, 50, fGlowA);
+    ellipse(width / 2, height / 2 + 30, 300, 200);
+  }
+
+  // Sleeping overlay
+  if (w.sleepingInShelter) {
+    fill(0, 0, 10, 200);
+    rect(0, 0, width, height);
+    textSize(14); textAlign(CENTER, CENTER);
+    fill(180, 200, 255, 150 + sin(frameCount * 0.03) * 50);
+    text('Sleeping...', width / 2, height / 2);
+    let dots = '.'.repeat(floor(frameCount * 0.02) % 4);
+    text('z z z' + dots, width / 2, height / 2 + 20);
+    textAlign(LEFT, TOP);
+    return; // don't draw rest of HUD while sleeping
+  }
 
   // Dark semi-transparent background panel
   fill(10, 8, 5, 220);
   rect(hx - 6, hy - 6, 210, panelH, 4);
-  // Subtle gold border
   stroke(150, 120, 50, 120);
   strokeWeight(1);
   noFill();
   rect(hx - 6, hy - 6, 210, panelH, 4);
   noStroke();
 
-  // Helper: outlined text for readability
   let outText = function(txt, x, y, col) {
     fill(0, 0, 0, 180);
     text(txt, x + 1, y + 1);
@@ -1685,50 +3018,122 @@ function drawWreckHUD() {
 
   textAlign(LEFT, TOP);
 
-  // Resource header
+  // ── SURVIVAL BARS ──
+  textSize(10);
+  let barW = 80, barH = 6;
+
+  // Thirst bar
+  outText('Thirst', hx, hy, color(100, 180, 255));
+  fill(20, 18, 12, 200); rect(hx + 40, hy + 1, barW, barH, 2);
+  let thirstCol = w.thirst > 30 ? color(60, 150, 255) : color(255, 80, 60);
+  fill(thirstCol); rect(hx + 41, hy + 2, floor((barW - 2) * w.thirst / 100), barH - 2, 1);
+  outText(floor(w.thirst) + '%', hx + 125, hy, w.thirst > 30 ? color(100, 180, 255) : color(255, 80, 60));
+
+  // Hunger bar
+  outText('Hunger', hx, hy + 12, color(255, 180, 80));
+  fill(20, 18, 12, 200); rect(hx + 40, hy + 13, barW, barH, 2);
+  let hungerCol = w.hunger > 30 ? color(255, 170, 60) : color(255, 80, 60);
+  fill(hungerCol); rect(hx + 41, hy + 14, floor((barW - 2) * w.hunger / 100), barH - 2, 1);
+  outText(floor(w.hunger) + '%', hx + 125, hy + 12, w.hunger > 30 ? color(255, 180, 80) : color(255, 80, 60));
+
+  // ── INVENTORY ──
   textSize(11);
-  outText('RAFT MATERIALS', hx, hy, color(220, 200, 140));
+  let iy = hy + 28;
+  outText('INVENTORY', hx, iy, color(220, 200, 140));
+  iy += 14;
+  textSize(10);
+  if (inv.driftwood > 0) { outText('Driftwood: ' + inv.driftwood, hx, iy, color(180, 150, 90)); iy += 11; }
+  if (inv.sailcloth > 0) { outText('Sailcloth: ' + inv.sailcloth, hx, iy, color(200, 180, 150)); iy += 11; }
+  if (inv.rope > 0) { outText('Rope: ' + inv.rope, hx, iy, color(160, 140, 80)); iy += 11; }
+  if (inv.hammer) { outText('Hammer', hx, iy, color(180, 170, 160)); iy += 11; }
+  if (inv.flint) { outText('Flint', hx, iy, color(140, 135, 125)); iy += 11; }
+  if (inv.palmFrond > 0) { outText('Palm Frond: ' + inv.palmFrond, hx, iy, color(80, 160, 60)); iy += 11; }
+  if (state.fish > 0) { outText('Fish: ' + state.fish, hx, iy, color(100, 180, 220)); iy += 11; }
+  if (inv.raftFrame) { outText('Raft Frame [CRAFTED]', hx, iy, color(100, 255, 150)); iy += 11; }
+  if (inv.seaworthyRaft) { outText('Seaworthy Raft [READY]', hx, iy, color(100, 255, 150)); iy += 11; }
 
-  // Wood X/8
-  textSize(11);
-  let woodCol = w.raftWood >= 8 ? color(100, 255, 150) : color(200, 170, 100);
-  outText('Wood ' + (state.wood + w.raftWood) + '  (' + w.raftWood + '/8)', hx, hy + 15, woodCol);
+  // ── STATUS ICONS ──
+  iy += 4;
+  if (w.shelter) { outText('[Shelter]', hx, iy, color(120, 200, 100)); iy += 11; }
+  if (w.hasFire) { outText('[Campfire]', hx + (w.shelter ? 60 : 0), iy - (w.shelter ? 11 : 0), color(255, 180, 50)); iy += (w.shelter ? 0 : 11); }
+  let mg2 = _wreckMiniGames;
+  if (mg2.shellCount > 0) { outText('Shells: ' + mg2.shellCount + (mg2.shellNecklace ? ' [Necklace]' : ''), hx, iy, color(235, 215, 185)); iy += 11; }
+  if (mg2.rockHighScore > 0) { outText('Rock Skip Best: ' + mg2.rockHighScore, hx, iy, color(170, 200, 220)); iy += 11; }
+  if (mg2.campfireResting) { outText('[Resting by fire]', hx, iy, color(255, 200, 100)); iy += 11; }
 
-  // Rope X/4
-  let ropeCol = w.raftRope >= 4 ? color(100, 255, 150) : color(180, 150, 90);
-  outText('Rope ' + (state.wood > 0 ? '+' + state.wood : '') + '  (' + w.raftRope + '/4)', hx, hy + 29, ropeCol);
-
-  // Cloth X/2
-  let clothCol = w.raftCloth >= 2 ? color(100, 255, 150) : color(200, 180, 150);
-  outText('Cloth ' + (state.seeds > 0 ? '+' + state.seeds : '') + '  (' + w.raftCloth + '/2)', hx, hy + 43, clothCol);
-
-  // Raft progress bar
-  let barX = hx, barY = hy + 58, barW = 140, barH = 8;
+  // ── RAFT PROGRESS ──
+  iy += 4;
   let prog = w.raftBuilt ? 100 : w.raftProgress;
-  fill(20, 18, 12, 200);
-  rect(barX, barY, barW, barH, 2);
+  textSize(10);
+  let barX = hx, barY2 = iy;
+  fill(20, 18, 12, 200); rect(barX, barY2, 140, barH, 2);
   if (prog > 0) {
     fill(w.raftBuilt ? color(80, 220, 120) : color(180, 150, 60));
-    rect(barX + 1, barY + 1, floor((barW - 2) * prog / 100), barH - 2, 1);
+    rect(barX + 1, barY2 + 1, floor(138 * prog / 100), barH - 2, 1);
   }
-  textSize(11);
-  outText(w.raftBuilt ? 'RAFT READY!' : 'Raft: ' + prog + '%', barX + barW + 6, barY - 1,
+  outText(w.raftBuilt ? 'RAFT READY!' : 'Raft: ' + prog + '%', barX + 145, barY2 - 1,
     w.raftBuilt ? color(100, 255, 150) : color(200, 190, 150));
 
-  // Day/time + food
-  textSize(11);
+  // Day/time
+  iy += 12;
+  textSize(10);
   let hrs = floor(state.time / 60), mins = floor(state.time % 60);
-  outText('Day ' + state.day + '  ' + nf(hrs, 2) + ':' + nf(mins, 2), hx, hy + 72, color(180, 170, 140));
-  outText('Food: ' + state.fish, hx + 100, hy + 72, color(100, 180, 255));
+  outText('Day ' + state.day + '  ' + nf(hrs, 2) + ':' + nf(mins, 2), hx, iy, color(180, 170, 140));
 
-  // Hint text at bottom of panel
-  textSize(11);
+  // Hint text at bottom
+  iy += 14;
+  textSize(10);
   let hintAlpha = 140 + sin(frameCount * 0.03) * 40;
+  let hintMsg = '';
+  if (w.raftBuilt) hintMsg = 'Go to the raft and press E to set sail!';
+  else if (!inv.hammer) hintMsg = 'Search the shipwreck for tools and materials';
+  else if (!w.shelter && hr >= 16) hintMsg = 'Build shelter before nightfall!';
+  else hintMsg = 'Explore the beach — gather, craft, survive';
+  fill(0, 0, 0, 150); text(hintMsg, hx + 1, iy + 1);
+  fill(200, 190, 150, hintAlpha); text(hintMsg, hx, iy);
+  // ─── COMPASS ARROW — points toward nearest objective ───
+  let p = state.player;
+  let arrowTargetX = null, arrowTargetY = null, arrowLabel = '';
   if (w.raftBuilt) {
-    fill(0, 0, 0, 150); text('Go to the raft and press E to set sail!', hx + 1, hy + panelH + 3);
-    fill(100, 255, 150, hintAlpha); text('Go to the raft and press E to set sail!', hx, hy + panelH + 2);
+    arrowTargetX = WRECK.cx; arrowTargetY = WRECK.cy + 35; arrowLabel = 'RAFT';
   } else {
-    fill(0, 0, 0, 150); text('Explore the beach and shallows for materials', hx + 1, hy + panelH + 3);
-    fill(200, 190, 150, hintAlpha); text('Explore the beach and shallows for materials', hx, hy + panelH + 2);
+    // Point to nearest uncollected scav node
+    let nearest = null, nearestD = Infinity;
+    for (let sn of state.wreck.scavNodes) {
+      if (sn.collected) continue;
+      let sd = dist(p.x, p.y, sn.x, sn.y);
+      if (sd < nearestD) { nearestD = sd; nearest = sn; }
+    }
+    if (nearest && nearestD > 40) {
+      arrowTargetX = nearest.x; arrowTargetY = nearest.y; arrowLabel = 'MATERIAL';
+    } else if (!nearest) {
+      arrowTargetX = WRECK.cx; arrowTargetY = WRECK.cy + 35; arrowLabel = 'RAFT';
+    }
+  }
+  if (arrowTargetX !== null) {
+    let psx = w2sX(p.x), psy = w2sY(p.y);
+    let tsx = w2sX(arrowTargetX), tsy = w2sY(arrowTargetY);
+    let tdist = dist(psx, psy, tsx, tsy);
+    if (tdist > 50) {
+      let ang = atan2(tsy - psy, tsx - psx);
+      let arrowR = 35;
+      let ax = psx + cos(ang) * arrowR, ay = psy + sin(ang) * arrowR;
+      let bob2 = sin(frameCount * 0.08) * 2;
+      push();
+      translate(floor(ax + bob2 * cos(ang + HALF_PI)), floor(ay + bob2 * sin(ang + HALF_PI)));
+      rotate(ang);
+      let arrAlpha = 140 + sin(frameCount * 0.06) * 40;
+      fill(212, 180, 80, arrAlpha);
+      noStroke();
+      triangle(8, 0, -4, -5, -4, 5);
+      fill(180, 150, 60, arrAlpha * 0.7);
+      rect(-6, -2, 6, 4, 1);
+      pop();
+      // Label
+      fill(200, 180, 120, arrAlpha * 0.6);
+      textSize(6); textAlign(CENTER, CENTER);
+      text(arrowLabel, floor(ax + cos(ang) * 16), floor(ay + sin(ang) * 16 - 8));
+      textAlign(LEFT, TOP);
+    }
   }
 }

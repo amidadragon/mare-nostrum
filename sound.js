@@ -5,164 +5,623 @@
 
 let snd = null; // global SoundManager instance
 
+// ═══════════════════════════════════════════════════════════════
+// AMBIENT MANAGER — Rich layered soundscapes via Web Audio API
+// ═══════════════════════════════════════════════════════════════
+class AmbientManager {
+  constructor(ctx, sndMgr) {
+    this.ctx = ctx;
+    this.snd = sndMgr;
+    this._t = 0; // internal time accumulator
+
+    // Master ambient gain
+    this.master = ctx.createGain();
+    this.master.gain.value = 0;
+    this.master.connect(ctx.destination);
+
+    // Underwater low-pass on master (bypassed when not diving)
+    this._uwFilter = ctx.createBiquadFilter();
+    this._uwFilter.type = 'lowpass';
+    this._uwFilter.frequency.value = 20000; // fully open by default
+    this._uwFilter.Q.value = 0.5;
+    this._uwFilter.connect(this.master);
+
+    // --- OCEAN WAVES ---
+    this._oceanGain = ctx.createGain();
+    this._oceanGain.gain.value = 0;
+    this._oceanGain.connect(this._uwFilter);
+    // Layer 1: brown noise through low-pass for deep wave body
+    this._oceanBody = this._makeLoopNoise('brown', 4);
+    this._oceanBodyFilter = ctx.createBiquadFilter();
+    this._oceanBodyFilter.type = 'lowpass';
+    this._oceanBodyFilter.frequency.value = 400;
+    this._oceanBodyFilter.Q.value = 0.7;
+    this._oceanBody.connect(this._oceanBodyFilter);
+    this._oceanBodyFilter.connect(this._oceanGain);
+    // Layer 2: white noise through bandpass for foam hiss
+    this._oceanFoam = this._makeLoopNoise('white', 4);
+    this._oceanFoamFilter = ctx.createBiquadFilter();
+    this._oceanFoamFilter.type = 'bandpass';
+    this._oceanFoamFilter.frequency.value = 2000;
+    this._oceanFoamFilter.Q.value = 1.5;
+    this._oceanFoamGain = ctx.createGain();
+    this._oceanFoamGain.gain.value = 0.4;
+    this._oceanFoam.connect(this._oceanFoamFilter);
+    this._oceanFoamFilter.connect(this._oceanFoamGain);
+    this._oceanFoamGain.connect(this._oceanGain);
+    // Layer 3: brown noise through bandpass for mid-frequency wash
+    this._oceanMid = this._makeLoopNoise('brown', 4);
+    this._oceanMidFilter = ctx.createBiquadFilter();
+    this._oceanMidFilter.type = 'bandpass';
+    this._oceanMidFilter.frequency.value = 600;
+    this._oceanMidFilter.Q.value = 0.8;
+    this._oceanMidGain = ctx.createGain();
+    this._oceanMidGain.gain.value = 0.3;
+    this._oceanMid.connect(this._oceanMidFilter);
+    this._oceanMidFilter.connect(this._oceanMidGain);
+    this._oceanMidGain.connect(this._oceanGain);
+
+    // --- WIND ---
+    this._windGain = ctx.createGain();
+    this._windGain.gain.value = 0;
+    this._windGain.connect(this._uwFilter);
+    // Layer 1: white noise through bandpass
+    this._windMain = this._makeLoopNoise('white', 3);
+    this._windMainFilter = ctx.createBiquadFilter();
+    this._windMainFilter.type = 'bandpass';
+    this._windMainFilter.frequency.value = 800;
+    this._windMainFilter.Q.value = 2;
+    this._windMain.connect(this._windMainFilter);
+    this._windMainFilter.connect(this._windGain);
+    // Layer 2: brown noise for low rumble
+    this._windLow = this._makeLoopNoise('brown', 3);
+    this._windLowFilter = ctx.createBiquadFilter();
+    this._windLowFilter.type = 'lowpass';
+    this._windLowFilter.frequency.value = 200;
+    this._windLowFilter.Q.value = 1;
+    this._windLowGain = ctx.createGain();
+    this._windLowGain.gain.value = 0.5;
+    this._windLow.connect(this._windLowFilter);
+    this._windLowFilter.connect(this._windLowGain);
+    this._windLowGain.connect(this._windGain);
+    // Wind gust state
+    this._gustTimer = 0;
+    this._gustActive = false;
+
+    // --- RAIN ---
+    this._rainGain = ctx.createGain();
+    this._rainGain.gain.value = 0;
+    this._rainGain.connect(this._uwFilter);
+    // Light rain: white noise through bandpass at 4kHz
+    this._rainLight = this._makeLoopNoise('white', 3);
+    this._rainLightFilter = ctx.createBiquadFilter();
+    this._rainLightFilter.type = 'bandpass';
+    this._rainLightFilter.frequency.value = 4000;
+    this._rainLightFilter.Q.value = 0.8;
+    this._rainLight.connect(this._rainLightFilter);
+    this._rainLightFilter.connect(this._rainGain);
+    // Heavy rain: brown noise through lowpass
+    this._rainHeavy = this._makeLoopNoise('brown', 3);
+    this._rainHeavyFilter = ctx.createBiquadFilter();
+    this._rainHeavyFilter.type = 'lowpass';
+    this._rainHeavyFilter.frequency.value = 800;
+    this._rainHeavyFilter.Q.value = 1;
+    this._rainHeavyGain = ctx.createGain();
+    this._rainHeavyGain.gain.value = 0;
+    this._rainHeavy.connect(this._rainHeavyFilter);
+    this._rainHeavyFilter.connect(this._rainHeavyGain);
+    this._rainHeavyGain.connect(this._rainGain);
+    // Raindrop tick timer
+    this._dropTimer = 0;
+
+    // --- FIRE ---
+    this._fireGain = ctx.createGain();
+    this._fireGain.gain.value = 0;
+    this._fireGain.connect(this._uwFilter);
+    this._fireTimer = 0;
+    this._fireActive = false;
+
+    // --- BIRDS ---
+    this._birdTimers = [
+      { timer: 120 + Math.random() * 300, baseFreq: 1800, range: 1200 }, // voice 1: 1800-3000Hz
+      { timer: 200 + Math.random() * 400, baseFreq: 2200, range: 800 },  // voice 2: 2200-3000Hz
+      { timer: 300 + Math.random() * 500, baseFreq: 1200, range: 600 },  // voice 3: lower warbler 1200-1800Hz
+    ];
+
+    // --- CRICKETS ---
+    this._cricketTimers = [];
+    for (let i = 0; i < 4; i++) {
+      this._cricketTimers.push({
+        timer: 30 + Math.random() * 90,
+        baseFreq: 4000 + i * 300 + Math.random() * 200,
+        active: false
+      });
+    }
+
+    // --- UNDERWATER ---
+    this._uwGain = ctx.createGain();
+    this._uwGain.gain.value = 0;
+    this._uwGain.connect(this.master); // bypass uwFilter for UW sounds
+    // Deep rumble: heavy low-pass brown noise
+    this._uwRumble = this._makeLoopNoise('brown', 4);
+    this._uwRumbleFilter = ctx.createBiquadFilter();
+    this._uwRumbleFilter.type = 'lowpass';
+    this._uwRumbleFilter.frequency.value = 300;
+    this._uwRumbleFilter.Q.value = 1;
+    this._uwRumble.connect(this._uwRumbleFilter);
+    this._uwRumbleFilter.connect(this._uwGain);
+    // Bubble timer
+    this._bubbleTimer = 0;
+
+    // --- ISLAND SPECIFIC ---
+    // Vulcan rumble
+    this._vulcanGain = ctx.createGain();
+    this._vulcanGain.gain.value = 0;
+    this._vulcanGain.connect(this._uwFilter);
+    this._vulcanRumble = this._makeLoopNoise('brown', 4);
+    this._vulcanFilter = ctx.createBiquadFilter();
+    this._vulcanFilter.type = 'lowpass';
+    this._vulcanFilter.frequency.value = 60;
+    this._vulcanFilter.Q.value = 6;
+    this._vulcanRumble.connect(this._vulcanFilter);
+    this._vulcanFilter.connect(this._vulcanGain);
+
+    // Hyperborea howl
+    this._hyperGain = ctx.createGain();
+    this._hyperGain.gain.value = 0;
+    this._hyperGain.connect(this._uwFilter);
+    this._hyperHowl = this._makeLoopNoise('white', 3);
+    this._hyperFilter = ctx.createBiquadFilter();
+    this._hyperFilter.type = 'bandpass';
+    this._hyperFilter.frequency.value = 1200;
+    this._hyperFilter.Q.value = 8;
+    this._hyperHowl.connect(this._hyperFilter);
+    this._hyperFilter.connect(this._hyperGain);
+
+    // Necropolis eerie
+    this._necroGain = ctx.createGain();
+    this._necroGain.gain.value = 0;
+    this._necroGain.connect(this._uwFilter);
+    this._necroOsc = ctx.createOscillator();
+    this._necroOsc.type = 'sine';
+    this._necroOsc.frequency.value = 60;
+    this._necroOsc.connect(this._necroGain);
+    this._necroOsc.start();
+
+    // Shore lap phase
+    this._shorePhase = 0;
+  }
+
+  // Create looping noise buffer source
+  _makeLoopNoise(type, duration) {
+    let sr = this.ctx.sampleRate;
+    let len = Math.floor(sr * duration);
+    let buf = this.ctx.createBuffer(1, len, sr);
+    let data = buf.getChannelData(0);
+    if (type === 'brown') {
+      let last = 0;
+      for (let i = 0; i < len; i++) {
+        let white = Math.random() * 2 - 1;
+        last = (last + 0.02 * white) / 1.02;
+        data[i] = last * 3.5;
+      }
+    } else {
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    }
+    let src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    src.loop = true;
+    src.start();
+    return src;
+  }
+
+  // Fire a short noise burst (for rain ticks, fire crackle, etc.)
+  _noiseBurst(opts) {
+    let ctx = this.ctx;
+    let o = Object.assign({
+      type: 'white', filterType: 'highpass', freq: 3000, Q: 1,
+      volume: 0.05, duration: 0.01, attack: 0.001, dest: this._uwFilter
+    }, opts);
+    let sr = ctx.sampleRate;
+    let len = Math.floor(sr * (o.duration + 0.02));
+    let buf = ctx.createBuffer(1, len, sr);
+    let data = buf.getChannelData(0);
+    if (o.type === 'brown') {
+      let last = 0;
+      for (let i = 0; i < len; i++) { let w = Math.random() * 2 - 1; last = (last + 0.02 * w) / 1.02; data[i] = last * 3.5; }
+    } else {
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    }
+    let src = ctx.createBufferSource();
+    src.buffer = buf;
+    let filter = ctx.createBiquadFilter();
+    filter.type = o.filterType;
+    filter.frequency.value = o.freq;
+    filter.Q.value = o.Q;
+    let gain = ctx.createGain();
+    let t = ctx.currentTime;
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(o.volume, t + o.attack);
+    gain.gain.linearRampToValueAtTime(0, t + o.duration);
+    src.connect(filter);
+    filter.connect(gain);
+    gain.connect(o.dest);
+    src.start(t);
+    src.stop(t + o.duration + 0.02);
+  }
+
+  // Fire a short tone (for bird chirps, cricket chirps, bubbles)
+  _toneBurst(opts) {
+    let ctx = this.ctx;
+    let o = Object.assign({
+      type: 'sine', freq: 1000, freqEnd: null, volume: 0.05,
+      duration: 0.05, attack: 0.003, dest: this._uwFilter
+    }, opts);
+    let osc = ctx.createOscillator();
+    osc.type = o.type;
+    let t = ctx.currentTime;
+    osc.frequency.setValueAtTime(o.freq, t);
+    if (o.freqEnd) osc.frequency.exponentialRampToValueAtTime(Math.max(20, o.freqEnd), t + o.duration);
+    let gain = ctx.createGain();
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(o.volume, t + o.attack);
+    let decayStart = t + o.duration * 0.6;
+    gain.gain.setValueAtTime(o.volume * 0.8, decayStart);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + o.duration);
+    osc.connect(gain);
+    gain.connect(o.dest);
+    osc.start(t);
+    osc.stop(t + o.duration + 0.01);
+  }
+
+  // Smooth parameter ramp
+  _ramp(param, target, time) {
+    let t = this.ctx.currentTime;
+    param.cancelScheduledValues(t);
+    param.setValueAtTime(param.value, t);
+    param.linearRampToValueAtTime(target, t + time);
+  }
+
+  update(p) {
+    let { masterVol, bright, island, diving, isRain, isStorm, weatherIntensity, hour, px, py } = p;
+    let dt = 1 / 60; // assume ~60fps
+    this._t += dt;
+
+    // Master volume
+    this._ramp(this.master.gain, masterVol, 0.1);
+
+    // --- UNDERWATER MUFFLING ---
+    let uwCutoff = diving ? 300 : 20000;
+    this._ramp(this._uwFilter.frequency, uwCutoff, diving ? 0.5 : 0.3);
+
+    // --- OCEAN WAVES ---
+    let waveMute = (island === 'hyperborea' || island === 'necropolis');
+    let waveBase = waveMute ? 0 : (0.12 + (1 - bright) * 0.06);
+    if (diving) waveBase = 0.04;
+    this._ramp(this._oceanGain.gain, waveBase, 0.5);
+    // Slow LFO on body filter cutoff (0.1Hz) for wave whoosh
+    let bodyLFO = 400 + Math.sin(this._t * 0.1 * Math.PI * 2) * 200;
+    this._oceanBodyFilter.frequency.value = Math.max(100, bodyLFO);
+    // Faster LFO on foam filter (0.3Hz) for hiss variation
+    let foamLFO = 2000 + Math.sin(this._t * 0.3 * Math.PI * 2) * 800;
+    this._oceanFoamFilter.frequency.value = foamLFO;
+    // Slow volume modulation (0.08Hz) for wave rise and fall
+    let waveEnv = 0.6 + Math.sin(this._t * 0.08 * Math.PI * 2) * 0.4;
+    this._oceanFoamGain.gain.value = 0.25 * waveEnv;
+    this._oceanMidGain.gain.value = 0.2 * (1 - waveEnv * 0.3);
+    // Second wave cycle offset for organic layering
+    let waveEnv2 = 0.5 + Math.sin(this._t * 0.06 * Math.PI * 2 + 1.5) * 0.5;
+    this._oceanMidFilter.frequency.value = 400 + waveEnv2 * 300;
+
+    // --- WIND ---
+    let windTarget = 0.02; // gentle breeze default
+    if (isStorm) windTarget = 0.15;
+    else if (isRain) windTarget = 0.06 + weatherIntensity * 0.05;
+    if (island === 'hyperborea') windTarget = Math.max(windTarget, 0.08);
+    if (diving) windTarget *= 0.15;
+    this._ramp(this._windGain.gain, windTarget, 0.8);
+    // Slow random cutoff modulation
+    let windCutoff = 800 + Math.sin(this._t * 0.15 * Math.PI * 2) * 300 + Math.sin(this._t * 0.07 * Math.PI * 2) * 150;
+    if (isStorm) windCutoff = 400 + Math.sin(this._t * 0.2 * Math.PI * 2) * 150;
+    this._windMainFilter.frequency.value = windCutoff;
+    this._windLowFilter.frequency.value = 150 + Math.sin(this._t * 0.05 * Math.PI * 2) * 80;
+    // Occasional gusts
+    this._gustTimer -= dt;
+    if (!this._gustActive && this._gustTimer <= 0 && (isRain || isStorm || Math.random() < 0.001)) {
+      this._gustActive = true;
+      this._gustTimer = 0.5 + Math.random() * 1.5; // gust duration
+      let gustVol = windTarget * (1.5 + Math.random());
+      this._ramp(this._windGain.gain, Math.min(0.25, gustVol), 0.15);
+      this._windMainFilter.frequency.value = windCutoff + 400;
+    } else if (this._gustActive && this._gustTimer <= 0) {
+      this._gustActive = false;
+      this._gustTimer = 5 + Math.random() * 15; // time until next gust
+      if (isStorm) this._gustTimer = 2 + Math.random() * 6;
+    }
+
+    // --- RAIN ---
+    let rainTarget = 0;
+    if (isRain || isStorm) {
+      rainTarget = isStorm ? 0.10 : (0.04 + weatherIntensity * 0.04);
+      if (diving) rainTarget *= 0.15;
+    }
+    this._ramp(this._rainGain.gain, rainTarget, 1.0);
+    // Heavy rain layer scales with intensity
+    let heavyTarget = isStorm ? 0.6 : (weatherIntensity > 0.5 ? (weatherIntensity - 0.5) * 1.2 : 0);
+    this._ramp(this._rainHeavyGain.gain, heavyTarget, 0.5);
+    // Modulate light rain filter
+    if (isRain || isStorm) {
+      this._rainLightFilter.frequency.value = 3500 + Math.sin(this._t * 0.4 * Math.PI * 2) * 1000;
+    }
+    // Individual raindrop ticks
+    if ((isRain || isStorm) && !diving) {
+      this._dropTimer -= dt;
+      if (this._dropTimer <= 0) {
+        let intensity = isStorm ? 0.8 : weatherIntensity;
+        this._dropTimer = 0.02 + Math.random() * (0.15 - intensity * 0.12);
+        this._noiseBurst({
+          type: 'white', filterType: 'bandpass',
+          freq: 3000 + Math.random() * 4000, Q: 2,
+          volume: (0.01 + Math.random() * 0.02) * masterVol,
+          duration: 0.005, attack: 0.001, dest: this._uwFilter
+        });
+      }
+    }
+
+    // --- BIRDS ---
+    let birdMute = (island === 'necropolis' || diving || hour < 6 || hour > 18);
+    // Louder at dawn/dusk, quieter at noon
+    let birdVolumeScale = 1.0;
+    if (hour >= 6 && hour < 8) birdVolumeScale = 1.5; // dawn chorus
+    else if (hour >= 16 && hour < 18) birdVolumeScale = 1.3; // dusk chorus
+    else if (hour >= 11 && hour < 14) birdVolumeScale = 0.5; // quiet noon
+    if (island === 'plenty') birdVolumeScale *= 1.5;
+    if (island === 'vulcan') birdVolumeScale *= 0.4;
+
+    if (!birdMute) {
+      for (let i = 0; i < this._birdTimers.length; i++) {
+        let b = this._birdTimers[i];
+        b.timer -= dt * 60;
+        if (b.timer <= 0) {
+          b.timer = 120 + Math.random() * 480; // 2-8 seconds
+          if (island === 'plenty') b.timer *= 0.4;
+          let freq = b.baseFreq + Math.random() * b.range;
+          let vol = (0.02 + Math.random() * 0.04) * masterVol * birdVolumeScale;
+          // Chirp: rapid frequency sweep
+          let chirpDur = 0.05 + Math.random() * 0.05;
+          this._toneBurst({ freq: freq, freqEnd: freq * (0.7 + Math.random() * 0.6), volume: vol, duration: chirpDur, attack: 0.003 });
+          // Double chirp 50% of the time
+          if (Math.random() < 0.5) {
+            let delay = chirpDur + 0.02 + Math.random() * 0.04;
+            let f2 = freq * (0.85 + Math.random() * 0.3);
+            setTimeout(() => {
+              this._toneBurst({ freq: f2, freqEnd: f2 * (0.75 + Math.random() * 0.5), volume: vol * 0.7, duration: chirpDur * 0.8, attack: 0.003 });
+            }, delay * 1000);
+          }
+          // Triple chirp for dawn chorus (30% chance)
+          if (birdVolumeScale > 1.2 && Math.random() < 0.3) {
+            let delay2 = chirpDur * 2 + 0.06 + Math.random() * 0.05;
+            let f3 = freq * (0.9 + Math.random() * 0.2);
+            setTimeout(() => {
+              this._toneBurst({ freq: f3, freqEnd: f3 * (0.8 + Math.random() * 0.4), volume: vol * 0.5, duration: chirpDur * 0.6, attack: 0.003 });
+            }, delay2 * 1000);
+          }
+        }
+      }
+    }
+
+    // --- CRICKETS ---
+    let cricketActive = !diving && (hour >= 20 || hour < 5);
+    if (cricketActive) {
+      for (let i = 0; i < this._cricketTimers.length; i++) {
+        let c = this._cricketTimers[i];
+        c.timer -= dt * 60;
+        if (c.timer <= 0) {
+          c.timer = 30 + Math.random() * 120; // 0.5-2s between chirps
+          let freq = c.baseFreq + (Math.random() - 0.5) * 300;
+          let vol = (0.015 + Math.random() * 0.025) * masterVol;
+          // Cricket chirp: rapid on/off oscillation
+          let burstCount = 2 + Math.floor(Math.random() * 4);
+          let burstGap = 0.025 + Math.random() * 0.015;
+          for (let j = 0; j < burstCount; j++) {
+            let delay = j * burstGap;
+            setTimeout(() => {
+              this._toneBurst({
+                freq: freq + (Math.random() - 0.5) * 50,
+                volume: vol * (1 - j * 0.1),
+                duration: 0.012 + Math.random() * 0.008,
+                attack: 0.001
+              });
+            }, delay * 1000);
+          }
+        }
+      }
+    }
+
+    // --- FIRE CRACKLING ---
+    let nearFire = false;
+    if (typeof state !== 'undefined' && state.buildings && !diving) {
+      for (let i = 0; i < state.buildings.length; i++) {
+        let b = state.buildings[i];
+        if ((b.type === 'campfire' || b.type === 'hearth' || b.type === 'firepit' ||
+             b.type === 'bakery' || b.type === 'castrum') &&
+            Math.sqrt((px - b.x) ** 2 + (py - b.y) ** 2) < 120) {
+          nearFire = true; break;
+        }
+      }
+    }
+    let fireTarget = nearFire ? 0.08 : 0;
+    this._ramp(this._fireGain.gain, fireTarget, nearFire ? 0.3 : 0.5);
+    if (nearFire) {
+      this._fireTimer -= dt;
+      if (this._fireTimer <= 0) {
+        this._fireTimer = 0.05 + Math.random() * 0.15; // 50-200ms gaps
+        // Random noise burst for crackle
+        this._noiseBurst({
+          type: 'white', filterType: 'highpass',
+          freq: 2000 + Math.random() * 4000, Q: 1 + Math.random() * 2,
+          volume: (0.03 + Math.random() * 0.06) * masterVol,
+          duration: 0.01 + Math.random() * 0.02, attack: 0.001,
+          dest: this._fireGain
+        });
+        // Occasional low pop
+        if (Math.random() < 0.3) {
+          this._toneBurst({
+            freq: 100 + Math.random() * 200, volume: (0.02 + Math.random() * 0.03) * masterVol,
+            duration: 0.015 + Math.random() * 0.01, attack: 0.002,
+            dest: this._fireGain
+          });
+        }
+      }
+    }
+
+    // --- UNDERWATER ---
+    let uwTarget = diving ? 0.12 : 0;
+    this._ramp(this._uwGain.gain, uwTarget, 0.5);
+    this._uwRumbleFilter.frequency.value = 200 + Math.sin(this._t * 0.08 * Math.PI * 2) * 100;
+    // Slow bubbling
+    if (diving) {
+      this._bubbleTimer -= dt;
+      if (this._bubbleTimer <= 0) {
+        this._bubbleTimer = 0.5 + Math.random() * 3;
+        let bFreq = 400 + Math.random() * 400;
+        this._toneBurst({
+          freq: bFreq, freqEnd: bFreq * 1.3,
+          volume: (0.02 + Math.random() * 0.03) * masterVol,
+          duration: 0.03 + Math.random() * 0.04, attack: 0.002,
+          dest: this._uwGain
+        });
+        // Second bubble
+        if (Math.random() < 0.4) {
+          setTimeout(() => {
+            this._toneBurst({
+              freq: bFreq * (1.1 + Math.random() * 0.3),
+              freqEnd: bFreq * 1.5, volume: (0.01 + Math.random() * 0.02) * masterVol,
+              duration: 0.02 + Math.random() * 0.03, attack: 0.002,
+              dest: this._uwGain
+            });
+          }, (0.05 + Math.random() * 0.15) * 1000);
+        }
+      }
+    }
+
+    // --- VULCAN RUMBLE ---
+    let vulcanTarget = island === 'vulcan' ? 0.10 : 0;
+    if (island === 'vulcan') vulcanTarget *= (0.7 + Math.sin(this._t * 0.3) * 0.3);
+    this._ramp(this._vulcanGain.gain, Math.max(0, vulcanTarget), 0.5);
+    if (island === 'vulcan') this._vulcanFilter.frequency.value = 55 + Math.sin(this._t * 0.2) * 15;
+
+    // --- HYPERBOREA HOWL ---
+    let hyperTarget = island === 'hyperborea' ? 0.12 : 0;
+    if (island === 'hyperborea') {
+      hyperTarget *= (0.5 + Math.sin(this._t * 0.4) * 0.3 + Math.sin(this._t * 0.7) * 0.2);
+      this._hyperFilter.frequency.value = 1200 + Math.sin(this._t * 0.25) * 400;
+    }
+    this._ramp(this._hyperGain.gain, Math.max(0, hyperTarget), 0.5);
+
+    // --- NECROPOLIS EERIE ---
+    let necroTarget = island === 'necropolis' ? 0.07 : 0;
+    if (island === 'necropolis') necroTarget *= (0.4 + Math.sin(this._t * 1.2) * 0.6);
+    this._ramp(this._necroGain.gain, Math.max(0, necroTarget), 0.3);
+
+    // --- SHORE LAP ---
+    if (island === 'home' && !diving) {
+      let srx = typeof getSurfaceRX === 'function' ? getSurfaceRX() : 450;
+      let sry = typeof getSurfaceRY === 'function' ? getSurfaceRY() : 144;
+      let cx = typeof WORLD !== 'undefined' ? WORLD.islandCX : 600;
+      let cy = typeof WORLD !== 'undefined' ? WORLD.islandCY : 400;
+      let dx = (px - cx) / srx;
+      let dy = (py - cy) / sry;
+      let edgeDist = Math.sqrt(dx * dx + dy * dy);
+      if (edgeDist > 0.80 && edgeDist < 1.1) {
+        this._shorePhase += dt * (0.35 + Math.sin(this._t * 0.04) * 0.05);
+        let swell = Math.pow(Math.max(0, Math.sin(this._shorePhase * Math.PI * 2)), 2.5);
+        let proxFactor = 1.0 - Math.abs(edgeDist - 0.95) * 5;
+        proxFactor = Math.max(0, Math.min(1, proxFactor));
+        // Use a noise burst for the lap sound during swell peaks
+        if (swell > 0.8 && Math.random() < 0.03) {
+          this._noiseBurst({
+            type: 'brown', filterType: 'bandpass',
+            freq: 250 + swell * 120, Q: 1.5,
+            volume: swell * proxFactor * 0.04 * masterVol,
+            duration: 0.2 + Math.random() * 0.15, attack: 0.05,
+            dest: this._uwFilter
+          });
+        }
+      }
+    }
+  }
+}
+
 class SoundManager {
   constructor() {
     this.ready = false;
     this.vol = { master: 0.5, sfx: 0.7, ambient: 0.5, music: 0.4 };
     this._loadVolume();
-    // Ambient layers
-    this._waveNoise = null;
-    this._waveFilter = null;
-    this._waveGain = null;
-    this._windNoise = null;
-    this._windFilter = null;
-    this._windGain = null;
-    // Bird chirp oscillator (reused)
-    this._birdOsc = null;
-    this._birdGain = null;
-    this._birdTimer = 0;
-    // Cricket oscillators (3 virtual crickets for organic sound)
-    this._crickets = []; // [{osc, gain, timer}]
+    // Real audio samples (CC0)
+    this._samples = {};
+    this._sampleLoops = {}; // currently playing ambient loops
+    this._samplesLoaded = false;
+    // Ambient system (Web Audio API based)
+    this._amb = null; // AmbientManager instance
     // Dawn/dusk transition tracking
-    this._lastTimeSlot = null; // 'day', 'night', 'dawn', 'dusk'
-    // SFX oscillator pool (4 reusable)
+    this._lastTimeSlot = null;
+    // SFX oscillator pool (6 reusable)
     this._sfxPool = [];
     this._sfxIdx = 0;
     // Throttle: prevent same SFX from spamming
     this._lastPlay = {};
-    this._minInterval = 80; // ms between same SFX
+    this._minInterval = 80;
     // Lyre music system
-    this._lyreVoices = [];   // 3 oscillator voices
+    this._lyreVoices = [];
     this._lyreGains = [];
     this._lyreActive = false;
     this._lyreNoteIdx = 0;
     this._lyreTimer = 0;
     this._lyrePhrase = 0;
-    this._lyreMode = 'peaceful'; // 'peaceful', 'tense', 'eerie'
+    this._lyreMode = 'peaceful';
     // Island-specific ambient state
     this._islandAmbient = 'home';
-    // Vulcan rumble
-    this._rumbleNoise = null;
-    this._rumbleFilter = null;
-    this._rumbleGain = null;
-    // Hyperborea wind howl
-    this._howlNoise = null;
-    this._howlFilter = null;
-    this._howlGain = null;
-    // Plenty: second tropical bird
-    this._bird2Osc = null;
-    this._bird2Gain = null;
-    this._bird2Timer = 0;
-    // Necropolis: eerie pulse
-    this._eerieOsc = null;
-    this._eerieGain = null;
     // Diving underwater state
     this._divingActive = false;
-    // Underwater ambient layers
-    this._uwRumbleOsc = null;
-    this._uwRumbleGain = null;
-    this._whaleOsc = null;
-    this._whaleGain = null;
-    this._whaleTimer = 0;
     // Storm ambient
     this._thunderTimer = 0;
     // Bass drone oscillator (foundation for harmony)
     this._droneOsc = null;
     this._droneGain = null;
     this._droneTarget = 0;
+    this._droneRootFreq = 146.8; // Current drone root, follows chord changes
     // Rhythmic pulse oscillator (subtle heartbeat underneath music)
     this._pulseOsc = null;
     this._pulseGain = null;
     this._pulseTimer = 0;
     // Mode crossfade
     this._lyreVolMult = 1.0;
-    this._lyreFadeDir = 0; // -1 fading out, 1 fading in, 0 steady
+    this._lyreFadeDir = 0;
     this._lyrePendingMode = null;
     // Dynamic context
-    this._lyreContext = 'default'; // farming, combat, night, rain, ocean, dawn
-    // Harmony layer: 4th oscillator doubles melody note at interval
+    this._lyreContext = 'default';
+    // Harmony layer
     this._harmOsc = null;
     this._harmGain = null;
-    // Rain ambient (filtered white noise)
-    this._rainNoise = null;
-    this._rainFilter = null;
-    this._rainGain = null;
     // Context tempo multiplier
     this._tempoMult = 1.0;
-    // Campfire crackle (filtered noise bursts)
-    this._fireNoise = null;
-    this._fireFilter = null;
-    this._fireGain = null;
-    this._fireTimer = 0;
-    // Extra wave oscillators for organic ocean
-    this._wave2Noise = null;
-    this._wave2Filter = null;
-    this._wave2Gain = null;
-    this._wave3Noise = null;
-    this._wave3Filter = null;
-    this._wave3Gain = null;
-    // Shore lap: gentle rhythmic water lap near coastline
-    this._shoreNoise = null;
-    this._shoreFilter = null;
-    this._shoreGain = null;
-    this._shorePhase = 0; // phase accumulator for rhythmic swell
     // Seagull ambient timer
     this._seagullTimer = 0;
+    // Recorded music system
+    this._musicTrack = null; // currently playing music key
+    this._musicFading = false;
   }
 
   init() {
     try {
-      // Ambient: sea waves (white noise → bandpass)
-      this._waveNoise = new p5.Noise('white');
-      this._waveFilter = new p5.BandPass();
-      this._waveFilter.freq(300);
-      this._waveFilter.res(1.5);
-      this._waveNoise.disconnect();
-      this._waveNoise.connect(this._waveFilter);
-      this._waveGain = new p5.Gain();
-      this._waveFilter.connect(this._waveGain);
-      this._waveGain.connect();
-      this._waveGain.amp(0);
-      this._waveNoise.start();
-      this._waveNoise.amp(0.15);
-
-      // Ambient: wind (pink noise → bandpass)
-      this._windNoise = new p5.Noise('pink');
-      this._windFilter = new p5.BandPass();
-      this._windFilter.freq(500);
-      this._windFilter.res(0.8);
-      this._windNoise.disconnect();
-      this._windNoise.connect(this._windFilter);
-      this._windGain = new p5.Gain();
-      this._windFilter.connect(this._windGain);
-      this._windGain.connect();
-      this._windGain.amp(0);
-      this._windNoise.start();
-      this._windNoise.amp(0.08);
-
-      // Bird chirp (sine, reused)
-      this._birdOsc = new p5.Oscillator('sine');
-      this._birdGain = new p5.Gain();
-      this._birdOsc.disconnect();
-      this._birdOsc.connect(this._birdGain);
-      this._birdGain.connect();
-      this._birdGain.amp(0);
-      this._birdOsc.start();
-      this._birdOsc.amp(0);
-
-      // Crickets (3 virtual crickets with independent timing)
-      for (let ci = 0; ci < 3; ci++) {
-        let osc = new p5.Oscillator('sine');
-        let gain = new p5.Gain();
-        osc.disconnect();
-        osc.connect(gain);
-        gain.connect();
-        gain.amp(0);
-        osc.start();
-        osc.freq(4000 + ci * 200); // slightly different base pitch each
-        osc.amp(0);
-        this._crickets.push({ osc, gain, timer: floor(random(30, 120)), baseFreq: 4000 + ci * 200 });
-      }
+      // Initialize Web Audio API ambient system
+      try {
+        let ctx = this._getAudioCtx();
+        if (ctx && typeof AmbientManager !== 'undefined') {
+          this._amb = new AmbientManager(ctx, this);
+        }
+      } catch(_ambErr) { /* ambient not ready yet */ }
 
       // Lyre: 3 sine voices for polyphonic plucked strings
       for (let i = 0; i < 3; i++) {
@@ -213,76 +672,6 @@ class SoundManager {
         this._sfxPool.push({ osc, gain, busy: false, _vol: 0 });
       }
 
-      // Vulcan: sub-bass rumble (white noise → lowpass ~60Hz)
-      this._rumbleNoise = new p5.Noise('white');
-      this._rumbleFilter = new p5.LowPass();
-      this._rumbleFilter.freq(60);
-      this._rumbleFilter.res(8);
-      this._rumbleNoise.disconnect();
-      this._rumbleNoise.connect(this._rumbleFilter);
-      this._rumbleGain = new p5.Gain();
-      this._rumbleFilter.connect(this._rumbleGain);
-      this._rumbleGain.connect();
-      this._rumbleGain.amp(0);
-      this._rumbleNoise.start();
-      this._rumbleNoise.amp(0.2);
-
-      // Hyperborea: wind howl (pink noise → bandpass ~1200Hz, high resonance)
-      this._howlNoise = new p5.Noise('pink');
-      this._howlFilter = new p5.BandPass();
-      this._howlFilter.freq(1200);
-      this._howlFilter.res(12);
-      this._howlNoise.disconnect();
-      this._howlNoise.connect(this._howlFilter);
-      this._howlGain = new p5.Gain();
-      this._howlFilter.connect(this._howlGain);
-      this._howlGain.connect();
-      this._howlGain.amp(0);
-      this._howlNoise.start();
-      this._howlNoise.amp(0.12);
-
-      // Plenty: second tropical bird voice (different freq range)
-      this._bird2Osc = new p5.Oscillator('sine');
-      this._bird2Gain = new p5.Gain();
-      this._bird2Osc.disconnect();
-      this._bird2Osc.connect(this._bird2Gain);
-      this._bird2Gain.connect();
-      this._bird2Gain.amp(0);
-      this._bird2Osc.start();
-      this._bird2Osc.amp(0);
-
-      // Necropolis: eerie low pulse (sine at 60Hz, slow amplitude modulation)
-      this._eerieOsc = new p5.Oscillator('sine');
-      this._eerieGain = new p5.Gain();
-      this._eerieOsc.disconnect();
-      this._eerieOsc.connect(this._eerieGain);
-      this._eerieGain.connect();
-      this._eerieGain.amp(0);
-      this._eerieOsc.start();
-      this._eerieOsc.freq(60);
-      this._eerieOsc.amp(1.0);
-
-      // Underwater: low rumble oscillator (triangle for warmth)
-      this._uwRumbleOsc = new p5.Oscillator('triangle');
-      this._uwRumbleGain = new p5.Gain();
-      this._uwRumbleOsc.disconnect();
-      this._uwRumbleOsc.connect(this._uwRumbleGain);
-      this._uwRumbleGain.connect();
-      this._uwRumbleGain.amp(0);
-      this._uwRumbleOsc.start();
-      this._uwRumbleOsc.freq(55);
-      this._uwRumbleOsc.amp(1.0);
-
-      // Underwater: whale-like sweep (sine, slow pitch glide)
-      this._whaleOsc = new p5.Oscillator('sine');
-      this._whaleGain = new p5.Gain();
-      this._whaleOsc.disconnect();
-      this._whaleOsc.connect(this._whaleGain);
-      this._whaleGain.connect();
-      this._whaleGain.amp(0);
-      this._whaleOsc.start();
-      this._whaleOsc.amp(1.0);
-
       // Harmony layer: sine oscillator that doubles melody at an interval
       this._harmOsc = new p5.Oscillator('sine');
       this._harmGain = new p5.Gain();
@@ -293,79 +682,196 @@ class SoundManager {
       this._harmOsc.start();
       this._harmOsc.amp(1.0);
 
-      // Rain ambient: filtered white noise for rainfall
-      this._rainNoise = new p5.Noise('white');
-      this._rainFilter = new p5.BandPass();
-      this._rainFilter.freq(2000);
-      this._rainFilter.res(2);
-      this._rainNoise.disconnect();
-      this._rainNoise.connect(this._rainFilter);
-      this._rainGain = new p5.Gain();
-      this._rainFilter.connect(this._rainGain);
-      this._rainGain.connect();
-      this._rainGain.amp(0);
-      this._rainNoise.start();
-      this._rainNoise.amp(0.12);
-
-      // Campfire: filtered noise bursts for crackle
-      this._fireNoise = new p5.Noise('white');
-      this._fireFilter = new p5.BandPass();
-      this._fireFilter.freq(1800);
-      this._fireFilter.res(3);
-      this._fireNoise.disconnect();
-      this._fireNoise.connect(this._fireFilter);
-      this._fireGain = new p5.Gain();
-      this._fireFilter.connect(this._fireGain);
-      this._fireGain.connect();
-      this._fireGain.amp(0);
-      this._fireNoise.start();
-      this._fireNoise.amp(0.15);
-
-      // Extra wave oscillators for organic ocean (detuned layers)
-      this._wave2Noise = new p5.Noise('white');
-      this._wave2Filter = new p5.BandPass();
-      this._wave2Filter.freq(340);
-      this._wave2Filter.res(1.2);
-      this._wave2Noise.disconnect();
-      this._wave2Noise.connect(this._wave2Filter);
-      this._wave2Gain = new p5.Gain();
-      this._wave2Filter.connect(this._wave2Gain);
-      this._wave2Gain.connect();
-      this._wave2Gain.amp(0);
-      this._wave2Noise.start();
-      this._wave2Noise.amp(0.12);
-
-      this._wave3Noise = new p5.Noise('pink');
-      this._wave3Filter = new p5.BandPass();
-      this._wave3Filter.freq(260);
-      this._wave3Filter.res(1.8);
-      this._wave3Noise.disconnect();
-      this._wave3Noise.connect(this._wave3Filter);
-      this._wave3Gain = new p5.Gain();
-      this._wave3Filter.connect(this._wave3Gain);
-      this._wave3Gain.connect();
-      this._wave3Gain.amp(0);
-      this._wave3Noise.start();
-      this._wave3Noise.amp(0.10);
-
-      // Shore lap: filtered noise with rhythmic amplitude swell
-      this._shoreNoise = new p5.Noise('pink');
-      this._shoreFilter = new p5.BandPass();
-      this._shoreFilter.freq(280);
-      this._shoreFilter.res(1.8);
-      this._shoreNoise.disconnect();
-      this._shoreNoise.connect(this._shoreFilter);
-      this._shoreGain = new p5.Gain();
-      this._shoreFilter.connect(this._shoreGain);
-      this._shoreGain.connect();
-      this._shoreGain.amp(0);
-      this._shoreNoise.start();
-      this._shoreNoise.amp(0.10);
-
       this.ready = true;
-      console.log('[SoundManager] init OK — 3 lyre voices + harmony, 6 sfx slots, campfire + layered ocean ready');
+      this.loadSamples();
+      // SoundManager init OK
     } catch (e) {
       console.warn('SoundManager init failed:', e.message);
+    }
+  }
+
+  // ─── LOAD REAL AUDIO SAMPLES (CC0) ───
+  loadSamples() {
+    const files = {
+      // Ambient loops
+      ocean: 'sounds/ambient_ocean.flac',
+      birds: 'sounds/ambient_birds.mp3',
+      wind: 'sounds/ambient_wind.wav',
+      rain: 'sounds/ambient_rain.ogg',
+      fire: 'sounds/ambient_fire.ogg',
+      crickets: 'sounds/ambient_crickets.mp3',
+      battle: 'sounds/ambient_battle.ogg',
+      cave: 'sounds/ambient_cave.ogg',
+      dawn: 'sounds/ambient_dawn.ogg',
+      dusk: 'sounds/ambient_dusk.mp3',
+      forest: 'sounds/ambient_forest.mp3',
+      ice: 'sounds/ambient_ice.ogg',
+      lava: 'sounds/ambient_lava.ogg',
+      market: 'sounds/ambient_market.mp3',
+      night: 'sounds/ambient_night.ogg',
+      ocean_deep: 'sounds/ambient_ocean_deep.ogg',
+      sailing: 'sounds/ambient_sailing.ogg',
+      spooky: 'sounds/ambient_spooky.mp3',
+      storm: 'sounds/ambient_storm.mp3',
+      tavern: 'sounds/ambient_tavern.mp3',
+      thunder_distant: 'sounds/ambient_thunder_distant.mp3',
+      tropical: 'sounds/ambient_tropical.ogg',
+      underwater: 'sounds/ambient_underwater.ogg',
+      // SFX
+      achievement: 'sounds/sfx_achievement.ogg',
+      anchor: 'sounds/sfx_anchor.ogg',
+      anvil: 'sounds/sfx_anvil.ogg',
+      armor_hit: 'sounds/sfx_armor_hit.wav',
+      arrow_hit: 'sounds/sfx_arrow_hit.ogg',
+      arrow_shoot: 'sounds/sfx_arrow_shoot.ogg',
+      battle_cry: 'sounds/sfx_battle_cry.ogg',
+      bird_chirp: 'sounds/sfx_bird_chirp.mp3',
+      bird_single: 'sounds/sfx_bird_single.ogg',
+      bobber_plop: 'sounds/sfx_bobber_plop.ogg',
+      bubbles_loop: 'sounds/sfx_bubbles_loop.wav',
+      bubbles_single: 'sounds/sfx_bubbles_single.wav',
+      buff: 'sounds/sfx_buff.ogg',
+      build: 'sounds/sfx_build.ogg',
+      cast_line: 'sounds/sfx_cast_line.ogg',
+      cat_meow: 'sounds/sfx_cat_meow.ogg',
+      cat_purr: 'sounds/sfx_cat_purr.wav',
+      chicken: 'sounds/sfx_chicken.wav',
+      click: 'sounds/sfx_click.ogg',
+      close_menu: 'sounds/sfx_close_menu.ogg',
+      coin: 'sounds/sfx_coin.wav',
+      craft_complete: 'sounds/sfx_craft_complete.ogg',
+      cricket_single: 'sounds/sfx_cricket_single.wav',
+      crop_grow: 'sounds/sfx_crop_grow.ogg',
+      crow: 'sounds/sfx_crow.wav',
+      crystal_charge: 'sounds/sfx_crystal_charge.ogg',
+      crystal_collect: 'sounds/sfx_crystal_collect.ogg',
+      death_enemy: 'sounds/sfx_death_enemy.ogg',
+      dig: 'sounds/sfx_dig.ogg',
+      dodge: 'sounds/sfx_dodge.ogg',
+      door_close: 'sounds/sfx_door_close.ogg',
+      door_open: 'sounds/sfx_door_open.ogg',
+      enchant: 'sounds/sfx_enchant.ogg',
+      equip: 'sounds/sfx_equip.wav',
+      fanfare: 'sounds/sfx_fanfare.ogg',
+      fire_crackling: 'sounds/sfx_fire_crackling.ogg',
+      fire_ignite: 'sounds/sfx_fire_ignite.ogg',
+      fire_loop: 'sounds/sfx_fire_loop.wav',
+      fish_caught: 'sounds/sfx_fish_caught.ogg',
+      fish_splash: 'sounds/sfx_fish_splash.ogg',
+      footstep_grass: 'sounds/sfx_footstep_grass.ogg',
+      footstep_water: 'sounds/sfx_footstep_water.ogg',
+      footstep_wood: 'sounds/sfx_footstep_wood.ogg',
+      frog: 'sounds/sfx_frog.wav',
+      gold_pile: 'sounds/sfx_gold_pile.ogg',
+      hammer: 'sounds/sfx_hammer.ogg',
+      harvest: 'sounds/sfx_harvest.ogg',
+      harvest_fruit: 'sounds/sfx_harvest_fruit.ogg',
+      harvest_grain: 'sounds/sfx_harvest_grain.ogg',
+      heal: 'sounds/sfx_heal.ogg',
+      hit: 'sounds/sfx_hit.wav',
+      hover: 'sounds/sfx_hover.ogg',
+      inventory: 'sounds/sfx_inventory.ogg',
+      leaves_rustle: 'sounds/sfx_leaves_rustle.ogg',
+      levelup: 'sounds/sfx_levelup.mp3',
+      magic_cast: 'sounds/sfx_magic_cast.ogg',
+      notification: 'sounds/sfx_notification.ogg',
+      open_menu: 'sounds/sfx_open_menu.ogg',
+      owl: 'sounds/sfx_owl.wav',
+      page_turn: 'sounds/sfx_page_turn.ogg',
+      plant_seed: 'sounds/sfx_plant_seed.ogg',
+      portal: 'sounds/sfx_portal.ogg',
+      punch: 'sounds/sfx_punch.wav',
+      quest_complete: 'sounds/sfx_quest_complete.mp3',
+      quest_new: 'sounds/sfx_quest_new.ogg',
+      rain_drop: 'sounds/sfx_rain_drop.ogg',
+      reel: 'sounds/sfx_reel.ogg',
+      sail_unfurl: 'sounds/sfx_sail_unfurl.ogg',
+      saw: 'sounds/sfx_saw.ogg',
+      seagull: 'sounds/sfx_seagull.wav',
+      shield_block: 'sounds/sfx_shield_block.ogg',
+      ship_creak: 'sounds/sfx_ship_creak.ogg',
+      splash: 'sounds/sfx_splash.wav',
+      step_sand: 'sounds/sfx_step_sand.ogg',
+      step_stone: 'sounds/sfx_step_stone.ogg',
+      stone_place: 'sounds/sfx_stone_place.ogg',
+      sword_clash: 'sounds/sfx_sword_clash.ogg',
+      sword_swing: 'sounds/sfx_sword_swing.ogg',
+      thunder_crack: 'sounds/sfx_thunder_crack.ogg',
+      thunder_roll: 'sounds/sfx_thunder_roll.ogg',
+      torch: 'sounds/sfx_torch.ogg',
+      treasure_open: 'sounds/sfx_treasure_open.ogg',
+      tree_fall: 'sounds/sfx_tree_fall.ogg',
+      unequip: 'sounds/sfx_unequip.wav',
+      water_pour: 'sounds/sfx_water_pour.ogg',
+      wave_crash: 'sounds/sfx_wave_crash.ogg',
+      whirlwind: 'sounds/sfx_whirlwind.ogg',
+      wind_gust: 'sounds/sfx_wind_gust.ogg',
+      wolf_howl: 'sounds/sfx_wolf_howl.mp3',
+      wood_chop: 'sounds/sfx_wood_chop.ogg',
+      writing: 'sounds/sfx_writing.ogg',
+      // Music tracks
+      music_combat: 'sounds/music_combat.mp3',
+      music_festival: 'sounds/music_festival.mp3',
+      music_menu: 'sounds/music_menu.ogg',
+      music_night: 'sounds/music_night.ogg',
+      music_peaceful: 'sounds/music_peaceful.ogg',
+      music_sad: 'sounds/music_sad.ogg',
+      music_sailing: 'sounds/music_sailing.ogg',
+      music_temple: 'sounds/music_temple.mp3',
+      music_victory: 'sounds/music_victory.wav'
+    };
+    let loaded = 0;
+    const total = Object.keys(files).length;
+    for (const [key, path] of Object.entries(files)) {
+      loadSound(path, (s) => {
+        this._samples[key] = s;
+        loaded++;
+        if (loaded >= total) this._samplesLoaded = true;
+      }, () => {
+        // Failed to load — procedural fallback will handle it
+        loaded++;
+        if (loaded >= total) this._samplesLoaded = true;
+      });
+    }
+  }
+
+  // Play a sample-based SFX if available, returns true if played
+  _playSample(key, volMult) {
+    let s = this._samples[key];
+    if (!s) return false;
+    let vol = this.vol.master * this.vol.sfx * (volMult || 1.0);
+    if (vol < 0.001) return true; // muted, but still "handled"
+    s.setVolume(vol);
+    if (s.isPlaying()) s.stop();
+    s.play();
+    return true;
+  }
+
+  // Start or update an ambient sample loop
+  _loopSample(key, vol) {
+    let s = this._samples[key];
+    if (!s) return false;
+    if (vol < 0.001) {
+      if (this._sampleLoops[key]) {
+        s.stop();
+        this._sampleLoops[key] = false;
+      }
+      return true;
+    }
+    s.setVolume(vol);
+    if (!this._sampleLoops[key]) {
+      s.loop();
+      this._sampleLoops[key] = true;
+    }
+    return true;
+  }
+
+  // Stop an ambient sample loop
+  _stopLoop(key) {
+    let s = this._samples[key];
+    if (s && this._sampleLoops[key]) {
+      s.stop();
+      this._sampleLoops[key] = false;
     }
   }
 
@@ -389,348 +895,178 @@ class SoundManager {
     let diving = typeof state !== 'undefined' && state.diving && state.diving.active;
     this._divingActive = diving;
 
-    // Imperial Bridge detection — exposed causeway between islands
-    let onBridge = typeof state !== 'undefined' && typeof isOnImperialBridge === 'function'
-      && state.imperialBridge && state.imperialBridge.built
-      && isOnImperialBridge(state.player.x, state.player.y);
-
-    // ─── Waves (3 detuned layers for organic sound) ───
-    let waveMute = (island === 'hyperborea' || island === 'necropolis');
-    let waveVol = waveMute ? 0 : (0.06 + (1 - bright) * 0.04) * masterVol;
-    if (diving) waveVol = 0.12 * masterVol;
-    if (onBridge) waveVol = 0.10 * masterVol;
-    this._waveGain.amp(waveVol, 0.3);
-    let waveFreq = 300 + sin(frameCount * 0.003) * 80;
-    if (diving) waveFreq = 180 + sin(frameCount * 0.002) * 40;
-    if (onBridge) waveFreq = 220 + sin(frameCount * 0.004) * 60;
-    this._waveFilter.freq(waveFreq);
-    // Layer 2: slightly higher freq, different LFO rate
-    if (this._wave2Gain) {
-      this._wave2Gain.amp(waveVol * 0.7, 0.4);
-      this._wave2Filter.freq(waveFreq * 1.15 + sin(frameCount * 0.0047) * 60);
-    }
-    // Layer 3: lower freq, slowest LFO for deep swells
-    if (this._wave3Gain) {
-      this._wave3Gain.amp(waveVol * 0.5, 0.5);
-      this._wave3Filter.freq(waveFreq * 0.78 + sin(frameCount * 0.0019) * 45);
-    }
-
-    // ─── Wind (weather-reactive: clear=barely audible, storm=howling) ───
+    // Weather state
     let isRain = (typeof state !== 'undefined' && state.weather && state.weather.type === 'rain');
     let isStorm = (typeof stormActive !== 'undefined' && stormActive);
     let weatherIntensity = (typeof state !== 'undefined' && state.weather && state.weather.intensity) ? state.weather.intensity : 0;
-    let windBase = isStorm ? 0.09 : isRain ? (0.04 + weatherIntensity * 0.03) : 0.015; // clear=barely there
-    let windVol = (windBase + sin(frameCount * 0.001) * (isStorm ? 0.03 : 0.008)) * masterVol;
-    let windFreq = 500 + sin(frameCount * 0.002) * 150;
-    // LFO on filter cutoff for organic variation
-    let windLFO = sin(frameCount * 0.0013) * 120 + sin(frameCount * 0.0031) * 60;
-    windFreq += windLFO;
-    if (isStorm) windFreq = 320 + sin(frameCount * 0.003) * 100; // lower, more howling
-    else if (isRain) windFreq = 400 + sin(frameCount * 0.002) * 130;
-    if (island === 'vulcan') windFreq = 800 + sin(frameCount * 0.002) * 100;
-    if (diving) { windVol *= 0.2; windFreq = 120; }
-    if (onBridge) { windVol = 0.07 * masterVol; windFreq = 280 + sin(frameCount * 0.0015) * 80; } // exposed wind, lower pitch
-    this._windGain.amp(max(0, windVol), 0.5);
-    this._windFilter.freq(windFreq);
 
-    // Storm boost — slightly louder wind, rare thunder
-    if (isStorm && !diving) {
-      this._windGain.amp(windVol * 1.3, 0.5);
-      this._windFilter.freq(350);
-      // Thunder — every 20-40 seconds, with initial delay
-      if (this._thunderTimer <= 0) {
-        this._thunderTimer = floor(random(1200, 2400)); // initial delay
+    // Time of day
+    let hour = (typeof state !== 'undefined' && state.time !== undefined) ? state.time / 60 : 12;
+
+    // Player position
+    let px = (typeof state !== 'undefined' && state.player) ? state.player.x : 0;
+    let py = (typeof state !== 'undefined' && state.player) ? state.player.y : 0;
+
+    // Update the ambient manager (procedural)
+    if (this._amb) {
+      this._amb.update({
+        masterVol, bright, island, diving, isRain, isStorm,
+        weatherIntensity, hour, px, py
+      });
+    }
+
+    // Detect sailing and market proximity
+    let isSailing = typeof state !== 'undefined' && state.rowing && state.rowing.active;
+    let nearMarket = false;
+    if (typeof state !== 'undefined' && state.buildings && state.player) {
+      nearMarket = state.buildings.some(b => b.type === 'market' && dist(b.x, b.y, px, py) < 200);
+    }
+
+    // All ambient keys we manage — stop any not actively set this frame
+    const _allAmbientKeys = [
+      'ocean','birds','wind','rain','fire','crickets','cave','underwater','ocean_deep',
+      'lava','ice','tropical','spooky','storm','night','sailing','market','forest',
+      'tavern','battle','dawn','dusk','thunder_distant'
+    ];
+
+    // ─── SAMPLE-BASED AMBIENT LOOPS (layered on top of procedural) ───
+    if (this._samplesLoaded && !diving) {
+      let ambVol = masterVol * 0.35;
+      // Track which keys are active this frame
+      let activeKeys = {};
+      let setAmb = (key, vol) => { activeKeys[key] = true; this._loopSample(key, vol); };
+
+      // --- Universal layers ---
+      // Rain: during rain weather
+      let rainVol = isRain ? ambVol * 0.7 * weatherIntensity : 0;
+      setAmb('rain', rainVol);
+      // Storm: storm weather layer
+      let stormVol = isStorm ? ambVol * 0.6 : 0;
+      setAmb('storm', stormVol);
+      // Distant thunder during storms
+      setAmb('thunder_distant', isStorm ? ambVol * 0.3 : 0);
+
+      // --- Sailing ---
+      if (isSailing) {
+        setAmb('sailing', ambVol * 0.7);
+        setAmb('ocean', ambVol * 0.5);
+        setAmb('wind', ambVol * 0.3);
       }
+      // --- Island-specific ---
+      else if (island === 'home') {
+        // Ocean: always present
+        setAmb('ocean', ambVol * 0.8);
+        // Daytime: birds + forest
+        let birdVol = bright > 0.4 ? ambVol * 0.5 * bright : 0;
+        setAmb('birds', birdVol);
+        setAmb('forest', bright > 0.4 ? ambVol * 0.25 * bright : 0);
+        // Dawn/dusk transitions
+        if (hour >= 5 && hour < 7) setAmb('dawn', ambVol * 0.4);
+        if (hour >= 17 && hour < 19) setAmb('dusk', ambVol * 0.4);
+        // Night: crickets + night ambience
+        let nightVol = bright < 0.3 ? ambVol * 0.6 * (1 - bright) : 0;
+        setAmb('crickets', nightVol);
+        setAmb('night', nightVol * 0.7);
+        // Wind: always gentle
+        setAmb('wind', ambVol * 0.15);
+        // Near market: market bustle
+        setAmb('market', nearMarket ? ambVol * 0.5 : 0);
+        // Near tavern (reuse market proximity logic for simplicity)
+        let nearTavern = false;
+        if (typeof state !== 'undefined' && state.buildings && state.player) {
+          nearTavern = state.buildings.some(b => b.type === 'tavern' && dist(b.x, b.y, px, py) < 200);
+        }
+        setAmb('tavern', nearTavern ? ambVol * 0.4 : 0);
+      }
+      else if (island === 'vulcan') {
+        setAmb('lava', ambVol * 0.6);
+        setAmb('fire', ambVol * 0.4);
+        setAmb('wind', ambVol * 0.2);
+      }
+      else if (island === 'hyperborea') {
+        setAmb('ice', ambVol * 0.6);
+        setAmb('wind', ambVol * 0.6);
+      }
+      else if (island === 'plenty') {
+        setAmb('tropical', ambVol * 0.6);
+        setAmb('ocean', ambVol * 0.5);
+        setAmb('birds', bright > 0.4 ? ambVol * 0.4 * bright : 0);
+        setAmb('crickets', bright < 0.3 ? ambVol * 0.5 * (1 - bright) : 0);
+      }
+      else if (island === 'necropolis') {
+        setAmb('spooky', ambVol * 0.7);
+        setAmb('wind', ambVol * 0.25);
+      }
+
+      // Combat ambient layer
+      let inCombat = typeof state !== 'undefined' && state.conquest && state.conquest.active;
+      setAmb('battle', inCombat ? ambVol * 0.4 : 0);
+
+      // Stop any ambient keys not active this frame
+      for (const key of _allAmbientKeys) {
+        if (!activeKeys[key]) this._stopLoop(key);
+      }
+    } else if (diving) {
+      // Underwater ambience
+      let ambVol = masterVol * 0.35;
+      this._loopSample('underwater', ambVol * 0.7);
+      this._loopSample('ocean_deep', ambVol * 0.5);
+      // Stop all non-diving ambient loops
+      for (const key of _allAmbientKeys) {
+        if (key !== 'underwater' && key !== 'ocean_deep') this._stopLoop(key);
+      }
+    }
+
+    // Storm thunder (kept in SoundManager for SFX access)
+    if (isStorm && !diving) {
+      if (this._thunderTimer <= 0) this._thunderTimer = floor(random(1200, 2400));
       this._thunderTimer--;
       if (this._thunderTimer === 1) {
         this.playSFX('thunder');
-        this._thunderTimer = floor(random(1200, 2400)); // reset for next
+        this._thunderTimer = floor(random(1200, 2400));
       }
     } else {
-      this._thunderTimer = 0; // reset when storm ends
+      this._thunderTimer = 0;
     }
-
-    // ─── Rain ambient (filtered noise) ───
-    if (this._rainGain) {
-      let isRaining = (typeof stormActive !== 'undefined' && stormActive) ||
-        (typeof state !== 'undefined' && state.weather && state.weather.type === 'rain');
-      let rainVol = isRaining ? 0.05 * masterVol : 0;
-      if (typeof state !== 'undefined' && state.weather && state.weather.intensity) {
-        rainVol *= (0.6 + state.weather.intensity * 0.4);
-      }
-      if (typeof stormActive !== 'undefined' && stormActive) rainVol = 0.07 * masterVol;
-      if (diving) rainVol *= 0.2;
-      this._rainGain.amp(max(0, rainVol), 0.5);
-      // Modulate filter frequency for variation
-      if (isRaining && this._rainFilter) {
-        this._rainFilter.freq(1800 + sin(frameCount * 0.006) * 400);
-      }
-    }
-
-    // ─── Bird chirps ───
-    let birdMute = (island === 'necropolis' || diving || onBridge);
-    let birdChance = 0.008;
-    if (island === 'vulcan') birdChance = 0.003;
-    if (island === 'plenty') birdChance = 0.018;
-    this._birdTimer--;
-    if (!birdMute && bright > 0.3 && this._birdTimer <= 0 && random() < birdChance) {
-      this._birdTimer = island === 'plenty' ? floor(random(30, 90)) : floor(random(60, 180));
-      let birdFreq = random(2200, 3800);
-      let birdVol = random(0.02, 0.06) * masterVol;
-      this._birdOsc.freq(birdFreq);
-      this._birdGain.amp(birdVol, 0.01);
-      setTimeout(() => {
-        if (this._birdGain) this._birdGain.amp(0, 0.05);
-      }, 40 + random(30));
-      if (random() < 0.5) {
-        setTimeout(() => {
-          if (this._birdOsc && this._birdGain) {
-            this._birdOsc.freq(birdFreq * (random() < 0.5 ? 1.2 : 0.85));
-            this._birdGain.amp(birdVol * 0.7, 0.01);
-            setTimeout(() => { if (this._birdGain) this._birdGain.amp(0, 0.04); }, 35);
-          }
-        }, 80);
-      }
-    }
-
-    // ─── Plenty: second tropical bird (lower warble ~1200-1800Hz) ───
-    if (this._bird2Osc) {
-      this._bird2Timer--;
-      if (island === 'plenty' && !diving && bright > 0.3 && this._bird2Timer <= 0 && random() < 0.012) {
-        this._bird2Timer = floor(random(50, 120));
-        let f = random(1200, 1800);
-        let v = random(0.02, 0.05) * masterVol;
-        this._bird2Osc.freq(f);
-        this._bird2Gain.amp(v, 0.01);
-        let trillCount = floor(random(3, 6));
-        for (let i = 0; i < trillCount; i++) {
-          ((idx) => {
-            setTimeout(() => {
-              if (this._bird2Osc && this._bird2Gain) {
-                this._bird2Osc.freq(f * (1 + (idx % 2 === 0 ? 0.15 : -0.1)));
-                this._bird2Gain.amp(v * (1 - idx / (trillCount + 1)), 0.01);
-              }
-            }, 50 * idx);
-          })(i);
-        }
-        setTimeout(() => { if (this._bird2Gain) this._bird2Gain.amp(0, 0.04); }, 50 * trillCount + 30);
-      } else if (island !== 'plenty') {
-        this._bird2Gain.amp(0, 0.1);
-      }
-    }
-
-    // ─── Crickets (3 virtual crickets, organic timing) ───
-    let cricketVol = bright < 0.3 ? (0.3 - bright) * 0.08 * masterVol : 0;
-    if (diving) cricketVol = 0;
-    for (let ci = 0; ci < this._crickets.length; ci++) {
-      let c = this._crickets[ci];
-      c.timer--;
-      if (c.timer <= 0 && cricketVol > 0) {
-        // Chirp: quick on-off burst with slight pitch variation
-        let pitchVar = c.baseFreq + random(-150, 150);
-        c.osc.freq(pitchVar);
-        c.gain.amp(cricketVol * random(0.6, 1.0), 0.005);
-        // Chirp duration 30-60ms, then silence
-        let chirpMs = random(30, 60);
-        setTimeout(() => { if (c.gain) c.gain.amp(0, 0.01); }, chirpMs);
-        // Next chirp: random interval 0.5-2s (30-120 frames at 60fps)
-        c.timer = floor(random(30, 120));
-      } else if (cricketVol <= 0) {
-        c.gain.amp(0, 0.05);
-        c.timer = floor(random(30, 60)); // reset for when they come back
-      }
-    }
-
-    // ─── Vulcan: sub-bass rumble ───
-    if (this._rumbleGain) {
-      let rumbleVol = island === 'vulcan' ? 0.08 * masterVol : 0;
-      if (island === 'vulcan') rumbleVol *= (0.7 + sin(frameCount * 0.005) * 0.3);
-      this._rumbleGain.amp(max(0, rumbleVol), 0.5);
-      if (island === 'vulcan') this._rumbleFilter.freq(60 + sin(frameCount * 0.003) * 15);
-    }
-
-    // ─── Hyperborea: wind howl ───
-    if (this._howlGain) {
-      let howlVol = island === 'hyperborea' ? 0.10 * masterVol : 0;
-      if (island === 'hyperborea') {
-        howlVol *= (0.5 + sin(frameCount * 0.007) * 0.3 + sin(frameCount * 0.013) * 0.2);
-        this._howlFilter.freq(1200 + sin(frameCount * 0.004) * 300);
-      }
-      this._howlGain.amp(max(0, howlVol), 0.5);
-    }
-
-    // ─── Necropolis: eerie low pulse ───
-    if (this._eerieGain) {
-      let eerieVol = island === 'necropolis' ? 0.07 * masterVol : 0;
-      if (island === 'necropolis') eerieVol *= (0.4 + sin(frameCount * 0.02) * 0.6);
-      this._eerieGain.amp(max(0, eerieVol), 0.3);
-    }
-
-    // ─── Underwater: rumble + whale calls ───
-    if (this._uwRumbleGain) {
-      let uwVol = diving ? 0.09 * masterVol : 0;
-      this._uwRumbleGain.amp(uwVol, 0.5);
-      if (diving) this._uwRumbleOsc.freq(55 + sin(frameCount * 0.004) * 10);
-    }
-    if (this._whaleGain) {
-      this._whaleTimer--;
-      if (diving && this._whaleTimer <= 0 && random() < 0.004) {
-        this._whaleTimer = floor(random(300, 600));
-        let startF = random(120, 200);
-        let endF = random(80, 140);
-        let whaleVol = random(0.04, 0.08) * masterVol;
-        let dur = floor(random(80, 150));
-        let step = 0;
-        this._whaleOsc.freq(startF);
-        this._whaleGain.amp(whaleVol, 0.3);
-        let whaleTick = () => {
-          step++;
-          let t = step / dur;
-          if (t >= 1) { this._whaleGain.amp(0, 0.5); return; }
-          try {
-            this._whaleOsc.freq(lerp(startF, endF, t) + sin(step * 0.15) * 8);
-            let env = sin(t * PI) * whaleVol;
-            this._whaleGain.amp(max(0, env), 0.03);
-          } catch(e) {}
-          setTimeout(whaleTick, 30);
-        };
-        setTimeout(whaleTick, 30);
-      } else if (!diving) {
-        this._whaleGain.amp(0, 0.3);
-      }
-    }
-
-    // ─── Home island: chicken clucks & companion animal sounds ───
+    // Home island: chicken clucks & companion animal sounds
     if (island === 'home' && !diving && typeof state !== 'undefined') {
-      if (state.chickens && state.chickens.length > 0 && frameCount % 400 < 1 && random() < 0.5) {
-        this.playSFX('chicken_cluck');
-      }
-      // Cat meow: ~30-60s interval, only when adopted cat near player
-      if (state.cats && state.cats.some(c => c.adopted) && frameCount % 2400 < 1 && random() < 0.5) {
-        let nearCat = state.cats.find(c => c.adopted && dist(c.x, c.y, state.player.x, state.player.y) < 150);
+      if (state.chickens && state.chickens.length > 0 && frameCount % 400 < 1 && Math.random() < 0.5) this.playSFX('chicken_cluck');
+      if (state.cats && state.cats.some(c => c.adopted) && frameCount % 2400 < 1 && Math.random() < 0.5) {
+        let nearCat = state.cats.find(c => c.adopted && dist(c.x, c.y, px, py) < 150);
         if (nearCat) this.playSFX('cat_meow');
       }
-      // Crow caw: ~45-90s interval, ambient island fauna
-      if (state.islandLevel >= 2 && frameCount % 3600 < 1 && random() < 0.5) {
-        this.playSFX('crow_caw');
-      }
-      // Tortoise blip: ~60-120s interval, subtle low blip
-      if (state.islandLevel >= 3 && frameCount % 5400 < 1 && random() < 0.4) {
-        this.playSFX('tortoise_blip');
-      }
+      if (state.islandLevel >= 2 && frameCount % 3600 < 1 && Math.random() < 0.5) this.playSFX('crow_caw');
+      if (state.islandLevel >= 3 && frameCount % 5400 < 1 && Math.random() < 0.4) this.playSFX('tortoise_blip');
     }
 
-    // ─── Campfire crackle (warm noise bursts near campfire/hearth) ───
-    if (this._fireGain && typeof state !== 'undefined' && !diving) {
-      let nearFire = false;
-      let px = state.player ? state.player.x : 0;
-      let py = state.player ? state.player.y : 0;
-      if (state.buildings) {
-        for (let i = 0; i < state.buildings.length; i++) {
-          let b = state.buildings[i];
-          if ((b.type === 'campfire' || b.type === 'hearth' || b.type === 'firepit') && dist(px, py, b.x, b.y) < 120) {
-            nearFire = true; break;
-          }
-        }
-      }
-      if (nearFire) {
-        this._fireTimer--;
-        if (this._fireTimer <= 0) {
-          // Random crackle burst: short pop of filtered noise
-          let intensity = random(0.04, 0.10) * masterVol;
-          let popDur = random(20, 60); // ms
-          this._fireFilter.freq(random(1200, 3000));
-          this._fireFilter.res(random(2, 5));
-          this._fireGain.amp(intensity, 0.005);
-          setTimeout(() => {
-            if (this._fireGain) this._fireGain.amp(intensity * 0.3, popDur / 2000);
-          }, popDur * 0.4);
-          setTimeout(() => {
-            if (this._fireGain) this._fireGain.amp(0, 0.03);
-          }, popDur);
-          // Random interval between crackles: 3-12 frames (cozy, not sparse)
-          this._fireTimer = floor(random(3, 12));
-        }
-      } else {
-        this._fireGain.amp(0, 0.2);
-        this._fireTimer = 0;
-      }
-    }
-
-    // ─── Shore lap: rhythmic water lap when near coastline (~60px) ───
-    if (this._shoreGain && typeof state !== 'undefined' && !diving && island === 'home') {
-      let px = state.player ? state.player.x : 0;
-      let py = state.player ? state.player.y : 0;
-      let srx = typeof getSurfaceRX === 'function' ? getSurfaceRX() : 450;
-      let sry = typeof getSurfaceRY === 'function' ? getSurfaceRY() : 144;
-      let cx = typeof WORLD !== 'undefined' ? WORLD.islandCX : 600;
-      let cy = typeof WORLD !== 'undefined' ? WORLD.islandCY : 400;
-      let dx = (px - cx) / srx;
-      let dy = (py - cy) / sry;
-      let edgeDist = Math.sqrt(dx * dx + dy * dy); // 1.0 = at edge
-      // Within ~60px of coastline (0.85 to 1.05 normalized distance)
-      let nearShore = edgeDist > 0.85 && edgeDist < 1.05;
-      if (nearShore) {
-        // Rhythmic swell: 2-3 second period with slight randomness
-        this._shorePhase += 0.018 + sin(frameCount * 0.0007) * 0.003;
-        let swell = Math.pow(Math.max(0, sin(this._shorePhase)), 2.5);
-        // Proximity factor: loudest right at edge, fades as you approach/leave
-        let proxFactor = 1.0 - Math.abs(edgeDist - 0.95) * 5;
-        proxFactor = Math.max(0, Math.min(1, proxFactor));
-        let shoreVol = swell * proxFactor * 0.04 * masterVol;
-        this._shoreGain.amp(shoreVol, 0.08);
-        // Modulate filter for each lap — lower as wave recedes
-        this._shoreFilter.freq(250 + swell * 120);
-      } else {
-        this._shoreGain.amp(0, 0.3);
-      }
-    } else if (this._shoreGain) {
-      this._shoreGain.amp(0, 0.3);
-    }
-
-    // ─── Ambient seagulls: daytime home island, every 20-40 seconds ───
+    // Ambient seagulls: daytime home island
     if (island === 'home' && !diving && bright > 0.4) {
       this._seagullTimer--;
       if (this._seagullTimer <= 0) {
-        this._seagullTimer = floor(random(1200, 2400)); // 20-40s at 60fps
-        // Distant-sounding seagull: lower volume than the SFX version
+        this._seagullTimer = floor(random(1200, 2400));
         let sg = this._getSfxSlot();
         if (sg) {
           let gullVol = random(0.04, 0.07) * masterVol;
-          sg.osc.setType('sine');
-          sg.osc.freq(800);
+          sg.osc.setType('sine'); sg.osc.freq(800);
           sg._vol = gullVol; sg._peak = gullVol;
-          sg.gain.amp(0, 0);
-          sg.gain.amp(gullVol, 0.02);
-          // Sweep 800→1200→600Hz with vibrato for seagull cry
-          let step = 0;
-          let dur = 25; // steps
+          sg.gain.amp(0, 0); sg.gain.amp(gullVol, 0.02);
+          let step = 0, dur = 25;
           let tick = () => {
-            step++;
-            let t = step / dur;
+            step++; let t = step / dur;
             if (t >= 1) { sg.gain.amp(0, 0.08); sg.busy = false; return; }
-            // Two-part sweep: rise then fall
-            let freq;
-            if (t < 0.4) freq = 800 + (t / 0.4) * 400; // 800→1200
-            else freq = 1200 - ((t - 0.4) / 0.6) * 600; // 1200→600
-            // Add vibrato (5Hz rate, ~15Hz depth)
-            freq += sin(step * 0.5) * 15;
-            let env = sin(t * PI) * gullVol;
-            try {
-              sg.osc.freq(freq);
-              sg.gain.amp(Math.max(0, env), 0.02);
-            } catch(e) {}
+            let freq = t < 0.4 ? 800 + (t / 0.4) * 400 : 1200 - ((t - 0.4) / 0.6) * 600;
+            freq += Math.sin(step * 0.5) * 15;
+            try { sg.osc.freq(freq); sg.gain.amp(Math.max(0, Math.sin(t * Math.PI) * gullVol), 0.02); } catch(e) {}
             setTimeout(tick, 22);
           };
-          sg.busy = true;
-          setTimeout(tick, 22);
+          sg.busy = true; setTimeout(tick, 22);
         }
       }
     } else {
-      this._seagullTimer = floor(random(600, 1200)); // reset when conditions change
+      this._seagullTimer = floor(random(600, 1200));
     }
 
-    // ─── Dawn/Dusk transition sounds (one-shot per transition) ───
+    // Dawn/Dusk transition sounds
     if (typeof state !== 'undefined') {
       let h = state.time / 60;
       let slot;
@@ -744,6 +1080,85 @@ class SoundManager {
       }
       this._lastTimeSlot = slot;
     }
+  }
+
+  // ─── RECORDED MUSIC SYSTEM ───
+  // Call each frame. Selects and loops appropriate music track based on game state.
+  // Only active when gameSettings.musicSource === 'recorded'.
+  updateMusic() {
+    if (!this.ready || !this._samplesLoaded) return;
+    let useRecorded = typeof gameSettings !== 'undefined' && gameSettings.musicSource === 'recorded';
+    if (!useRecorded) {
+      // Stop any playing music track
+      if (this._musicTrack) {
+        let s = this._samples[this._musicTrack];
+        if (s && s.isPlaying()) s.stop();
+        this._musicTrack = null;
+      }
+      return;
+    }
+    let musicVol = this.vol.master * this.vol.music;
+    if (musicVol < 0.01) {
+      if (this._musicTrack) {
+        let s = this._samples[this._musicTrack];
+        if (s && s.isPlaying()) s.stop();
+        this._musicTrack = null;
+      }
+      return;
+    }
+
+    // Determine desired track
+    let target = 'music_peaceful';
+    if (typeof gameScreen !== 'undefined' && (gameScreen === 'menu' || gameScreen === 'settings' || gameScreen === 'credits')) {
+      target = 'music_menu';
+    } else if (typeof state !== 'undefined') {
+      if (state.conquest && state.conquest.active) target = 'music_combat';
+      else if (state.festival) target = 'music_festival';
+      else if (state.rowing && state.rowing.active) target = 'music_sailing';
+      else if (state.necropolis && state.necropolis.active) target = 'music_sad';
+      else if (state.time >= 1200 || state.time < 300) target = 'music_night';
+      // Near temple?
+      if (typeof state.buildings !== 'undefined' && state.player) {
+        let nearTemple = state.buildings.some(b => b.type === 'temple' && dist(b.x, b.y, state.player.x, state.player.y) < 200);
+        if (nearTemple) target = 'music_temple';
+      }
+    }
+
+    // Don't switch if sample doesn't exist
+    if (!this._samples[target]) target = 'music_peaceful';
+    if (!this._samples[target]) return; // no music samples at all
+
+    // Switch track if needed
+    if (this._musicTrack !== target) {
+      // Stop old
+      if (this._musicTrack) {
+        let old = this._samples[this._musicTrack];
+        if (old && old.isPlaying()) old.stop();
+      }
+      // Start new
+      let s = this._samples[target];
+      if (s) {
+        s.setVolume(musicVol);
+        s.loop();
+        this._musicTrack = target;
+      }
+    } else {
+      // Update volume
+      let s = this._samples[this._musicTrack];
+      if (s) s.setVolume(musicVol);
+    }
+  }
+
+  // Play a one-shot music sting (victory, etc)
+  playMusicSting(key) {
+    if (!this.ready || !this._samplesLoaded) return;
+    let s = this._samples[key];
+    if (!s) return;
+    let vol = this.vol.master * this.vol.music;
+    if (vol < 0.01) return;
+    s.setVolume(vol);
+    if (s.isPlaying()) s.stop();
+    s.play();
   }
 
   // --- LYRE MODE API (with crossfade) ---
@@ -798,7 +1213,7 @@ class SoundManager {
 
     // Handle crossfade
     if (this._lyreFadeDir === -1) {
-      this._lyreVolMult = max(0, this._lyreVolMult - 0.04);
+      this._lyreVolMult = max(0, this._lyreVolMult - 0.02);
       if (this._lyreVolMult <= 0) {
         // Switch mode at silence
         this._lyreMode = this._lyrePendingMode || this._lyreMode;
@@ -809,7 +1224,7 @@ class SoundManager {
         this._lyreFadeDir = 1;
       }
     } else if (this._lyreFadeDir === 1) {
-      this._lyreVolMult = min(1, this._lyreVolMult + 0.03);
+      this._lyreVolMult = min(1, this._lyreVolMult + 0.015);
       if (this._lyreVolMult >= 1) this._lyreFadeDir = 0;
     }
 
@@ -827,6 +1242,8 @@ class SoundManager {
     let phrygian = [293.7, 311.1, 349.2, 392.0, 440.0, 466.2, 523.3, 587.3, 622.3, 698.5, 784.0, 880.0];
     // D Aeolian (natural minor): D E F G A Bb C — for eerie
     let aeolian = [293.7, 329.6, 349.2, 392.0, 440.0, 466.2, 523.3, 587.3, 659.3, 698.5, 784.0, 880.0];
+    // D Mixolydian: D E F# G A B C — for sailing (major feel)
+    let mixolydian = [293.7, 329.6, 370.0, 392.0, 440.0, 493.9, 523.3, 587.3, 659.3, 740.0, 784.0, 880.0];
 
     let scale, phrases;
 
@@ -870,38 +1287,48 @@ class SoundManager {
       ];
     } else if (this._lyreMode === 'tense') {
       scale = phrygian;
-      // Driving Phrygian urgency — rhythmic, dark, relentless
+      // Combat: driving Phrygian, short-short-LONG rhythmic patterns, building intensity
       phrases = [
-        // Hammered ostinato: repeated root with chromatic neighbor
-        [[0,20,0.75,0],[1,20,0.55,1],[0,20,0.70,0],[3,25,0.65,1],[4,30,0.80,0],[-1,8,0,0],
-         [3,20,0.65,0],[1,20,0.55,1],[0,30,0.75,0],[-1,12,0,0],
-         [0,20,0.70,0],[4,25,0.80,1],[7,30,0.90,0],[-1,25,0,0]],
-        // Ascending menace: chromatic creep up with drone
-        [[0,60,0.30,2],[0,20,0.65,0],[1,20,0.60,0],[3,20,0.70,0],[4,20,0.75,0],[-1,10,0,0],
-         [5,25,0.70,0],[4,20,0.65,1],[3,20,0.60,0],[1,25,0.70,1],[0,30,0.75,0],[-1,20,0,0]],
-        // Stabbing chords: parallel fifths moving down
-        [[7,18,0.80,0],[4,18,0.65,1],[-1,6,0,0],[5,18,0.75,0],[3,18,0.60,1],[-1,6,0,0],
-         [4,18,0.75,0],[1,18,0.60,1],[-1,6,0,0],[3,18,0.70,0],[0,18,0.65,1],[-1,10,0,0],
-         [0,25,0.80,0],[4,25,0.65,1],[7,35,0.85,0],[-1,30,0,0]],
-        // Driving rhythm: syncopated accents
-        [[0,15,0.80,0],[-1,5,0,0],[0,15,0.50,1],[-1,10,0,0],[3,15,0.70,0],[4,20,0.80,1],[-1,5,0,0],
-         [5,15,0.65,0],[-1,5,0,0],[4,15,0.70,0],[3,20,0.75,1],[0,25,0.80,0],[-1,8,0,0],
-         [1,15,0.65,0],[0,30,0.80,1],[-1,25,0,0]],
-        // Cascading descent: rapid falling scales
-        [[7,15,0.80,0],[5,15,0.70,1],[4,15,0.75,0],[3,15,0.65,1],[1,15,0.70,0],[0,20,0.80,1],[-1,10,0,0],
-         [0,80,0.25,2],[3,20,0.70,0],[4,20,0.75,1],[7,25,0.85,0],[5,20,0.70,1],[3,30,0.75,0],[-1,30,0,0]],
-        // War march: heavy emphasis on beats 1 and 3
-        [[0,25,0.85,0],[0,25,0.30,2],[-1,20,0,0],[3,20,0.60,1],[-1,5,0,0],
-         [4,25,0.85,0],[-1,20,0,0],[1,20,0.60,1],[-1,5,0,0],
-         [0,25,0.80,0],[7,25,0.65,1],[-1,8,0,0],[5,20,0.70,0],[3,25,0.75,1],[0,35,0.85,0],[-1,35,0,0]],
-        // Flurry: rapid alternation building tension
-        [[0,12,0.70,0],[1,12,0.60,1],[0,12,0.70,0],[1,12,0.60,1],[0,12,0.70,0],[3,12,0.65,1],[-1,5,0,0],
-         [4,12,0.75,0],[5,12,0.65,1],[4,12,0.75,0],[5,12,0.65,1],[7,20,0.85,0],[4,20,0.70,1],[-1,8,0,0],
-         [0,30,0.80,0],[-1,30,0,0]],
-        // Resolution: brief moment of clarity before next assault
-        [[4,30,0.70,0],[3,30,0.60,1],[0,40,0.75,0],[-1,20,0,0],
-         [0,80,0.30,2],[3,25,0.65,0],[4,25,0.70,1],[7,30,0.80,0],[-1,15,0,0],
-         [5,25,0.65,0],[4,20,0.60,1],[0,35,0.75,0],[-1,35,0,0]],
+        // Phrase 1: short-short-LONG ostinato — rhythmic hammer
+        [[0,10,0.70,0],[0,10,0.50,1],[-1,3,0,0],[0,30,0.85,0],[4,30,0.60,1],[-1,5,0,0],
+         [0,10,0.70,0],[1,10,0.55,1],[-1,3,0,0],[0,30,0.80,0],[3,30,0.58,1],[-1,5,0,0],
+         [0,10,0.70,0],[3,10,0.55,1],[-1,3,0,0],[4,35,0.85,0],[7,35,0.60,1],[-1,20,0,0]],
+        // Phrase 2: Ascending Phrygian menace with drone — building tension
+        [[0,60,0.25,2],[0,15,0.65,0],[1,15,0.55,0],[3,15,0.70,0],[4,20,0.75,0],[-1,5,0,0],
+         [5,15,0.70,0],[4,15,0.65,1],[3,15,0.60,0],[-1,5,0,0],
+         [4,10,0.65,0],[5,10,0.60,0],[7,25,0.85,0],[4,25,0.60,1],[-1,20,0,0]],
+        // Phrase 3: Parallel fifths — stabbing downward
+        [[7,12,0.80,0],[4,12,0.60,1],[-1,4,0,0],[5,12,0.75,0],[3,12,0.55,1],[-1,4,0,0],
+         [4,12,0.72,0],[1,12,0.55,1],[-1,4,0,0],[3,12,0.70,0],[0,12,0.58,1],[-1,6,0,0],
+         [0,30,0.85,0],[4,30,0.62,1],[7,40,0.90,0],[-1,25,0,0]],
+        // Phrase 4: Syncopated accents — off-beat strikes
+        [[0,10,0.80,0],[-1,5,0,0],[0,10,0.45,1],[-1,8,0,0],[3,10,0.70,0],[4,18,0.82,1],[-1,4,0,0],
+         [5,10,0.65,0],[-1,4,0,0],[4,10,0.70,0],[3,18,0.75,1],[0,22,0.82,0],[-1,6,0,0],
+         [1,10,0.65,0],[0,28,0.85,1],[-1,22,0,0]],
+        // Phrase 5: Cascading descent — rapid falling then crash
+        [[7,10,0.78,0],[5,10,0.65,1],[4,10,0.72,0],[3,10,0.60,1],[1,10,0.68,0],[0,18,0.80,1],[-1,6,0,0],
+         [0,70,0.22,2],[3,15,0.68,0],[4,15,0.72,1],[7,20,0.85,0],[5,15,0.65,1],[3,25,0.78,0],[-1,25,0,0]],
+        // Phrase 6: War march — heavy beats 1 and 3
+        [[0,22,0.85,0],[0,22,0.25,2],[-1,15,0,0],[3,15,0.55,1],[-1,4,0,0],
+         [4,22,0.85,0],[-1,15,0,0],[1,15,0.55,1],[-1,4,0,0],
+         [0,22,0.82,0],[7,22,0.60,1],[-1,6,0,0],[5,15,0.68,0],[3,20,0.72,1],[0,30,0.85,0],[-1,30,0,0]],
+        // Phrase 7: Rapid alternation — flurry building to climax
+        [[0,8,0.68,0],[1,8,0.55,1],[0,8,0.68,0],[1,8,0.55,1],[0,8,0.70,0],[3,8,0.60,1],[-1,3,0,0],
+         [4,8,0.72,0],[5,8,0.60,1],[4,8,0.72,0],[5,8,0.60,1],[7,18,0.85,0],[4,18,0.65,1],[-1,5,0,0],
+         [0,28,0.82,0],[-1,25,0,0]],
+        // Phrase 8: Brief resolution then new assault
+        [[4,25,0.70,0],[3,25,0.55,1],[0,35,0.75,0],[-1,15,0,0],
+         [0,70,0.25,2],[3,20,0.65,0],[4,20,0.70,1],[7,25,0.82,0],[-1,10,0,0],
+         [5,20,0.65,0],[4,15,0.58,1],[0,30,0.78,0],[-1,30,0,0]],
+        // Phrase 9: Phrygian climb — Eb tension resolving to D
+        [[1,15,0.70,0],[3,15,0.58,1],[4,15,0.72,0],[5,18,0.75,1],[-1,5,0,0],
+         [7,20,0.82,0],[5,15,0.62,1],[4,15,0.70,0],[3,15,0.60,1],[-1,5,0,0],
+         [1,18,0.72,0],[-1,5,0,0],[0,30,0.85,0],[4,30,0.62,1],[-1,25,0,0]],
+        // Phrase 10: Relentless pulse — driving repeated root
+        [[0,8,0.75,0],[-1,3,0,0],[0,8,0.75,0],[-1,3,0,0],[0,8,0.78,0],[-1,3,0,0],
+         [3,12,0.70,1],[4,15,0.78,0],[-1,4,0,0],
+         [0,8,0.75,0],[-1,3,0,0],[0,8,0.75,0],[-1,3,0,0],[0,8,0.78,0],[-1,3,0,0],
+         [7,18,0.85,0],[4,18,0.65,1],[0,25,0.82,0],[-1,25,0,0]],
       ];
     } else if (this._lyreMode === 'eerie') {
       scale = aeolian;
@@ -934,216 +1361,184 @@ class SoundManager {
       ];
     } else if (this._lyreMode === 'celebration') {
       scale = dorian;
-      // Festival: fast, joyful, dancing rhythms with ornamental trills
+      // Festival: fast, joyful, dotted rhythms, high register, dancing bounce
       phrases = [
-        // Opening dance: ascending melody with rhythmic bounce
-        [[4,18,0.80,0],[7,18,0.65,1],[4,15,0.55,0],[5,18,0.70,1],[7,22,0.80,0],[9,18,0.65,1],[-1,8,0,0],
-         [7,18,0.70,0],[5,15,0.55,1],[4,22,0.80,0],[2,18,0.55,0],[4,25,0.70,1],[-1,18,0,0]],
-        // Leaping joy: wide intervals, bright register
-        [[0,14,0.70,0],[4,14,0.55,1],[7,18,0.80,0],[9,18,0.65,1],[11,22,0.85,0],[-1,6,0,0],
-         [9,14,0.65,0],[7,14,0.55,1],[4,18,0.70,0],[7,22,0.80,1],[9,28,0.85,0],[-1,22,0,0]],
-        // Trill ornament: rapid neighbor-tone alternation
-        [[4,10,0.70,0],[5,10,0.55,1],[4,10,0.70,0],[5,10,0.55,1],[4,10,0.70,0],[5,10,0.60,1],[-1,5,0,0],
-         [7,14,0.80,0],[9,14,0.65,1],[11,18,0.85,0],[-1,6,0,0],[7,14,0.65,0],[4,18,0.80,1],[-1,18,0,0]],
-        // Descending garland: cascading scale with harmony
-        [[11,14,0.80,0],[9,14,0.65,1],[7,14,0.75,0],[5,14,0.60,1],[4,14,0.70,0],[2,14,0.55,1],[-1,6,0,0],
-         [0,18,0.75,0],[4,18,0.60,1],[7,22,0.80,0],[9,18,0.65,1],[11,25,0.85,0],[-1,20,0,0]],
-        // Stomping dance: heavy downbeats with pickup notes
-        [[0,22,0.85,0],[4,22,0.60,1],[-1,10,0,0],[3,12,0.55,0],[4,22,0.85,1],[7,22,0.60,0],[-1,10,0,0],
-         [5,12,0.55,0],[7,22,0.85,0],[4,22,0.60,1],[-1,10,0,0],[2,12,0.55,0],[0,25,0.80,1],[-1,18,0,0]],
-        // Call and response: melody then answer
-        [[4,14,0.70,0],[5,14,0.60,0],[7,18,0.80,0],[-1,12,0,0],
-         [7,14,0.70,1],[5,14,0.60,1],[4,18,0.80,1],[-1,12,0,0],
-         [4,14,0.70,0],[7,14,0.60,0],[9,18,0.80,0],[11,22,0.85,1],[-1,18,0,0]],
-        // Spinning: circular melodic pattern
-        [[4,12,0.70,0],[7,12,0.60,1],[9,12,0.70,0],[7,12,0.60,1],
-         [4,12,0.70,0],[7,12,0.60,1],[9,12,0.70,0],[11,14,0.80,1],[-1,5,0,0],
-         [9,12,0.65,0],[7,12,0.55,1],[4,14,0.70,0],[0,18,0.80,1],[-1,18,0,0]],
-        // Grand finale: ascending octaves with full harmony
-        [[0,12,0.80,0],[4,12,0.55,1],[7,12,0.40,2],[-1,5,0,0],
-         [2,12,0.75,0],[5,12,0.55,1],[-1,5,0,0],
-         [4,14,0.80,0],[7,14,0.60,1],[9,14,0.45,2],[-1,5,0,0],
-         [7,14,0.85,0],[9,14,0.60,1],[11,18,0.90,0],[-1,8,0,0],
-         [7,14,0.70,0],[4,18,0.80,1],[0,22,0.85,0],[-1,25,0,0]],
-        // Drone dance: pedal tone underneath moving melody
-        [[0,80,0.20,2],[4,14,0.70,0],[5,14,0.60,1],[7,14,0.70,0],[9,14,0.60,1],[-1,5,0,0],
-         [7,14,0.70,0],[5,14,0.55,1],[4,14,0.70,0],[2,14,0.55,1],[-1,5,0,0],
-         [4,18,0.80,0],[7,22,0.70,1],[-1,20,0,0]],
-        // Ending flourish: fast ascending arpeggio
-        [[0,10,0.60,0],[2,10,0.50,1],[4,10,0.65,0],[5,10,0.50,1],[7,10,0.70,0],[9,10,0.55,1],
-         [11,14,0.85,0],[9,14,0.65,1],[7,14,0.70,0],[4,18,0.80,1],[0,22,0.85,0],[-1,25,0,0]],
-        // Rhythmic clap: short-long pattern with accents
-        [[4,8,0.70,0],[-1,4,0,0],[4,16,0.80,0],[7,16,0.60,1],[-1,8,0,0],
-         [5,8,0.65,0],[-1,4,0,0],[5,16,0.75,0],[9,16,0.55,1],[-1,8,0,0],
-         [7,8,0.70,0],[-1,4,0,0],[7,16,0.80,0],[11,16,0.60,1],[-1,6,0,0],
-         [9,12,0.65,0],[7,12,0.55,1],[4,18,0.80,0],[-1,20,0,0]],
-        // Wine toast: ascending major with held chord at top
-        [[0,14,0.65,0],[2,14,0.50,1],[-1,6,0,0],[4,14,0.70,0],[5,14,0.55,1],[-1,6,0,0],
-         [7,14,0.75,0],[9,14,0.55,1],[-1,6,0,0],
-         [11,22,0.85,0],[9,22,0.65,1],[7,22,0.50,2],[-1,10,0,0],
-         [9,12,0.60,0],[7,12,0.50,1],[4,18,0.70,0],[0,22,0.75,1],[-1,22,0,0]],
+        // Phrase 1: Dotted rhythm dance — long-short bounce pattern
+        [[4,28,0.80,0],[7,28,0.55,1],[-1,5,0,0],[5,12,0.55,0],[-1,3,0,0],
+         [7,28,0.80,0],[9,28,0.55,1],[-1,5,0,0],[7,12,0.55,0],[-1,3,0,0],
+         [9,28,0.82,0],[7,28,0.55,1],[-1,5,0,0],[5,12,0.52,0],[-1,3,0,0],
+         [4,22,0.75,0],[2,18,0.50,1],[0,28,0.80,0],[-1,18,0,0]],
+        // Phrase 2: Leaping joy — wide intervals, bright register
+        [[0,12,0.68,0],[4,12,0.48,1],[7,16,0.78,0],[9,16,0.58,1],[11,22,0.85,0],[-1,5,0,0],
+         [9,12,0.62,0],[7,12,0.48,1],[4,16,0.68,0],[7,20,0.78,1],[9,25,0.85,0],[-1,18,0,0]],
+        // Phrase 3: Trill ornament then ascending fanfare
+        [[4,8,0.68,0],[5,8,0.50,1],[4,8,0.68,0],[5,8,0.50,1],[4,8,0.68,0],[5,8,0.52,1],[-1,4,0,0],
+         [7,14,0.78,0],[9,14,0.58,1],[11,18,0.85,0],[-1,5,0,0],[7,12,0.62,0],[4,16,0.78,1],[-1,15,0,0]],
+        // Phrase 4: Descending garland — cascading scale
+        [[11,12,0.80,0],[9,12,0.58,1],[7,12,0.72,0],[5,12,0.52,1],[4,12,0.68,0],[2,12,0.48,1],[-1,5,0,0],
+         [0,16,0.72,0],[4,16,0.52,1],[7,20,0.78,0],[9,16,0.58,1],[11,22,0.85,0],[-1,18,0,0]],
+        // Phrase 5: Stomping dance — heavy downbeats with pickups
+        [[0,20,0.85,0],[4,20,0.55,1],[-1,8,0,0],[3,10,0.50,0],[4,20,0.82,1],[7,20,0.55,0],[-1,8,0,0],
+         [5,10,0.50,0],[7,20,0.82,0],[4,20,0.55,1],[-1,8,0,0],[2,10,0.50,0],[0,22,0.78,1],[-1,15,0,0]],
+        // Phrase 6: Call and response — high call, mid answer
+        [[4,12,0.68,0],[5,12,0.55,0],[7,16,0.78,0],[-1,10,0,0],
+         [7,12,0.65,1],[5,12,0.52,1],[4,16,0.75,1],[-1,10,0,0],
+         [4,12,0.68,0],[7,12,0.55,0],[9,16,0.78,0],[11,20,0.85,1],[-1,15,0,0]],
+        // Phrase 7: Spinning circle — circular pattern building up
+        [[4,10,0.68,0],[7,10,0.52,1],[9,10,0.68,0],[7,10,0.52,1],
+         [4,10,0.68,0],[7,10,0.52,1],[9,10,0.68,0],[11,12,0.78,1],[-1,4,0,0],
+         [9,10,0.62,0],[7,10,0.50,1],[4,12,0.68,0],[0,16,0.78,1],[-1,15,0,0]],
+        // Phrase 8: Grand finale — ascending with full chords
+        [[0,10,0.78,0],[4,10,0.50,1],[7,10,0.35,2],[-1,4,0,0],
+         [2,10,0.72,0],[5,10,0.48,1],[-1,4,0,0],
+         [4,12,0.78,0],[7,12,0.52,1],[9,12,0.38,2],[-1,4,0,0],
+         [7,12,0.82,0],[9,12,0.55,1],[11,16,0.88,0],[-1,6,0,0],
+         [7,12,0.68,0],[4,16,0.78,1],[0,20,0.85,0],[-1,22,0,0]],
+        // Phrase 9: Wine toast — ascending major with held chord at top
+        [[0,12,0.62,0],[2,12,0.45,1],[-1,5,0,0],[4,12,0.68,0],[5,12,0.48,1],[-1,5,0,0],
+         [7,12,0.72,0],[9,12,0.50,1],[-1,5,0,0],
+         [11,20,0.85,0],[9,20,0.60,1],[7,20,0.42,2],[-1,8,0,0],
+         [9,10,0.58,0],[7,10,0.45,1],[4,16,0.68,0],[0,20,0.72,1],[-1,18,0,0]],
+        // Phrase 10: Rhythmic clap — short-LONG bounce
+        [[4,8,0.68,0],[-1,3,0,0],[4,18,0.80,0],[7,18,0.55,1],[-1,6,0,0],
+         [5,8,0.62,0],[-1,3,0,0],[5,18,0.75,0],[9,18,0.50,1],[-1,6,0,0],
+         [7,8,0.68,0],[-1,3,0,0],[7,18,0.80,0],[11,18,0.55,1],[-1,5,0,0],
+         [9,10,0.62,0],[7,10,0.50,1],[4,16,0.78,0],[-1,18,0,0]],
       ];
     } else if (this._lyreMode === 'night') {
-      scale = dorian;
-      // Night: haunting, sparse, minor-inflected, long sustains with bell-like quality
+      scale = aeolian;
+      // Night: haunting, minor, long sustained notes with vibrato, lots of silence
       phrases = [
-        // Opening stillness: D drone with floating A above
-        [[0,150,0.30,0],[0,220,0.10,2],[-1,80,0,0],[4,120,0.25,1],[-1,70,0,0],
-         [3,130,0.22,0],[-1,60,0,0],[2,140,0.20,1],[0,160,0.18,2],[-1,150,0,0]],
-        // Moonlit melody: gentle ascending then falling back
-        [[0,120,0.28,0],[-1,50,0,0],[2,100,0.24,1],[-1,40,0,0],[4,110,0.26,0],[-1,50,0,0],
-         [5,120,0.28,1],[-1,60,0,0],[4,130,0.24,0],[-1,50,0,0],[2,110,0.22,1],[-1,40,0,0],
-         [0,160,0.26,0],[0,200,0.08,2],[-1,160,0,0]],
-        // Lullaby fragment: two voices in gentle thirds
-        [[4,110,0.24,0],[2,110,0.18,1],[-1,50,0,0],[3,100,0.22,0],[0,100,0.16,1],[-1,50,0,0],
-         [2,110,0.24,0],[0,110,0.18,1],[-1,60,0,0],[0,140,0.26,0],[4,140,0.18,2],[-1,180,0,0]],
-        // Starlight: isolated high notes over low drone
-        [[0,200,0.10,2],[7,100,0.22,0],[-1,100,0,0],[5,90,0.18,1],[-1,120,0,0],
-         [4,110,0.20,0],[-1,100,0,0],[7,120,0.22,1],[-1,160,0,0]],
-        // Nocturne: flowing melody with wide intervals
-        [[4,120,0.25,0],[-1,40,0,0],[7,100,0.22,1],[-1,50,0,0],[5,110,0.24,0],[-1,40,0,0],
-         [3,120,0.22,1],[-1,50,0,0],[0,150,0.28,0],[4,150,0.18,2],[-1,180,0,0]],
-        // Echo: each note repeated softer
-        [[4,90,0.28,0],[-1,30,0,0],[4,90,0.14,1],[-1,50,0,0],
-         [7,80,0.25,0],[-1,30,0,0],[7,80,0.12,1],[-1,60,0,0],
-         [5,100,0.26,0],[-1,30,0,0],[5,100,0.13,1],[-1,70,0,0],
-         [0,140,0.22,0],[-1,150,0,0]],
-        // Deep night: very sparse, bass-heavy
-        [[0,180,0.12,2],[-1,100,0,0],[3,140,0.20,0],[-1,120,0,0],
-         [0,200,0.10,2],[-1,80,0,0],[4,120,0.18,1],[-1,150,0,0],[0,160,0.15,0],[-1,200,0,0]],
-        // Wistful: minor seconds creating gentle tension
-        [[4,100,0.24,0],[3,100,0.18,1],[-1,50,0,0],[2,110,0.22,0],[1,110,0.16,1],[-1,60,0,0],
-         [0,140,0.26,0],[4,140,0.18,2],[-1,70,0,0],[2,120,0.20,0],[-1,80,0,0],
+        // Phrase 1: Long D with gentle vibrato, then minor 3rd sigh (D-F)
+        [[0,180,0.28,0],[0,200,0.10,2],[-1,120,0,0],
+         [2,150,0.22,1],[-1,100,0,0],[0,180,0.25,0],[-1,180,0,0]],
+        // Phrase 2: Bb down to G, haunting minor descent
+        [[5,160,0.24,0],[-1,80,0,0],[4,140,0.22,1],[-1,80,0,0],
+         [3,150,0.24,0],[-1,100,0,0],[2,140,0.20,1],[-1,80,0,0],
+         [0,200,0.28,0],[0,200,0.10,2],[-1,200,0,0]],
+        // Phrase 3: Isolated high D over low drone — starlight
+        [[0,220,0.10,2],[-1,80,0,0],[7,120,0.20,0],[-1,140,0,0],
+         [5,100,0.16,1],[-1,160,0,0],[4,130,0.18,0],[-1,180,0,0]],
+        // Phrase 4: Lullaby — gentle thirds descending to rest
+        [[4,120,0.22,0],[2,120,0.14,1],[-1,60,0,0],
+         [3,110,0.20,0],[0,110,0.12,1],[-1,60,0,0],
+         [2,120,0.22,0],[0,120,0.14,1],[-1,80,0,0],
+         [0,160,0.26,0],[0,160,0.10,2],[-1,200,0,0]],
+        // Phrase 5: Echo motif — each note answered softer
+        [[4,100,0.24,0],[-1,40,0,0],[4,100,0.12,1],[-1,80,0,0],
+         [5,100,0.22,0],[-1,40,0,0],[5,100,0.11,1],[-1,80,0,0],
+         [3,120,0.20,0],[-1,40,0,0],[3,120,0.10,1],[-1,120,0,0],
          [0,160,0.24,0],[-1,180,0,0]],
-        // Firefly: tiny bright notes scattered high
-        [[9,60,0.18,0],[-1,100,0,0],[7,70,0.16,1],[-1,90,0,0],
-         [0,180,0.08,2],[11,50,0.15,0],[-1,120,0,0],[9,60,0.16,1],[-1,100,0,0],
-         [7,80,0.18,0],[-1,80,0,0],[4,100,0.20,1],[0,130,0.22,0],[-1,200,0,0]],
-        // Closing: descending to rest
-        [[5,110,0.22,0],[-1,50,0,0],[4,100,0.20,1],[-1,50,0,0],
-         [3,110,0.22,0],[-1,50,0,0],[2,100,0.18,1],[-1,50,0,0],
-         [0,160,0.26,0],[0,160,0.14,2],[-1,220,0,0]],
-        // Descending minor: Aeolian descent, melancholy and warm
-        [[5,130,0.24,0],[-1,60,0,0],[4,120,0.22,1],[-1,50,0,0],
-         [3,130,0.24,0],[-1,60,0,0],[2,120,0.20,1],[-1,50,0,0],
-         [1,140,0.22,0],[-1,70,0,0],[0,180,0.26,0],[0,180,0.12,2],[-1,200,0,0]],
-        // Embers: very low register, sparse warmth
-        [[0,200,0.14,2],[-1,120,0,0],[1,150,0.20,0],[-1,80,0,0],
-         [0,160,0.18,1],[-1,100,0,0],[3,140,0.20,0],[-1,70,0,0],
-         [2,150,0.18,1],[-1,80,0,0],[0,200,0.22,0],[-1,200,0,0]],
-        // Owl call: two-note motif repeated with variation
-        [[4,80,0.22,0],[2,120,0.18,1],[-1,100,0,0],
-         [4,80,0.20,0],[3,120,0.16,1],[-1,120,0,0],
-         [4,80,0.22,0],[0,140,0.20,1],[-1,80,0,0],
-         [0,180,0.15,2],[-1,180,0,0]],
+        // Phrase 6: Owl call — two-note motif with variation
+        [[4,90,0.22,0],[2,130,0.18,1],[-1,120,0,0],
+         [4,90,0.20,0],[3,130,0.16,1],[-1,140,0,0],
+         [4,90,0.22,0],[0,150,0.18,1],[-1,100,0,0],
+         [0,200,0.12,2],[-1,200,0,0]],
+        // Phrase 7: Low register embers — bass warmth
+        [[0,200,0.14,2],[-1,100,0,0],[1,160,0.20,0],[-1,100,0,0],
+         [0,180,0.18,1],[-1,120,0,0],[3,150,0.18,0],[-1,100,0,0],
+         [0,220,0.22,0],[-1,220,0,0]],
+        // Phrase 8: Wistful minor — gentle tension and release
+        [[4,110,0.22,0],[3,110,0.14,1],[-1,60,0,0],
+         [2,120,0.20,0],[1,120,0.12,1],[-1,70,0,0],
+         [0,150,0.26,0],[0,150,0.10,2],[-1,80,0,0],
+         [2,120,0.18,0],[-1,100,0,0],[0,180,0.22,0],[-1,200,0,0]],
       ];
     } else if (this._lyreMode === 'sailing') {
-      scale = dorian;
-      // Sailing: adventurous, pentatonic feel, wave-like contour, call of the sea
+      scale = mixolydian;
+      // Sailing: adventurous, major key, wave-like up-down contour, confident
       phrases = [
-        // Ascending horizon: rising momentum
-        [[0,35,0.70,0],[1,30,0.55,1],[3,30,0.70,0],[4,35,0.75,1],[7,40,0.85,0],[-1,12,0,0],
-         [4,30,0.55,0],[3,35,0.65,1],[4,40,0.75,0],[7,50,0.70,1],[-1,35,0,0]],
-        // Wave rhythm: rolling up and down like the sea
-        [[0,40,0.65,0],[3,35,0.55,0],[4,30,0.65,0],[7,35,0.75,0],[4,30,0.60,0],[3,35,0.55,0],[-1,10,0,0],
-         [0,40,0.65,0],[4,35,0.55,1],[7,40,0.75,0],[9,45,0.70,1],[-1,35,0,0]],
-        // Shanty call: bold melodic statement
-        [[4,35,0.75,0],[4,35,0.55,1],[-1,10,0,0],[7,30,0.70,0],[9,35,0.80,0],[-1,12,0,0],
-         [7,30,0.65,1],[4,35,0.70,0],[-1,10,0,0],[3,30,0.60,0],[0,40,0.70,1],[-1,15,0,0],
-         [4,40,0.75,0],[7,45,0.80,1],[-1,40,0,0]],
-        // Response: answering phrase, descending
-        [[9,30,0.70,0],[7,30,0.60,1],[-1,8,0,0],[7,30,0.65,0],[4,30,0.55,1],[-1,8,0,0],
-         [4,35,0.70,0],[3,30,0.55,0],[0,40,0.75,1],[-1,15,0,0],
-         [3,30,0.60,0],[4,35,0.70,1],[7,45,0.80,0],[-1,45,0,0]],
-        // Wind in sails: soaring high melody
-        [[7,30,0.70,0],[9,30,0.60,1],[11,35,0.80,0],[-1,10,0,0],
-         [9,28,0.65,0],[7,28,0.55,1],[4,30,0.70,0],[-1,8,0,0],
-         [7,32,0.75,0],[9,35,0.80,1],[11,40,0.85,0],[-1,12,0,0],
-         [9,30,0.65,0],[7,35,0.70,1],[4,45,0.65,0],[-1,45,0,0]],
-        // Bass anchor: deep notes with dancing upper voice
-        [[0,70,0.20,2],[4,25,0.65,0],[7,25,0.55,1],[4,25,0.65,0],[3,30,0.55,1],[-1,8,0,0],
-         [4,25,0.65,0],[7,30,0.75,0],[9,35,0.65,1],[7,40,0.55,0],[-1,50,0,0]],
-        // Arrival fanfare: triumphant ascending
-        [[0,30,0.70,0],[4,30,0.55,1],[-1,8,0,0],[4,30,0.75,0],[7,30,0.55,1],[-1,8,0,0],
-         [7,35,0.80,0],[9,35,0.60,1],[-1,8,0,0],[9,30,0.75,0],[11,35,0.85,0],[-1,10,0,0],
-         [9,28,0.65,1],[7,30,0.70,0],[4,40,0.60,1],[0,50,0.70,0],[-1,60,0,0]],
-        // Rocking lullaby: gentle sea sway
-        [[4,45,0.60,0],[7,40,0.50,1],[-1,15,0,0],[5,40,0.55,0],[4,45,0.50,1],[-1,15,0,0],
-         [3,45,0.60,0],[4,40,0.50,1],[-1,15,0,0],[0,50,0.65,0],[3,45,0.50,1],[-1,15,0,0],
-         [4,55,0.70,0],[7,50,0.55,1],[-1,50,0,0]],
+        // Phrase 1: Wave contour — up-down-up-down like rolling seas
+        [[0,35,0.65,0],[1,30,0.45,1],[-1,8,0,0],[2,30,0.60,0],[3,35,0.70,0],[4,40,0.78,1],[-1,10,0,0],
+         [3,30,0.60,0],[2,30,0.55,0],[0,35,0.65,1],[-1,10,0,0],
+         [2,30,0.60,0],[4,35,0.70,0],[7,45,0.80,1],[-1,12,0,0],
+         [4,30,0.58,0],[2,35,0.55,0],[0,45,0.70,1],[-1,40,0,0]],
+        // Phrase 2: Shanty call — bold ascending statement
+        [[4,30,0.75,0],[4,30,0.48,1],[-1,8,0,0],[7,28,0.70,0],[9,35,0.80,0],[-1,10,0,0],
+         [7,28,0.60,1],[4,30,0.68,0],[-1,8,0,0],[3,28,0.58,0],[0,35,0.68,1],[-1,12,0,0],
+         [4,35,0.72,0],[7,40,0.80,1],[-1,40,0,0]],
+        // Phrase 3: Shanty response — descending answer
+        [[9,28,0.70,0],[7,28,0.55,1],[-1,6,0,0],[7,28,0.65,0],[4,28,0.48,1],[-1,6,0,0],
+         [4,30,0.68,0],[3,28,0.50,0],[0,35,0.72,1],[-1,12,0,0],
+         [3,28,0.58,0],[4,30,0.68,1],[7,40,0.78,0],[-1,40,0,0]],
+        // Phrase 4: Wind in sails — soaring high then back
+        [[7,28,0.68,0],[9,28,0.55,1],[11,32,0.80,0],[-1,8,0,0],
+         [9,25,0.62,0],[7,25,0.50,1],[4,28,0.68,0],[-1,8,0,0],
+         [7,30,0.72,0],[9,32,0.78,1],[11,38,0.85,0],[-1,10,0,0],
+         [9,28,0.62,0],[7,30,0.68,1],[4,40,0.62,0],[-1,40,0,0]],
+        // Phrase 5: Bass anchor — low pedal with dancing melody above
+        [[0,65,0.18,2],[4,22,0.62,0],[7,22,0.48,1],[4,22,0.62,0],[3,25,0.48,1],[-1,6,0,0],
+         [4,22,0.62,0],[7,28,0.72,0],[9,32,0.60,1],[7,35,0.52,0],[-1,45,0,0]],
+        // Phrase 6: Triumphant fanfare — ascending thirds
+        [[0,28,0.68,0],[4,28,0.48,1],[-1,6,0,0],[4,28,0.72,0],[7,28,0.50,1],[-1,6,0,0],
+         [7,30,0.78,0],[9,30,0.55,1],[-1,6,0,0],[9,28,0.72,0],[11,32,0.82,0],[-1,8,0,0],
+         [9,25,0.60,1],[7,28,0.68,0],[4,35,0.55,1],[0,45,0.68,0],[-1,50,0,0]],
+        // Phrase 7: Rolling wave — gentle rocking rhythm
+        [[4,40,0.58,0],[7,35,0.45,1],[-1,12,0,0],[5,35,0.52,0],[4,40,0.45,1],[-1,12,0,0],
+         [3,40,0.58,0],[4,35,0.45,1],[-1,12,0,0],[0,45,0.62,0],[3,40,0.45,1],[-1,12,0,0],
+         [4,48,0.68,0],[7,45,0.50,1],[-1,45,0,0]],
+        // Phrase 8: Horizon sighting — building excitement
+        [[0,20,0.58,0],[2,20,0.50,0],[4,20,0.60,0],[7,25,0.70,0],[4,25,0.50,1],[-1,8,0,0],
+         [7,20,0.68,0],[9,22,0.72,0],[11,28,0.80,0],[9,28,0.58,1],[-1,10,0,0],
+         [7,25,0.65,0],[4,30,0.58,1],[0,40,0.72,0],[-1,45,0,0]],
       ];
     } else {
-      // Peaceful: warm Mediterranean lyre — beautiful flowing melodies
+      // Peaceful: Mediterranean lyre — composed melodic phrases with tension/release arcs
       scale = dorian;
       phrases = [
-        // Morning theme: gentle ascending melody with thirds harmony
-        [[4,50,0.70,0],[2,50,0.45,1],[-1,15,0,0],[5,45,0.65,0],[3,45,0.42,1],[-1,12,0,0],
-         [7,50,0.75,0],[4,50,0.48,1],[-1,20,0,0],[5,45,0.60,0],[3,50,0.42,1],[-1,15,0,0],
-         [4,55,0.70,0],[2,55,0.45,1],[0,70,0.75,0],[-1,80,0,0]],
-        // Pastoral arc: rise and gentle fall over bass drone
-        [[0,60,0.60,0],[0,120,0.22,2],[2,50,0.50,0],[4,50,0.65,0],[5,55,0.60,1],[7,65,0.75,0],[-1,20,0,0],
-         [5,45,0.55,0],[4,50,0.60,1],[2,55,0.50,0],[0,70,0.65,0],[-1,80,0,0]],
-        // Mediterranean dance: lilting rhythm, sixths and thirds
-        [[7,40,0.70,0],[4,40,0.50,1],[-1,15,0,0],[5,35,0.60,0],[2,35,0.42,1],[-1,12,0,0],
-         [7,40,0.70,0],[5,40,0.50,1],[-1,15,0,0],[4,35,0.60,0],[2,35,0.42,1],[-1,12,0,0],
-         [3,45,0.65,0],[0,45,0.45,1],[0,80,0.70,0],[-1,90,0,0]],
-        // Flowing water: stepwise motion, gentle and continuous
-        [[4,30,0.60,0],[5,30,0.50,1],[7,35,0.70,0],[5,30,0.50,0],[4,35,0.60,1],[2,30,0.50,0],[-1,12,0,0],
-         [4,30,0.65,0],[7,35,0.75,0],[9,35,0.60,1],[7,40,0.70,0],[4,50,0.60,0],[-1,65,0,0]],
-        // Sunlit rest: open voicing, warmth
-        [[0,65,0.55,0],[4,60,0.42,1],[0,130,0.18,2],[-1,25,0,0],[2,55,0.50,0],[4,60,0.60,0],
-         [7,70,0.70,0],[4,80,0.50,1],[0,90,0.60,0],[-1,100,0,0]],
-        // Scale walk: ascending with pauses for breath
-        [[0,40,0.60,0],[1,35,0.48,1],[2,35,0.60,0],[3,40,0.65,1],[4,45,0.75,0],[-1,20,0,0],
-         [5,40,0.55,1],[7,50,0.75,0],[-1,15,0,0],[4,45,0.60,0],[2,50,0.50,1],[0,65,0.70,0],[-1,80,0,0]],
-        // Echo dialogue: voice 0 calls, voice 1 answers lower
-        [[4,45,0.70,0],[7,40,0.60,0],[-1,20,0,0],[2,45,0.50,1],[4,40,0.48,1],[-1,25,0,0],
-         [5,50,0.70,0],[7,45,0.65,0],[-1,18,0,0],[3,45,0.50,1],[0,55,0.55,1],[-1,90,0,0]],
-        // Parallel thirds: voices moving together
-        [[0,50,0.60,0],[2,50,0.45,1],[-1,15,0,0],[2,45,0.60,0],[4,45,0.45,1],[-1,15,0,0],
-         [4,50,0.65,0],[5,50,0.48,1],[-1,12,0,0],[7,55,0.75,0],[9,55,0.48,1],[-1,20,0,0],
-         [4,50,0.60,0],[5,50,0.45,1],[0,70,0.70,0],[-1,90,0,0]],
-        // Harvest song: warm, resolved, satisfying
-        [[0,45,0.65,0],[4,45,0.48,1],[7,45,0.35,2],[-1,15,0,0],
-         [7,40,0.70,0],[5,40,0.50,1],[-1,12,0,0],[4,40,0.65,0],[2,40,0.48,1],[-1,12,0,0],
-         [3,45,0.65,0],[4,45,0.48,1],[-1,15,0,0],[5,40,0.60,0],[7,45,0.70,0],[-1,12,0,0],
-         [4,55,0.75,0],[0,55,0.50,1],[-1,80,0,0]],
-        // Lyre cadence: classic ancient ending formula (IV-I)
-        [[3,50,0.65,0],[5,50,0.50,1],[7,50,0.38,2],[-1,20,0,0],
-         [4,45,0.60,0],[3,45,0.48,1],[-1,15,0,0],
-         [2,50,0.60,0],[4,50,0.48,1],[-1,15,0,0],
-         [0,65,0.70,0],[4,65,0.50,1],[7,65,0.38,2],[-1,25,0,0],
-         [0,80,0.75,0],[4,80,0.50,1],[-1,100,0,0]],
-        // Contemplation: slow, wide intervals, philosophical mood
-        [[0,70,0.55,0],[-1,30,0,0],[7,60,0.50,1],[-1,25,0,0],[4,55,0.60,0],[-1,30,0,0],
-         [3,65,0.55,1],[-1,25,0,0],[0,80,0.65,0],[4,80,0.45,1],[-1,30,0,0],
-         [2,55,0.50,0],[0,70,0.60,0],[-1,100,0,0]],
-        // Birdsong imitation: quick ornamental notes then held tone
-        [[4,20,0.50,0],[5,18,0.45,0],[4,20,0.50,0],[-1,8,0,0],
-         [7,55,0.70,0],[4,55,0.48,1],[-1,25,0,0],
-         [5,20,0.50,0],[7,18,0.45,0],[5,20,0.50,0],[-1,8,0,0],
-         [4,55,0.65,0],[2,55,0.48,1],[0,70,0.70,0],[-1,90,0,0]],
-        // Golden hour: long warm phrase, two-chord voicings with stepwise melody
-        [[0,55,0.60,0],[4,55,0.42,1],[7,55,0.30,2],[-1,18,0,0],
-         [2,45,0.55,0],[5,45,0.38,1],[-1,15,0,0],
-         [4,50,0.65,0],[7,50,0.45,1],[-1,15,0,0],
-         [5,50,0.60,0],[9,50,0.42,1],[-1,18,0,0],
-         [7,55,0.70,0],[4,55,0.48,1],[-1,20,0,0],
-         [5,45,0.55,0],[2,45,0.38,1],[-1,15,0,0],
-         [4,50,0.60,0],[0,50,0.42,1],[-1,15,0,0],
-         [0,70,0.65,0],[4,70,0.45,2],[-1,100,0,0]],
-        // Cypress shade: gentle descending thirds over drone
-        [[0,100,0.18,2],[7,40,0.60,0],[5,40,0.42,1],[-1,12,0,0],
-         [5,40,0.55,0],[3,40,0.38,1],[-1,12,0,0],
-         [4,40,0.60,0],[2,40,0.42,1],[-1,12,0,0],
-         [3,40,0.55,0],[0,40,0.38,1],[-1,15,0,0],
-         [2,45,0.50,0],[4,45,0.38,1],[-1,12,0,0],
-         [0,60,0.65,0],[4,60,0.45,1],[-1,80,0,0]],
-        // Forum gossip: playful rhythmic alternation
-        [[4,25,0.60,0],[-1,8,0,0],[5,25,0.55,0],[-1,8,0,0],[4,25,0.60,0],[7,30,0.70,1],[-1,12,0,0],
-         [5,25,0.55,0],[-1,8,0,0],[4,25,0.55,0],[-1,8,0,0],[2,25,0.50,0],[4,30,0.60,1],[-1,15,0,0],
-         [3,35,0.60,0],[5,35,0.42,1],[-1,12,0,0],
-         [0,50,0.65,0],[4,50,0.45,1],[-1,70,0,0]],
+        // Phrase 1: Ascending scale run (D E F G A) then resolve down (G F E D)
+        [[0,40,0.65,0],[2,40,0.42,1],[-1,10,0,0],[1,30,0.55,0],[-1,8,0,0],
+         [2,30,0.60,0],[4,30,0.38,1],[-1,8,0,0],[3,35,0.65,0],[-1,10,0,0],
+         [4,45,0.75,0],[2,45,0.48,1],[-1,15,0,0],
+         [3,35,0.60,0],[-1,8,0,0],[2,30,0.55,0],[0,30,0.38,1],[-1,8,0,0],
+         [1,35,0.50,0],[-1,10,0,0],[0,60,0.70,0],[4,60,0.42,1],[-1,80,0,0]],
+        // Phrase 2: Arpeggio pattern (D F A D' A F D) — harp-like bloom
+        [[0,35,0.60,0],[-1,8,0,0],[2,30,0.55,0],[-1,8,0,0],[4,35,0.65,0],[2,35,0.40,1],[-1,10,0,0],
+         [7,45,0.75,0],[4,45,0.48,1],[-1,15,0,0],
+         [4,35,0.60,0],[-1,8,0,0],[2,30,0.55,0],[-1,8,0,0],[0,50,0.70,0],[4,50,0.42,1],[-1,90,0,0]],
+        // Phrase 3: Call and response — high phrase, low answer
+        [[4,35,0.70,0],[5,30,0.55,0],[7,40,0.75,0],[4,40,0.48,1],[-1,30,0,0],
+         [2,35,0.55,1],[0,30,0.50,1],[2,40,0.60,1],[0,50,0.65,1],[-1,25,0,0],
+         [4,30,0.65,0],[7,35,0.70,0],[5,45,0.60,1],[-1,20,0,0],
+         [3,30,0.50,1],[2,35,0.55,1],[0,50,0.65,1],[-1,80,0,0]],
+        // Phrase 4: Held note with trill ornamentation
+        [[4,60,0.70,0],[2,60,0.42,1],[-1,20,0,0],
+         [4,10,0.50,0],[5,10,0.40,0],[4,10,0.50,0],[5,10,0.40,0],[4,10,0.50,0],[5,10,0.40,0],[-1,8,0,0],
+         [4,50,0.65,0],[2,50,0.40,1],[-1,15,0,0],
+         [2,45,0.55,0],[0,45,0.38,1],[-1,10,0,0],[0,60,0.70,0],[4,60,0.42,1],[-1,90,0,0]],
+        // Phrase 5: Pastoral arc — I to IV, gentle climb and descent
+        [[0,50,0.60,0],[0,100,0.18,2],[-1,15,0,0],[2,40,0.55,0],[4,40,0.42,1],[-1,10,0,0],
+         [3,45,0.65,0],[5,45,0.42,1],[-1,12,0,0],[4,50,0.70,0],[7,50,0.45,1],[-1,20,0,0],
+         [5,40,0.60,0],[3,40,0.42,1],[-1,10,0,0],[4,35,0.55,0],[2,35,0.38,1],[-1,10,0,0],
+         [0,60,0.70,0],[4,60,0.45,1],[-1,80,0,0]],
+        // Phrase 6: Dotted rhythm dance — long-short-long pattern
+        [[4,45,0.70,0],[7,45,0.45,1],[-1,8,0,0],[5,20,0.50,0],[-1,5,0,0],
+         [7,45,0.70,0],[4,45,0.45,1],[-1,8,0,0],[5,20,0.50,0],[-1,5,0,0],
+         [4,45,0.65,0],[2,45,0.42,1],[-1,8,0,0],[3,20,0.48,0],[-1,5,0,0],
+         [2,35,0.55,0],[0,35,0.38,1],[-1,10,0,0],[0,60,0.70,0],[-1,80,0,0]],
+        // Phrase 7: Parallel thirds ascending — voices moving together warmly
+        [[0,40,0.60,0],[2,40,0.38,1],[-1,10,0,0],[1,35,0.55,0],[3,35,0.35,1],[-1,8,0,0],
+         [2,40,0.60,0],[4,40,0.38,1],[-1,10,0,0],[3,35,0.58,0],[5,35,0.36,1],[-1,8,0,0],
+         [4,45,0.65,0],[7,45,0.42,1],[-1,12,0,0],[5,40,0.60,0],[7,40,0.40,1],[-1,15,0,0],
+         [4,40,0.55,0],[2,40,0.36,1],[-1,10,0,0],[0,55,0.70,0],[4,55,0.42,1],[-1,90,0,0]],
+        // Phrase 8: Harvest cadence — IV chord to I, classic ancient resolution
+        [[3,45,0.65,0],[5,45,0.42,1],[7,45,0.30,2],[-1,15,0,0],
+         [4,35,0.58,0],[3,35,0.38,1],[-1,10,0,0],
+         [2,40,0.60,0],[4,40,0.40,1],[-1,12,0,0],
+         [0,55,0.70,0],[4,55,0.45,1],[7,55,0.32,2],[-1,20,0,0],
+         [0,70,0.75,0],[4,70,0.48,1],[-1,90,0,0]],
+        // Phrase 9: Birdsong — quick grace notes then sustained tone
+        [[4,12,0.45,0],[5,12,0.38,0],[4,12,0.45,0],[-1,5,0,0],
+         [7,55,0.70,0],[4,55,0.45,1],[-1,25,0,0],
+         [5,12,0.45,0],[7,12,0.38,0],[5,12,0.45,0],[-1,5,0,0],
+         [4,50,0.65,0],[2,50,0.42,1],[-1,20,0,0],[0,60,0.70,0],[-1,80,0,0]],
+        // Phrase 10: Golden hour — two-chord voicings, stepwise, warm resolution
+        [[0,50,0.58,0],[4,50,0.38,1],[7,50,0.25,2],[-1,15,0,0],
+         [2,40,0.52,0],[5,40,0.35,1],[-1,12,0,0],
+         [4,45,0.62,0],[7,45,0.40,1],[-1,12,0,0],
+         [5,40,0.55,0],[3,40,0.36,1],[-1,12,0,0],
+         [4,45,0.60,0],[0,45,0.38,1],[-1,12,0,0],
+         [0,65,0.70,0],[4,65,0.45,2],[-1,90,0,0]],
       ];
     }
 
@@ -1175,7 +1570,7 @@ class SoundManager {
     if (ni >= 0 && ni < scale.length) {
       let freq = scale[ni];
       let amp = vel * musicVol * volMult * (this._lyreMode === 'menu' ? 0.06 : 0.14);
-      if (this._lyreMode === 'eerie' && freq > 500) freq *= 0.5;
+      if (this._lyreMode === 'eerie' && freq > 500) freq *= 0.75;
       // Rain: dampen highs, slight detune for washed-out feel
       if (this._lyreContext === 'rain') {
         if (freq > 600) amp *= 0.6;
@@ -1191,14 +1586,33 @@ class SoundManager {
       let pluckDur = dur * 16;
       this._pluckLyre(voice, freq, amp, pluckDur);
 
-      // Harmony layer: play a 5th above (or 3rd) — Era 2+ only
+      // Update drone root to follow melody chord (I-IV-V movement)
+      // Map scale degrees to chord roots: 0,1,2 → I (D), 3,4,5 → IV (G), 6+ → V (A)
+      if (voice === 0 && vel > 0.3) {
+        if (ni <= 2 || ni === 7) this._droneRootFreq = 146.8; // D3 (I)
+        else if (ni >= 3 && ni <= 5) this._droneRootFreq = 196.0; // G3 (IV)
+        else if (ni === 6 || ni >= 8) this._droneRootFreq = 164.8; // E3 or A2→ V
+      }
+
+      // Harmony layer: variable intervals (3rd/5th/octave below) — Era 2+ only, 60% volume
       if (lyreEra >= 2 && this._harmOsc && this._harmGain && amp > 0.005) {
-        let harmInterval = (this._lyreMode === 'night' || this._lyreMode === 'eerie') ? 1.2 : 1.5; // minor 3rd vs perfect 5th
-        if (this._lyreContext === 'farming') harmInterval = 1.25; // major 3rd for warmth
+        let r = random();
+        let harmInterval;
+        if (this._lyreMode === 'night' || this._lyreMode === 'eerie') {
+          // Dark modes: minor 3rd most common, occasional 5th
+          harmInterval = r < 0.55 ? 1.2 : (r < 0.80 ? 1.5 : 0.5); // m3rd / P5th / octave below
+        } else if (this._lyreMode === 'celebration') {
+          // Celebration: major 3rd dominant, 5th for emphasis
+          harmInterval = r < 0.50 ? 1.25 : (r < 0.80 ? 1.5 : 0.5);
+        } else {
+          // Default: major 3rd most common, 5th for emphasis, octave below for depth
+          harmInterval = r < 0.45 ? 1.25 : (r < 0.75 ? 1.5 : 0.5);
+        }
+        if (this._lyreContext === 'farming') harmInterval = r < 0.6 ? 1.25 : 1.5; // warm thirds
         let harmFreq = freq * harmInterval;
         // Only harmonize if result is in comfortable range
-        if (harmFreq < 1200) {
-          let harmAmp = amp * 0.35;
+        if (harmFreq < 1200 && harmFreq > 80) {
+          let harmAmp = amp * 0.60; // 60% of melody volume
           this._harmOsc.freq(harmFreq * (1 + (random() - 0.5) * 0.004));
           this._harmGain.amp(harmAmp, 0.015);
           // Slower decay than main note
@@ -1257,29 +1671,31 @@ class SoundManager {
       this._lyreNoteIdx = 0;
       this._lyrePhrase++;
       let pauseMult = this._lyreContext === 'rain' ? 1.4 : (this._lyreContext === 'combat' ? 0.6 : 1.0);
+      // Musical rests between phrases — silence makes melodies stand out
       if (this._lyreMode === 'menu') this._lyreTimer += floor(random(180, 360) * pauseMult);
-      else if (this._lyreMode === 'tense') this._lyreTimer += floor(random(15, 40) * pauseMult);
-      else if (this._lyreMode === 'eerie') this._lyreTimer += floor(random(100, 200) * pauseMult);
-      else if (this._lyreMode === 'celebration') this._lyreTimer += floor(random(12, 30) * pauseMult);
-      else if (this._lyreMode === 'night') this._lyreTimer += floor(random(140, 280) * pauseMult);
-      else if (this._lyreMode === 'sailing') this._lyreTimer += floor(random(35, 70) * pauseMult);
-      else this._lyreTimer += floor(random(50, 120) * pauseMult);
+      else if (this._lyreMode === 'tense') this._lyreTimer += floor(random(20, 50) * pauseMult);
+      else if (this._lyreMode === 'eerie') this._lyreTimer += floor(random(120, 240) * pauseMult);
+      else if (this._lyreMode === 'celebration') this._lyreTimer += floor(random(18, 40) * pauseMult);
+      else if (this._lyreMode === 'night') this._lyreTimer += floor(random(160, 320) * pauseMult); // 2-4 sec silence
+      else if (this._lyreMode === 'sailing') this._lyreTimer += floor(random(40, 80) * pauseMult);
+      else this._lyreTimer += floor(random(60, 140) * pauseMult); // peaceful: longer breaths
     }
   }
 
-  // Update bass drone — provides harmonic foundation under melodies
+  // Update bass drone — follows chord progression set by melody
   _updateDrone(musicVol) {
     if (!this._droneGain) return;
     let mode = this._lyreMode;
-    let droneFreq = 146.8; // D3
+    // Drone freq follows melody chord root (smooth glide)
+    let droneFreq = this._droneRootFreq || 146.8;
     let droneVol = 0;
-    if (mode === 'peaceful') { droneVol = 0.04; droneFreq = 146.8; }
-    else if (mode === 'night') { droneVol = 0.035; droneFreq = 146.8; }
-    else if (mode === 'tense') { droneVol = 0.05; droneFreq = 146.8; }
-    else if (mode === 'eerie') { droneVol = 0.03; droneFreq = 110.0; } // A2 for darker color
-    else if (mode === 'celebration') { droneVol = 0.04; droneFreq = 146.8; }
-    else if (mode === 'sailing') { droneVol = 0.045; droneFreq = 146.8; }
-    else if (mode === 'menu') { droneVol = 0.02; droneFreq = 146.8; }
+    if (mode === 'peaceful') { droneVol = 0.04; }
+    else if (mode === 'night') { droneVol = 0.035; }
+    else if (mode === 'tense') { droneVol = 0.05; }
+    else if (mode === 'eerie') { droneVol = 0.03; droneFreq = 110.0; } // A2 for darker color (override)
+    else if (mode === 'celebration') { droneVol = 0.04; }
+    else if (mode === 'sailing') { droneVol = 0.045; }
+    else if (mode === 'menu') { droneVol = 0.02; }
     // Era-based drone scaling: Era 1 minimal, Era 2 moderate, Era 3 full
     let lyreEra = 1;
     if (typeof state !== 'undefined' && state.islandLevel) {
@@ -1298,7 +1714,8 @@ class SoundManager {
     let breathe = 1.0 + Math.sin((typeof frameCount !== 'undefined' ? frameCount : 0) * 0.008) * 0.15;
     let targetAmp = droneVol * musicVol * this._lyreVolMult * breathe;
     this._droneGain.amp(Math.max(0, targetAmp), 0.3);
-    this._droneOsc.freq(droneFreq);
+    // Smooth glide to new chord root (0.5s transition)
+    this._droneOsc.freq(droneFreq, 0.5);
   }
 
   // Update rhythmic pulse — subtle heartbeat underneath music
@@ -1313,6 +1730,8 @@ class SoundManager {
     else if (mode === 'tense') { pulseVol = 0.035; pulseRate = 0.09; } // faster in combat
     else if (mode === 'celebration') { pulseVol = 0.03; pulseRate = 0.10; }
     else if (mode === 'sailing') { pulseVol = 0.025; pulseRate = 0.07; }
+    else if (mode === 'eerie') { pulseVol = 0.015; pulseRate = 0.04; }
+    else if (mode === 'menu') { pulseVol = 0.01; pulseRate = 0.03; }
     // Context modifiers on pulse
     if (this._lyreContext === 'combat') { pulseVol *= 1.3; pulseRate *= 1.2; }
     else if (this._lyreContext === 'rain') { pulseVol *= 0.5; pulseRate *= 0.7; }
@@ -1365,6 +1784,128 @@ class SoundManager {
     setTimeout(tick, 20);
   }
 
+  // ─── NOISE BUFFER HELPERS (Web Audio API for realistic textures) ───
+  _getAudioCtx() {
+    try {
+      if (typeof getAudioContext === 'function') return getAudioContext();
+    } catch(e) {}
+    return null;
+  }
+
+  _createNoiseBuffer(duration) {
+    let ctx = this._getAudioCtx();
+    if (!ctx) return null;
+    let sampleRate = ctx.sampleRate;
+    let length = Math.floor(sampleRate * duration);
+    let buffer = ctx.createBuffer(1, length, sampleRate);
+    let data = buffer.getChannelData(0);
+    for (let i = 0; i < length; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+    return buffer;
+  }
+
+  _createBrownNoiseBuffer(duration) {
+    let ctx = this._getAudioCtx();
+    if (!ctx) return null;
+    let sampleRate = ctx.sampleRate;
+    let length = Math.floor(sampleRate * duration);
+    let buffer = ctx.createBuffer(1, length, sampleRate);
+    let data = buffer.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < length; i++) {
+      let white = Math.random() * 2 - 1;
+      last = (last + (0.02 * white)) / 1.02;
+      data[i] = last * 3.5;
+    }
+    return buffer;
+  }
+
+  // Play filtered noise: the core of realistic SFX
+  _playNoise(opts) {
+    let ctx = this._getAudioCtx();
+    if (!ctx) return;
+    let o = Object.assign({
+      type: 'white', // 'white' or 'brown'
+      filterType: 'bandpass', // 'bandpass', 'lowpass', 'highpass'
+      freq: 1000,
+      Q: 1,
+      volume: 0.1,
+      duration: 0.1,
+      attack: 0.005,
+      decay: 0.08,
+      freqEnd: null, // sweep target
+      delay: 0
+    }, opts);
+    let run = () => {
+      let buf = o.type === 'brown' ? this._createBrownNoiseBuffer(o.duration + 0.05) : this._createNoiseBuffer(o.duration + 0.05);
+      if (!buf) return;
+      let src = ctx.createBufferSource();
+      src.buffer = buf;
+      let filter = ctx.createBiquadFilter();
+      filter.type = o.filterType;
+      filter.frequency.setValueAtTime(o.freq, ctx.currentTime);
+      filter.Q.setValueAtTime(o.Q, ctx.currentTime);
+      if (o.freqEnd !== null) {
+        filter.frequency.linearRampToValueAtTime(o.freqEnd, ctx.currentTime + o.duration);
+      }
+      let gain = ctx.createGain();
+      let vol = o.volume * this.vol.master * this.vol.sfx;
+      let t = ctx.currentTime;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(vol, t + o.attack);
+      gain.gain.linearRampToValueAtTime(vol * 0.7, t + o.attack + (o.duration - o.attack - o.decay) * 0.5);
+      gain.gain.linearRampToValueAtTime(0, t + o.duration);
+      src.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+      src.start(t);
+      src.stop(t + o.duration + 0.05);
+    };
+    if (o.delay > 0) setTimeout(run, o.delay * 1000);
+    else run();
+  }
+
+  // Play a tonal element via Web Audio (bypass p5 oscillator pool)
+  _playTone(opts) {
+    let ctx = this._getAudioCtx();
+    if (!ctx) return;
+    let o = Object.assign({
+      type: 'sine',
+      freq: 440,
+      freqEnd: null,
+      volume: 0.1,
+      duration: 0.2,
+      attack: 0.01,
+      decay: 0.1,
+      delay: 0
+    }, opts);
+    let run = () => {
+      let osc = ctx.createOscillator();
+      osc.type = o.type;
+      let t = ctx.currentTime;
+      osc.frequency.setValueAtTime(o.freq, t);
+      if (o.freqEnd !== null) {
+        osc.frequency.exponentialRampToValueAtTime(Math.max(20, o.freqEnd), t + o.duration);
+      }
+      let gain = ctx.createGain();
+      let vol = o.volume * this.vol.master * this.vol.sfx;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(vol, t + Math.min(o.attack, o.duration * 0.3));
+      let sustainEnd = t + o.duration - o.decay;
+      if (sustainEnd > t + o.attack) {
+        gain.gain.linearRampToValueAtTime(vol * 0.8, sustainEnd);
+      }
+      gain.gain.exponentialRampToValueAtTime(0.001, t + o.duration);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + o.duration + 0.01);
+    };
+    if (o.delay > 0) setTimeout(run, o.delay * 1000);
+    else run();
+  }
+
   // ─── SFX PLAYBACK ───
   playSFX(id) {
     if (!this.ready) return;
@@ -1372,18 +1913,78 @@ class SoundManager {
     if (this._lastPlay[id] && now - this._lastPlay[id] < this._minInterval) return;
     this._lastPlay[id] = now;
 
+    // Try real audio sample first, fall back to procedural
+    const sampleMap = {
+      // Farming
+      harvest: 'harvest', harvest_fruit: 'harvest_fruit', harvest_grain: 'harvest_grain',
+      chop: 'wood_chop', plant_seed: 'plant_seed', crop_grow: 'crop_grow',
+      // Building / Crafting
+      build: 'build', repair: 'hammer', stone_mine: 'anvil', craft_complete: 'craft_complete',
+      stone_place: 'stone_place', saw: 'saw', dig: 'dig',
+      // UI
+      click: 'click', equip: 'equip', unequip: 'unequip', hover: 'hover',
+      ding: 'notification', open_menu: 'open_menu', close_menu: 'close_menu',
+      inventory: 'inventory', page_turn: 'page_turn', writing: 'writing',
+      // Economy
+      coin: 'coin', coin_clink: 'coin', purchase: 'gold_pile', gold_pile: 'gold_pile',
+      // Footsteps
+      step_sand: 'step_sand', step_stone: 'step_stone',
+      step_grass: 'footstep_grass', step_water: 'footstep_water', step_wood: 'footstep_wood',
+      // Combat
+      hit: 'hit', armor_hit: 'armor_hit', punch: 'punch',
+      dodge: 'dodge', whirlwind: 'whirlwind',
+      shield_bash: 'shield_block', sword_swing: 'sword_swing', sword_clash: 'sword_clash',
+      arrow_shoot: 'arrow_shoot', arrow_hit: 'arrow_hit',
+      player_hurt: 'armor_hit', skeleton_death: 'death_enemy', death_enemy: 'death_enemy',
+      battle_cry: 'battle_cry', buff: 'buff',
+      // Fishing
+      fish_cast: 'cast_line', fish_catch: 'fish_caught', bobber_plop: 'bobber_plop',
+      fish_splash: 'fish_splash', reel: 'reel',
+      // Water / Diving
+      splash: 'splash', water: 'splash', bubble_pop: 'bubbles_single',
+      oar_splash: 'splash', wave_crash: 'wave_crash', water_pour: 'water_pour',
+      // Magic / Crystal
+      crystal: 'crystal_collect', crystal_charge: 'crystal_charge',
+      crystal_resonance: 'crystal_collect', heart: 'heal', heal: 'heal',
+      enchant: 'enchant', magic_cast: 'magic_cast', portal: 'portal',
+      // Level up / Achievement
+      fanfare: 'levelup', level_up: 'levelup', skill_unlock: 'fanfare',
+      achievement: 'achievement', milestone: 'fanfare',
+      quest_progress: 'quest_new', quest_complete: 'quest_complete', quest_new: 'quest_new',
+      era_transition: 'fanfare', upgrade: 'craft_complete',
+      // Animals
+      chicken_cluck: 'chicken', cat_meow: 'cat_meow', crow_caw: 'crow',
+      seagull: 'seagull', owl: 'owl', frog: 'frog', wolf_howl: 'wolf_howl',
+      bird_chirp: 'bird_chirp', cat_purr: 'cat_purr',
+      // Nature
+      thunder: 'thunder_crack', thunder_roll: 'thunder_roll',
+      leaves_rustle: 'leaves_rustle', wind_gust: 'wind_gust',
+      // Building interaction
+      door_creak: 'door_open', door_open: 'door_open', door_close: 'door_close',
+      // Sailing
+      sail: 'sail_unfurl', anchor: 'anchor', ship_creak: 'ship_creak',
+      // Fire
+      fire_ignite: 'fire_ignite', torch: 'torch', fire_crackling: 'fire_crackling',
+      // Misc
+      scavenge: 'treasure_open', treasure_open: 'treasure_open',
+      festival_start: 'fanfare', visitor_arrive: 'notification',
+      dialogue_open: 'click', gift_accepted: 'notification', favor_up: 'notification',
+      rain_drop: 'rain_drop', cricket_single: 'cricket_single',
+      tree_fall: 'tree_fall', dash: 'wind_gust'
+    };
+    if (sampleMap[id] && this._playSample(sampleMap[id])) return;
+
     let vol = this.vol.master * this.vol.sfx;
     let s = this._getSfxSlot();
     if (!s) return;
 
-    // Helper: soft attack + exponential decay envelope
+    // Helper: soft attack + exponential decay envelope (kept for tonal SFX)
     let play = (type, freq, amp, endFreq, dur, opts) => {
       opts = opts || {};
       s.osc.setType(type);
       s.osc.freq(freq);
-      s._vol = amp * vol;
+      s._vol = amp * vol * 0.6;
       s._peak = s._vol;
-      // Soft attack: start silent, ramp up
       let attackMs = opts.attack || Math.min(dur * 0.12, 30);
       s.gain.amp(0, 0);
       s.gain.amp(s._vol, attackMs / 1000);
@@ -1404,415 +2005,496 @@ class SoundManager {
     };
 
     switch (id) {
-      // Farming — warm, soft pops and plucks
+      // ═══ Farming — organic pops with noise texture ═══
       case 'harvest':
-        playTwo('sine', 523, 659, 0.22, 300, 100);  // C5->E5 major third
-        setTimeout(() => {
-          let sh = this._getSfxSlot();
-          if (sh) { sh.osc.setType('sine'); sh.osc.freq(784); sh._vol = 0.18 * vol; sh._peak = sh._vol;
-            sh.gain.amp(0,0); sh.gain.amp(sh._vol, 0.01); this._sfxEnvSmooth(sh, 784, 784, 350, { attack: 10 }); }
-        }, 200);
-        break;  // C5->E5->G5 satisfying ascending triad
-      case 'chop':      play('triangle', 160, 0.25, 90, 120, { attack: 5 }); break;  // short thunk
+        // Satisfying pop: detuned sines + bandpass noise burst for organic feel
+        this._playTone({ freq: 523, freqEnd: 540, volume: 0.14, duration: 0.25, attack: 0.008 });
+        this._playTone({ freq: 659, volume: 0.12, duration: 0.22, attack: 0.01, delay: 0.08 });
+        this._playTone({ freq: 784, volume: 0.10, duration: 0.30, attack: 0.012, delay: 0.16 });
+        // Rustling noise burst — sounds like pulling a plant
+        this._playNoise({ type: 'white', filterType: 'bandpass', freq: 2200, Q: 0.8, volume: 0.08, duration: 0.12, attack: 0.003, decay: 0.06 });
+        // Low bandpass crunch — soil/straw texture
+        this._playNoise({ type: 'brown', filterType: 'bandpass', freq: 400, Q: 1.5, volume: 0.06, duration: 0.08, attack: 0.002, decay: 0.04, delay: 0.02 });
+        break;
+      case 'chop':
+        // Axe chop: noise impact + tonal thunk
+        this._playNoise({ type: 'white', filterType: 'bandpass', freq: 800, Q: 2, volume: 0.12, duration: 0.06, attack: 0.002, decay: 0.03 });
+        this._playTone({ type: 'triangle', freq: 160, freqEnd: 90, volume: 0.16, duration: 0.10, attack: 0.003, decay: 0.05 });
+        // Wood crack — high bandpass snap
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 3000, Q: 0.5, volume: 0.05, duration: 0.03, attack: 0.001, decay: 0.02 });
+        break;
       case 'expand_rumble':
-        play('sine', 55, 0.25, 35, 800, { attack: 60 });  // low rumble
-        setTimeout(() => {
-          let sr = this._getSfxSlot();
-          if (sr) { sr.osc.setType('triangle'); sr.osc.freq(44); sr._vol = 0.15 * vol; sr._peak = sr._vol;
-            sr.gain.amp(0,0); sr.gain.amp(sr._vol, 0.08); this._sfxEnvSmooth(sr, 44, 28, 600, { attack: 40 }); }
-        }, 200);
-        break;  // deep rumble for island expansion
+        // Deep earth rumble: brown noise + sub-bass sine
+        this._playNoise({ type: 'brown', filterType: 'lowpass', freq: 80, Q: 3, volume: 0.14, duration: 0.8, attack: 0.06, decay: 0.3 });
+        this._playTone({ freq: 55, freqEnd: 35, volume: 0.16, duration: 0.7, attack: 0.05, decay: 0.2 });
+        this._playNoise({ type: 'brown', filterType: 'lowpass', freq: 120, Q: 2, volume: 0.08, duration: 0.5, attack: 0.1, decay: 0.2, delay: 0.15 });
+        // Crumbling texture layer
+        this._playNoise({ type: 'white', filterType: 'bandpass', freq: 600, Q: 1, volume: 0.04, duration: 0.4, attack: 0.08, decay: 0.15, delay: 0.1 });
+        break;
       case 'build':
-        play('triangle', 330, 0.20, 220, 180, { attack: 10 });  // woody tap
-        setTimeout(() => {
-          let sb2 = this._getSfxSlot();
-          if (sb2) { sb2.osc.setType('sine'); sb2.osc.freq(165); sb2._vol = 0.12 * vol; sb2._peak = sb2._vol;
-            sb2.gain.amp(0,0); sb2.gain.amp(sb2._vol, 0.01); this._sfxEnvSmooth(sb2, 165, 110, 200, { attack: 8 }); }
-        }, 30);
-        break;  // woody tap + resonant thunk
-      // UI — gentle clicks and chimes
-      case 'equip':     playTwo('sine', 784, 1047, 0.18, 200, 80); break;  // G5->C6 perfect fourth
-      case 'click':     play('sine', 660, 0.12, 440, 60, { attack: 3 }); break;  // tiny pip
-      case 'ding':      play('sine', 1047, 0.18, 880, 400, { attack: 20 }); break;  // bell tone, long ring
-      // Movement — subtle whooshes
-      case 'step_sand': { let p20 = 1 + (random() - 0.5) * 0.4; play('triangle', 140 * p20, 0.06, 80 * p20, 70, { attack: 5 }); break; }  // soft puff +/- 20%
-      case 'step_stone':{ let p20 = 1 + (random() - 0.5) * 0.4; play('triangle', 320 * p20, 0.07, 200 * p20, 60, { attack: 3 }); break; }  // light tap +/- 20%
-      case 'dash':      play('triangle', 500, 0.18, 150, 200, { attack: 8 }); break;  // breeze sweep
-      // Fishing — watery plops
-      case 'fish_cast': play('sine', 400, 0.16, 200, 250, { attack: 15 }); break;  // descending plop
-      case 'fish_catch':playTwo('sine', 392, 523, 0.20, 300, 120); break;  // G4->C5 happy catch
-      case 'bobber_plop': play('sine', 320, 0.14, 140, 180, { attack: 8 }); break;  // bobber hitting water
-      case 'fish_bite': play('sine', 500, 0.22, 200, 150, { attack: 5 }); play('triangle', 180, 0.12, 100, 200, { attack: 10 }); break;  // sharp tug + underwater thud
-      // Magical — shimmery tones
-      case 'crystal':   playTwo('sine', 880, 1319, 0.22, 500, 150); break;  // A5->E6 sparkle
-      case 'heart':     playTwo('sine', 659, 880, 0.16, 400, 130); break;   // E5->A5 warm
+        // Hammer hit: noise burst + resonant low sine + wood texture
+        this._playNoise({ type: 'white', filterType: 'bandpass', freq: 1200, Q: 2.5, volume: 0.10, duration: 0.05, attack: 0.002, decay: 0.025 });
+        this._playTone({ type: 'triangle', freq: 330, freqEnd: 220, volume: 0.12, duration: 0.15, attack: 0.005, decay: 0.08 });
+        this._playTone({ freq: 165, freqEnd: 110, volume: 0.08, duration: 0.18, attack: 0.005, decay: 0.08, delay: 0.02 });
+        // Resonant wood thud
+        this._playNoise({ type: 'brown', filterType: 'bandpass', freq: 350, Q: 3, volume: 0.06, duration: 0.08, attack: 0.002, decay: 0.04, delay: 0.01 });
+        break;
+
+      // ═══ UI — clean clicks with filtered noise transient ═══
+      case 'equip':
+        this._playTone({ freq: 784, volume: 0.12, duration: 0.15, attack: 0.005 });
+        this._playTone({ freq: 1047, volume: 0.14, duration: 0.18, attack: 0.008, delay: 0.06 });
+        // Subtle click texture
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 4000, Q: 0.5, volume: 0.03, duration: 0.02, attack: 0.001, decay: 0.01 });
+        break;
+      case 'click':
+        // Filtered noise transient + clean sine pip
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 5000, Q: 0.8, volume: 0.04, duration: 0.015, attack: 0.001, decay: 0.008 });
+        this._playTone({ freq: 660, freqEnd: 440, volume: 0.08, duration: 0.04, attack: 0.002, decay: 0.02 });
+        break;
+      case 'ding':
+        // Bell: multiple harmonics + noise shimmer
+        this._playTone({ freq: 1047, volume: 0.12, duration: 0.4, attack: 0.008, decay: 0.15 });
+        this._playTone({ freq: 2094, volume: 0.04, duration: 0.25, attack: 0.005, decay: 0.1 }); // overtone
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 6000, Q: 1, volume: 0.02, duration: 0.06, attack: 0.002, decay: 0.03 });
+        break;
+
+      // ═══ Footsteps — filtered noise, sounds like real surfaces ═══
+      case 'step_sand': {
+        // Sand crunch: brown noise through bandpass 200-800Hz
+        let p = 1 + (Math.random() - 0.5) * 0.4;
+        this._playNoise({ type: 'brown', filterType: 'bandpass', freq: 500 * p, Q: 0.8, volume: 0.06, duration: 0.07, attack: 0.003, decay: 0.035 });
+        // Subtle high grain texture
+        this._playNoise({ type: 'white', filterType: 'bandpass', freq: 3000 * p, Q: 1.5, volume: 0.02, duration: 0.04, attack: 0.002, decay: 0.02 });
+        break;
+      }
+      case 'step_stone': {
+        // Stone tap: short noise burst with highpass + sine transient click
+        let p = 1 + (Math.random() - 0.5) * 0.4;
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 2000 * p, Q: 1, volume: 0.05, duration: 0.03, attack: 0.001, decay: 0.015 });
+        this._playTone({ freq: 320 * p, freqEnd: 200 * p, volume: 0.04, duration: 0.04, attack: 0.001, decay: 0.02 });
+        // Low resonant thud
+        this._playNoise({ type: 'brown', filterType: 'lowpass', freq: 300, Q: 2, volume: 0.03, duration: 0.03, attack: 0.001, decay: 0.015 });
+        break;
+      }
+      case 'step_grass': {
+        // Grass rustle: bandpass white noise, soft and breathy
+        let p = 1 + (Math.random() - 0.5) * 0.4;
+        this._playNoise({ type: 'white', filterType: 'bandpass', freq: 3500 * p, Q: 0.6, volume: 0.03, duration: 0.06, attack: 0.003, decay: 0.03 });
+        this._playNoise({ type: 'brown', filterType: 'bandpass', freq: 800 * p, Q: 1, volume: 0.02, duration: 0.05, attack: 0.002, decay: 0.025 });
+        break;
+      }
+      case 'step_water': {
+        // Water step: lowpass noise splash + sine plop
+        let p = 1 + (Math.random() - 0.5) * 0.4;
+        this._playNoise({ type: 'white', filterType: 'lowpass', freq: 2000, Q: 1, volume: 0.05, duration: 0.08, attack: 0.003, decay: 0.04 });
+        this._playTone({ freq: 200 * p, freqEnd: 120 * p, volume: 0.05, duration: 0.07, attack: 0.005, decay: 0.03 });
+        break;
+      }
+      case 'dash':
+        // Breeze whoosh: sweeping bandpass noise high to low
+        this._playNoise({ type: 'white', filterType: 'bandpass', freq: 3000, freqEnd: 400, Q: 0.8, volume: 0.10, duration: 0.18, attack: 0.005, decay: 0.08 });
+        this._playTone({ type: 'triangle', freq: 500, freqEnd: 150, volume: 0.08, duration: 0.16, attack: 0.005, decay: 0.06 });
+        break;
+
+      // ═══ Fishing — watery splashes and plops ═══
+      case 'fish_cast':
+        // Line cast: sweeping noise high→low for whoosh + water impact
+        this._playNoise({ type: 'white', filterType: 'bandpass', freq: 4000, freqEnd: 600, Q: 1, volume: 0.08, duration: 0.15, attack: 0.005, decay: 0.06 });
+        // Splash on water
+        this._playNoise({ type: 'white', filterType: 'lowpass', freq: 1500, freqEnd: 400, Q: 1.5, volume: 0.07, duration: 0.12, attack: 0.003, decay: 0.05, delay: 0.1 });
+        this._playTone({ freq: 400, freqEnd: 200, volume: 0.08, duration: 0.2, attack: 0.01, decay: 0.08 });
+        break;
+      case 'fish_catch':
+        // Happy catch: tonal chime + water splash texture
+        this._playTone({ freq: 392, volume: 0.12, duration: 0.2, attack: 0.008 });
+        this._playTone({ freq: 523, volume: 0.14, duration: 0.25, attack: 0.01, delay: 0.1 });
+        this._playNoise({ type: 'white', filterType: 'bandpass', freq: 1800, Q: 1, volume: 0.06, duration: 0.08, attack: 0.003, decay: 0.04 });
+        // Dripping texture
+        this._playNoise({ type: 'white', filterType: 'lowpass', freq: 800, Q: 2, volume: 0.04, duration: 0.1, attack: 0.005, decay: 0.05, delay: 0.08 });
+        break;
+      case 'bobber_plop':
+        // Bobber hitting water: short noise bursts + resonant plop
+        this._playNoise({ type: 'white', filterType: 'lowpass', freq: 1200, freqEnd: 300, Q: 2, volume: 0.08, duration: 0.08, attack: 0.002, decay: 0.04 });
+        this._playTone({ freq: 320, freqEnd: 140, volume: 0.09, duration: 0.14, attack: 0.005, decay: 0.06 });
+        // Secondary ripple
+        this._playNoise({ type: 'white', filterType: 'bandpass', freq: 600, Q: 2.5, volume: 0.04, duration: 0.06, attack: 0.003, decay: 0.03, delay: 0.06 });
+        break;
+      case 'fish_bite':
+        // Sharp tug: quick noise snap + underwater thud
+        this._playNoise({ type: 'white', filterType: 'bandpass', freq: 2500, Q: 2, volume: 0.10, duration: 0.04, attack: 0.001, decay: 0.02 });
+        this._playTone({ freq: 500, freqEnd: 200, volume: 0.14, duration: 0.12, attack: 0.003, decay: 0.05 });
+        this._playNoise({ type: 'brown', filterType: 'lowpass', freq: 300, Q: 2, volume: 0.06, duration: 0.15, attack: 0.005, decay: 0.07, delay: 0.02 });
+        break;
+
+      // ═══ Magical — shimmer with harmonic beating ═══
+      case 'crystal':
+        // Multiple detuned sines for shimmer + high noise sparkle
+        this._playTone({ freq: 880, volume: 0.10, duration: 0.45, attack: 0.02, decay: 0.15 });
+        this._playTone({ freq: 884, volume: 0.08, duration: 0.40, attack: 0.025, decay: 0.12 }); // beat frequency
+        this._playTone({ freq: 1319, volume: 0.10, duration: 0.35, attack: 0.03, delay: 0.12 });
+        this._playTone({ freq: 1323, volume: 0.07, duration: 0.30, attack: 0.035, delay: 0.12 }); // beat
+        // Sparkle noise
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 8000, Q: 1, volume: 0.03, duration: 0.15, attack: 0.01, decay: 0.06 });
+        break;
+      case 'heart':
+        this._playTone({ freq: 659, volume: 0.10, duration: 0.35, attack: 0.015, decay: 0.12 });
+        this._playTone({ freq: 880, volume: 0.12, duration: 0.30, attack: 0.02, delay: 0.1 });
+        // Warm noise halo
+        this._playNoise({ type: 'brown', filterType: 'bandpass', freq: 1200, Q: 0.5, volume: 0.03, duration: 0.2, attack: 0.02, decay: 0.08 });
+        break;
       case 'fanfare':
-        play('sine', 523, 0.20, 523, 200, { attack: 15 });  // C5
-        setTimeout(() => {
-          let s2 = this._getSfxSlot();
-          if (s2) { s2.osc.setType('sine'); s2.osc.freq(659); s2._vol = 0.20 * vol; s2._peak = s2._vol;
-            s2.gain.amp(0,0); s2.gain.amp(s2._vol, 0.015); this._sfxEnvSmooth(s2, 659, 659, 200, {}); }
-        }, 180);
-        setTimeout(() => {
-          let s3 = this._getSfxSlot();
-          if (s3) { s3.osc.setType('sine'); s3.osc.freq(784); s3._vol = 0.22 * vol; s3._peak = s3._vol;
-            s3.gain.amp(0,0); s3.gain.amp(s3._vol, 0.015); this._sfxEnvSmooth(s3, 784, 784, 350, {}); }
-        }, 360);
-        break;  // C5->E5->G5 major arpeggio
-      // Nature / world
-      case 'crab_catch': play('sine', 440, 0.18, 330, 150, { attack: 10 }); break;  // quick pluck
-      case 'heartbeat': play('sine', 55, 0.20, 40, 300, { attack: 30 }); break;  // deep throb
-      case 'whoosh':    play('triangle', 300, 0.14, 80, 250, { attack: 15 }); break;  // gentle wind
-      case 'sail':      play('triangle', 220, 0.18, 350, 500, { attack: 40 }); break;  // rising breeze
-      case 'repair':    play('triangle', 380, 0.18, 260, 140, { attack: 5 }); break;  // tap
-      case 'scavenge':  playTwo('sine', 349, 440, 0.16, 250, 90); break;  // F4->A4 find
-      // Combat
+        // C5->E5->G5 with noise sparkle on each
+        this._playTone({ freq: 523, volume: 0.14, duration: 0.18, attack: 0.01 });
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 5000, Q: 0.5, volume: 0.02, duration: 0.04, attack: 0.002, decay: 0.02 });
+        this._playTone({ freq: 659, volume: 0.14, duration: 0.18, attack: 0.01, delay: 0.15 });
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 5000, Q: 0.5, volume: 0.02, duration: 0.04, attack: 0.002, decay: 0.02, delay: 0.15 });
+        this._playTone({ freq: 784, volume: 0.16, duration: 0.30, attack: 0.012, delay: 0.30 });
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 6000, Q: 0.5, volume: 0.025, duration: 0.06, attack: 0.003, decay: 0.03, delay: 0.30 });
+        break;
+
+      // ═══ Nature / world ═══
+      case 'crab_catch':
+        this._playTone({ freq: 440, freqEnd: 330, volume: 0.12, duration: 0.12, attack: 0.005, decay: 0.05 });
+        this._playNoise({ type: 'white', filterType: 'bandpass', freq: 1500, Q: 2, volume: 0.05, duration: 0.04, attack: 0.002, decay: 0.02 });
+        break;
+      case 'heartbeat':
+        // Deep throb with sub-bass noise
+        this._playTone({ freq: 55, freqEnd: 40, volume: 0.14, duration: 0.25, attack: 0.02, decay: 0.1 });
+        this._playNoise({ type: 'brown', filterType: 'lowpass', freq: 60, Q: 4, volume: 0.08, duration: 0.2, attack: 0.01, decay: 0.08 });
+        break;
+      case 'whoosh':
+        // Wind whoosh: sweeping filtered noise
+        this._playNoise({ type: 'white', filterType: 'bandpass', freq: 2000, freqEnd: 400, Q: 0.6, volume: 0.08, duration: 0.2, attack: 0.01, decay: 0.08 });
+        this._playTone({ type: 'triangle', freq: 300, freqEnd: 80, volume: 0.06, duration: 0.2, attack: 0.01, decay: 0.08 });
+        break;
+      case 'sail':
+        // Rising breeze: noise sweep low→high + rising tone
+        this._playNoise({ type: 'white', filterType: 'bandpass', freq: 400, freqEnd: 2000, Q: 0.6, volume: 0.08, duration: 0.4, attack: 0.04, decay: 0.15 });
+        this._playTone({ type: 'triangle', freq: 220, freqEnd: 350, volume: 0.10, duration: 0.45, attack: 0.03, decay: 0.12 });
+        break;
+      case 'repair':
+        // Tap with wood texture
+        this._playNoise({ type: 'white', filterType: 'bandpass', freq: 1500, Q: 2, volume: 0.08, duration: 0.04, attack: 0.002, decay: 0.02 });
+        this._playTone({ type: 'triangle', freq: 380, freqEnd: 260, volume: 0.10, duration: 0.12, attack: 0.003, decay: 0.05 });
+        break;
+      case 'scavenge':
+        this._playTone({ freq: 349, volume: 0.10, duration: 0.18, attack: 0.008 });
+        this._playTone({ freq: 440, volume: 0.12, duration: 0.20, attack: 0.01, delay: 0.07 });
+        this._playNoise({ type: 'white', filterType: 'bandpass', freq: 2000, Q: 1, volume: 0.04, duration: 0.05, attack: 0.003, decay: 0.025 });
+        break;
+
+      // ═══ Combat — layered impacts with real punch ═══
       case 'hit':
-        play('triangle', 280, 0.24, 120, 100, { attack: 3 });  // impact thud
-        setTimeout(() => {
-          let si = this._getSfxSlot();
-          if (si) { si.osc.setType('sine'); si.osc.freq(70); si._vol = 0.16 * vol; si._peak = si._vol;
-            si.gain.amp(0,0); si.gain.amp(si._vol, 0.008); this._sfxEnvSmooth(si, 70, 40, 120, { attack: 3 }); }
-        }, 8);
-        break;  // thud + sub-bass punch
+        // Impact: lowpass noise burst + sine sub-bass thump + mid transient
+        this._playNoise({ type: 'white', filterType: 'lowpass', freq: 800, Q: 2, volume: 0.14, duration: 0.06, attack: 0.001, decay: 0.03 });
+        this._playTone({ freq: 70, freqEnd: 40, volume: 0.12, duration: 0.10, attack: 0.002, decay: 0.05 });
+        this._playNoise({ type: 'brown', filterType: 'bandpass', freq: 400, Q: 3, volume: 0.08, duration: 0.04, attack: 0.001, decay: 0.02, delay: 0.005 });
+        break;
       case 'whirlwind':
-        play('triangle', 600, 0.20, 150, 180, { attack: 5 });  // fast descending sweep
-        // Sub-bass rumble layer for punch
-        setTimeout(() => {
-          let sr = this._getSfxSlot();
-          if (sr) { sr.osc.setType('sine'); sr.osc.freq(60); sr._vol = 0.18 * vol; sr._peak = sr._vol;
-            sr.gain.amp(0,0); sr.gain.amp(sr._vol, 0.01); this._sfxEnvSmooth(sr, 60, 40, 300, { attack: 10 }); }
-        }, 10);
+        // Sweeping attack: noise sweep + sub-bass rumble
+        this._playNoise({ type: 'white', filterType: 'bandpass', freq: 3000, freqEnd: 300, Q: 1, volume: 0.12, duration: 0.16, attack: 0.003, decay: 0.06 });
+        this._playTone({ freq: 60, freqEnd: 40, volume: 0.12, duration: 0.25, attack: 0.008, decay: 0.1 });
+        this._playNoise({ type: 'brown', filterType: 'lowpass', freq: 200, Q: 3, volume: 0.08, duration: 0.2, attack: 0.005, decay: 0.08, delay: 0.01 });
         break;
       case 'dodge':
-        play('triangle', 400, 0.14, 100, 30, { attack: 1 });  // snappy whoosh
-        // High freq crack layer
-        setTimeout(() => {
-          let sd = this._getSfxSlot();
-          if (sd) { sd.osc.setType('sine'); sd.osc.freq(1200); sd._vol = 0.10 * vol; sd._peak = sd._vol;
-            sd.gain.amp(0,0); sd.gain.amp(sd._vol, 0.005); this._sfxEnvSmooth(sd, 1200, 800, 25, { attack: 1 }); }
-        }, 5);
+        // Quick whoosh: fast noise burst high→low
+        this._playNoise({ type: 'white', filterType: 'bandpass', freq: 4000, freqEnd: 800, Q: 0.8, volume: 0.08, duration: 0.04, attack: 0.001, decay: 0.02 });
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 6000, Q: 1, volume: 0.04, duration: 0.02, attack: 0.001, decay: 0.01, delay: 0.003 });
         break;
       case 'shield_bash':
-        play('triangle', 180, 0.24, 80, 120, { attack: 3 });  // heavy thud
-        // Metallic ring layer
-        setTimeout(() => {
-          let sb = this._getSfxSlot();
-          if (sb) { sb.osc.setType('sine'); sb.osc.freq(800); sb._vol = 0.14 * vol; sb._peak = sb._vol;
-            sb.gain.amp(0,0); sb.gain.amp(sb._vol, 0.008); this._sfxEnvSmooth(sb, 800, 600, 50, { attack: 2 }); }
-        }, 8);
+        // Heavy metallic impact: noise thud + metallic ring
+        this._playNoise({ type: 'white', filterType: 'lowpass', freq: 600, Q: 3, volume: 0.14, duration: 0.07, attack: 0.001, decay: 0.035 });
+        this._playTone({ freq: 800, freqEnd: 600, volume: 0.08, duration: 0.08, attack: 0.002, decay: 0.04 });
+        this._playNoise({ type: 'brown', filterType: 'bandpass', freq: 250, Q: 4, volume: 0.08, duration: 0.05, attack: 0.001, decay: 0.025, delay: 0.005 });
+        // Metallic overtone ring
+        this._playTone({ freq: 2400, volume: 0.03, duration: 0.15, attack: 0.002, decay: 0.06, delay: 0.005 });
         break;
       case 'player_hurt':
-        play('sine', 150, 0.22, 90, 100, { attack: 3 });  // low filtered grunt
-        // Slight pitch-drop layer for impact feel
-        setTimeout(() => {
-          let sh = this._getSfxSlot();
-          if (sh) { sh.osc.setType('triangle'); sh.osc.freq(120); sh._vol = 0.12 * vol; sh._peak = sh._vol;
-            sh.gain.amp(0,0); sh.gain.amp(sh._vol, 0.005); this._sfxEnvSmooth(sh, 120, 60, 80, { attack: 2 }); }
-        }, 10);
+        // Impact with body: lowpass noise + descending tone
+        this._playNoise({ type: 'white', filterType: 'lowpass', freq: 500, Q: 2, volume: 0.12, duration: 0.06, attack: 0.002, decay: 0.03 });
+        this._playTone({ freq: 150, freqEnd: 90, volume: 0.12, duration: 0.08, attack: 0.002, decay: 0.04 });
+        this._playNoise({ type: 'brown', filterType: 'lowpass', freq: 200, Q: 3, volume: 0.06, duration: 0.06, attack: 0.002, decay: 0.03, delay: 0.008 });
         break;
       case 'skill_unlock':
-        play('sine', 600, 0.18, 600, 30, { attack: 3 });  // ascending chime: note 1
-        setTimeout(() => {
-          let s2 = this._getSfxSlot();
-          if (s2) { s2.osc.setType('sine'); s2.osc.freq(800); s2._vol = 0.18 * vol; s2._peak = s2._vol;
-            s2.gain.amp(0,0); s2.gain.amp(s2._vol, 0.005); this._sfxEnvSmooth(s2, 800, 800, 30, { attack: 3 }); }
-        }, 40);
-        setTimeout(() => {
-          let s3 = this._getSfxSlot();
-          if (s3) { s3.osc.setType('sine'); s3.osc.freq(1000); s3._vol = 0.20 * vol; s3._peak = s3._vol;
-            s3.gain.amp(0,0); s3.gain.amp(s3._vol, 0.005); this._sfxEnvSmooth(s3, 1000, 1000, 40, { attack: 3 }); }
-        }, 80);
-        break;  // 600->800->1000Hz ascending chime
-      // Diving
-      case 'water':     play('sine', 250, 0.16, 120, 300, { attack: 20 }); break;  // splash plunge
-      case 'bubble_pop':play('triangle', 800, 0.18, 1200, 20, { attack: 2 }); break;  // bubble pop
-      // Mining — dull impacts
-      case 'stone_mine': play('sine', 180, 0.22, 120, 80, { attack: 3 }); break;  // deep thud + crumble
-      // Cinematic
-      case 'thunder':
-        play('sine', 45, 0.15, 25, 300, { attack: 10 });  // low rumble, gentler
-        setTimeout(() => {
-          let s2 = this._getSfxSlot();
-          if (s2) { s2.osc.setType('triangle'); s2.osc.freq(70); s2._vol = 0.12 * vol; s2._peak = s2._vol;
-            s2.gain.amp(0,0); s2.gain.amp(s2._vol, 0.01); this._sfxEnvSmooth(s2, 70, 25, 250, { attack: 15 }); }
-        }, 50);
-        break;  // distant thunder rumble
-      case 'seagull':
-        play('sine', 2800, 0.12, 2200, 150, { attack: 8 }); // high descending chirp
-        setTimeout(() => {
-          let s2 = this._getSfxSlot();
-          if (s2) { s2.osc.setType('sine'); s2.osc.freq(2400); s2._vol = 0.10 * vol; s2._peak = s2._vol;
-            s2.gain.amp(0,0); s2.gain.amp(s2._vol, 0.01); this._sfxEnvSmooth(s2, 2400, 1900, 120, { attack: 5 }); }
-        }, 100);
-        break;  // seagull: two-part descending call
-      case 'oar_splash':
-        play('triangle', 200, 0.10, 100, 180, { attack: 10 }); break;  // subtle water splash
-      // Ambient animals
-      case 'chicken_cluck':
-        play('sine', 800, 0.08, 600, 40, { attack: 2 });  // short cluck
-        setTimeout(() => {
-          let sc = this._getSfxSlot();
-          if (sc) { sc.osc.setType('sine'); sc.osc.freq(750); sc._vol = 0.06 * vol; sc._peak = sc._vol;
-            sc.gain.amp(0,0); sc.gain.amp(sc._vol, 0.005); this._sfxEnvSmooth(sc, 750, 550, 35, { attack: 2 }); }
-        }, 50);
-        break;  // two-part cluck
-      case 'cat_meow':
-        play('sine', 700, 0.07, 500, 120, { attack: 10 });  // rising then falling meow
-        setTimeout(() => {
-          let sm = this._getSfxSlot();
-          if (sm) { sm.osc.setType('sine'); sm.osc.freq(600); sm._vol = 0.06 * vol; sm._peak = sm._vol;
-            sm.gain.amp(0,0); sm.gain.amp(sm._vol, 0.008); this._sfxEnvSmooth(sm, 600, 400, 100, { attack: 8 }); }
-        }, 80);
-        break;  // soft descending meow
-      case 'skeleton_death':
-        play('triangle', 200, 0.18, 80, 200, { attack: 5 });  // crumble
-        setTimeout(() => {
-          let sd = this._getSfxSlot();
-          if (sd) { sd.osc.setType('sine'); sd.osc.freq(120); sd._vol = 0.12 * vol; sd._peak = sd._vol;
-            sd.gain.amp(0,0); sd.gain.amp(sd._vol, 0.005); this._sfxEnvSmooth(sd, 120, 60, 150, { attack: 3 }); }
-        }, 60);
+        // Ascending chime with sparkle noise on each note
+        this._playTone({ freq: 600, volume: 0.12, duration: 0.08, attack: 0.003 });
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 6000, Q: 1, volume: 0.02, duration: 0.03, attack: 0.001, decay: 0.015 });
+        this._playTone({ freq: 800, volume: 0.12, duration: 0.08, attack: 0.003, delay: 0.04 });
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 7000, Q: 1, volume: 0.02, duration: 0.03, attack: 0.001, decay: 0.015, delay: 0.04 });
+        this._playTone({ freq: 1000, volume: 0.14, duration: 0.12, attack: 0.003, delay: 0.08 });
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 8000, Q: 1, volume: 0.025, duration: 0.04, attack: 0.001, decay: 0.02, delay: 0.08 });
         break;
+
+      // ═══ Diving — water with real splash textures ═══
+      case 'water':
+        // Splash plunge: noise sweep high→low + resonant plop
+        this._playNoise({ type: 'white', filterType: 'lowpass', freq: 3000, freqEnd: 300, Q: 1.5, volume: 0.10, duration: 0.2, attack: 0.005, decay: 0.08 });
+        this._playTone({ freq: 250, freqEnd: 120, volume: 0.10, duration: 0.25, attack: 0.01, decay: 0.1 });
+        // Underwater resonance
+        this._playNoise({ type: 'brown', filterType: 'bandpass', freq: 200, Q: 3, volume: 0.06, duration: 0.15, attack: 0.02, decay: 0.06, delay: 0.08 });
+        break;
+      case 'bubble_pop':
+        // Bubble: short bandpass burst rising in pitch
+        this._playTone({ freq: 800, freqEnd: 1200, volume: 0.10, duration: 0.025, attack: 0.001, decay: 0.012 });
+        this._playNoise({ type: 'white', filterType: 'bandpass', freq: 3000, Q: 4, volume: 0.06, duration: 0.015, attack: 0.001, decay: 0.008 });
+        break;
+
+      // ═══ Mining — dull impacts with crumble ═══
+      case 'stone_mine':
+        // Pick hitting stone: noise crack + resonant thud + debris crumble
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 3000, Q: 1.5, volume: 0.08, duration: 0.03, attack: 0.001, decay: 0.015 });
+        this._playTone({ freq: 180, freqEnd: 120, volume: 0.14, duration: 0.07, attack: 0.002, decay: 0.035 });
+        this._playNoise({ type: 'brown', filterType: 'lowpass', freq: 400, Q: 2, volume: 0.08, duration: 0.06, attack: 0.002, decay: 0.03 });
+        // Debris crumble
+        this._playNoise({ type: 'white', filterType: 'bandpass', freq: 1500, Q: 1, volume: 0.04, duration: 0.1, attack: 0.01, decay: 0.04, delay: 0.03 });
+        break;
+
+      // ═══ Cinematic ═══
+      case 'thunder':
+        // Real thunder: long noise sweep with sub-bass rumble + crackle bursts
+        this._playNoise({ type: 'brown', filterType: 'lowpass', freq: 120, Q: 3, volume: 0.12, duration: 0.6, attack: 0.02, decay: 0.25 });
+        this._playTone({ freq: 45, freqEnd: 25, volume: 0.10, duration: 0.5, attack: 0.01, decay: 0.2 });
+        // Mid rumble layer
+        this._playNoise({ type: 'brown', filterType: 'bandpass', freq: 200, Q: 1.5, volume: 0.06, duration: 0.4, attack: 0.03, decay: 0.15, delay: 0.05 });
+        // Crackle bursts — rapid short noise hits
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 2000, Q: 1, volume: 0.05, duration: 0.02, attack: 0.001, decay: 0.01, delay: 0.01 });
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 2500, Q: 1, volume: 0.04, duration: 0.015, attack: 0.001, decay: 0.008, delay: 0.04 });
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 1800, Q: 1.5, volume: 0.04, duration: 0.02, attack: 0.001, decay: 0.01, delay: 0.08 });
+        break;
+      case 'seagull':
+        // Seagull cry: two-part sine sweep with noise breath
+        this._playTone({ freq: 2800, freqEnd: 2200, volume: 0.08, duration: 0.12, attack: 0.005, decay: 0.04 });
+        this._playNoise({ type: 'white', filterType: 'bandpass', freq: 3000, Q: 3, volume: 0.03, duration: 0.08, attack: 0.003, decay: 0.03 });
+        this._playTone({ freq: 2400, freqEnd: 1900, volume: 0.06, duration: 0.10, attack: 0.005, decay: 0.04, delay: 0.08 });
+        this._playNoise({ type: 'white', filterType: 'bandpass', freq: 2500, Q: 3, volume: 0.02, duration: 0.06, attack: 0.003, decay: 0.025, delay: 0.08 });
+        break;
+      case 'oar_splash':
+        // Oar entering water: noise splash + tonal plop
+        this._playNoise({ type: 'white', filterType: 'lowpass', freq: 1500, freqEnd: 400, Q: 1.5, volume: 0.06, duration: 0.12, attack: 0.005, decay: 0.05 });
+        this._playTone({ type: 'triangle', freq: 200, freqEnd: 100, volume: 0.06, duration: 0.14, attack: 0.008, decay: 0.05 });
+        break;
+
+      // ═══ Ambient animals ═══
+      case 'chicken_cluck':
+        // Two-part cluck with noise texture
+        this._playTone({ freq: 800, freqEnd: 600, volume: 0.05, duration: 0.035, attack: 0.001, decay: 0.015 });
+        this._playNoise({ type: 'white', filterType: 'bandpass', freq: 2000, Q: 3, volume: 0.02, duration: 0.02, attack: 0.001, decay: 0.01 });
+        this._playTone({ freq: 750, freqEnd: 550, volume: 0.04, duration: 0.03, attack: 0.001, decay: 0.012, delay: 0.04 });
+        this._playNoise({ type: 'white', filterType: 'bandpass', freq: 1800, Q: 3, volume: 0.015, duration: 0.015, attack: 0.001, decay: 0.008, delay: 0.04 });
+        break;
+      case 'cat_meow':
+        // Meow: sweeping tone with noise breath
+        this._playTone({ freq: 700, freqEnd: 500, volume: 0.05, duration: 0.1, attack: 0.008, decay: 0.04 });
+        this._playNoise({ type: 'white', filterType: 'bandpass', freq: 2500, Q: 2, volume: 0.02, duration: 0.08, attack: 0.005, decay: 0.03 });
+        this._playTone({ freq: 600, freqEnd: 400, volume: 0.04, duration: 0.08, attack: 0.005, decay: 0.03, delay: 0.06 });
+        break;
+      case 'crow_caw':
+        // Crow: harsh descending tone with noise rasp
+        this._playTone({ type: 'sawtooth', freq: 400, freqEnd: 200, volume: 0.05, duration: 0.15, attack: 0.005, decay: 0.06 });
+        this._playNoise({ type: 'white', filterType: 'bandpass', freq: 1200, Q: 2, volume: 0.04, duration: 0.12, attack: 0.003, decay: 0.05 });
+        break;
+      case 'tortoise_blip':
+        this._playTone({ freq: 150, freqEnd: 140, volume: 0.03, duration: 0.05, attack: 0.003, decay: 0.02 });
+        this._playNoise({ type: 'brown', filterType: 'bandpass', freq: 300, Q: 3, volume: 0.01, duration: 0.03, attack: 0.002, decay: 0.015 });
+        break;
+      case 'skeleton_death':
+        // Bone crumble: noise cascade + descending thud
+        this._playNoise({ type: 'white', filterType: 'bandpass', freq: 1500, Q: 1.5, volume: 0.10, duration: 0.15, attack: 0.003, decay: 0.06 });
+        this._playTone({ type: 'triangle', freq: 200, freqEnd: 80, volume: 0.10, duration: 0.18, attack: 0.003, decay: 0.08 });
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 3000, Q: 1, volume: 0.05, duration: 0.1, attack: 0.005, decay: 0.04, delay: 0.04 });
+        this._playNoise({ type: 'brown', filterType: 'lowpass', freq: 200, Q: 2, volume: 0.06, duration: 0.12, attack: 0.005, decay: 0.05, delay: 0.05 });
+        break;
+
+      // ═══ Time/Season transitions ═══
       case 'season_change':
-        playTwo('sine', 440, 660, 0.14, 500, 180);  // A4->E5 soft chime
-        setTimeout(() => playTwo('sine', 523, 784, 0.12, 400, 150), 200);
+        this._playTone({ freq: 440, volume: 0.10, duration: 0.35, attack: 0.015, decay: 0.12 });
+        this._playTone({ freq: 660, volume: 0.10, duration: 0.30, attack: 0.02, delay: 0.15 });
+        this._playTone({ freq: 523, volume: 0.08, duration: 0.30, attack: 0.02, delay: 0.30 });
+        this._playTone({ freq: 784, volume: 0.08, duration: 0.28, attack: 0.02, delay: 0.42 });
+        // Ambient shimmer
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 6000, Q: 0.5, volume: 0.02, duration: 0.3, attack: 0.03, decay: 0.12, delay: 0.1 });
         break;
       case 'dawn_transition':
-        // Rising birdsong-like chirp sequence: 4 ascending pips
-        play('sine', 880, 0.10, 1100, 150, { attack: 15 });
-        setTimeout(() => play('sine', 1047, 0.09, 1200, 140, { attack: 12 }), 180);
-        setTimeout(() => play('sine', 1175, 0.08, 1320, 130, { attack: 10 }), 350);
-        setTimeout(() => playTwo('sine', 1320, 1568, 0.07, 250, 100), 520);
+        // Rising birdsong-like chirps with breath noise
+        this._playTone({ freq: 880, freqEnd: 1100, volume: 0.07, duration: 0.12, attack: 0.01 });
+        this._playNoise({ type: 'white', filterType: 'bandpass', freq: 4000, Q: 2, volume: 0.02, duration: 0.06, attack: 0.005, decay: 0.03 });
+        this._playTone({ freq: 1047, freqEnd: 1200, volume: 0.06, duration: 0.11, attack: 0.008, delay: 0.15 });
+        this._playTone({ freq: 1175, freqEnd: 1320, volume: 0.05, duration: 0.10, attack: 0.008, delay: 0.30 });
+        this._playTone({ freq: 1320, volume: 0.05, duration: 0.18, attack: 0.01, delay: 0.44 });
+        this._playTone({ freq: 1568, volume: 0.04, duration: 0.15, attack: 0.012, delay: 0.50 });
         break;
       case 'dusk_transition':
-        // Soft descending tone: 3 falling notes, warm and quiet
-        play('sine', 660, 0.08, 550, 200, { attack: 20 });
-        setTimeout(() => play('sine', 523, 0.07, 440, 220, { attack: 18 }), 250);
-        setTimeout(() => play('sine', 392, 0.06, 330, 300, { attack: 25 }), 500);
+        // Soft descending tones with warm noise
+        this._playTone({ freq: 660, freqEnd: 550, volume: 0.06, duration: 0.18, attack: 0.015, decay: 0.07 });
+        this._playTone({ freq: 523, freqEnd: 440, volume: 0.05, duration: 0.20, attack: 0.015, delay: 0.20 });
+        this._playTone({ freq: 392, freqEnd: 330, volume: 0.04, duration: 0.25, attack: 0.02, delay: 0.42 });
+        this._playNoise({ type: 'brown', filterType: 'bandpass', freq: 600, Q: 0.5, volume: 0.015, duration: 0.3, attack: 0.03, decay: 0.12, delay: 0.1 });
         break;
       case 'dusk_lanterns':
-        // 3 gentle descending lyre notes: D5, A4, F#4 — going-home feeling
-        play('sine', 587, 0.07, 550, 350, { attack: 30 });   // D5
-        setTimeout(() => play('sine', 440, 0.06, 420, 400, { attack: 25 }), 400);  // A4
-        setTimeout(() => play('sine', 370, 0.05, 350, 500, { attack: 30 }), 850);  // F#4
+        this._playTone({ freq: 587, freqEnd: 550, volume: 0.05, duration: 0.30, attack: 0.025, decay: 0.1 });
+        this._playTone({ freq: 440, freqEnd: 420, volume: 0.04, duration: 0.35, attack: 0.02, delay: 0.35 });
+        this._playTone({ freq: 370, freqEnd: 350, volume: 0.035, duration: 0.40, attack: 0.025, delay: 0.75 });
         break;
+
+      // ═══ Festival / Economy / Quests ═══
       case 'festival_start':
-        playTwo('sine', 523, 784, 0.20, 400, 150);  // C5->G5 bright
-        setTimeout(() => playTwo('sine', 659, 988, 0.18, 350, 130), 150);
-        setTimeout(() => playTwo('sine', 784, 1175, 0.16, 300, 120), 300);
+        this._playTone({ freq: 523, volume: 0.14, duration: 0.15, attack: 0.008 });
+        this._playTone({ freq: 784, volume: 0.12, duration: 0.15, attack: 0.01, delay: 0.06 });
+        this._playTone({ freq: 659, volume: 0.12, duration: 0.14, attack: 0.01, delay: 0.12 });
+        this._playTone({ freq: 988, volume: 0.10, duration: 0.14, attack: 0.012, delay: 0.18 });
+        this._playTone({ freq: 784, volume: 0.10, duration: 0.12, attack: 0.012, delay: 0.24 });
+        this._playTone({ freq: 1175, volume: 0.08, duration: 0.20, attack: 0.015, delay: 0.30 });
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 5000, Q: 0.5, volume: 0.03, duration: 0.15, attack: 0.01, decay: 0.06, delay: 0.25 });
         break;
       case 'purchase':
-        playTwo('sine', 440, 660, 0.16, 250, 100);  // cash register feel
+        this._playTone({ freq: 440, volume: 0.10, duration: 0.18, attack: 0.008 });
+        this._playTone({ freq: 660, volume: 0.12, duration: 0.18, attack: 0.01, delay: 0.08 });
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 4000, Q: 1, volume: 0.03, duration: 0.02, attack: 0.001, decay: 0.01 });
         break;
       case 'quest_progress':
-        play('sine', 600, 0.14, 800, 200, { attack: 10 });  // rising pip
+        this._playTone({ freq: 600, freqEnd: 800, volume: 0.10, duration: 0.16, attack: 0.008, decay: 0.06 });
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 5000, Q: 1, volume: 0.02, duration: 0.04, attack: 0.002, decay: 0.02 });
         break;
       case 'upgrade':
-        playTwo('sine', 660, 880, 0.18, 350, 120);  // E5->A5 ascending confirmation
-        setTimeout(() => {
-          let su = this._getSfxSlot();
-          if (su) { su.osc.setType('sine'); su.osc.freq(1047); su._vol = 0.16 * vol; su._peak = su._vol;
-            su.gain.amp(0,0); su.gain.amp(su._vol, 0.01); this._sfxEnvSmooth(su, 1047, 1047, 300, { attack: 8 }); }
-        }, 240);
-        break;  // E5->A5->C6 ascending triad
+        this._playTone({ freq: 660, volume: 0.12, duration: 0.15, attack: 0.008 });
+        this._playTone({ freq: 880, volume: 0.12, duration: 0.15, attack: 0.01, delay: 0.10 });
+        this._playTone({ freq: 1047, volume: 0.10, duration: 0.25, attack: 0.012, delay: 0.20 });
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 6000, Q: 0.5, volume: 0.025, duration: 0.06, attack: 0.003, decay: 0.03, delay: 0.20 });
+        break;
       case 'hover':
-        play('sine', 880, 0.06, 660, 40, { attack: 3 }); break;  // subtle high pip
-      case 'step_grass':
-        { let p20 = 1 + (random() - 0.5) * 0.4; play('triangle', 180 * p20, 0.05, 100 * p20, 65, { attack: 5 }); break; }  // soft rustle +/- 20%
-      case 'step_water':
-        { let p20 = 1 + (random() - 0.5) * 0.4; play('sine', 200 * p20, 0.08, 120 * p20, 90, { attack: 8 }); break; }  // light splash +/- 20%
-      // New SFX: level up fanfare — triumphant 4-note ascending D major arpeggio
+        this._playTone({ freq: 880, freqEnd: 660, volume: 0.04, duration: 0.03, attack: 0.002, decay: 0.015 });
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 6000, Q: 1, volume: 0.015, duration: 0.01, attack: 0.001, decay: 0.005 });
+        break;
+
+      // ═══ Level up / Achievement / Era ═══
       case 'level_up':
-        play('sine', 293.7, 0.22, 293.7, 200, { attack: 15 });  // D4
-        setTimeout(() => {
-          let s2 = this._getSfxSlot();
-          if (s2) { s2.osc.setType('sine'); s2.osc.freq(440); s2._vol = 0.22 * vol; s2._peak = s2._vol;
-            s2.gain.amp(0,0); s2.gain.amp(s2._vol, 0.015); this._sfxEnvSmooth(s2, 440, 440, 200, {}); }
-        }, 150);
-        setTimeout(() => {
-          let s3 = this._getSfxSlot();
-          if (s3) { s3.osc.setType('sine'); s3.osc.freq(587.3); s3._vol = 0.24 * vol; s3._peak = s3._vol;
-            s3.gain.amp(0,0); s3.gain.amp(s3._vol, 0.015); this._sfxEnvSmooth(s3, 587.3, 587.3, 200, {}); }
-        }, 300);
-        setTimeout(() => {
-          let s4 = this._getSfxSlot();
-          if (s4) { s4.osc.setType('sine'); s4.osc.freq(880); s4._vol = 0.26 * vol; s4._peak = s4._vol;
-            s4.gain.amp(0,0); s4.gain.amp(s4._vol, 0.015); this._sfxEnvSmooth(s4, 880, 880, 400, {}); }
-        }, 450);
+        // Triumphant D major arpeggio with noise sparkle
+        this._playTone({ freq: 293.7, volume: 0.14, duration: 0.18, attack: 0.01 });
+        this._playTone({ freq: 440, volume: 0.14, duration: 0.18, attack: 0.012, delay: 0.12 });
+        this._playTone({ freq: 587.3, volume: 0.16, duration: 0.18, attack: 0.012, delay: 0.24 });
+        this._playTone({ freq: 880, volume: 0.18, duration: 0.35, attack: 0.015, delay: 0.36 });
+        // Sparkle noise on each note
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 5000, Q: 0.5, volume: 0.02, duration: 0.03, attack: 0.001, decay: 0.015 });
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 6000, Q: 0.5, volume: 0.02, duration: 0.03, attack: 0.001, decay: 0.015, delay: 0.12 });
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 7000, Q: 0.5, volume: 0.025, duration: 0.04, attack: 0.001, decay: 0.02, delay: 0.36 });
         break;
-      // Achievement unlock: bright sparkle arpeggio (fast ascending + shimmer)
       case 'achievement':
-        play('sine', 880, 0.16, 880, 60, { attack: 3 });
-        setTimeout(() => {
-          let s2 = this._getSfxSlot();
-          if (s2) { s2.osc.setType('sine'); s2.osc.freq(1047); s2._vol = 0.16 * vol; s2._peak = s2._vol;
-            s2.gain.amp(0,0); s2.gain.amp(s2._vol, 0.008); this._sfxEnvSmooth(s2, 1047, 1047, 60, { attack: 3 }); }
-        }, 50);
-        setTimeout(() => {
-          let s3 = this._getSfxSlot();
-          if (s3) { s3.osc.setType('sine'); s3.osc.freq(1319); s3._vol = 0.18 * vol; s3._peak = s3._vol;
-            s3.gain.amp(0,0); s3.gain.amp(s3._vol, 0.008); this._sfxEnvSmooth(s3, 1319, 1319, 80, { attack: 3 }); }
-        }, 100);
-        setTimeout(() => {
-          let s4 = this._getSfxSlot();
-          if (s4) { s4.osc.setType('sine'); s4.osc.freq(1760); s4._vol = 0.14 * vol; s4._peak = s4._vol;
-            s4.gain.amp(0,0); s4.gain.amp(s4._vol, 0.005); this._sfxEnvSmooth(s4, 1760, 1760, 350, { attack: 3 }); }
-        }, 150);
+        // Fast ascending sparkle arpeggio
+        this._playTone({ freq: 880, volume: 0.10, duration: 0.06, attack: 0.002 });
+        this._playTone({ freq: 1047, volume: 0.10, duration: 0.06, attack: 0.002, delay: 0.04 });
+        this._playTone({ freq: 1319, volume: 0.12, duration: 0.08, attack: 0.003, delay: 0.08 });
+        this._playTone({ freq: 1760, volume: 0.10, duration: 0.30, attack: 0.003, delay: 0.12 });
+        // Shimmer: detuned pair for beating
+        this._playTone({ freq: 1764, volume: 0.06, duration: 0.25, attack: 0.005, delay: 0.12 });
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 8000, Q: 1, volume: 0.025, duration: 0.1, attack: 0.005, decay: 0.04, delay: 0.12 });
         break;
-      // Era transition: dramatic swell — low rumble rising to bright chord
       case 'era_transition':
-        play('triangle', 110, 0.20, 220, 600, { attack: 200 });  // rising bass
-        setTimeout(() => {
-          let s2 = this._getSfxSlot();
-          if (s2) { s2.osc.setType('sine'); s2.osc.freq(440); s2._vol = 0.22 * vol; s2._peak = s2._vol;
-            s2.gain.amp(0,0); s2.gain.amp(s2._vol, 0.15); this._sfxEnvSmooth(s2, 440, 440, 500, { attack: 150 }); }
-        }, 200);
-        setTimeout(() => {
-          let s3 = this._getSfxSlot();
-          if (s3) { s3.osc.setType('sine'); s3.osc.freq(587.3); s3._vol = 0.20 * vol; s3._peak = s3._vol;
-            s3.gain.amp(0,0); s3.gain.amp(s3._vol, 0.12); this._sfxEnvSmooth(s3, 587.3, 587.3, 450, { attack: 120 }); }
-        }, 350);
-        setTimeout(() => {
-          let s4 = this._getSfxSlot();
-          if (s4) { s4.osc.setType('sine'); s4.osc.freq(880); s4._vol = 0.18 * vol; s4._peak = s4._vol;
-            s4.gain.amp(0,0); s4.gain.amp(s4._vol, 0.10); this._sfxEnvSmooth(s4, 880, 880, 500, { attack: 100 }); }
-        }, 500);
+        // Dramatic swell: noise rumble rising to bright chord
+        this._playNoise({ type: 'brown', filterType: 'lowpass', freq: 80, freqEnd: 200, Q: 3, volume: 0.10, duration: 0.6, attack: 0.15, decay: 0.2 });
+        this._playTone({ type: 'triangle', freq: 110, freqEnd: 220, volume: 0.12, duration: 0.55, attack: 0.15, decay: 0.15 });
+        this._playTone({ freq: 440, volume: 0.12, duration: 0.45, attack: 0.12, delay: 0.15 });
+        this._playTone({ freq: 587.3, volume: 0.10, duration: 0.40, attack: 0.10, delay: 0.28 });
+        this._playTone({ freq: 880, volume: 0.10, duration: 0.40, attack: 0.08, delay: 0.40 });
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 4000, Q: 0.5, volume: 0.03, duration: 0.2, attack: 0.03, decay: 0.08, delay: 0.40 });
         break;
-      // Crystal resonance: ethereal shimmer — two detuned high sines beating
+
+      // ═══ Crystal / Magic ═══
       case 'crystal_resonance':
-        play('sine', 1047, 0.14, 1047, 600, { attack: 30 });
-        setTimeout(() => {
-          let s2 = this._getSfxSlot();
-          if (s2) { s2.osc.setType('sine'); s2.osc.freq(1052); s2._vol = 0.12 * vol; s2._peak = s2._vol;
-            s2.gain.amp(0,0); s2.gain.amp(s2._vol, 0.03); this._sfxEnvSmooth(s2, 1052, 1048, 600, { attack: 30 }); }
-        }, 5);
-        setTimeout(() => {
-          let s3 = this._getSfxSlot();
-          if (s3) { s3.osc.setType('sine'); s3.osc.freq(1568); s3._vol = 0.08 * vol; s3._peak = s3._vol;
-            s3.gain.amp(0,0); s3.gain.amp(s3._vol, 0.05); this._sfxEnvSmooth(s3, 1568, 1575, 500, { attack: 50 }); }
-        }, 100);
-        break;
-      // Legion march: rhythmic stomping — low thumps in march tempo
-      case 'legion_march':
-        play('triangle', 80, 0.22, 50, 100, { attack: 5 });  // STOMP
-        setTimeout(() => {
-          let s2 = this._getSfxSlot();
-          if (s2) { s2.osc.setType('triangle'); s2.osc.freq(75); s2._vol = 0.18 * vol; s2._peak = s2._vol;
-            s2.gain.amp(0,0); s2.gain.amp(s2._vol, 0.005); this._sfxEnvSmooth(s2, 75, 45, 90, { attack: 5 }); }
-        }, 200);
-        setTimeout(() => {
-          let s3 = this._getSfxSlot();
-          if (s3) { s3.osc.setType('triangle'); s3.osc.freq(80); s3._vol = 0.22 * vol; s3._peak = s3._vol;
-            s3.gain.amp(0,0); s3.gain.amp(s3._vol, 0.005); this._sfxEnvSmooth(s3, 80, 50, 100, { attack: 5 }); }
-        }, 400);
-        setTimeout(() => {
-          let s4 = this._getSfxSlot();
-          if (s4) { s4.osc.setType('triangle'); s4.osc.freq(75); s4._vol = 0.18 * vol; s4._peak = s4._vol;
-            s4.gain.amp(0,0); s4.gain.amp(s4._vol, 0.005); this._sfxEnvSmooth(s4, 75, 45, 90, { attack: 5 }); }
-        }, 600);
-        break;
-      case 'visitor_arrive':
-        playTwo('sine', 523, 659, 0.16, 300, 120);  // C5->E5 welcoming major third
-        setTimeout(() => {
-          let sv = this._getSfxSlot();
-          if (sv) { sv.osc.setType('sine'); sv.osc.freq(784); sv._vol = 0.14 * vol; sv._peak = sv._vol;
-            sv.gain.amp(0,0); sv.gain.amp(sv._vol, 0.01); this._sfxEnvSmooth(sv, 784, 784, 350, { attack: 10 }); }
-        }, 220);
+        // Ethereal shimmer: detuned sines beating + high noise sparkle
+        this._playTone({ freq: 1047, volume: 0.08, duration: 0.55, attack: 0.025, decay: 0.15 });
+        this._playTone({ freq: 1052, volume: 0.06, duration: 0.50, attack: 0.03, decay: 0.12 }); // 5Hz beat
+        this._playTone({ freq: 1568, volume: 0.05, duration: 0.40, attack: 0.04, decay: 0.12, delay: 0.08 });
+        this._playTone({ freq: 1575, volume: 0.03, duration: 0.35, attack: 0.045, delay: 0.08 }); // beat
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 8000, Q: 1.5, volume: 0.02, duration: 0.3, attack: 0.02, decay: 0.1 });
         break;
       case 'crystal_charge':
-        play('sine', 880, 0.16, 1320, 400, { attack: 30 });  // rising shimmer
-        setTimeout(() => {
-          let sc = this._getSfxSlot();
-          if (sc) { sc.osc.setType('sine'); sc.osc.freq(885); sc._vol = 0.12 * vol; sc._peak = sc._vol;
-            sc.gain.amp(0,0); sc.gain.amp(sc._vol, 0.03); this._sfxEnvSmooth(sc, 885, 1325, 400, { attack: 30 }); }
-        }, 5);
+        // Rising shimmer with detuned pair
+        this._playTone({ freq: 880, freqEnd: 1320, volume: 0.10, duration: 0.35, attack: 0.025, decay: 0.1 });
+        this._playTone({ freq: 885, freqEnd: 1325, volume: 0.07, duration: 0.35, attack: 0.03, decay: 0.1 });
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 6000, freqEnd: 10000, Q: 1, volume: 0.025, duration: 0.3, attack: 0.02, decay: 0.1 });
         break;
-      // NPC interaction sounds
+
+      // ═══ Legion / March ═══
+      case 'legion_march':
+        // Marching stomps with ground impact noise
+        this._playTone({ type: 'triangle', freq: 80, freqEnd: 50, volume: 0.14, duration: 0.08, attack: 0.003, decay: 0.04 });
+        this._playNoise({ type: 'brown', filterType: 'lowpass', freq: 120, Q: 3, volume: 0.10, duration: 0.06, attack: 0.002, decay: 0.03 });
+        // Second stomp
+        this._playTone({ type: 'triangle', freq: 75, freqEnd: 45, volume: 0.12, duration: 0.07, attack: 0.003, decay: 0.035, delay: 0.16 });
+        this._playNoise({ type: 'brown', filterType: 'lowpass', freq: 110, Q: 3, volume: 0.08, duration: 0.05, attack: 0.002, decay: 0.025, delay: 0.16 });
+        // Third stomp
+        this._playTone({ type: 'triangle', freq: 80, freqEnd: 50, volume: 0.14, duration: 0.08, attack: 0.003, decay: 0.04, delay: 0.33 });
+        this._playNoise({ type: 'brown', filterType: 'lowpass', freq: 120, Q: 3, volume: 0.10, duration: 0.06, attack: 0.002, decay: 0.03, delay: 0.33 });
+        // Fourth stomp
+        this._playTone({ type: 'triangle', freq: 75, freqEnd: 45, volume: 0.12, duration: 0.07, attack: 0.003, decay: 0.035, delay: 0.50 });
+        this._playNoise({ type: 'brown', filterType: 'lowpass', freq: 110, Q: 3, volume: 0.08, duration: 0.05, attack: 0.002, decay: 0.025, delay: 0.50 });
+        break;
+
+      // ═══ NPC / Visitor / Dialogue ═══
+      case 'visitor_arrive':
+        this._playTone({ freq: 523, volume: 0.10, duration: 0.2, attack: 0.01 });
+        this._playTone({ freq: 659, volume: 0.10, duration: 0.2, attack: 0.012, delay: 0.10 });
+        this._playTone({ freq: 784, volume: 0.08, duration: 0.28, attack: 0.012, delay: 0.20 });
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 5000, Q: 0.5, volume: 0.02, duration: 0.04, attack: 0.002, decay: 0.02, delay: 0.15 });
+        break;
       case 'dialogue_open':
-        play('sine', 440, 0.10, 494, 180, { attack: 20 }); break;  // gentle rising tone (A4->B4)
+        this._playTone({ freq: 440, freqEnd: 494, volume: 0.06, duration: 0.15, attack: 0.015, decay: 0.05 });
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 4000, Q: 1, volume: 0.015, duration: 0.03, attack: 0.003, decay: 0.015 });
+        break;
       case 'gift_accepted':
-        playTwo('sine', 440, 554, 0.16, 280, 100);  // warm ascending A4->C#5
-        setTimeout(() => {
-          let sg = this._getSfxSlot();
-          if (sg) { sg.osc.setType('sine'); sg.osc.freq(659); sg._vol = 0.14 * vol; sg._peak = sg._vol;
-            sg.gain.amp(0,0); sg.gain.amp(sg._vol, 0.01); this._sfxEnvSmooth(sg, 659, 659, 300, { attack: 10 }); }
-        }, 200);
-        break;  // A4->C#5->E5 warm major triad
+        this._playTone({ freq: 440, volume: 0.10, duration: 0.2, attack: 0.01 });
+        this._playTone({ freq: 554, volume: 0.10, duration: 0.2, attack: 0.012, delay: 0.08 });
+        this._playTone({ freq: 659, volume: 0.08, duration: 0.25, attack: 0.012, delay: 0.16 });
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 5000, Q: 0.5, volume: 0.02, duration: 0.04, attack: 0.002, decay: 0.02, delay: 0.10 });
+        break;
       case 'favor_up':
-        play('sine', 784, 0.14, 784, 100, { attack: 8 });  // satisfying chime G5
-        setTimeout(() => {
-          let sf = this._getSfxSlot();
-          if (sf) { sf.osc.setType('sine'); sf.osc.freq(988); sf._vol = 0.14 * vol; sf._peak = sf._vol;
-            sf.gain.amp(0,0); sf.gain.amp(sf._vol, 0.008); this._sfxEnvSmooth(sf, 988, 988, 120, { attack: 5 }); }
-        }, 80);
-        setTimeout(() => {
-          let sf2 = this._getSfxSlot();
-          if (sf2) { sf2.osc.setType('sine'); sf2.osc.freq(1175); sf2._vol = 0.12 * vol; sf2._peak = sf2._vol;
-            sf2.gain.amp(0,0); sf2.gain.amp(sf2._vol, 0.008); this._sfxEnvSmooth(sf2, 1175, 1175, 300, { attack: 8 }); }
-        }, 160);
-        break;  // G5->B5->D6 bright ascending chime
-      // Building interaction — door creak (descending filtered square 200→80Hz)
+        this._playTone({ freq: 784, volume: 0.10, duration: 0.10, attack: 0.005 });
+        this._playTone({ freq: 988, volume: 0.10, duration: 0.10, attack: 0.005, delay: 0.06 });
+        this._playTone({ freq: 1175, volume: 0.08, duration: 0.25, attack: 0.008, delay: 0.13 });
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 7000, Q: 1, volume: 0.02, duration: 0.05, attack: 0.002, decay: 0.02, delay: 0.13 });
+        break;
+
+      // ═══ Building interaction ═══
       case 'door_creak':
-        play('square', 200, 0.12, 80, 150, { attack: 8 }); break;
-      // Coin clink — short metallic ping (2000Hz sine, fast decay)
+        // Creak: filtered noise sweep + descending tone
+        this._playNoise({ type: 'brown', filterType: 'bandpass', freq: 800, freqEnd: 300, Q: 4, volume: 0.06, duration: 0.12, attack: 0.005, decay: 0.05 });
+        this._playTone({ type: 'sawtooth', freq: 200, freqEnd: 80, volume: 0.06, duration: 0.12, attack: 0.005, decay: 0.05 });
+        break;
+
+      // ═══ Coin / Purchase ═══
       case 'coin_clink':
-        play('sine', 2000, 0.14, 1600, 60, { attack: 2 });
-        setTimeout(() => {
-          let sc = this._getSfxSlot();
-          if (sc) { sc.osc.setType('sine'); sc.osc.freq(2400); sc._vol = 0.08 * vol; sc._peak = sc._vol;
-            sc.gain.amp(0,0); sc.gain.amp(sc._vol, 0.003); this._sfxEnvSmooth(sc, 2400, 2000, 40, { attack: 2 }); }
-        }, 15);
-        break;  // metallic ping + overtone shimmer
-      // Milestone jingle — D4-F#4-A4-D5 ascending triangle fanfare
+        // Metallic ping with harmonic overtones + noise shimmer
+        this._playTone({ freq: 2000, freqEnd: 1600, volume: 0.08, duration: 0.05, attack: 0.001, decay: 0.025 });
+        this._playTone({ freq: 2400, freqEnd: 2000, volume: 0.04, duration: 0.035, attack: 0.001, decay: 0.018, delay: 0.01 });
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 8000, Q: 2, volume: 0.03, duration: 0.02, attack: 0.001, decay: 0.01 });
+        break;
+
+      // ═══ Milestone / Level milestones ═══
       case 'milestone':
-        play('triangle', 293.7, 0.22, 293.7, 100, { attack: 8 });  // D4
-        setTimeout(() => {
-          let s2 = this._getSfxSlot();
-          if (s2) { s2.osc.setType('triangle'); s2.osc.freq(370); s2._vol = 0.22 * vol; s2._peak = s2._vol;
-            s2.gain.amp(0,0); s2.gain.amp(s2._vol, 0.008); this._sfxEnvSmooth(s2, 370, 370, 100, { attack: 8 }); }
-        }, 100);  // F#4
-        setTimeout(() => {
-          let s3 = this._getSfxSlot();
-          if (s3) { s3.osc.setType('triangle'); s3.osc.freq(440); s3._vol = 0.24 * vol; s3._peak = s3._vol;
-            s3.gain.amp(0,0); s3.gain.amp(s3._vol, 0.008); this._sfxEnvSmooth(s3, 440, 440, 100, { attack: 8 }); }
-        }, 200);  // A4
-        setTimeout(() => {
-          let s4 = this._getSfxSlot();
-          if (s4) { s4.osc.setType('triangle'); s4.osc.freq(587.3); s4._vol = 0.26 * vol; s4._peak = s4._vol;
-            s4.gain.amp(0,0); s4.gain.amp(s4._vol, 0.008); this._sfxEnvSmooth(s4, 587.3, 587.3, 300, { attack: 8 }); }
-        }, 300);  // D5 — held longer for triumphant finish
+        // D4-F#4-A4-D5 ascending triangle fanfare with noise sparkle
+        this._playTone({ type: 'triangle', freq: 293.7, volume: 0.14, duration: 0.10, attack: 0.005 });
+        this._playTone({ type: 'triangle', freq: 370, volume: 0.14, duration: 0.10, attack: 0.005, delay: 0.08 });
+        this._playTone({ type: 'triangle', freq: 440, volume: 0.16, duration: 0.10, attack: 0.006, delay: 0.16 });
+        this._playTone({ type: 'triangle', freq: 587.3, volume: 0.18, duration: 0.25, attack: 0.006, delay: 0.24 });
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 5000, Q: 0.5, volume: 0.025, duration: 0.08, attack: 0.003, decay: 0.04, delay: 0.24 });
         break;
-      // Home sunrise: sustained warm D major chord (D4, F#4, A4)
+
+      // ═══ Home sunrise ═══
       case 'home_sunrise_chord':
-        play('sine', 293.7, 0.14, 293.7, 2500, { attack: 400 });  // D4
-        setTimeout(() => {
-          let s2 = this._getSfxSlot();
-          if (s2) { s2.osc.setType('sine'); s2.osc.freq(370); s2._vol = 0.12 * vol; s2._peak = s2._vol;
-            s2.gain.amp(0,0); s2.gain.amp(s2._vol, 0.4); this._sfxEnvSmooth(s2, 370, 370, 2400, { attack: 400 }); }
-        }, 50);  // F#4
-        setTimeout(() => {
-          let s3 = this._getSfxSlot();
-          if (s3) { s3.osc.setType('sine'); s3.osc.freq(440); s3._vol = 0.10 * vol; s3._peak = s3._vol;
-            s3.gain.amp(0,0); s3.gain.amp(s3._vol, 0.35); this._sfxEnvSmooth(s3, 440, 440, 2300, { attack: 400 }); }
-        }, 100);  // A4
+        // Sustained warm D major chord with ambient noise halo
+        this._playTone({ freq: 293.7, volume: 0.08, duration: 2.2, attack: 0.35, decay: 0.5 });
+        this._playTone({ freq: 370, volume: 0.06, duration: 2.1, attack: 0.35, decay: 0.45, delay: 0.04 });
+        this._playTone({ freq: 440, volume: 0.05, duration: 2.0, attack: 0.30, decay: 0.4, delay: 0.08 });
+        // Warm ambient noise halo
+        this._playNoise({ type: 'brown', filterType: 'bandpass', freq: 500, Q: 0.3, volume: 0.015, duration: 1.5, attack: 0.3, decay: 0.5, delay: 0.2 });
         break;
-      // Companion: crow caw — descending sawtooth
-      case 'crow_caw':
-        play('sawtooth', 400, 0.08, 200, 180, { attack: 10 }); break;
-      // Companion: tortoise blip — very brief low tone
-      case 'tortoise_blip':
-        play('sine', 150, 0.05, 140, 60, { attack: 5 }); break;
-      // Photo mode: shutter click — short percussive snap
+
+      // ═══ Photo mode ═══
       case 'shutter_click':
-        play('square', 800, 0.12, 200, 50, { attack: 2 });
-        setTimeout(() => {
-          let s2 = this._getSfxSlot();
-          if (s2) {
-            s2.osc.setType('square'); s2.osc.freq(600); s2._vol = 0.06 * vol; s2._peak = s2._vol;
-            s2.gain.amp(0, 0); s2.gain.amp(s2._vol, 0.002);
-            this._sfxEnvSmooth(s2, 600, 100, 40, { attack: 2 });
-          }
-        }, 30);
+        // Shutter snap: fast noise burst (mechanical click)
+        this._playNoise({ type: 'white', filterType: 'bandpass', freq: 2000, Q: 2, volume: 0.08, duration: 0.02, attack: 0.001, decay: 0.01 });
+        this._playNoise({ type: 'white', filterType: 'lowpass', freq: 800, Q: 1, volume: 0.04, duration: 0.025, attack: 0.001, decay: 0.012, delay: 0.015 });
         break;
     }
   }
@@ -1924,7 +2606,7 @@ class SoundManager {
         let ctx = getAudioContext();
         if (ctx.state === 'suspended') {
           ctx.resume().then(() => {
-            console.log('[Sound] AudioContext resumed');
+            // AudioContext resumed
             if (!this.ready) this.init();
           });
         }

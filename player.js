@@ -87,10 +87,22 @@ function updatePlayer(dt) {
     p.vy = (dy / len) * spd;
     p.moving = true;
     p.targetX = null; p.targetY = null;
+    let _prevFacing = p.facing;
     if (dx > 0) p.facing = 'right';
     else if (dx < 0) p.facing = 'left';
     else if (dy < 0) p.facing = 'up';
     else p.facing = 'down';
+    // Dust puff on quick direction change
+    if (_prevFacing && _prevFacing !== p.facing && p.moving) {
+      for (let _di = 0; _di < 3; _di++) {
+        particles.push({
+          x: p.x + random(-3, 3), y: p.y + 6,
+          vx: random(-0.8, 0.8), vy: random(-1.0, -0.3),
+          life: 12, maxLife: 12, type: 'burst', size: random(2, 4),
+          r: 160, g: 140, b: 100, world: true,
+        });
+      }
+    }
   } else if (p.targetX !== null) {
     let tdx = p.targetX - p.x;
     let tdy = p.targetY - p.y;
@@ -183,13 +195,30 @@ function updatePlayer(dt) {
         });
       }
     } else if (isOnIsland(p.x, p.y)) {
+      // Terrain-matched footsteps: sand near coast, leaves on grass inland
+      let _fdx = (p.x - WORLD.islandCX) / getSurfaceRX();
+      let _fdy = (p.y - WORLD.islandCY) / getSurfaceRY();
+      let _fdist = _fdx * _fdx + _fdy * _fdy;
+      let _isBeach = _fdist > 0.75; // outer 25% is sandy
       particles.push({
         x: p.x + random(-4, 4), y: p.y + random(2, 6),
         vx: random(-0.3, 0.3), vy: random(-0.4, -0.1),
         life: random(15, 25), maxLife: 25,
         type: 'dust', size: random(2, 4),
-        r: 120, g: 100, b: 70, world: true,
+        r: _isBeach ? 180 : 80, g: _isBeach ? 170 : 120, b: _isBeach ? 130 : 50,
+        world: true,
       });
+      // Occasional leaf kick on grass
+      if (!_isBeach && random() < 0.3) {
+        particles.push({
+          x: p.x + random(-3, 3), y: p.y + random(1, 4),
+          vx: random(-0.6, 0.6), vy: random(-1.2, -0.5),
+          life: random(20, 35), maxLife: 35, type: 'burst',
+          size: random(1.5, 3), gravity: 0.04,
+          r: 70 + floor(random(30)), g: 110 + floor(random(30)), b: 40,
+          world: true,
+        });
+      }
     }
   }
 
@@ -490,6 +519,19 @@ function drawPlayer() {
 
   push();
   translate(floor(sx), floor(sy + bobY + a.bounceY));
+  // Squash & stretch on dash landing
+  if (!p._squashTimer) p._squashTimer = 0;
+  if (p._wasDashing && p.dashTimer <= 0) {
+    p._squashTimer = 8; // start squash
+  }
+  p._wasDashing = p.dashTimer > 0;
+  if (p._squashTimer > 0) {
+    let _sqt = p._squashTimer / 8;
+    let _sqX = 1 + 0.15 * sin(_sqt * PI); // wider
+    let _sqY = 1 - 0.12 * sin(_sqt * PI); // shorter
+    scale(_sqX, _sqY);
+    p._squashTimer -= 1;
+  }
   noStroke();
 
   let fDir = (p.facing === 'left') ? -1 : 1;
@@ -679,27 +721,28 @@ function drawPlayerCape(fDir, moving, isRoman) {
   let capeBlow = moving ? floor(sin(frameCount * 0.12) * 2) * -fDir : 0;
 
   if (isRoman) {
-    // Crimson cape — both shoulders, full Roman paludamentum
+    let _fpc = getFactionData().player || {};
+    let _cc = _fpc.cape || [196, 64, 50];
     let capeXL = -9 * fDir;
     let capeXR = 5 * fDir;
     // Left drape
-    fill(110, 35, 28, 120);
+    fill(_cc[0] - 86, _cc[1] - 29, _cc[2] - 22, 120);
     rect(capeXL + capeBlow, -4, 4 * fDir, capeLen + 1);
-    fill(196, 64, 50, 210);
+    fill(_cc[0], _cc[1], _cc[2], 210);
     rect(capeXL + capeBlow, -5, 4 * fDir, capeLen);
-    fill(160, 50, 40, 140);
+    fill(_cc[0] - 36, _cc[1] - 14, _cc[2] - 10, 140);
     rect(capeXL + capeBlow + fDir, -3, 1 * fDir, capeLen - 3);
     // Right drape
-    fill(110, 35, 28, 120);
+    fill(_cc[0] - 86, _cc[1] - 29, _cc[2] - 22, 120);
     rect(capeXR + capeBlow, -4, 4 * fDir, capeLen - 2);
-    fill(196, 64, 50, 210);
+    fill(_cc[0], _cc[1], _cc[2], 210);
     rect(capeXR + capeBlow, -5, 4 * fDir, capeLen - 3);
     // Wind ripple highlights
-    fill(220, 85, 65, 60);
+    fill(_cc[0] + 24, _cc[1] + 21, _cc[2] + 15, 60);
     rect(capeXL + capeBlow, -5 + floor(capeLen * 0.3), 3 * fDir, 2);
     rect(capeXR + capeBlow + capeWave2 * fDir * 0.3, -5 + floor(capeLen * 0.5), 2 * fDir, 2);
     // Clean hem
-    fill(140, 45, 35, 80);
+    fill(_cc[0] - 56, _cc[1] - 19, _cc[2] - 15, 80);
     rect(capeXL + capeBlow, -5 + capeLen - 1, 3 * fDir, 1);
     rect(capeXR + capeBlow, -5 + capeLen - 4, 3 * fDir, 1);
   } else {
@@ -743,45 +786,46 @@ function drawPlayerBody(isRoman) {
   let _hasCostume = state.wardrobe && state.wardrobe.tunicColor > 0;
 
   if (isRoman) {
-  // Tunic with bronze lorica
-  fill(_hasCostume ? _tc[0] : 175, _hasCostume ? _tc[1] : 58, _hasCostume ? _tc[2] : 44);
+  let _fpl = getFactionData().player || {};
+  let _ft = _fpl.tunic || [175, 58, 44];
+  let _fs = _fpl.sash || [200, 170, 50];
+  let _fh = _fpl.helm || [196, 162, 70];
+  // Tunic — faction color
+  fill(_hasCostume ? _tc[0] : _ft[0], _hasCostume ? _tc[1] : _ft[1], _hasCostume ? _tc[2] : _ft[2]);
   rect(-floor(chestW / 2), -5, chestW, 18);
   // Tunica shadow fold
-  fill(_hasCostume ? _tc[0] - 50 : 122, _hasCostume ? _tc[1] - 18 : 40, _hasCostume ? _tc[2] - 14 : 30, 60);
+  fill(_hasCostume ? _tc[0] - 50 : _ft[0] - 53, _hasCostume ? _tc[1] - 18 : _ft[1] - 18, _hasCostume ? _tc[2] - 14 : _ft[2] - 14, 60);
   rect(-6, 4, 2, 8);
   rect(4, 5, 2, 7);
-  // Torn tunic edge — tattered hem
-  fill(_hasCostume ? _tc[0] - 20 : 155, _hasCostume ? _tc[1] - 8 : 50, _hasCostume ? _tc[2] - 6 : 38, 80);
+  fill(_hasCostume ? _tc[0] - 20 : _ft[0] - 20, _hasCostume ? _tc[1] - 8 : _ft[1] - 8, _hasCostume ? _tc[2] - 6 : _ft[2] - 6, 80);
   rect(-5, 12, 2, 1);
   rect(2, 13, 3, 1);
 
-  // Lorica segmentata — warm bronze bands
-  fill(196, 162, 70);
+  // Armor/sash bands — faction style
+  fill(_fh[0], _fh[1], _fh[2]);
   rect(-6, -5, 12, 3);
-  fill(180, 148, 62);
+  fill(_fh[0] - 16, _fh[1] - 14, _fh[2] - 8);
   rect(-6, -2, 12, 3);
-  fill(196, 162, 70);
+  fill(_fh[0], _fh[1], _fh[2]);
   rect(-6, 1, 12, 2);
-  // Armor highlight
-  fill(220, 195, 100, 50);
+  fill(_fh[0] + 24, _fh[1] + 33, _fh[2] + 30, 50);
   rect(-5, -5, 4, 1);
 
-  // Pteruges (leather strips)
+  // Pteruges
   fill(140, 100, 45);
   for (let i = -2; i <= 2; i++) rect(i * 3 - 1, 3, 2, 4);
 
-  // Belt — gold with buckle
-  fill(200, 170, 50);
+  // Belt/sash — faction sash color
+  fill(_fs[0], _fs[1], _fs[2]);
   rect(-7, 2, 14, 2);
-  fill(220, 190, 60);
+  fill(_fs[0] + 20, _fs[1] + 20, _fs[2] + 10);
   rect(-2, 1, 4, 3);
 
-  // Pauldrons — bronze
-  fill(170, 140, 60);
+  // Pauldrons
+  fill(_fh[0] - 26, _fh[1] - 22, _fh[2] - 10);
   rect(-9, -6, 4, 3);
   rect(5, -6, 4, 3);
-  // Pauldron highlight
-  fill(200, 175, 80, 60);
+  fill(_fh[0] + 4, _fh[1] + 13, _fh[2] + 10, 60);
   rect(-8, -6, 2, 1);
   rect(6, -6, 2, 1);
   } else {
@@ -871,6 +915,19 @@ function drawPlayerTool(fDir, hs, toolSwingTimer) {
     fill(100, 70, 35);
     rect(toolX, 2 + swingOff, 2 * tw, 2); // grip
   }
+  // Tool swing arc trail (semicircle) — visible on tool slots 0-2
+  if (toolSwingTimer > 0 && hs <= 2) {
+    let arcProg = toolSwingTimer / 12;
+    let arcAlpha = floor(arcProg * 120);
+    stroke(255, 240, 200, arcAlpha);
+    strokeWeight(1);
+    noFill();
+    let arcR = 14;
+    let startA = fDir > 0 ? -PI * 0.7 : -PI * 0.3;
+    let endA = startA + PI * arcProg;
+    arc(toolX, -2 + swingOff, arcR * 2, arcR * 2, startA, endA);
+    noStroke();
+  }
 }
 
 function drawPlayerHead(fDir, facingUp, anim, isRoman) {
@@ -908,17 +965,18 @@ function drawPlayerHead(fDir, facingUp, anim, isRoman) {
     rect(-2, -18, 1, 1);
     rect(3, -17, 1, 1);
     if (isRoman) {
-    // Gold laurel wreath
-    fill(200, 170, 50);
+    // Crown — faction-tinted
+    let _crownC = (typeof getFactionData === 'function' ? getFactionData().player : null) || {};
+    let _crSash = _crownC.sash || [200, 170, 50];
+    fill(_crSash[0], _crSash[1], _crSash[2]);
     rect(-5, -15, 2, 1);
     rect(3, -15, 2, 1);
-    fill(220, 190, 60);
+    fill(_crSash[0] + 20, _crSash[1] + 20, _crSash[2] + 10);
     rect(-4, -16, 2, 1);
     rect(2, -16, 2, 1);
-    fill(200, 170, 50);
+    fill(_crSash[0], _crSash[1], _crSash[2]);
     rect(-1, -17, 2, 1);
-    // Gold leaf shimmer
-    fill(240, 210, 80, 80);
+    fill(_crSash[0] + 40, _crSash[1] + 40, _crSash[2] + 30, 80);
     rect(-4, -15, 1, 1);
     rect(3, -16, 1, 1);
     } else {
@@ -941,24 +999,24 @@ function drawPlayerHead(fDir, facingUp, anim, isRoman) {
     rect(5, -14, 1, 2);
     }
   } else {
-    // Helmet — bronze with crest
-    fill(196, 162, 70);
+    // Helmet — faction-colored
+    let _fhc = (typeof getFactionData === 'function' ? getFactionData().player : null) || {};
+    let _helmC = _fhc.helm || [196, 162, 70];
+    let _capeC = _fhc.cape || [180, 30, 20];
+    fill(_helmC[0], _helmC[1], _helmC[2]);
     rect(-6, -16, 12, 5);
-    // Cheek guards
-    fill(170, 140, 60);
+    fill(_helmC[0] - 26, _helmC[1] - 22, _helmC[2] - 10);
     rect(-6, -13, 2, 3);
     rect(4, -13, 2, 3);
-    // Crest (tattered red plume)
-    fill(180, 30, 20);
+    // Crest plume — faction cape color
+    fill(_capeC[0], _capeC[1], _capeC[2]);
     rect(-4, -20, 8, 4);
     rect(-2, -22, 4, 2);
-    // Crest flutter
     let cf = floor(sin(frameCount * 0.08) * 1);
     rect(-3, -21 + cf, 2, 3);
     rect(2, -21 - cf, 2, 3);
-    // Plume wear/tear — gap pixels
-    fill(196, 162, 70);
-    rect(3, -19, 1, 1); // torn spot
+    fill(_helmC[0], _helmC[1], _helmC[2]);
+    rect(3, -19, 1, 1);
   }
 
   // Wardrobe headwear override
@@ -1183,6 +1241,8 @@ function playerAttack() {
     e.flashTimer = 6;
     e.state = 'stagger';
     e.stateTimer = 8;
+    // Freeze frame on killing blow (2 frames)
+    if (e.hp <= 0) { _juiceFreezeFrames = 2; _juiceCombatVignette = min(1, _juiceCombatVignette + 0.3); }
     // Knockback
     let kb = 5;
     let kbAngle = atan2(e.y - p.y, e.x - p.x);

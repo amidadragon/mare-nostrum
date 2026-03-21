@@ -5,12 +5,21 @@
 // Surface by pressing D again or swimming back onto land.
 
 const DIVE_TREASURES = [
-  { type: 'pearl', name: 'Pearl', value: 15, rarity: 0.35, col: [240, 235, 255] },
-  { type: 'sponge', name: 'Sea Sponge', value: 5, rarity: 0.45, col: [200, 180, 100] },
-  { type: 'coral_piece', name: 'Coral', value: 8, rarity: 0.35, col: [255, 100, 80] },
-  { type: 'amphora', name: 'Amphora', value: 40, rarity: 0.08, col: [180, 120, 60] },
-  { type: 'gold_coin', name: 'Roman Coin', value: 25, rarity: 0.12, col: [220, 190, 60] },
-  { type: 'ancient_helm', name: "Neptune's Helm", value: 100, rarity: 0.015, col: [100, 200, 180] },
+  // Shallow tier (rim 1.0-1.2)
+  { type: 'sponge', name: 'Sea Sponge', value: 5, rarity: 0.45, col: [200, 180, 100], depthTier: 0 },
+  { type: 'shell_fragment', name: 'Shell Fragment', value: 3, rarity: 0.50, col: [230, 215, 190], depthTier: 0 },
+  { type: 'sea_glass', name: 'Sea Glass', value: 6, rarity: 0.40, col: [140, 220, 200], depthTier: 0 },
+  // Mid tier (rim 1.2-1.4)
+  { type: 'pearl', name: 'Pearl', value: 15, rarity: 0.35, col: [240, 235, 255], depthTier: 1 },
+  { type: 'coral_piece', name: 'Coral', value: 8, rarity: 0.35, col: [255, 100, 80], depthTier: 1 },
+  { type: 'gold_coin', name: 'Roman Coin', value: 25, rarity: 0.12, col: [220, 190, 60], depthTier: 1 },
+  { type: 'bronze_idol', name: 'Bronze Idol', value: 30, rarity: 0.10, col: [170, 130, 60], depthTier: 1 },
+  // Deep tier (rim 1.4-1.8)
+  { type: 'amphora', name: 'Amphora', value: 40, rarity: 0.08, col: [180, 120, 60], depthTier: 2 },
+  { type: 'triton_horn', name: "Triton's Horn", value: 55, rarity: 0.05, col: [180, 200, 140], depthTier: 2 },
+  { type: 'black_pearl', name: 'Black Pearl', value: 60, rarity: 0.04, col: [40, 35, 50], depthTier: 2 },
+  { type: 'ancient_helm', name: "Neptune's Helm", value: 100, rarity: 0.015, col: [100, 200, 180], depthTier: 2 },
+  { type: 'sunken_crown', name: 'Sunken Crown', value: 120, rarity: 0.01, col: [220, 200, 80], depthTier: 2 },
 ];
 
 // Pixel-art fish sprite definitions (each row is a horizontal line of [r,g,b] blocks)
@@ -63,16 +72,21 @@ function initDiveWorld() {
   let cx = WORLD.islandCX, cy = WORLD.islandCY;
   let srx = state.islandRX, sry = state.islandRY;
 
-  // Scatter treasures in the shallow water ring around the island
-  for (let i = 0; i < 20; i++) {
+  // Scatter treasures with depth-based tiers
+  for (let i = 0; i < 28; i++) {
     let angle = random(TWO_PI);
-    let rim = random(1.05, 1.6);
+    let rim = random(1.05, 1.8);
     let tx = cx + cos(angle) * srx * rim;
     let ty = cy + sin(angle) * sry * 0.45 * rim;
 
+    // Determine depth tier from distance
+    let depthTier = rim < 1.2 ? 0 : rim < 1.4 ? 1 : 2;
+    let tierTreasures = DIVE_TREASURES.filter(t => t.depthTier === depthTier);
+    if (tierTreasures.length === 0) tierTreasures = DIVE_TREASURES;
+
     let roll = random(), cumulative = 0;
-    let tType = DIVE_TREASURES[0];
-    for (let t of DIVE_TREASURES) {
+    let tType = tierTreasures[0];
+    for (let t of tierTreasures) {
       cumulative += t.rarity;
       if (roll < cumulative) { tType = t; break; }
     }
@@ -80,7 +94,7 @@ function initDiveWorld() {
       x: tx, y: ty,
       type: tType.type, name: tType.name, value: tType.value,
       col: tType.col, collected: false, sparkle: random(TWO_PI),
-      respawnTimer: 0,
+      respawnTimer: 0, depthTier: depthTier,
     });
   }
 
@@ -114,20 +128,21 @@ function initDiveWorld() {
       rim = random(1.0, 1.8);
       cx2 = cx + cos(angle) * srx * rim;
       cy2 = cy + sin(angle) * sry * 0.45 * rim;
-      let types = ['fish','jellyfish','turtle','octopus','seahorse'];
+      let types = ['fish','jellyfish','turtle','octopus','seahorse','dolphin'];
       type = types[floor(random(types.length))];
       fishSprite = type === 'fish' ? fishTypes[floor(random(fishTypes.length))] : null;
     }
 
     let colors = {
       fish: [[60,140,200],[200,160,40],[120,200,120],[200,100,60],[180,80,140]],
-      jellyfish: [[180,120,255],[255,150,200]],
+      jellyfish: [[180,120,255],[255,150,200],[120,200,255]],
       turtle: [[80,140,60]],
-      octopus: [[180,60,80],[100,60,140]],
+      octopus: [[180,60,80],[100,60,140],[140,80,160]],
       seahorse: [[255,180,60],[200,100,150]],
+      dolphin: [[100,130,170],[120,145,180]],
     };
     let col = colors[type][floor(random(colors[type].length))];
-    let spd = { fish: 0.8, jellyfish: 0.2, turtle: 0.4, octopus: 0.3, seahorse: 0.15 }[type];
+    let spd = { fish: 0.8, jellyfish: 0.2, turtle: 0.4, octopus: 0.3, seahorse: 0.15, dolphin: 1.0 }[type];
     d.creatures.push({
       x: cx2, y: cy2,
       vx: (random() > 0.5 ? 1 : -1) * spd * random(0.5, 1.2),
@@ -182,12 +197,12 @@ function initDiveWorld() {
     });
   }
 
-  // Init ambient light rays
+  // Init ambient light rays — more for richer atmosphere
   _diveAmbient.rays = [];
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 10; i++) {
     _diveAmbient.rays.push({
-      x: random(width), speed: random(0.15, 0.4),
-      w: random(8, 20), alpha: random(0.03, 0.08),
+      x: random(width), speed: random(0.1, 0.45),
+      w: random(6, 24), alpha: random(0.02, 0.09),
       phase: random(TWO_PI),
     });
   }
@@ -249,6 +264,14 @@ function exitDive() {
       case 'gold_coin': state.gold += t.value; break;
       case 'ancient_helm': state.gold += t.value;
         if (typeof unlockJournal === 'function') unlockJournal('neptunes_helm'); break;
+      case 'shell_fragment': state.gold += t.value; break;
+      case 'sea_glass': state.gold += t.value; break;
+      case 'bronze_idol': state.gold += t.value; break;
+      case 'triton_horn': state.gold += t.value;
+        if (typeof unlockJournal === 'function') unlockJournal('tritons_horn'); break;
+      case 'black_pearl': d.pearls++; state.gold += t.value; break;
+      case 'sunken_crown': state.gold += t.value;
+        if (typeof unlockJournal === 'function') unlockJournal('sunken_crown'); break;
     }
   }
   if (collected.length > 0) {
@@ -272,8 +295,17 @@ function updateDiving(dt) {
 
   if (!d.active) return;
 
-  // Breath
-  d.breath -= 0.08 * dt;
+  // Oxygen management — deeper = faster drain
+  // Calculate player depth based on distance from island center
+  let _dcx = state.player.x - WORLD.islandCX, _dcy = state.player.y - WORLD.islandCY;
+  let _playerRim = sqrt((_dcx / state.islandRX) * (_dcx / state.islandRX) + (_dcy / (state.islandRY * 0.45)) * (_dcy / (state.islandRY * 0.45)));
+  let depthMult = _playerRim < 1.2 ? 1.0 : _playerRim < 1.4 ? 1.5 : 2.2;  // shallow/mid/deep
+  d.depth = _playerRim < 1.2 ? 0 : _playerRim < 1.4 ? 1 : 2;
+  d.breath -= 0.08 * depthMult * dt;
+  // Warn when breath is low
+  if (d.breath < 40 && d.breath > 38 && depthMult > 1.0) {
+    addFloatingText(width / 2, height * 0.35, 'Breath draining fast! Surface!', '#ff8855');
+  }
   if (d.breath <= 0) {
     d.breath = 0;
     exitDive();
@@ -433,13 +465,28 @@ function updateDiving(dt) {
   }
   d.seaEnemies = d.seaEnemies.filter(e => e.hp > 0 || (e._deathTimer && e._deathTimer > 0));
 
-  // Player breath bubbles
-  if (frameCount % 25 === 0) {
+  // Player breath bubbles — more at depth (breathing harder)
+  let breathInterval = d.depth === 0 ? 25 : d.depth === 1 ? 18 : 10;
+  if (frameCount % breathInterval === 0) {
+    let bubbleCount = d.depth === 2 ? 3 : d.depth === 1 ? 2 : 1;
+    for (let b = 0; b < bubbleCount; b++) {
+      particles.push({
+        x: px + random(-6, 6), y: py - 5,
+        vx: random(-0.15, 0.15), vy: -random(0.3, 1.0),
+        life: 45, maxLife: 45, type: 'bubble',
+        r: 180, g: 220, b: 255, size: random(2, 5 + d.depth), world: true,
+      });
+    }
+  }
+  // Ambient rising bubbles from seabed
+  if (frameCount % 20 === 0 && random() < 0.4) {
+    let bx = px + random(-120, 120);
+    let by = py + random(40, 80);
     particles.push({
-      x: px + random(-4, 4), y: py - 5,
-      vx: random(-0.1, 0.1), vy: -random(0.3, 0.8),
-      life: 40, maxLife: 40, type: 'bubble',
-      r: 180, g: 220, b: 255, size: random(2, 5), world: true,
+      x: bx, y: by,
+      vx: random(-0.05, 0.05), vy: -random(0.2, 0.5),
+      life: 60, maxLife: 60, type: 'bubble',
+      r: 160, g: 200, b: 240, size: random(1, 3), world: true,
     });
   }
 
@@ -491,17 +538,24 @@ function drawDivingOverlay() {
 
   noStroke();
 
-  // --- Depth fog: darker blue further from surface (top=lighter, bottom=darker) ---
-  for (let band = 0; band < 8; band++) {
-    let by = band * height / 8;
-    let bh = height / 8 + 1;
-    let depthFrac = band / 7;
-    let fogR = floor(lerp(15, 5, depthFrac));
-    let fogG = floor(lerp(50, 20, depthFrac));
-    let fogB = floor(lerp(90, 50, depthFrac));
-    let fogA = floor(lerp(60, 120, depthFrac) * bright);
-    fill(fogR, fogG, fogB, fogA);
+  // --- Depth fog: darker blue further from surface, murkier at deep depth ---
+  let playerDepth = d.depth || 0; // 0=shallow, 1=mid, 2=deep
+  let murkMult = playerDepth === 0 ? 1.0 : playerDepth === 1 ? 1.3 : 1.8;
+  for (let band = 0; band < 10; band++) {
+    let by = band * height / 10;
+    let bh = height / 10 + 1;
+    let depthFrac = band / 9;
+    let fogR = floor(lerp(15, 3, depthFrac));
+    let fogG = floor(lerp(50, 15, depthFrac));
+    let fogB = floor(lerp(90, 40, depthFrac));
+    let fogA = floor(lerp(60, 140, depthFrac) * bright * murkMult);
+    fill(fogR, fogG, fogB, min(220, fogA));
     rect(0, floor(by), width, floor(bh));
+  }
+  // Extra murk overlay at deep depth
+  if (playerDepth >= 2) {
+    fill(5, 12, 30, floor(40 * bright));
+    rect(0, 0, width, height);
   }
 
   // --- Sandy seabed terrain ---
@@ -550,11 +604,12 @@ function drawDivingOverlay() {
     rect(floor(rx + 4), floor(height - rh - 14), 4, 4);
   }
 
-  // --- Light rays from surface (animated diagonal bright rects) ---
+  // --- Light rays from surface — stronger in shallow, faint in deep ---
+  let rayBrightMult = playerDepth === 0 ? 1.4 : playerDepth === 1 ? 1.0 : 0.4;
   for (let ray of _diveAmbient.rays) {
     let rx = (ray.x + frameCount * ray.speed) % (width + 60) - 30;
     let rw = floor(ray.w);
-    let rAlpha = floor(ray.alpha * 255 * bright);
+    let rAlpha = floor(ray.alpha * 255 * bright * rayBrightMult);
     // Ray is a series of diagonal 2px rects descending from top
     fill(120, 200, 255, rAlpha);
     for (let ry = 0; ry < height; ry += 4) {
@@ -562,6 +617,18 @@ function drawDivingOverlay() {
       let fade = 1.0 - (ry / height) * 0.7;
       fill(120, 200, 255, floor(rAlpha * fade));
       rect(floor(rx + xOff), ry, rw, 4);
+    }
+  }
+  // Extra volumetric light shafts in shallow water
+  if (playerDepth === 0) {
+    for (let i = 0; i < 3; i++) {
+      let shaftX = (i * 200 + floor(frameCount * 0.2)) % (width + 40) - 20;
+      let shaftW = 6 + floor(sin(frameCount * 0.02 + i * 2) * 3);
+      for (let sy = 0; sy < height * 0.6; sy += 4) {
+        let sa = floor((1.0 - sy / (height * 0.6)) * 12 * bright);
+        fill(180, 230, 255, sa);
+        rect(floor(shaftX + sy * 0.15), sy, shaftW, 4);
+      }
     }
   }
 
@@ -816,12 +883,74 @@ function drawDivingOverlay() {
         rect(floor(tx) - 10, floor(ty) - 9, 2, 14);
         rect(floor(tx) + 8, floor(ty) - 9, 2, 14);
         break;
+      case 'shell_fragment':
+        fill(cr, cg, cb, 160);
+        rect(floor(tx) - 3, floor(ty) - 1, 6, 2);
+        fill(min(255, cr + 20), min(255, cg + 15), min(255, cb + 10), 120);
+        rect(floor(tx) - 2, floor(ty) - 2, 4, 2);
+        break;
+      case 'sea_glass':
+        fill(cr, cg, cb, 140);
+        rect(floor(tx) - 2, floor(ty) - 2, 5, 4);
+        fill(min(255, cr + 40), min(255, cg + 30), min(255, cb + 25), 80);
+        rect(floor(tx) - 1, floor(ty) - 1, 3, 2);
+        break;
+      case 'bronze_idol':
+        fill(cr, cg, cb, 200);
+        rect(floor(tx) - 3, floor(ty) - 5, 6, 8);
+        fill(min(255, cr + 20), min(255, cg + 15), cb, 160);
+        rect(floor(tx) - 2, floor(ty) - 7, 4, 3); // head
+        fill(cr - 20, cg - 15, cb - 10, 120);
+        rect(floor(tx) - 5, floor(ty) - 3, 2, 4); // arm
+        rect(floor(tx) + 3, floor(ty) - 3, 2, 4); // arm
+        break;
+      case 'triton_horn': {
+        fill(cr, cg, cb, 190);
+        rect(floor(tx) - 5, floor(ty) - 2, 10, 4);
+        rect(floor(tx) - 3, floor(ty) - 4, 6, 2);
+        fill(min(255, cr + 30), min(255, cg + 25), cb, 150);
+        rect(floor(tx) + 5, floor(ty) - 1, 3, 2); // mouthpiece
+        // Magical shimmer
+        let hornGlow = floor(6 + sin(frameCount * 0.08 + t.sparkle) * 4);
+        fill(200, 255, 180, hornGlow);
+        rect(floor(tx) - 7, floor(ty) - 4, 14, 2);
+        break;
+      }
+      case 'black_pearl':
+        fill(40, 35, 50, 220);
+        rect(floor(tx) - 3, floor(ty) - 3, 6, 6);
+        fill(80, 70, 100, 160);
+        rect(floor(tx) - 2, floor(ty) - 2, 4, 4);
+        // Dark iridescent highlight
+        fill(120, 100, 180, 80);
+        rect(floor(tx) - 2, floor(ty) - 2, 2, 2);
+        break;
+      case 'sunken_crown': {
+        fill(220, 200, 80, 210);
+        rect(floor(tx) - 5, floor(ty) - 3, 10, 4);
+        // Crown points
+        fill(240, 220, 100, 200);
+        rect(floor(tx) - 4, floor(ty) - 6, 2, 3);
+        rect(floor(tx) - 1, floor(ty) - 7, 2, 4);
+        rect(floor(tx) + 2, floor(ty) - 6, 2, 3);
+        // Jewels
+        fill(200, 50, 60, 180);
+        rect(floor(tx) - 1, floor(ty) - 5, 2, 2);
+        // Legendary glow
+        let crownGlow = floor(10 + sin(frameCount * 0.09) * 8);
+        fill(255, 240, 120, crownGlow);
+        rect(floor(tx) - 8, floor(ty) - 8, 16, 2);
+        rect(floor(tx) - 8, floor(ty) + 1, 16, 2);
+        rect(floor(tx) - 8, floor(ty) - 8, 2, 11);
+        rect(floor(tx) + 6, floor(ty) - 8, 2, 11);
+        break;
+      }
     }
     // Collect hint when near
     let pd = dist(state.player.x, state.player.y, t.x, t.y);
     if (pd < 30) {
       fill(255, 255, 200, 150 + sin(frameCount * 0.1) * 40);
-      textSize(7); textAlign(CENTER);
+      textSize(10); textAlign(CENTER);
       text(t.name, floor(tx), floor(ty) - 14);
       textAlign(LEFT, TOP);
     }
@@ -918,6 +1047,36 @@ function drawDivingOverlay() {
         // Dorsal fin
         fill(c.col[0] + 20, c.col[1] + 15, c.col[2], 120);
         rect(-2, sb - 2, 2, 3);
+        break;
+      }
+      case 'dolphin': {
+        let db = floor(sin(frameCount * 0.07 + c.frame) * 2);
+        // Streamlined body
+        fill(c.col[0], c.col[1], c.col[2], 190);
+        rect(-8, db - 2, 16, 4);
+        rect(-6, db - 3, 12, 6);
+        // Belly — lighter
+        fill(c.col[0] + 50, c.col[1] + 45, c.col[2] + 40, 140);
+        rect(-5, db + 1, 10, 2);
+        // Snout
+        fill(c.col[0] - 10, c.col[1] - 5, c.col[2]);
+        rect(8, db - 1, 4, 2);
+        // Dorsal fin
+        fill(c.col[0] - 15, c.col[1] - 10, c.col[2] - 10);
+        rect(-1, db - 5, 3, 3);
+        rect(0, db - 7, 2, 2);
+        // Tail flukes (animated)
+        let tf = floor(sin(frameCount * 0.12 + c.frame) * 2);
+        fill(c.col[0], c.col[1], c.col[2], 170);
+        rect(-10, db - 2 + tf, 2, 2);
+        rect(-12, db - 4 + tf, 2, 3);
+        rect(-12, db + 1 + tf, 2, 3);
+        // Eye
+        fill(20, 20, 30);
+        rect(5, db - 1, 2, 2);
+        // Friendly smile line
+        fill(c.col[0] - 30, c.col[1] - 20, c.col[2] - 20, 120);
+        rect(7, db, 2, 1);
         break;
       }
     }
@@ -1022,9 +1181,21 @@ function drawDivingOverlay() {
     }
   }
 
-  // --- Blue tint color shift overlay (subtle, on top of everything in-world) ---
-  fill(8, 30, 65, 25);
+  // --- Blue tint color shift overlay — stronger at depth ---
+  let tintAlpha = playerDepth === 0 ? 20 : playerDepth === 1 ? 35 : 55;
+  fill(8, 25, 60, tintAlpha);
   rect(0, 0, width, height);
+  // Vignette at deep depth — dark edges
+  if (playerDepth >= 2) {
+    let vigSize = floor(width * 0.3);
+    for (let v = 0; v < 4; v++) {
+      let va = floor(12 - v * 3);
+      fill(2, 8, 20, va);
+      rect(0, 0, vigSize - v * 20, height); // left
+      rect(width - vigSize + v * 20, 0, vigSize - v * 20, height); // right
+      rect(0, 0, width, vigSize - v * 20); // top
+    }
+  }
 
   // --- Breath HUD ---
   let barW = 100, barH = 8;
@@ -1039,7 +1210,7 @@ function drawDivingOverlay() {
   // Pixel breath pip marks
   fill(255, 255, 255, 40);
   for (let pip = 1; pip < 4; pip++) rect(barX + floor(barW * pip / 4), barY, 1, barH);
-  fill(255, 255, 255, 180); textSize(7); textAlign(CENTER, CENTER);
+  fill(255, 255, 255, 180); textSize(10); textAlign(CENTER, CENTER);
   text('BREATH', floor(width / 2), barY + floor(barH / 2));
 
   // Dive loot count
@@ -1050,13 +1221,13 @@ function drawDivingOverlay() {
   }
 
   // Depth indicator
-  fill(100, 180, 220, 120); textSize(7); textAlign(RIGHT);
+  fill(100, 180, 220, 120); textSize(10); textAlign(RIGHT);
   let depthLabel = d.depth === 0 ? 'Shallow' : d.depth === 1 ? 'Mid' : 'Deep';
   text(depthLabel, barX + barW + 50, barY + 2);
 
   // Surface hint
   fill(100, 200, 255, floor(80 + sin(frameCount * 0.06) * 40));
-  textSize(8); textAlign(CENTER);
+  textSize(11); textAlign(CENTER);
   text('[D] Surface  |  Walk onto land to exit', floor(width / 2), height - 12);
   textAlign(LEFT, TOP);
 
@@ -1168,4 +1339,4 @@ function drawDivePrompt() {
   textAlign(LEFT, TOP);
 }
 
-console.log('[Diving] In-world underwater system loaded');
+// Diving system loaded

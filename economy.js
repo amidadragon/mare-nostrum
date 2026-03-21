@@ -111,8 +111,9 @@ function updateTradeRoutes(dt) {
     route.shipAngle = atan2(dy, dx);
 
     if (d > 5) {
-      route.shipX += (dx / d) * TRADE_SHIP_SPEED * dt;
-      route.shipY += (dy / d) * TRADE_SHIP_SPEED * dt;
+      let speedMult = (typeof getTradeSpeedMult === 'function') ? getTradeSpeedMult() : 1;
+      route.shipX += (dx / d) * TRADE_SHIP_SPEED * speedMult * dt;
+      route.shipY += (dy / d) * TRADE_SHIP_SPEED * speedMult * dt;
     } else {
       // Arrived
       if (route.tripPhase === 'outbound') {
@@ -121,8 +122,19 @@ function updateTradeRoutes(dt) {
         // Completed a round trip
         route.tripPhase = 'outbound';
         let goldGain = TRADE_GOODS[route.good].goldPerTrip;
+        // Faction bonus: Carthage +15% trade income
+        if (typeof getFactionData === 'function') goldGain = floor(goldGain * getFactionData().tradeIncomeMult);
+        // Vineyard bonus: +30% trade value per vineyard
+        if (state.buildings) {
+          let vineyards = state.buildings.filter(b => b.type === 'vineyard').length;
+          if (vineyards > 0) goldGain = floor(goldGain * (1 + 0.3 * vineyards));
+        }
         // Trading spec doubles gold
         if (state.colonySpec['conquest'] === 'trading') goldGain *= 2;
+        // Tech: mathematics +15% trade profits
+        if (typeof hasTech === 'function' && hasTech('mathematics')) goldGain = floor(goldGain * 1.15);
+        // Tech: advanced_hulls — trade ships carry more (+25%)
+        if (typeof hasTech === 'function' && hasTech('advanced_hulls')) goldGain = floor(goldGain * 1.25);
         // Demand bonus: +50% if this good is in demand
         let demandMult = getDemandBonus(route.good);
         goldGain = floor(goldGain * demandMult);
@@ -224,12 +236,17 @@ function calculateDailyTradeIncome() {
 
 // Hook into day transition (called from economy update)
 function onDayTransitionEconomy() {
+  // Init new state if missing (legacy saves)
+  initPrestigeState();
+  // Track days survived for scoring
+  if (state.score) state.score.daysSurvived = state.day || 0;
+  // Process automation daily income
+  processAutomationDaily();
+
   let c = state.conquest;
   if (!c.colonized) return;
 
   let trade = calculateDailyTradeIncome();
-  let colonyIncome = c.colonyIncome || 0;
-  let totalIncome = colonyIncome + trade.net;
 
   // Apply colony spec bonuses to harvest
   if (state.colonySpec['conquest'] === 'agricultural') {
@@ -241,10 +258,11 @@ function onDayTransitionEconomy() {
     if (c.colonyLevel >= 5) state.ironOre = (state.ironOre || 0) + floor(c.colonyLevel * 0.5);
   }
 
-  if (trade.net !== 0) {
-    addNotification('Trade: +' + trade.income + 'g income, -' + trade.upkeep + 'g upkeep = ' +
-      (trade.net >= 0 ? '+' : '') + trade.net + 'g', '#ddcc66');
-    state.gold += trade.net;
+  // Trade ships earn gold on each completed round trip (in updateTradeRoutes).
+  // Daily upkeep is deducted here; income shown is an estimate for display only.
+  if (trade.upkeep > 0) {
+    state.gold = max(0, state.gold - trade.upkeep);
+    addNotification('Trade upkeep: -' + trade.upkeep + 'g (' + state.tradeRoutes.filter(r => r.active).length + ' routes)', '#ddcc66');
   }
 
   // Check if colony should offer spec selection
@@ -424,6 +442,9 @@ function drawColonySpecSelectUI() {
 // ─── KEY HANDLERS ────────────────────────────────────────────────────────────
 
 function handleEconomyKey(k, kCode) {
+  // Prestige UI
+  if (handlePrestigeKey(k, kCode)) return true;
+
   // Colony spec selection
   if (_specSelectOpen) {
     let specKeys = Object.keys(COLONY_SPECS);
@@ -468,6 +489,7 @@ function handleEconomyKey(k, kCode) {
 
 // Handle trade route UI mouse clicks
 function handleEconomyClick(mx, my) {
+  if (handlePrestigeClick(mx, my)) return true;
   if (!state.tradeRouteUI) return false;
 
   // Check if clicking on a good button to create route
@@ -528,9 +550,13 @@ function getCurrentDemandGoods() {
 
 // ─── MAIN UPDATE (called from sketch.js hook) ──────────────────────────────
 
+let _prestigeInited = false;
 function updateEconomySystem(dt) {
+  if (!_prestigeInited) { initPrestigeState(); _prestigeInited = true; }
   updateMarketDemand();
+  updateMarketPrices();
   updateTradeRoutes(dt);
+  updateAutomation(dt);
 }
 
 // ─── MAIN DRAW (called from sketch.js hooks) ────────────────────────────────
@@ -546,6 +572,7 @@ function drawEconomyWorldOverlay() {
 function drawEconomyUIOverlay() {
   drawTradeRouteUI();
   drawColonySpecSelectUI();
+  drawPrestigeUI();
 
   // Port hint when near port and colony exists
   if (!state.tradeRouteUI && !state.conquest.active && !state.rowing.active && state.conquest.colonized) {
@@ -660,4 +687,571 @@ function getHannoDialogue(dayCount) {
 // Check if today is market day
 function isMarketDay(dayCount) {
   return dayCount % 7 === 0;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ─── DYNAMIC MARKET PRICES ─────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+
+const MARKET_BASE_PRICES = {
+  // Sell prices (player sells TO merchant): resource -> gold
+  harvest: { base: 2, min: 1, max: 4 },
+  crystals: { base: 4, min: 2, max: 6 },
+  wood: { base: 1, min: 1, max: 2 },
+  fish: { base: 3, min: 2, max: 5 },
+  stone: { base: 1, min: 1, max: 2 },
+  wine: { base: 5, min: 3, max: 8 },
+  oil: { base: 4, min: 2, max: 6 },
+  obsidian: { base: 6, min: 4, max: 10 },
+  frostCrystal: { base: 7, min: 4, max: 11 },
+  exoticSpices: { base: 5, min: 3, max: 8 },
+  // Buy prices (player buys FROM merchant): gold -> resource
+  seeds: { base: 1, min: 1, max: 2 },
+  grapeSeeds: { base: 2, min: 1, max: 3 },
+  oliveSeeds: { base: 2, min: 1, max: 3 },
+  flaxSeeds: { base: 2, min: 1, max: 3 },
+  pomegranateSeeds: { base: 4, min: 2, max: 6 },
+  lotusSeeds: { base: 5, min: 3, max: 8 },
+};
+
+// Track what player sold yesterday — drives next-day price drop
+let _marketSellHistory = {}; // { resource: qtySold }
+let _marketPrices = {};      // { resource: { price, trend } } trend: -1, 0, +1
+let _marketPriceDay = -1;
+
+function updateMarketPrices() {
+  let day = state.day || 0;
+  if (day === _marketPriceDay) return;
+  let prevPrices = {};
+  for (let k in _marketPrices) prevPrices[k] = _marketPrices[k].price;
+  _marketPriceDay = day;
+  let mDay = isMarketDay(day);
+  let prestige = state.prestige ? state.prestige.count : 0;
+
+  for (let res in MARKET_BASE_PRICES) {
+    let mb = MARKET_BASE_PRICES[res];
+    let base = mb.base;
+    // Prestige makes prices slightly higher (economy inflates)
+    base = Math.floor(base * (1 + prestige * 0.1));
+    // Random daily modifier: -20% to +30%
+    let rand = _hannoSeededRandom(day * 31 + res.length * 7 + 13);
+    let modifier = 0.8 + rand * 0.5; // 0.8 to 1.3
+    // Market day bonus: +20% sell, -15% buy
+    if (mDay) {
+      if (['seeds','grapeSeeds','oliveSeeds','flaxSeeds','pomegranateSeeds','lotusSeeds'].includes(res)) {
+        modifier *= 0.85; // cheaper to buy
+      } else {
+        modifier *= 1.2; // better sell price
+      }
+    }
+    // Supply/demand: if player sold a lot yesterday, price drops
+    let sold = _marketSellHistory[res] || 0;
+    if (sold > 0) {
+      let dropPct = Math.min(0.3, sold * 0.05); // -5% per unit sold, max -30%
+      modifier *= (1 - dropPct);
+    }
+    let finalPrice = Math.max(mb.min, Math.min(mb.max, Math.round(base * modifier)));
+    let trend = 0;
+    if (prevPrices[res] !== undefined) {
+      if (finalPrice > prevPrices[res]) trend = 1;
+      else if (finalPrice < prevPrices[res]) trend = -1;
+    }
+    _marketPrices[res] = { price: finalPrice, trend: trend };
+  }
+  // Reset sell history for tomorrow
+  _marketSellHistory = {};
+}
+
+function getMarketPrice(resource) {
+  if (_marketPrices[resource]) return _marketPrices[resource].price;
+  let mb = MARKET_BASE_PRICES[resource];
+  return mb ? mb.base : 1;
+}
+
+function getMarketTrend(resource) {
+  if (_marketPrices[resource]) return _marketPrices[resource].trend;
+  return 0;
+}
+
+function recordMarketSell(resource, qty) {
+  _marketSellHistory[resource] = (_marketSellHistory[resource] || 0) + qty;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ─── PRESTIGE SYSTEM (New Game+) ───────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+
+function initPrestigeState() {
+  if (!state.prestige) {
+    state.prestige = {
+      count: 0,            // number of times prestiged
+      totalScore: 0,       // cumulative score across all runs
+      unlockedBuildings: [],// prestige building IDs unlocked
+    };
+  }
+  if (!state.score) {
+    state.score = {
+      goldEarned: 0,
+      buildingsBuilt: 0,
+      questsCompleted: 0,
+      fishCaught: 0,
+      enemiesDefeated: 0,
+      daysSurvived: 0,
+    };
+  }
+  if (!state.automation) {
+    state.automation = {
+      granaryAuto: false,      // auto-harvest ripe crops
+      fishingPier: false,      // generates fish/day
+      tradeRouteAuto: false,   // trade routes run 2x speed
+      watchtowerAuto: false,   // auto-defend vs raiders
+    };
+  }
+}
+
+const PRESTIGE_BUILDINGS = {
+  colosseum: {
+    name: 'Colosseum',
+    desc: 'Gladiatorial games generate 10g/day passively',
+    cost: { stone: 30, gold: 200, ironOre: 10 },
+    minLevel: 20,
+    w: 96, h: 72, blocks: true,
+    effect: 'passiveGold',
+    dailyGold: 10,
+  },
+  lighthouse: {
+    name: 'Lighthouse',
+    desc: 'Guides fishermen — fishing yields +50%',
+    cost: { stone: 20, wood: 15, crystals: 10 },
+    minLevel: 15,
+    w: 28, h: 64, blocks: true,
+    effect: 'fishBonus',
+    fishMult: 1.5,
+  },
+  observatory: {
+    name: 'Observatory',
+    desc: 'Predict weather — shows next 3 days forecast',
+    cost: { stone: 25, crystals: 15, gold: 100 },
+    minLevel: 18,
+    w: 40, h: 50, blocks: true,
+    effect: 'weatherPredict',
+  },
+};
+
+const AUTOMATION_COSTS = {
+  granaryAuto: { gold: 150, wood: 30, stone: 20, ironOre: 8 },
+  fishingPier: { gold: 120, wood: 25, stone: 15 },
+  tradeRouteAuto: { gold: 200, wood: 20, crystals: 10 },
+  watchtowerAuto: { gold: 180, stone: 25, ironOre: 10 },
+};
+
+function canAffordAutomation(autoKey) {
+  let cost = AUTOMATION_COSTS[autoKey];
+  if (!cost) return false;
+  for (let k in cost) {
+    let have = (k === 'gold') ? state.gold : (state[k] || 0);
+    if (have < cost[k]) return false;
+  }
+  return true;
+}
+
+function buyAutomation(autoKey) {
+  if (!canAffordAutomation(autoKey)) return false;
+  let cost = AUTOMATION_COSTS[autoKey];
+  for (let k in cost) {
+    if (k === 'gold') state.gold -= cost[k];
+    else state[k] -= cost[k];
+  }
+  state.automation[autoKey] = true;
+  addFloatingText(width / 2, height * 0.25, 'Automation unlocked!', '#44ffaa');
+  addNotification('Automation: ' + autoKey.replace(/([A-Z])/g, ' $1').trim() + ' activated', '#44ffaa');
+  return true;
+}
+
+function hasPrestigeBuilding(bType) {
+  return state.prestige && state.prestige.unlockedBuildings &&
+    state.prestige.unlockedBuildings.includes(bType);
+}
+
+function canAffordPrestigeBuilding(bType) {
+  let pb = PRESTIGE_BUILDINGS[bType];
+  if (!pb) return false;
+  let cost = pb.cost;
+  for (let k in cost) {
+    let have = (k === 'gold') ? state.gold : (state[k] || 0);
+    if (have < cost[k]) return false;
+  }
+  return true;
+}
+
+function buyPrestigeBuilding(bType) {
+  if (hasPrestigeBuilding(bType)) return false;
+  if (!canAffordPrestigeBuilding(bType)) return false;
+  let pb = PRESTIGE_BUILDINGS[bType];
+  for (let k in pb.cost) {
+    if (k === 'gold') state.gold -= pb.cost[k];
+    else state[k] -= pb.cost[k];
+  }
+  state.prestige.unlockedBuildings.push(bType);
+  addFloatingText(width / 2, height * 0.2, pb.name + ' built!', '#ffdd44');
+  addNotification('Prestige building: ' + pb.name + ' — ' + pb.desc, '#ffdd44');
+  return true;
+}
+
+// ─── PRESTIGE (New Game+) TRIGGER ───────────────────────────────────────
+
+function canPrestige() {
+  return state.won && state.mainQuest && state.mainQuest.chapter >= 9;
+}
+
+function doPrestige() {
+  if (!canPrestige()) return;
+  let finalScore = calculateScore();
+  let count = (state.prestige ? state.prestige.count : 0) + 1;
+  let totalScore = (state.prestige ? state.prestige.totalScore : 0) + finalScore;
+  let unlockedBuildings = state.prestige ? [...state.prestige.unlockedBuildings] : [];
+  // Keep tools
+  let tools = { ...state.tools };
+  // Keep some resources (50% of each)
+  let keepGold = Math.floor((state.gold || 0) * 0.5);
+  let keepCrystals = Math.floor((state.crystals || 0) * 0.5);
+  let keepIron = Math.floor((state.ironOre || 0) * 0.5);
+  // Keep achievement/codex progress
+  let codex = state.codex ? JSON.parse(JSON.stringify(state.codex)) : null;
+  let arenaHigh = state.arenaHighWave || 0;
+
+  // Reset game state
+  initState();
+
+  // Restore kept progress
+  state.prestige = { count: count, totalScore: totalScore, unlockedBuildings: unlockedBuildings };
+  state.score = { goldEarned: 0, buildingsBuilt: 0, questsCompleted: 0, fishCaught: 0, enemiesDefeated: 0, daysSurvived: 0 };
+  state.automation = { granaryAuto: false, fishingPier: false, tradeRouteAuto: false, watchtowerAuto: false };
+  state.tools = tools;
+  state.gold = keepGold;
+  state.crystals = keepCrystals;
+  state.ironOre = keepIron;
+  if (codex) state.codex = codex;
+  state.arenaHighWave = arenaHigh;
+
+  // Prestige difficulty scaling
+  // (Applied via getPrestigeDifficultyMult in gameplay checks)
+
+  addFloatingText(width / 2, height * 0.2, 'NEW GAME+ (Prestige ' + count + ')', '#ffdd44');
+  addNotification('Prestige ' + count + '! World is harder. New buildings unlocked.', '#ffdd44');
+}
+
+function getPrestigeDifficultyMult() {
+  let p = state.prestige ? state.prestige.count : 0;
+  return 1 + p * 0.25; // +25% difficulty per prestige
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ─── AUTOMATION ENDGAME ────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+
+function updateAutomation(dt) {
+  if (!state.automation) return;
+  // Auto-harvest: collect ripe crops automatically
+  if (state.automation.granaryAuto && state.plots) {
+    for (let p of state.plots) {
+      if (p.ripe && p.planted) {
+        let amt = 1;
+        if (state.tools.sickle) amt = 2;
+        if (p.cropType === 'grain') { state.harvest += amt; state.seeds += 1; }
+        else if (p.cropType === 'grape') state.wine = (state.wine || 0) + amt;
+        else if (p.cropType === 'olive') state.oil = (state.oil || 0) + amt;
+        else if (p.cropType === 'flax') state.harvest += amt;
+        else state.harvest += amt;
+        p.planted = false; p.ripe = false; p.stage = 0; p.timer = 0;
+        if (state.score) state.score.goldEarned += 0; // tracked by gold gain elsewhere
+      }
+    }
+  }
+  // Auto-defend: watchtower shoots at raid parties from all nations
+  if (state.automation.watchtowerAuto && state.nations) {
+    let _wtKeys = Object.keys(state.nations);
+    for (let _wtk of _wtKeys) {
+      let _wtn = state.nations[_wtk];
+      if (!_wtn || !_wtn.raidParty || _wtn.raidParty.length === 0) continue;
+      for (let i = _wtn.raidParty.length - 1; i >= 0; i--) {
+        let r = _wtn.raidParty[i];
+        r.hp -= 2 * dt;
+        if (r.hp <= 0) {
+          _wtn.raidParty.splice(i, 1);
+          if (state.score) state.score.enemiesDefeated++;
+          addFloatingText(width / 2, height * 0.4, 'Watchtower defends!', '#44aaff');
+        }
+      }
+    }
+  }
+  // Trade route auto: 2x ship speed
+  if (state.automation.tradeRouteAuto) {
+    // Applied in updateTradeRoutes via getTradeSpeedMult()
+  }
+}
+
+function getTradeSpeedMult() {
+  let m = (state.automation && state.automation.tradeRouteAuto) ? 2.0 : 1.0;
+  if (typeof hasTech === 'function' && hasTech('celestial_navigation')) m *= 1.15;
+  return m;
+}
+
+// Daily automation income (called from onDayTransitionEconomy)
+function processAutomationDaily() {
+  if (!state.automation) return;
+  // Fishing pier: generates fish per day
+  if (state.automation.fishingPier) {
+    let fishAmt = 4;
+    if (hasPrestigeBuilding('lighthouse')) fishAmt = Math.floor(fishAmt * 1.5);
+    state.fish += fishAmt;
+    if (state.score) state.score.fishCaught += fishAmt;
+    addNotification('Fishing pier: +' + fishAmt + ' fish', '#4488aa');
+  }
+  // Colosseum passive gold
+  if (hasPrestigeBuilding('colosseum')) {
+    let goldAmt = PRESTIGE_BUILDINGS.colosseum.dailyGold;
+    state.gold += goldAmt;
+    if (state.score) state.score.goldEarned += goldAmt;
+    addNotification('Colosseum games: +' + goldAmt + 'g', '#ddaa44');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ─── SCORING / LEADERBOARD ─────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+
+function calculateScore() {
+  if (!state.score) return 0;
+  let s = state.score;
+  return (s.goldEarned * 1) +
+    (s.buildingsBuilt * 10) +
+    (s.questsCompleted * 50) +
+    (s.fishCaught * 5) +
+    (s.enemiesDefeated * 3) +
+    (s.daysSurvived * 2);
+}
+
+function getScoreBreakdown() {
+  if (!state.score) return [];
+  let s = state.score;
+  return [
+    { label: 'Gold earned', value: s.goldEarned, points: s.goldEarned * 1 },
+    { label: 'Buildings built', value: s.buildingsBuilt, points: s.buildingsBuilt * 10 },
+    { label: 'Quests completed', value: s.questsCompleted, points: s.questsCompleted * 50 },
+    { label: 'Fish caught', value: s.fishCaught, points: s.fishCaught * 5 },
+    { label: 'Enemies defeated', value: s.enemiesDefeated, points: s.enemiesDefeated * 3 },
+    { label: 'Days survived', value: s.daysSurvived, points: s.daysSurvived * 2 },
+  ];
+}
+
+// ─── PRESTIGE / SCORE UI ──────────────────────────────────────────────
+
+let _prestigeUIOpen = false;
+
+function drawPrestigeUI() {
+  if (!_prestigeUIOpen) return;
+  push();
+
+  let pw = 380, ph = 420;
+  let px = width / 2 - pw / 2, py = height / 2 - ph / 2;
+
+  // Panel
+  fill(15, 12, 8, 240);
+  stroke(200, 170, 60);
+  strokeWeight(2);
+  rect(px, py, pw, ph, 8);
+  noStroke();
+
+  // Title
+  fill(255, 220, 100);
+  textSize(16); textAlign(CENTER, TOP);
+  let pCount = state.prestige ? state.prestige.count : 0;
+  text('IMPERATOR LEGACY' + (pCount > 0 ? '  [Prestige ' + pCount + ']' : ''), width / 2, py + 12);
+
+  // Score breakdown
+  let breakdown = getScoreBreakdown();
+  let sy = py + 42;
+  fill(180, 170, 130); textSize(10); textAlign(LEFT, TOP);
+  for (let i = 0; i < breakdown.length; i++) {
+    let b = breakdown[i];
+    fill(40, 35, 28, 180);
+    rect(px + 12, sy, pw - 24, 22, 3);
+    fill(200, 190, 150); textSize(9); textAlign(LEFT, TOP);
+    text(b.label + ': ' + b.value, px + 20, sy + 6);
+    fill(255, 220, 80); textAlign(RIGHT, TOP);
+    text('+' + b.points + ' pts', px + pw - 20, sy + 6);
+    sy += 26;
+  }
+
+  // Total score
+  sy += 8;
+  fill(255, 230, 120); textSize(14); textAlign(CENTER, TOP);
+  text('TOTAL SCORE: ' + calculateScore(), width / 2, sy);
+  if (pCount > 0) {
+    sy += 20;
+    fill(200, 190, 140); textSize(9);
+    text('Cumulative: ' + ((state.prestige ? state.prestige.totalScore : 0) + calculateScore()), width / 2, sy);
+  }
+
+  // Prestige buildings section
+  sy += 30;
+  fill(220, 200, 140); textSize(12); textAlign(CENTER, TOP);
+  text('PRESTIGE BUILDINGS', width / 2, sy);
+  sy += 18;
+
+  let pbKeys = Object.keys(PRESTIGE_BUILDINGS);
+  for (let i = 0; i < pbKeys.length; i++) {
+    let bk = pbKeys[i];
+    let pb = PRESTIGE_BUILDINGS[bk];
+    let owned = hasPrestigeBuilding(bk);
+    let canBuy = !owned && canAffordPrestigeBuilding(bk) && pCount > 0;
+    fill(owned ? color(30, 50, 30, 200) : color(40, 35, 28, 180));
+    rect(px + 12, sy, pw - 24, 32, 4);
+    fill(owned ? color(100, 220, 100) : (canBuy ? color(220, 200, 150) : color(120, 110, 90)));
+    textSize(10); textAlign(LEFT, TOP);
+    text((owned ? '[BUILT] ' : '') + pb.name, px + 20, sy + 4);
+    fill(160, 150, 120); textSize(7);
+    text(pb.desc, px + 20, sy + 18);
+    if (!owned && pCount > 0) {
+      let costStr = Object.entries(pb.cost).map(([k, v]) => v + ' ' + k).join(', ');
+      fill(canBuy ? color(180, 160, 60) : color(100, 90, 70));
+      textSize(7); textAlign(RIGHT, TOP);
+      text(costStr, px + pw - 20, sy + 4);
+    }
+    sy += 36;
+  }
+
+  // Automation section
+  sy += 4;
+  fill(220, 200, 140); textSize(12); textAlign(CENTER, TOP);
+  text('AUTOMATION', width / 2, sy);
+  sy += 18;
+
+  let autoNames = { granaryAuto: 'Auto-Harvest Granary', fishingPier: 'Fishing Pier', tradeRouteAuto: 'Trade Route Express', watchtowerAuto: 'Watchtower Defense' };
+  let autoDescs = { granaryAuto: 'Auto-collect ripe crops', fishingPier: 'Generates fish daily', tradeRouteAuto: 'Trade ships sail 2x speed', watchtowerAuto: 'Auto-defend vs raiders' };
+  let autoKeys = Object.keys(AUTOMATION_COSTS);
+  for (let i = 0; i < autoKeys.length; i++) {
+    let ak = autoKeys[i];
+    let owned = state.automation && state.automation[ak];
+    let canBuy = !owned && canAffordAutomation(ak);
+    fill(owned ? color(30, 50, 30, 200) : color(40, 35, 28, 180));
+    rect(px + 12, sy, pw - 24, 28, 4);
+    fill(owned ? color(100, 220, 100) : (canBuy ? color(220, 200, 150) : color(120, 110, 90)));
+    textSize(9); textAlign(LEFT, TOP);
+    text((owned ? '[ACTIVE] ' : '') + autoNames[ak], px + 20, sy + 4);
+    fill(160, 150, 120); textSize(7);
+    text(autoDescs[ak], px + 20, sy + 16);
+    if (!owned) {
+      let cost = AUTOMATION_COSTS[ak];
+      let costStr = Object.entries(cost).map(([k, v]) => v + ' ' + k).join(', ');
+      fill(canBuy ? color(180, 160, 60) : color(100, 90, 70));
+      textSize(7); textAlign(RIGHT, TOP);
+      text(costStr, px + pw - 20, sy + 4);
+    }
+    sy += 32;
+  }
+
+  // New Game+ button
+  if (canPrestige()) {
+    sy += 8;
+    let btnW = 180, btnH = 30;
+    let btnX = width / 2 - btnW / 2;
+    fill(120, 80, 20, 220);
+    stroke(255, 200, 60);
+    strokeWeight(1);
+    rect(btnX, sy, btnW, btnH, 6);
+    noStroke();
+    fill(255, 230, 100);
+    textSize(12); textAlign(CENTER, CENTER);
+    text('NEW GAME+ (Prestige)', width / 2, sy + btnH / 2);
+  }
+
+  // Close hint
+  fill(120, 110, 90); textSize(8); textAlign(CENTER, TOP);
+  text('ESC to close', width / 2, py + ph - 16);
+
+  pop();
+}
+
+function handlePrestigeClick(mx, my) {
+  if (!_prestigeUIOpen) return false;
+  let pw = 380, ph = 420;
+  let px = width / 2 - pw / 2, py = height / 2 - ph / 2;
+  let pCount = state.prestige ? state.prestige.count : 0;
+
+  // Prestige buildings click
+  let sy = py + 42 + getScoreBreakdown().length * 26 + 8 + 20 + (pCount > 0 ? 20 : 0) + 30 + 18;
+  let pbKeys = Object.keys(PRESTIGE_BUILDINGS);
+  for (let i = 0; i < pbKeys.length; i++) {
+    let bk = pbKeys[i];
+    if (mx >= px + 12 && mx <= px + pw - 12 && my >= sy && my <= sy + 32) {
+      if (!hasPrestigeBuilding(bk) && pCount > 0) {
+        buyPrestigeBuilding(bk);
+        return true;
+      }
+    }
+    sy += 36;
+  }
+
+  // Automation click
+  sy += 4 + 18;
+  let autoKeys = Object.keys(AUTOMATION_COSTS);
+  for (let i = 0; i < autoKeys.length; i++) {
+    let ak = autoKeys[i];
+    if (mx >= px + 12 && mx <= px + pw - 12 && my >= sy && my <= sy + 28) {
+      if (!state.automation[ak]) {
+        buyAutomation(ak);
+        return true;
+      }
+    }
+    sy += 32;
+  }
+
+  // New Game+ button
+  if (canPrestige()) {
+    sy += 8;
+    let btnW = 180, btnH = 30;
+    let btnX = width / 2 - btnW / 2;
+    if (mx >= btnX && mx <= btnX + btnW && my >= sy && my <= sy + btnH) {
+      doPrestige();
+      _prestigeUIOpen = false;
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function handlePrestigeKey(k, kCode) {
+  if (_prestigeUIOpen) {
+    if (kCode === 27) { _prestigeUIOpen = false; return true; }
+    return true;
+  }
+  // Open prestige UI with P key when won or after chapter 10
+  if ((k === 'p' || k === 'P') && !state.conquest.active && !state.adventure.active && !state.rowing.active) {
+    if (state.won || (state.mainQuest && state.mainQuest.chapter >= 9)) {
+      _prestigeUIOpen = true;
+      return true;
+    }
+  }
+  return false;
+}
+
+// ─── PRICE TREND ARROWS FOR SHOP UI ──────────────────────────────────
+
+function drawPriceTrendArrow(x, y, trend) {
+  push();
+  noStroke();
+  if (trend > 0) {
+    fill(80, 200, 80);
+    triangle(x, y - 4, x - 3, y + 2, x + 3, y + 2);
+  } else if (trend < 0) {
+    fill(200, 80, 80);
+    triangle(x, y + 4, x - 3, y - 2, x + 3, y - 2);
+  } else {
+    fill(160, 160, 120);
+    rect(x - 3, y - 1, 6, 2);
+  }
+  pop();
 }

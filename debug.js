@@ -443,6 +443,22 @@ const Debug = {
           this.addLog('/tools — unlock all tools', '#aaffaa');
           break;
 
+        case '/skipwreck':
+          if (typeof completeSailToHome === 'function') completeSailToHome();
+          else { gameScreen = 'game'; state.currentIsland = 'home'; }
+          this.addLog('Skipped wreck — welcome home', '#ffdd44');
+          break;
+
+        case '/skipintro':
+          gameScreen = 'game'; state.currentIsland = 'home';
+          state.progression.gameStarted = true;
+          state.progression.villaCleared = true;
+          state.faction = state.faction || 'rome';
+          state.gold = 200; state.wood = 50; state.stone = 30;
+          state.player.level = 5;
+          this.addLog('Skipped all intros — Lv5 with resources', '#ffdd44');
+          break;
+
         default:
           // Try eval for advanced debugging
           try {

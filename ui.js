@@ -38,7 +38,7 @@ function drawNotifications() {
     let tw = textWidth(n.text) + 16;
     rect(nx - tw + slideX, ny - 11, tw, 14, 3);
     fill(red(c), green(c), blue(c), 255 * alpha);
-    textSize(7);
+    textSize(10);
     text(n.text, nx - 4 + slideX, ny);
     ny -= 16;
   }
@@ -83,7 +83,7 @@ function drawAchievementPopup() {
   text('\u2605', px + 8, py + ph / 2);
   // Text
   fill(240, 220, 180);
-  textSize(8);
+  textSize(11);
   text(a.text, px + 26, py + ph / 2 - 1);
   textAlign(LEFT, TOP);
 }
@@ -184,7 +184,7 @@ function drawJournalUI() {
       text(entry.title, panX + 20, ry + 3);
       // Preview text (truncated)
       fill(160, 145, 110);
-      textSize(7);
+      textSize(10);
       let preview = entry.text.substring(0, 65) + '...';
       text(preview, panX + 20, ry + 18);
     } else {
@@ -199,14 +199,14 @@ function drawJournalUI() {
   if (JOURNAL_ENTRIES.length > maxEntries) {
     fill(120, 100, 70);
     textAlign(CENTER, TOP);
-    textSize(8);
+    textSize(11);
     text('... ' + (JOURNAL_ENTRIES.length - maxEntries) + ' more entries below ...', width / 2, startY + maxEntries * 38 + 4);
   }
 
   // Tab hint
   fill(120, 100, 70);
   textAlign(CENTER, TOP);
-  textSize(8);
+  textSize(11);
   text('[TAB] Codex    [V] Close', width / 2, panY + ph - 16);
   textAlign(LEFT, TOP);
 }
@@ -282,7 +282,7 @@ function drawCodexUI() {
     // Items preview
     if (cat.items) {
       let ix = panX + 20;
-      textSize(7);
+      textSize(10);
       cat.items.forEach((item, j) => {
         if (j > 6) return;
         let found = cat.check(item);
@@ -296,7 +296,7 @@ function drawCodexUI() {
   // Close hint
   fill(120, 100, 70);
   textAlign(CENTER, TOP);
-  textSize(8);
+  textSize(11);
   text('[TAB] Journal    [V] Close', width / 2, panY + ph - 16);
   textAlign(LEFT, TOP);
 }
@@ -346,7 +346,7 @@ function drawRecipeBookUI() {
   text('RECIPE BOOK', width / 2, panY + 12);
 
   fill(160, 140, 100);
-  textSize(8);
+  textSize(11);
   text('Cook at the Cookpot near your villa', width / 2, panY + 29);
 
   // Recipe list
@@ -377,7 +377,7 @@ function drawRecipeBookUI() {
     let owned = state[r.item] || 0;
     if (owned > 0) {
       fill(180, 170, 120);
-      textSize(7);
+      textSize(10);
       text('x' + owned, panX + 28 + textWidth(r.name) + 6, ry + 4);
     }
 
@@ -389,14 +389,14 @@ function drawRecipeBookUI() {
       ingParts.push(amt + ' ' + resName + (have < amt ? ' (' + have + ')' : ''));
     }
     fill(affordable ? color(160, 150, 120) : color(120, 105, 85));
-    textSize(7);
+    textSize(10);
     text(ingParts.join('  +  '), panX + 28, ry + 15);
 
     // Effect text
     let eff = _RECIPE_EFFECTS[r.name] || '';
     if (eff) {
       fill(140, 160, 120);
-      textSize(6);
+      textSize(9);
       textAlign(RIGHT, TOP);
       text(eff, panX + pw - 16, ry + 4);
       textAlign(LEFT, TOP);
@@ -406,7 +406,7 @@ function drawRecipeBookUI() {
   // Close hint
   fill(120, 100, 70);
   textAlign(CENTER, TOP);
-  textSize(8);
+  textSize(11);
   text('[G] Close    Cook at Cookpot with [E]', width / 2, panY + ph - 16);
   textAlign(LEFT, TOP);
 
@@ -482,7 +482,7 @@ function drawNaturalistCodex() {
   let barW = pw - 80, barX = px + 40, barY = py + 33;
   fill(200, 185, 150); rect(barX, barY, barW, 8, 4);
   fill(120, 170, 100); rect(barX, barY, barW * (comp.done / max(comp.total, 1)), 8, 4);
-  fill(100, 80, 50); textSize(7); textAlign(RIGHT, TOP);
+  fill(100, 80, 50); textSize(10); textAlign(RIGHT, TOP);
   text(comp.done + '/' + comp.total, px + pw - 35, barY);
   // Tab strip
   let tabW = pw / 6, tabY = py + 48;
@@ -495,7 +495,7 @@ function drawNaturalistCodex() {
     rect(tx, tabY, tabW, 20, active ? [4, 4, 0, 0] : 0);
     noStroke();
     fill(tc.complete ? [80, 140, 70] : (active ? [60, 40, 20] : [100, 80, 55]));
-    textSize(8); textAlign(CENTER, CENTER);
+    textSize(11); textAlign(CENTER, CENTER);
     text(NAT_TAB_NAMES[i] + ' ' + tc.done + '/' + tc.total, tx + tabW / 2, tabY + 10);
   }
   // Content area
@@ -509,7 +509,7 @@ function drawNaturalistCodex() {
   else if (state.naturalistTab === 4) drawNatBuildingsTab(cx, cy, cw, ch);
   else if (state.naturalistTab === 5) drawNatLoreTab(cx, cy, cw, ch);
   // Close hint
-  fill(120, 100, 70); textSize(7); textAlign(CENTER, BOTTOM);
+  fill(120, 100, 70); textSize(10); textAlign(CENTER, BOTTOM);
   text('[N] Close  |  [1-6] Switch Tab', px + pw / 2, py + ph - 5);
   pop();
 }
@@ -518,17 +518,17 @@ function _drawNatEntry(x, y, w, label, rarity, desc, countStr, discovered) {
   let bg = discovered ? color(250, 245, 230, 220) : color(200, 195, 185, 140);
   fill(bg); noStroke(); rect(x, y, w, 42, 4);
   if (discovered) {
-    fill(color(NAT_RARITY_COLORS[rarity] || '#aabbcc')); textSize(7); textAlign(LEFT, TOP);
+    fill(color(NAT_RARITY_COLORS[rarity] || '#aabbcc')); textSize(10); textAlign(LEFT, TOP);
     text(rarity, x + 6, y + 3);
     fill(60, 40, 20); textSize(9); textStyle(BOLD);
     text(label, x + 6, y + 12);
-    textStyle(NORMAL); fill(90, 70, 45); textSize(7);
+    textStyle(NORMAL); fill(90, 70, 45); textSize(10);
     text(desc, x + 6, y + 24, w - 60);
-    if (countStr) { fill(100, 140, 80); textSize(7); textAlign(RIGHT, TOP); text(countStr, x + w - 6, y + 12); }
+    if (countStr) { fill(100, 140, 80); textSize(10); textAlign(RIGHT, TOP); text(countStr, x + w - 6, y + 12); }
   } else {
     fill(140, 130, 110); textSize(9); textAlign(LEFT, TOP); textStyle(ITALIC);
     text('???', x + 6, y + 14);
-    textStyle(NORMAL); textSize(7); fill(150, 140, 120);
+    textStyle(NORMAL); textSize(10); fill(150, 140, 120);
     text('Not yet discovered', x + 6, y + 26);
   }
   textAlign(LEFT, TOP); textStyle(NORMAL);
@@ -550,7 +550,7 @@ function drawNatFishTab(cx, cy, cw, ch) {
   }
   // Completion reward note
   let tc = getNatTabCompletion(0);
-  fill(tc.complete ? [80, 140, 70] : [130, 110, 75]); textSize(7); textAlign(LEFT, BOTTOM);
+  fill(tc.complete ? [80, 140, 70] : [130, 110, 75]); textSize(10); textAlign(LEFT, BOTTOM);
   text(tc.complete ? 'REWARD ACTIVE: +50% fishing speed' : 'Complete all ' + tc.total + ' fish for +50% fishing speed', cx + 4, cy + ch - 2);
 }
 
@@ -567,7 +567,7 @@ function drawNatCropsTab(cx, cy, cw, ch) {
     _drawNatEntryWithDiscovery(ex, ey, colW, d.label, d.rarity, d.desc, countStr, !!rec, 'crops', k);
   }
   let tc = getNatTabCompletion(1);
-  fill(tc.complete ? [80, 140, 70] : [130, 110, 75]); textSize(7); textAlign(LEFT, BOTTOM);
+  fill(tc.complete ? [80, 140, 70] : [130, 110, 75]); textSize(10); textAlign(LEFT, BOTTOM);
   text(tc.complete ? 'REWARD ACTIVE: +1 seed per harvest' : 'Grow all ' + tc.total + ' crops for +1 bonus seed per harvest', cx + 4, cy + ch - 2);
 }
 
@@ -584,7 +584,7 @@ function drawNatBestiaryTab(cx, cy, cw, ch) {
     _drawNatEntryWithDiscovery(ex, ey, colW, d.label, d.rarity, d.desc, countStr, !!rec, 'enemies', k);
   }
   let tc = getNatTabCompletion(2);
-  fill(tc.complete ? [80, 140, 70] : [130, 110, 75]); textSize(7); textAlign(LEFT, BOTTOM);
+  fill(tc.complete ? [80, 140, 70] : [130, 110, 75]); textSize(10); textAlign(LEFT, BOTTOM);
   text(tc.complete ? 'REWARD ACTIVE: +10% damage' : 'Defeat all ' + tc.total + ' enemy types for +10% damage', cx + 4, cy + ch - 2);
 }
 
@@ -601,7 +601,7 @@ function drawNatRelicsTab(cx, cy, cw, ch) {
     _drawNatEntryWithDiscovery(ex, ey, colW, d.label, d.rarity, d.desc, countStr, !!rec, 'relics', k);
   }
   let tc = getNatTabCompletion(3);
-  fill(130, 110, 75); textSize(7); textAlign(LEFT, BOTTOM);
+  fill(130, 110, 75); textSize(10); textAlign(LEFT, BOTTOM);
   text('Dig treasures around the island to find relics. ' + tc.done + '/' + tc.total + ' found.', cx + 4, cy + ch - 2);
 }
 
@@ -617,13 +617,13 @@ function drawNatBuildingsTab(cx, cy, cw, ch) {
     let isBuilt = state.codex.buildingsBuilt && state.codex.buildingsBuilt[k];
     fill(isBuilt ? color(230, 225, 205, 220) : color(195, 190, 180, 130));
     noStroke(); rect(ex, ey, colW, entH, 3);
-    fill(isBuilt ? [50, 35, 20] : [140, 130, 115]); textSize(8); textAlign(LEFT, CENTER);
+    fill(isBuilt ? [50, 35, 20] : [140, 130, 115]); textSize(11); textAlign(LEFT, CENTER);
     let bp = BLUEPRINTS && BLUEPRINTS[k];
     let label = bp ? bp.name : k;
     text((isBuilt ? '' : '? ') + label, ex + 5, ey + entH / 2);
   }
   let tc = getNatTabCompletion(4);
-  fill(tc.complete ? [80, 140, 70] : [130, 110, 75]); textSize(7); textAlign(LEFT, BOTTOM);
+  fill(tc.complete ? [80, 140, 70] : [130, 110, 75]); textSize(10); textAlign(LEFT, BOTTOM);
   text(tc.complete ? 'REWARD ACTIVE: -20% build cost' : 'Build all types for -20% build cost. ' + tc.done + '/20 built.', cx + 4, cy + ch - 2);
 }
 
@@ -638,12 +638,12 @@ function drawNatLoreTab(cx, cy, cw, ch) {
     let rec = found[k];
     fill(rec ? color(230, 225, 205, 220) : color(195, 190, 180, 130));
     noStroke(); rect(ex, ey, colW, entH, 3);
-    fill(rec ? [50, 35, 20] : [140, 130, 115]); textSize(8); textAlign(LEFT, CENTER);
+    fill(rec ? [50, 35, 20] : [140, 130, 115]); textSize(11); textAlign(LEFT, CENTER);
     text(rec ? 'Tablet #' + k : '? Tablet #' + k, ex + 5, ey + entH / 2);
-    if (rec) { fill(100, 130, 80); textSize(6); text('Day ' + rec.firstDay, ex + colW - 28, ey + entH / 2); }
+    if (rec) { fill(100, 130, 80); textSize(9); text('Day ' + rec.firstDay, ex + colW - 28, ey + entH / 2); }
   }
   let tc = getNatTabCompletion(5);
-  fill(tc.complete ? [80, 140, 70] : [130, 110, 75]); textSize(7); textAlign(LEFT, BOTTOM);
+  fill(tc.complete ? [80, 140, 70] : [130, 110, 75]); textSize(10); textAlign(LEFT, BOTTOM);
   text(tc.complete ? 'REWARD ACTIVE: All lore unlocked — speak to Felix.' : 'Find all 20 lore tablets. ' + tc.done + '/20 found.', cx + 4, cy + ch - 2);
 }
 
@@ -672,7 +672,7 @@ function drawShopUI() {
   text('MERCATOR', width / 2, panY + 12);
   // Subtitle
   fill(160, 140, 100);
-  textSize(8);
+  textSize(11);
   text('Merchant Ship  —  Gold: ' + state.gold, width / 2, panY + 30);
   // Decorative line under title
   stroke(140, 110, 55, 100);
@@ -699,11 +699,16 @@ function drawShopUI() {
     textSize(9);
     text(offer.label, panX + 22, oy + 8);
 
+    // Price trend arrow
+    if (offer.trend !== undefined && typeof drawPriceTrendArrow === 'function') {
+      drawPriceTrendArrow(panX + panW - 50, oy + 12, offer.trend);
+    }
+
     // Click hint
     if (canDo) {
       fill(180, 150, 60);
       textAlign(RIGHT, TOP);
-      textSize(8);
+      textSize(11);
       text('CLICK', panX + panW - 18, oy + 9);
       textAlign(LEFT, TOP);
     }
@@ -712,7 +717,7 @@ function drawShopUI() {
   // Close hint
   fill(120, 100, 70);
   textAlign(CENTER, TOP);
-  textSize(8);
+  textSize(11);
   text('[E] Close', width / 2, panY + panH - 16);
   textAlign(LEFT, TOP);
 }
@@ -723,26 +728,37 @@ function drawAdventureHUD() {
   let a = state.adventure;
   push();
 
-  // HP Bar — top center
+  // HP Bar — top center (shakes on damage)
   let barW = 200, barH = 16;
   let barX = width / 2 - barW / 2;
   let barY = 15;
+  let _hpShakeOff = 0;
+  if (_juiceHpShakeTimer > 0) {
+    _hpShakeOff = floor(sin(_juiceHpShakeTimer * 1.5) * 3);
+    _juiceHpShakeTimer -= 1;
+  }
   // Background
   fill(40, 15, 15, 200);
-  rect(barX - 2, barY - 2, barW + 4, barH + 4, 4);
+  rect(barX - 2 + _hpShakeOff, barY - 2, barW + 4, barH + 4, 4);
   // Empty
   fill(80, 25, 20);
-  rect(barX, barY, barW, barH, 3);
+  rect(barX + _hpShakeOff, barY, barW, barH, 3);
   // Filled
   let hpFrac = max(0, p.hp / p.maxHp);
   let hpCol = hpFrac > 0.5 ? color(180, 50, 30) : (hpFrac > 0.25 ? color(200, 120, 20) : color(220, 40, 40));
   fill(hpCol);
-  rect(barX, barY, barW * hpFrac, barH, 3);
+  rect(barX + _hpShakeOff, barY, barW * hpFrac, barH, 3);
+  // Low HP pulse
+  if (hpFrac < 0.25) {
+    let pulse = sin(frameCount * 0.15) * 0.3 + 0.7;
+    fill(220, 40, 40, 40 * pulse);
+    rect(barX + _hpShakeOff, barY, barW * hpFrac, barH, 3);
+  }
   // Text
   fill(255);
   textSize(10);
   textAlign(CENTER, CENTER);
-  text('HP ' + max(0, floor(p.hp)) + ' / ' + p.maxHp, width / 2, barY + barH / 2);
+  text('HP ' + max(0, floor(p.hp)) + ' / ' + p.maxHp, width / 2 + _hpShakeOff, barY + barH / 2);
 
   // Wave indicator
   let waveText = '';
@@ -780,7 +796,7 @@ function drawAdventureHUD() {
 
   // Controls hint
   fill(160, 150, 130, 120);
-  textSize(8);
+  textSize(11);
   textAlign(RIGHT, BOTTOM);
   text('WASD move | SPACE attack | SHIFT dash', width - 10, height - 10);
 
@@ -804,14 +820,14 @@ function drawUpgradeShopUI() {
   // Title
   fill(220, 200, 150); textSize(14); textAlign(CENTER);
   text('EXPEDITION FORGE', px + panW / 2, py + 20);
-  fill(160, 140, 100); textSize(8);
+  fill(160, 140, 100); textSize(11);
   text('Upgrade your expeditions at the temple', px + panW / 2, py + 34);
 
   // Resource bar
   let ry = py + 44;
   fill(30, 25, 18, 180);
   rect(px + 8, ry, panW - 16, 18, 3);
-  fill(200, 180, 130); textSize(7); textAlign(LEFT);
+  fill(200, 180, 130); textSize(10); textAlign(LEFT);
   let resText = 'Gold:' + state.gold + '  Wood:' + state.wood + '  Iron:' + state.ironOre +
     '  Hide:' + state.rareHide + '  Relic:' + state.ancientRelic + '  Bone:' + state.titanBone;
   text(resText, px + 12, ry + 12);
@@ -835,7 +851,7 @@ function drawUpgradeShopUI() {
     fill(atMax ? 100 : 220, atMax ? 180 : 200, atMax ? 60 : 150);
     textSize(10); textAlign(LEFT);
     text(upg.name + (atMax ? ' (MAX)' : ' [Tier ' + tier + '/' + maxTier + ']'), px + 14, rowY + 12);
-    fill(150, 140, 110); textSize(7);
+    fill(150, 140, 110); textSize(10);
     text(upg.desc, px + 14, rowY + 24);
 
     // Cost + buy button
@@ -849,13 +865,13 @@ function drawUpgradeShopUI() {
       let btnX = px + panW - 85, btnY = rowY + 4;
       rect(btnX, btnY, 72, 24, 4);
       fill(canAfford ? 220 : 120, canAfford ? 240 : 120, canAfford ? 220 : 120);
-      textSize(7); textAlign(CENTER, CENTER);
+      textSize(10); textAlign(CENTER, CENTER);
       text(costStr, btnX + 36, btnY + 12);
     }
   }
 
   // Close hint
-  fill(140, 130, 100, 120); textSize(8); textAlign(CENTER);
+  fill(140, 130, 100, 120); textSize(11); textAlign(CENTER);
   text('[E] Close', px + panW / 2, py + panH - 10);
   pop();
 }
@@ -872,7 +888,7 @@ function drawBountyBoard() {
   strokeWeight(1);
   rect(bx, by, 170, 16 + bb.bounties.length * 22, 5);
   noStroke();
-  fill(200, 180, 120); textSize(8); textAlign(LEFT);
+  fill(200, 180, 120); textSize(11); textAlign(LEFT);
   text('BOUNTIES', bx + 8, by + 11);
   for (let i = 0; i < bb.bounties.length; i++) {
     let b = bb.bounties[i];
@@ -880,7 +896,7 @@ function drawBountyBoard() {
     fill(b.completed ? 60 : 35, b.completed ? 50 : 30, 25, 150);
     rect(bx + 4, ry, 162, 18, 3);
     fill(b.completed ? color(100, 180, 80) : color(180, 160, 120));
-    textSize(7); textAlign(LEFT);
+    textSize(10); textAlign(LEFT);
     text(b.desc, bx + 8, ry + 10);
     // Progress
     fill(b.completed ? color(100, 200, 80) : color(140, 120, 80));
@@ -926,7 +942,7 @@ function drawModifierSelectUI() {
   // Title
   fill(220, 200, 150); textSize(13); textAlign(CENTER);
   text('CHOOSE EXPEDITION TYPE', px + panW / 2, py + 20);
-  fill(160, 140, 100); textSize(7);
+  fill(160, 140, 100); textSize(10);
   text('Select a modifier for this expedition', px + panW / 2, py + 34);
 
   // Modifier options
@@ -952,7 +968,7 @@ function drawModifierSelectUI() {
     fill(selected ? 255 : 200, selected ? 240 : 190, selected ? 200 : 150);
     textSize(10); textAlign(LEFT);
     text(mod.name, px + 30, ry + 11);
-    fill(150, 140, 110); textSize(7);
+    fill(150, 140, 110); textSize(10);
     text(mod.desc, px + 30, ry + 23);
 
     // Key hint
@@ -969,7 +985,7 @@ function drawModifierSelectUI() {
   let costM = min(3, 1 + floor(en / 3));
   let totalFood = (state.meals || 0) + (state.stew || 0);
   let canGo = state.gold >= costG && state.wood >= costW && totalFood >= costM;
-  fill(canGo ? 140 : 180, canGo ? 130 : 60, canGo ? 100 : 50, 160); textSize(8); textAlign(CENTER);
+  fill(canGo ? 140 : 180, canGo ? 130 : 60, canGo ? 100 : 50, 160); textSize(11); textAlign(CENTER);
   text('Cost: ' + costG + 'g  ' + costW + ' wood  ' + costM + ' food (have ' + totalFood + ')', px + panW / 2, py + panH - 24);
   // Confirm hint
   fill(180, 160, 100, 180); textSize(9);
@@ -982,37 +998,126 @@ function drawLegiaUI() {
   let lg = state.legia;
   if (!lg || !lg.legiaUIOpen) return;
   push();
-  let pw = 240, ph = 150;
+
+  let hasArmy = typeof getArmyCount === 'function';
+  let armyCount = hasArmy ? getArmyCount() : 0;
+  let maxSoldiers = hasArmy && typeof getMaxSoldiers === 'function' ? getMaxSoldiers() : lg.maxRecruits;
+  let unlockedTypes = hasArmy && typeof getUnlockedUnitTypes === 'function' ? getUnlockedUnitTypes() : ['legionary'];
+  let upkeep = hasArmy && typeof getArmyUpkeep === 'function' ? getArmyUpkeep() : 0;
+  let garrison = hasArmy && typeof getGarrisonCount === 'function' ? getGarrisonCount() : 0;
+  let deployed = hasArmy && typeof getDeployedCount === 'function' ? getDeployedCount() : 0;
+  let morale = lg.morale || 100;
+  let castrumName = (typeof CASTRUM_LEVELS !== 'undefined' && CASTRUM_LEVELS[lg.castrumLevel]) ? CASTRUM_LEVELS[lg.castrumLevel].name : 'Barracks';
+
+  // Dynamic height based on unlocked units
+  let trainRows = unlockedTypes.length;
+  let pw = 320, ph = 200 + trainRows * 16 + (armyCount > 0 ? 50 : 0);
   let px = width / 2 - pw / 2, py = height / 2 - ph / 2;
-  // Parchment background
-  fill(210, 190, 140, 230); stroke(140, 110, 70); strokeWeight(2);
-  rect(px, py, pw, ph, 6);
-  noStroke();
-  fill(90, 60, 30); textAlign(CENTER, TOP); textSize(12);
+
+  // Dark panel background
+  fill(25, 18, 12, 235); stroke(160, 120, 60); strokeWeight(2);
+  rect(px, py, pw, ph, 8); noStroke();
+
+  // Title + banner
+  fill(200, 160, 80); textAlign(CENTER, TOP); textSize(13);
   text('LEGIO NOSTRA', px + pw / 2, py + 10);
-  fill(100, 75, 40); textSize(9); textAlign(LEFT, TOP);
-  text('Recruits: ' + lg.recruits + ' / ' + lg.maxRecruits, px + 14, py + 32);
-  text('Training: ' + lg.trainingQueue + ' queued', px + 14, py + 46);
-  if (lg.trainingTimer > 0) {
-    text('Next ready in: ' + ceil(lg.trainingTimer) + ' frames', px + 14, py + 60);
+  fill(140, 110, 70); textSize(9);
+  text(castrumName + ' (Level ' + lg.castrumLevel + '/' + 5 + ')', px + pw / 2, py + 26);
+
+  let sy = py + 44;
+  fill(180, 160, 120); textSize(10); textAlign(LEFT, TOP);
+
+  // Army overview
+  text('Army: ' + armyCount + ' / ' + maxSoldiers, px + 14, sy);
+  text('Garrison: ' + garrison + '  |  Deployed: ' + deployed, px + 14, sy + 13);
+  sy += 28;
+
+  // Morale bar
+  fill(140, 120, 90); textSize(9);
+  text('Morale:', px + 14, sy);
+  fill(40, 30, 20); rect(px + 60, sy, 100, 8, 2);
+  let moraleCol = morale > 60 ? color(80, 180, 80) : morale > 30 ? color(200, 180, 40) : color(200, 60, 40);
+  fill(moraleCol); rect(px + 60, sy, floor(100 * morale / 100), 8, 2);
+  fill(200, 180, 140); textSize(8); textAlign(RIGHT, TOP);
+  text(floor(morale) + '%', px + 170, sy);
+  sy += 14;
+
+  // Upkeep
+  fill(180, 140, 80); textSize(9); textAlign(LEFT, TOP);
+  text('Daily Upkeep: ' + upkeep + 'g/day', px + 14, sy);
+  sy += 16;
+
+  // Unit counts by type
+  if (armyCount > 0 && hasArmy) {
+    fill(160, 140, 100); textSize(9);
+    let typeNames = { legionary: 'Legionary', archer: 'Archer', cavalry: 'Cavalry', siege_ram: 'Siege Ram', centurion: 'Centurion' };
+    for (let t of unlockedTypes) {
+      let cnt = typeof getArmyCountByType === 'function' ? getArmyCountByType(t) : 0;
+      if (cnt > 0) {
+        text('  ' + (typeNames[t] || t) + ': ' + cnt, px + 14, sy);
+        sy += 12;
+      }
+    }
+    sy += 4;
   }
-  text('Castrum Level: ' + lg.castrumLevel, px + 14, py + 76);
-  // Action hints
-  fill(60, 40, 20); textSize(8);
-  text('[1] Train Legionary (20g + 1 meal)', px + 14, py + 98);
-  if (lg.castrumLevel < 3) {
-    let upg = lg.castrumLevel === 1 ? '100g + 20 stone' : '300g + 50 stone + 10 iron';
-    text('[2] Upgrade Castrum (' + upg + ')', px + 14, py + 112);
+
+  // Separator
+  stroke(100, 80, 50, 120); strokeWeight(1);
+  line(px + 14, sy, px + pw - 14, sy); noStroke();
+  sy += 6;
+
+  // Train buttons
+  fill(200, 170, 100); textSize(10); textAlign(LEFT, TOP);
+  text('TRAIN UNITS:', px + 14, sy); sy += 14;
+
+  let unitKeys = { legionary: '1', archer: '3', cavalry: '4', siege_ram: '5', centurion: '6' };
+  let unitCosts = (typeof UNIT_TYPES !== 'undefined') ? UNIT_TYPES : {};
+  for (let t of unlockedTypes) {
+    let k = unitKeys[t] || '?';
+    let def = unitCosts[t];
+    let costStr = def ? def.cost + 'g' : '?g';
+    let nameStr = def ? def.name : t;
+    fill(armyCount < maxSoldiers ? color(180, 160, 120) : color(100, 80, 60));
+    textSize(10);
+    text('[' + k + '] ' + nameStr + ' (' + costStr + ')', px + 20, sy);
+    sy += 15;
   }
-  // Army count and expedition launch prompt
-  if (state.legia.soldiers && state.legia.soldiers.length > 0) {
-    fill(220, 200, 160); textSize(9);
-    text('Army: ' + state.legia.soldiers.length + ' legionaries', px + 14, py + 112);
-    fill(180, 160, 120); textSize(8);
-    text('[R] Launch expedition (go to port)', px + 14, py + 126);
-  } else {
-    text('[ESC] Close', px + 14, py + 126);
+
+  // Upgrade castrum
+  if (lg.castrumLevel < 5) {
+    sy += 4;
+    let nextLvData = (typeof CASTRUM_LEVELS !== 'undefined') ? CASTRUM_LEVELS[lg.castrumLevel + 1] : null;
+    let costStr = '';
+    if (nextLvData && nextLvData.cost) {
+      let c = nextLvData.cost;
+      let parts = [];
+      if (c.gold) parts.push(c.gold + 'g');
+      if (c.stone) parts.push(c.stone + ' stone');
+      if (c.ironOre) parts.push(c.ironOre + ' iron');
+      if (c.crystals) parts.push(c.crystals + ' crystal');
+      costStr = parts.join(' + ');
+    }
+    fill(200, 170, 100); textSize(10);
+    text('[2] Upgrade to ' + (nextLvData ? nextLvData.name : 'next') + ' (' + costStr + ')', px + 14, sy);
+    sy += 16;
   }
+
+  // Garrison toggle
+  if (armyCount > 0) {
+    sy += 2;
+    fill(160, 140, 100); textSize(10);
+    text('[G] Toggle garrison/deploy all', px + 14, sy); sy += 14;
+  }
+
+  // Expedition launch
+  if (armyCount > 0) {
+    fill(180, 160, 120); textSize(10);
+    text('[R] Launch expedition (go to port)', px + 14, sy); sy += 14;
+  }
+
+  // Close hint
+  fill(100, 90, 70); textSize(9); textAlign(CENTER, TOP);
+  text('[L] or [ESC] Close', px + pw / 2, py + ph - 16);
   pop();
 }
 
@@ -1144,7 +1249,7 @@ function drawColonyOverlay() {
         fill(lerpColor(color(160, 80, 40), color(200, 120, 60), bright));
         triangle(bx - bw / 2 - 2, by - bh / 2 - 6, bx + bw / 2 + 2, by - bh / 2 - 6, bx, by - bh / 2 - 20);
         // Label
-        fill(255, 240, 200, 150); textSize(6); textAlign(CENTER);
+        fill(255, 240, 200, 150); textSize(9); textAlign(CENTER);
         text('FORUM', bx, by + bh / 2 + 8);
         break;
       case 'granary':
@@ -1185,7 +1290,7 @@ function drawColonyOverlay() {
   fill(255, 230, 180, 180); textSize(9); textAlign(CENTER);
   let labelY = sy - floor(c.isleRY * 0.55);
   text('Colony LV.' + c.colonyLevel, sx, labelY);
-  fill(200, 190, 150, 120); textSize(7);
+  fill(200, 190, 150, 120); textSize(10);
   text(c.colonyWorkers + ' workers  +' + c.colonyIncome + 'g/day', sx, labelY + 12);
   textAlign(LEFT, TOP);
 
@@ -1206,11 +1311,13 @@ function trackHudResource(key, val) {
 function drawHudResource(x, y, label, val, col, key) {
   trackHudResource(key, val);
   let flash = hudFlash[key];
-  let sc = 1, flashAlpha = 0;
+  let sc = 1, flashAlpha = 0, _fDelta = 0;
   if (flash && flash.timer > 0) {
     let t = flash.timer / 15;
-    sc = 1 + 0.15 * t;
+    let bounce = t > 0.5 ? sin(t * PI) : sin(t * PI * 2) * 0.5;
+    sc = 1 + 0.2 * bounce;
     flashAlpha = t;
+    _fDelta = flash.delta || 0;
     flash.timer--;
   }
   push();
@@ -1220,11 +1327,15 @@ function drawHudResource(x, y, label, val, col, key) {
   textSize(9);
   textAlign(LEFT, TOP);
   text(label + val, 0, 0);
-  // Gold flash pulse on change
   if (flashAlpha > 0) {
     let pulse = 0.5 + 0.5 * sin(flashAlpha * PI);
     fill(255, 200, 60, 160 * flashAlpha * pulse);
     text(label + val, 0, 0);
+    if (_fDelta !== 0) {
+      fill(_fDelta > 0 ? 80 : 220, _fDelta > 0 ? 220 : 80, 80, 200 * flashAlpha);
+      textSize(7);
+      text((_fDelta > 0 ? '+' : '') + _fDelta, textWidth(label + val) + 4, -2 - floor(flashAlpha * 4));
+    }
   }
   pop();
 }
@@ -1245,12 +1356,12 @@ function drawEmpireDashboard() {
   text('IMPERIUM ROMANUM', width/2, py+14);
   let rkT = state.islandLevel>=25?'IMPERATOR':state.islandLevel>=20?'CONSUL':state.islandLevel>=15?'SENATOR':state.islandLevel>=10?'GOVERNOR':'CITIZEN';
   let _iName = state.islandName ? '"' + state.islandName + '" — ' : '';
-  fill(160,140,100); textSize(8); text(rkT+' \u2014 ' + _iName + 'Island Level '+state.islandLevel, width/2, py+32);
+  fill(160,140,100); textSize(11); text(rkT+' \u2014 ' + _iName + 'Island Level '+state.islandLevel, width/2, py+32);
   stroke(120,95,55,80); strokeWeight(0.5); line(px+20,py+46,px+pw-20,py+46); noStroke();
   let mX=px+14,mY=py+54,mW=pw*0.45,mH=ph*0.5;
   fill(20,25,35,200); rect(mX,mY,mW,mH,4);
   stroke(100,85,55,100); strokeWeight(0.5); noFill(); rect(mX,mY,mW,mH,4); noStroke();
-  fill(140,120,80); textSize(7); textAlign(CENTER,TOP); text('WORLD MAP',mX+mW/2,mY+3);
+  fill(140,120,80); textSize(10); textAlign(CENTER,TOP); text('WORLD MAP',mX+mW/2,mY+3);
   let _isls=[{n:'Home',x:WORLD.islandCX,y:WORLD.islandCY,c:color(80,120,50),rx:18,ry:12},{n:'Arena',x:state.adventure.isleX,y:state.adventure.isleY,c:color(160,80,60),rx:8,ry:6},{n:'Terra Nova',x:state.conquest.isleX,y:state.conquest.isleY,c:state.conquest.colonized?color(80,160,80):color(80,120,160),rx:14,ry:10},{n:'Vulcan',x:state.vulcan.isleX,y:state.vulcan.isleY,c:color(180,60,30),rx:10,ry:8},{n:'Hyperborea',x:state.hyperborea.isleX,y:state.hyperborea.isleY,c:color(100,180,220),rx:11,ry:8},{n:'Plenty',x:state.plenty.isleX,y:state.plenty.isleY,c:color(60,160,60),rx:12,ry:9},{n:'Necropolis',x:state.necropolis.isleX,y:state.necropolis.isleY,c:color(120,50,160),rx:10,ry:7}];
   let _mnX=Infinity,_mxX=-Infinity,_mnY=Infinity,_mxY=-Infinity;
   _isls.forEach(i=>{_mnX=min(_mnX,i.x);_mxX=max(_mxX,i.x);_mnY=min(_mnY,i.y);_mxY=max(_mxY,i.y);});
@@ -1260,23 +1371,23 @@ function drawEmpireDashboard() {
   _isls.forEach(il=>{let ix=_mcx+(il.x-_aX)*_mSc,iy=_mcy+(il.y-_aY)*_mSc;fill(il.c);noStroke();ellipse(ix,iy,il.rx,il.ry);fill(200,185,150,180);textSize(5.5);textAlign(CENTER,TOP);text(il.n,ix,iy+il.ry/2+2);});
   fill(255,80,40,180+sin(frameCount*0.15)*60);circle(_mcx+(state.player.x-_aX)*_mSc,_mcy+(state.player.y-_aY)*_mSc,5);
   let sX=px+pw*0.52,sY=py+54,sW=pw*0.45;
-  fill(160,140,90);textSize(8);textAlign(LEFT,TOP);text('EMPIRE STATISTICS',sX,sY);sY+=14;
+  fill(160,140,90);textSize(11);textAlign(LEFT,TOP);text('EMPIRE STATISTICS',sX,sY);sY+=14;
   let _cI=state.conquest.colonized?state.conquest.colonyIncome:0,_tP=1+(state.conquest.colonized?state.conquest.colonyWorkers:0),_mS=state.conquest.soldiers.length+(state.centurion.hp>0?1:0);
-  [{l:'GOLD',v:state.gold,c:'#ffbb22'},{l:'POPULATION',v:_tP,c:'#aaddaa'},{l:'MILITARY',v:_mS+' sol.',c:'#dd8888'},{l:'DAILY INCOME',v:'+'+_cI+'g',c:'#ddcc66'},{l:'EXPEDITIONS',v:state.conquest.expeditionNum,c:'#88aadd'},{l:'TOTAL KILLS',v:state.conquest.totalKills,c:'#cc8866'},{l:'DAY',v:state.day,c:'#aabbcc'},{l:'SEASON',v:getSeasonName().split(' ')[0],c:'#88cc66'}].forEach(s=>{fill(color(s.c));textSize(7);textAlign(LEFT,TOP);text(s.l,sX,sY);textAlign(RIGHT,TOP);text(''+s.v,sX+sW,sY);sY+=13;});
-  textAlign(LEFT,TOP);sY+=6;fill(140,120,80);textSize(7);text('RANK PROGRESS',sX,sY);sY+=11;
+  [{l:'GOLD',v:state.gold,c:'#ffbb22'},{l:'POPULATION',v:_tP,c:'#aaddaa'},{l:'MILITARY',v:_mS+' sol.',c:'#dd8888'},{l:'DAILY INCOME',v:'+'+_cI+'g',c:'#ddcc66'},{l:'EXPEDITIONS',v:state.conquest.expeditionNum,c:'#88aadd'},{l:'TOTAL KILLS',v:state.conquest.totalKills,c:'#cc8866'},{l:'DAY',v:state.day,c:'#aabbcc'},{l:'SEASON',v:getSeasonName().split(' ')[0],c:'#88cc66'}].forEach(s=>{fill(color(s.c));textSize(10);textAlign(LEFT,TOP);text(s.l,sX,sY);textAlign(RIGHT,TOP);text(''+s.v,sX+sW,sY);sY+=13;});
+  textAlign(LEFT,TOP);sY+=6;fill(140,120,80);textSize(10);text('RANK PROGRESS',sX,sY);sY+=11;
   let _rks=[{n:'Citizen',l:1},{n:'Governor',l:10},{n:'Senator',l:15},{n:'Consul',l:20},{n:'Imperator',l:25}],_cR=0;
   for(let i=_rks.length-1;i>=0;i--){if(state.islandLevel>=_rks[i].l){_cR=i;break;}}
   let _nR=min(_cR+1,_rks.length-1),_rF=_cR===_nR?1:(state.islandLevel-_rks[_cR].l)/(_rks[_nR].l-_rks[_cR].l);
   fill(40,35,25);rect(sX,sY,sW,10,4);fill(180,145,60);rect(sX,sY,sW*_rF,10,4);
-  fill(255,230,180);textSize(6);textAlign(CENTER,CENTER);text(_rks[_cR].n+' \u2192 '+_rks[_nR].n,sX+sW/2,sY+5);textAlign(LEFT,TOP);
+  fill(255,230,180);textSize(9);textAlign(CENTER,CENTER);text(_rks[_cR].n+' \u2192 '+_rks[_nR].n,sX+sW/2,sY+5);textAlign(LEFT,TOP);
   let cdY=py+ph*0.62;stroke(120,95,55,60);strokeWeight(0.5);line(px+20,cdY-6,px+pw-20,cdY-6);noStroke();
-  fill(160,140,90);textSize(8);text('COLONIES & FLEET',px+14,cdY);cdY+=14;
-  if(state.conquest.colonized){let cw=pw*0.4,ch=ph*0.26;fill(30,25,18,200);rect(px+14,cdY,cw,ch,4);stroke(120,100,60,100);strokeWeight(0.5);noFill();rect(px+14,cdY,cw,ch,4);noStroke();fill(140,200,140);textSize(8);text('Terra Nova',px+22,cdY+6);fill(120,110,80);textSize(7);text('Colony Level '+state.conquest.colonyLevel,px+22,cdY+18);text('Workers: '+state.conquest.colonyWorkers,px+22,cdY+30);text('Income: +'+state.conquest.colonyIncome+'g/day',px+22,cdY+42);
-  } else {fill(100,90,70);textSize(7);text('No colonies yet. Conquer Terra Nova (LV.10+)',px+14,cdY+4);}
-  let fX=px+pw*0.52;fill(120,110,80);textSize(7);text('FLEET',fX,cdY);text('Navis Parva - Active',fX,cdY+13);
+  fill(160,140,90);textSize(11);text('COLONIES & FLEET',px+14,cdY);cdY+=14;
+  if(state.conquest.colonized){let cw=pw*0.4,ch=ph*0.26;fill(30,25,18,200);rect(px+14,cdY,cw,ch,4);stroke(120,100,60,100);strokeWeight(0.5);noFill();rect(px+14,cdY,cw,ch,4);noStroke();fill(140,200,140);textSize(11);text('Terra Nova',px+22,cdY+6);fill(120,110,80);textSize(10);text('Colony Level '+state.conquest.colonyLevel,px+22,cdY+18);text('Workers: '+state.conquest.colonyWorkers,px+22,cdY+30);text('Income: +'+state.conquest.colonyIncome+'g/day',px+22,cdY+42);
+  } else {fill(100,90,70);textSize(10);text('No colonies yet. Conquer Terra Nova (LV.10+)',px+14,cdY+4);}
+  let fX=px+pw*0.52;fill(120,110,80);textSize(10);text('FLEET',fX,cdY);text('Navis Parva - Active',fX,cdY+13);
   fill(state.ship.state==='docked'?color(140,200,140):color(90,80,60));text('Merchant - '+(state.ship.state==='docked'?'DOCKED':state.ship.state==='gone'?'At sea':state.ship.state.toUpperCase()),fX,cdY+26);
   if(state.imperialBridge.built){fill(200,170,90);text('Imperial Bridge - ACTIVE',fX,cdY+39);}
-  fill(120,100,70);textSize(7);textAlign(CENTER,BOTTOM);text('[TAB] Close',width/2,py+ph-6);textAlign(LEFT,TOP);
+  fill(120,100,70);textSize(10);textAlign(CENTER,BOTTOM);text('[TAB] Close',width/2,py+ph-6);textAlign(LEFT,TOP);
 }
 function _empDL(x1,y1,x2,y2,dl){let d=dist(x1,y1,x2,y2);if(d<1)return;let dx=(x2-x1)/d,dy=(y2-y1)/d;for(let i=0;i<d;i+=dl*2){let e=min(i+dl,d);line(x1+dx*i,y1+dy*i,x1+dx*e,y1+dy*e);}}
 
@@ -1289,16 +1400,16 @@ function drawInventoryScreen() {
   fill(212,175,80);textAlign(CENTER,TOP);textSize(13);text('INVENTARIUM',width/2,py+12);
   let gX=px+16,gY=py+36,cW=60,cH=36,cols=floor((pw-32)/cW);
   let _res=[{n:'Seeds',v:state.seeds,c:'#88cc44'},{n:'Harvest',v:state.harvest,c:'#ccaa44'},{n:'Wood',v:state.wood,c:'#8c6428'},{n:'Stone',v:state.stone,c:'#7a7268'},{n:'Crystals',v:state.crystals,c:'#44ffaa'},{n:'Gold',v:state.gold,c:'#ffbb22'},{n:'Fish',v:state.fish,c:'#64b4ff'},{n:'Iron',v:state.ironOre,c:'#aab8cc'},{n:'Hide',v:state.rareHide,c:'#c8a078'},{n:'Relics',v:state.ancientRelic,c:'#dc8cdc'},{n:'Bone',v:state.titanBone,c:'#f0dc8c'},{n:'Grape Sd',v:state.grapeSeeds,c:'#8c3ca0'},{n:'Olive Sd',v:state.oliveSeeds,c:'#6a8e30'}];
-  _res.forEach((r,i)=>{let cx=gX+(i%cols)*cW,cy=gY+floor(i/cols)*cH;fill(r.v>0?color(40,35,25,200):color(25,20,14,150));rect(cx,cy,cW-4,cH-4,3);if(r.v>0){stroke(100,85,55,60);strokeWeight(0.5);noFill();rect(cx,cy,cW-4,cH-4,3);noStroke();}fill(r.v>0?color(r.c):color(60,50,40));textSize(10);textAlign(CENTER,TOP);text(r.v,cx+(cW-4)/2,cy+4);fill(r.v>0?color(160,140,100):color(70,60,45));textSize(6);text(r.n,cx+(cW-4)/2,cy+18);});
+  _res.forEach((r,i)=>{let cx=gX+(i%cols)*cW,cy=gY+floor(i/cols)*cH;fill(r.v>0?color(40,35,25,200):color(25,20,14,150));rect(cx,cy,cW-4,cH-4,3);if(r.v>0){stroke(100,85,55,60);strokeWeight(0.5);noFill();rect(cx,cy,cW-4,cH-4,3);noStroke();}fill(r.v>0?color(r.c):color(60,50,40));textSize(10);textAlign(CENTER,TOP);text(r.v,cx+(cW-4)/2,cy+4);fill(r.v>0?color(160,140,100):color(70,60,45));textSize(9);text(r.n,cx+(cW-4)/2,cy+18);});
   let eY=gY+ceil(_res.length/cols)*cH+10;stroke(120,95,55,60);strokeWeight(0.5);line(px+20,eY,px+pw-20,eY);noStroke();eY+=6;
-  fill(160,140,90);textSize(8);textAlign(LEFT,TOP);text('EQUIPMENT',px+16,eY);eY+=14;
+  fill(160,140,90);textSize(11);textAlign(LEFT,TOP);text('EQUIPMENT',px+16,eY);eY+=14;
   let _p=state.player;
-  [{l:'WEAPON',v:WEAPONS[_p.weapon].name,d:'DMG '+WEAPONS[_p.weapon].dmg,c:'#ddccaa'},{l:'ARMOR',v:ARMORS[_p.armor].name,d:_p.armor>0?'REDUCE -'+ARMORS[_p.armor].reduce:'None',c:'#aabbcc'},{l:'POTIONS',v:_p.potions+'x',d:'Heals '+POTION_HEAL+' HP',c:'#44dd88'}].forEach((eq,i)=>{let sx=px+16+i*(pw/3-4),sw=pw/3-12;fill(35,28,20,200);rect(sx,eY,sw,40,4);stroke(100,85,55,80);strokeWeight(0.5);noFill();rect(sx,eY,sw,40,4);noStroke();fill(120,100,70);textSize(6);textAlign(CENTER,TOP);text(eq.l,sx+sw/2,eY+3);fill(color(eq.c));textSize(9);text(eq.v,sx+sw/2,eY+12);fill(100,90,65);textSize(6);text(eq.d,sx+sw/2,eY+25);});
-  let coY=eY+50;fill(160,140,90);textSize(8);textAlign(LEFT,TOP);text('CONSUMABLES',px+16,coY);coY+=14;
-  [{n:'Meals',v:state.meals,c:'#dcb450'},{n:'Wine',v:state.wine,c:'#a03250'},{n:'Oil',v:state.oil,c:'#8ca03c'}].forEach((c,i)=>{let cx=px+16+i*(pw/3-4),cw=pw/3-12;fill(35,28,20,180);rect(cx,coY,cw,32,3);fill(c.v>0?color(c.c):color(60,50,40));textSize(10);textAlign(CENTER,TOP);text(c.v,cx+cw/2,coY+3);fill(c.v>0?color(140,120,85):color(60,50,40));textSize(6);text(c.n,cx+cw/2,coY+16);});
-  let tY=coY+40;let _tN=['Basic','Bronze','Iron'];fill(120,100,70);textSize(7);textAlign(LEFT,TOP);
+  [{l:'WEAPON',v:WEAPONS[_p.weapon].name,d:'DMG '+WEAPONS[_p.weapon].dmg,c:'#ddccaa'},{l:'ARMOR',v:ARMORS[_p.armor].name,d:_p.armor>0?'REDUCE -'+ARMORS[_p.armor].reduce:'None',c:'#aabbcc'},{l:'POTIONS',v:_p.potions+'x',d:'Heals '+POTION_HEAL+' HP',c:'#44dd88'}].forEach((eq,i)=>{let sx=px+16+i*(pw/3-4),sw=pw/3-12;fill(35,28,20,200);rect(sx,eY,sw,40,4);stroke(100,85,55,80);strokeWeight(0.5);noFill();rect(sx,eY,sw,40,4);noStroke();fill(120,100,70);textSize(9);textAlign(CENTER,TOP);text(eq.l,sx+sw/2,eY+3);fill(color(eq.c));textSize(9);text(eq.v,sx+sw/2,eY+12);fill(100,90,65);textSize(9);text(eq.d,sx+sw/2,eY+25);});
+  let coY=eY+50;fill(160,140,90);textSize(11);textAlign(LEFT,TOP);text('CONSUMABLES',px+16,coY);coY+=14;
+  [{n:'Meals',v:state.meals,c:'#dcb450'},{n:'Wine',v:state.wine,c:'#a03250'},{n:'Oil',v:state.oil,c:'#8ca03c'}].forEach((c,i)=>{let cx=px+16+i*(pw/3-4),cw=pw/3-12;fill(35,28,20,180);rect(cx,coY,cw,32,3);fill(c.v>0?color(c.c):color(60,50,40));textSize(10);textAlign(CENTER,TOP);text(c.v,cx+cw/2,coY+3);fill(c.v>0?color(140,120,85):color(60,50,40));textSize(9);text(c.n,cx+cw/2,coY+16);});
+  let tY=coY+40;let _tN=['Basic','Bronze','Iron'];fill(120,100,70);textSize(10);textAlign(LEFT,TOP);
   text('TOOLS:  Sickle: '+_tN[state.tools.sickle]+'  |  Axe: '+_tN[state.tools.axe]+'  |  Net: '+_tN[state.tools.net],px+16,tY);
-  fill(120,100,70);textSize(7);textAlign(CENTER,BOTTOM);text('[I] Close',width/2,py+ph-6);textAlign(LEFT,TOP);
+  fill(120,100,70);textSize(10);textAlign(CENTER,BOTTOM);text('[I] Close',width/2,py+ph-6);textAlign(LEFT,TOP);
 }
 
 function drawHotbar() {
@@ -1312,20 +1423,29 @@ function drawHotbar() {
   let by = height - slotH - 12;
 
   noStroke();
+  // Track hotbar selection change for bounce
+  if (typeof _hotbarPrevSlot === 'undefined') _hotbarPrevSlot = slot;
+  if (typeof _hotbarBounce === 'undefined') _hotbarBounce = 0;
+  if (_hotbarPrevSlot !== slot) { _hotbarBounce = 8; _hotbarPrevSlot = slot; }
+  if (_hotbarBounce > 0) _hotbarBounce -= 0.5;
+
   for (let i = 0; i < HOTBAR_ITEMS.length; i++) {
     let sx = bx + i * (slotW + gap);
     let selected = i === slot;
+    // Bounce offset for newly selected slot
+    let _slotBounce = (selected && _hotbarBounce > 0) ? floor(sin(_hotbarBounce / 8 * PI) * -4) : 0;
 
     // Slot background
     fill(selected ? 45 : 20, selected ? 38 : 16, selected ? 28 : 12, 200);
-    rect(sx, by, slotW, slotH);
-    // Gold border for selected
+    rect(sx, by + _slotBounce, slotW, slotH);
+    // Faction-tinted border for selected
     if (selected) {
-      fill(212, 160, 64, 200);
-      rect(sx, by, slotW, 2);
-      rect(sx, by + slotH - 2, slotW, 2);
-      rect(sx, by, 2, slotH);
-      rect(sx + slotW - 2, by, 2, slotH);
+      let _hbAc = (typeof getFactionData === 'function') ? getFactionData().accentColor : [212, 160, 64];
+      fill(_hbAc[0], _hbAc[1], _hbAc[2], 200);
+      rect(sx, by + _slotBounce, slotW, 2);
+      rect(sx, by + _slotBounce + slotH - 2, slotW, 2);
+      rect(sx, by + _slotBounce, 2, slotH);
+      rect(sx + slotW - 2, by + _slotBounce, 2, slotH);
     } else {
       fill(80, 70, 55, 100);
       rect(sx, by, slotW, 1);
@@ -1336,7 +1456,7 @@ function drawHotbar() {
 
     // Key number label (top-left of slot)
     fill(selected ? 212 : 120, selected ? 160 : 100, selected ? 64 : 60, selected ? 220 : 120);
-    textSize(6); textAlign(LEFT, TOP);
+    textSize(9); textAlign(LEFT, TOP);
     text(HOTBAR_ITEMS[i].key, sx + 2, by + 1);
 
     // Pixel icon in slot
@@ -1415,7 +1535,7 @@ function drawHotbar() {
 
   // Selected item name below hotbar
   fill(212, 160, 64);
-  textSize(7);
+  textSize(10);
   textAlign(CENTER, TOP);
   let cur = HOTBAR_ITEMS[slot];
   let displayName = cur.icon === 'weapon' ? WEAPONS[p.weapon].name : cur.name;
@@ -1597,31 +1717,33 @@ function drawHUD() {
 
   // Island level
   fill(color(C.textDim));
-  textSize(7);
+  textSize(10);
   let rankTitle = state.islandLevel >= 25 ? 'IMPERATOR' : state.islandLevel >= 20 ? 'CONSUL' : state.islandLevel >= 15 ? 'SENATOR' : state.islandLevel >= 10 ? 'GOVERNOR' : 'CITIZEN';
   text(rankTitle + ' — LV.' + state.islandLevel, 22, cookedY + 30 + qOff);
   // Skill points alert
+  let _skillOff = 0;
   if ((state.player.skillPoints || 0) > 0) {
-    fill(255, 220, 80); textSize(7);
+    fill(255, 220, 80); textSize(10);
     text('[K] ' + state.player.skillPoints + ' skill pt' + (state.player.skillPoints > 1 ? 's' : '') + ' ready', 22, cookedY + 41 + qOff);
+    _skillOff = 11;
   }
   // Season
   let seasonCol = getSeason() === 2 ? color(200, 140, 40) : getSeason() === 3 ? color(180, 200, 220) : getSeason() === 1 ? color(200, 180, 60) : color(80, 160, 50);
   fill(seasonCol);
-  textSize(7);
-  text(getSeasonName(), 22, cookedY + 41 + qOff);
+  textSize(10);
+  text(getSeasonName(), 22, cookedY + 41 + _skillOff + qOff);
   // Seasonal crop hint
   let _scHint = typeof getSeasonalCrop === 'function' ? getSeasonalCrop() : null;
   if (_scHint) {
-    fill(160, 150, 110, 160); textSize(6);
-    text('Best crop: ' + _scHint.name, 22, cookedY + 50 + qOff);
+    fill(160, 150, 110, 160); textSize(9);
+    text('Best crop: ' + _scHint.name, 22, cookedY + 50 + _skillOff + qOff);
   }
 
   // Ship status
-  let hudY = cookedY + 53;
+  let hudY = cookedY + 53 + _skillOff;
   if (state.ship.state !== 'gone') {
     fill(color(C.solarBright));
-    textSize(7);
+    textSize(10);
     text('SHIP: ' + state.ship.state.toUpperCase(), 22, hudY);
     hudY += 12;
   }
@@ -1629,7 +1751,7 @@ function drawHUD() {
   // Grape/olive seeds — only show when player has some
   if (state.grapeSeeds > 0 || state.oliveSeeds > 0) {
     fill(140, 60, 160);
-    textSize(7);
+    textSize(10);
     let seedStr = '';
     if (state.grapeSeeds > 0) seedStr += 'GRAPE ' + state.grapeSeeds + '  ';
     if (state.oliveSeeds > 0) seedStr += 'OLIVE ' + state.oliveSeeds;
@@ -1640,7 +1762,8 @@ function drawHUD() {
   // Crop select
   fill(color(C.textDim));
   let sc = getSeasonalCrop();
-  let cropHint = sc ? '  (1/2/3/4)' : '  (1/2/3)';
+  let hasNewSeeds = (state.flaxSeeds > 0 || state.pomegranateSeeds > 0 || state.lotusSeeds > 0);
+  let cropHint = sc ? (hasNewSeeds ? '  (1-7)' : '  (1/2/3/4)') : (hasNewSeeds ? '  (1-3,5-7)' : '  (1/2/3)');
   text('CROP: ' + (state.cropSelect || 'grain').toUpperCase() + cropHint, 22, hudY);
   hudY += 11;
 
@@ -1648,7 +1771,7 @@ function drawHUD() {
   if (state.blessing.type) {
     let blessCol = state.blessing.type === 'crops' ? '#88cc44' : state.blessing.type === 'solar' ? '#ffcc44' : state.blessing.type === 'speed' ? '#44ccff' : state.blessing.type === 'storm' ? '#8888ff' : '#ff88ff';
     fill(color(blessCol));
-    textSize(7);
+    textSize(10);
     let bMin = floor(state.blessing.timer / 60);
     text('BLESSING: ' + state.blessing.type.toUpperCase() + ' (' + bMin + 'm)', 22, hudY);
     hudY += 12;
@@ -1658,16 +1781,24 @@ function drawHUD() {
   if (state.weather.type !== 'clear') {
     let wCol = state.weather.type === 'rain' ? '#6699cc' : state.weather.type === 'heatwave' ? '#ff8844' : '#aabbcc';
     fill(color(wCol));
-    textSize(7);
+    textSize(10);
     let wSec = floor(state.weather.timer / 60);
     text('WEATHER: ' + state.weather.type.toUpperCase() + ' (' + wSec + 's)', 22, hudY);
     hudY += 12;
   }
 
+  // Tech: natural_philosophy — predict tomorrow's weather
+  if (typeof hasTech === 'function' && hasTech('natural_philosophy')) {
+    fill(140, 170, 200, 160); textSize(9);
+    let nextWeather = (state.daysSinceRain || 0) >= 5 ? 'RAIN likely' : (state.daysSinceRain || 0) >= 3 ? 'DROUGHT continues' : 'CLEAR skies expected';
+    text('Tomorrow: ' + nextWeather, 22, hudY);
+    hudY += 11;
+  }
+
   // Drought indicator
   if ((state.daysSinceRain || 0) >= 3) {
     fill(200, 140, 60);
-    textSize(7);
+    textSize(10);
     let dLabel = (state.daysSinceRain || 0) >= 7 ? 'SEVERE DROUGHT' : 'DROUGHT';
     text(dLabel + ' (day ' + (state.daysSinceRain || 0) + ')', 22, hudY);
     hudY += 12;
@@ -1676,7 +1807,7 @@ function drawHUD() {
   // Quest tracker
   if (state.quest) {
     fill(color(C.solarGold));
-    textSize(7);
+    textSize(10);
     text('QUEST: ' + state.quest.desc + ' ' + state.quest.progress + '/' + state.quest.target, 22, hudY);
     hudY += 12;
   }
@@ -1691,9 +1822,24 @@ function drawHUD() {
   // Island name label (top center, subtle)
   if (state.islandName && !stormActive) {
     fill(180, 160, 120, 140);
-    textSize(8);
+    textSize(11);
     textAlign(CENTER, TOP);
-    text(state.islandName + ' — Day ' + state.day, width / 2, 6);
+    let _dayLbl = state.islandName + ' \u2014 Day ' + state.day;
+    if (typeof isMarketDay === 'function' && isMarketDay(state.day)) _dayLbl += '  [MARKET DAY]';
+    if (state.prestige && state.prestige.count > 0) _dayLbl += '  \u2726' + state.prestige.count;
+    text(_dayLbl, width / 2, 6);
+    if (typeof isMarketDay === 'function' && isMarketDay(state.day)) {
+      fill(255, 220, 80, 80 + Math.sin(frameCount * 0.05) * 30);
+      textSize(8);
+      text('Better shop prices today!', width / 2, 20);
+    }
+    textAlign(LEFT, TOP);
+  }
+
+  // Prestige UI hint (after winning)
+  if (state.won && !state.conquest.active && !state.rowing.active) {
+    fill(200, 180, 100, 120); textSize(8); textAlign(CENTER, TOP);
+    text('[P] Prestige & Score', width / 2, height - 18);
     textAlign(LEFT, TOP);
   }
 
@@ -1713,7 +1859,7 @@ function drawHUD() {
     textSize(10 * pulse);
     fill(red(col), green(col), blue(col), 220);
     text('COMBO x' + hc.count, psx + 50, psy - 40);
-    textSize(7);
+    textSize(10);
     fill(red(col), green(col), blue(col), 160);
     text('+' + bonusPct + '% yield', psx + 50, psy - 28);
     // Timer bar
@@ -1728,10 +1874,10 @@ function drawHUD() {
   // ─── QUEST TRACKER (right side) ───
   if(state.quest){let qtX=width-170,qtY=100;noStroke();fill(25,20,14,180);rect(qtX,qtY,156,32,4);
     stroke(180,145,70,100);strokeWeight(0.5);noFill();rect(qtX,qtY,156,32,4);noStroke();
-    fill(212,160,64);textSize(7);textAlign(LEFT,TOP);text('QUEST',qtX+6,qtY+3);
-    fill(200,190,160);textSize(7);text(state.quest.desc.length>22?state.quest.desc.substring(0,22)+'..':state.quest.desc,qtX+6,qtY+13);
+    fill(212,160,64);textSize(10);textAlign(LEFT,TOP);text('QUEST',qtX+6,qtY+3);
+    fill(200,190,160);textSize(10);text(state.quest.desc.length>22?state.quest.desc.substring(0,22)+'..':state.quest.desc,qtX+6,qtY+13);
     let _qF=state.quest.progress/state.quest.target;fill(40,35,25);rect(qtX+6,qtY+24,100,4,2);
-    fill(212,160,64);rect(qtX+6,qtY+24,100*_qF,4,2);fill(160,140,100);textSize(6);textAlign(RIGHT,TOP);
+    fill(212,160,64);rect(qtX+6,qtY+24,100*_qF,4,2);fill(160,140,100);textSize(9);textAlign(RIGHT,TOP);
     text(state.quest.progress+'/'+state.quest.target,qtX+150,qtY+22);textAlign(LEFT,TOP);}
 
   // Controls (bottom right) — context-aware, minimal
@@ -1744,11 +1890,11 @@ function drawHUD() {
   } else if (state.wreck && state.wreck.active) {
     controlLines = ['WASD move  |  E gather  |  TAB raft'];
   } else {
-    controlLines = ['WASD move  |  1-5 tools  |  6-0 items  |  E interact', 'SPACE attack  |  B build  |  K skills  |  N codex  |  G recipes  |  ESC menu'];
+    controlLines = ['WASD move  |  1-5 tools  |  6-0 items  |  E interact', 'SPACE attack  |  B build  |  K skills  |  N codex  |  Y tech  |  ESC menu'];
   }
   let controlH = 10 + controlLines.length * 12;
   drawHUDPanel(cr - 200, cb - controlH, 200, controlH);
-  fill(160, 140, 100, 180); textSize(7); textAlign(LEFT, TOP);
+  fill(160, 140, 100, 180); textSize(10); textAlign(LEFT, TOP);
   for (let ci = 0; ci < controlLines.length; ci++) {
     text(controlLines[ci], cr - 194, cb - controlH + 5 + ci * 12);
   }
@@ -1834,8 +1980,15 @@ function drawHUD() {
   }
 }
 
+// Build menu slide-in animation state
+let _buildMenuSlide = 0;
+
 function drawBuildUI() {
-  if (!state.buildMode) return;
+  if (!state.buildMode) { _buildMenuSlide = 0; return; }
+
+  // Slide-in from bottom animation
+  if (_buildMenuSlide < 1) _buildMenuSlide = min(1, _buildMenuSlide + 0.08);
+  let slideOff = floor((1 - _buildMenuSlide) * 80);
 
   // Build mode = personal decoration only. Landmark buildings auto-spawn with island levels.
   let baseTypes = ['floor', 'wall', 'door', 'chest', 'bridge', 'fence', 'torch', 'flower', 'lantern', 'mosaic', 'aqueduct', 'bath'];
@@ -1846,7 +1999,7 @@ function drawBuildUI() {
   let rowH = 56;
   let barH = rowH + 8;
   let barX = width / 2 - barW / 2;
-  let barY = height - barH - 16;
+  let barY = height - barH - 16 + slideOff;
 
   // Bar background
   noStroke();
@@ -1869,7 +2022,7 @@ function drawBuildUI() {
 
   // Row labels
   fill(160, 130, 70, 160);
-  textSize(6);
+  textSize(9);
   textAlign(LEFT, TOP);
   text('BASE', barX + 4, barY + 3);
   fill(140, 100, 55, 140);
@@ -1878,8 +2031,10 @@ function drawBuildUI() {
   let startX = barX + 12;
 
   function drawSlot(t, i, row) {
+    // Stagger slide-in per slot
+    let _slotSlide = max(0, floor((1 - min(1, _buildMenuSlide * 1.5 - i * 0.04)) * 30));
     let tx = startX + i * (slotW + gap);
-    let ty = barY + row * (rowH + 4) + 5;
+    let ty = barY + row * (rowH + 4) + 5 + _slotSlide;
     let selected = state.buildType === t;
     let unlocked = isBuildingUnlocked(t);
     let affordable = unlocked && canAfford(t);
@@ -1914,21 +2069,21 @@ function drawBuildUI() {
     if (!unlocked) {
       // Lock icon
       fill(120, 90, 50, 180);
-      textSize(8);
+      textSize(11);
       textAlign(CENTER, TOP);
       text('LV' + bp.minLevel, tx + slotW / 2, ty + 32);
       fill(80, 60, 35, 160);
-      textSize(6);
+      textSize(9);
       text(bp.name, tx + slotW / 2, ty + 42);
     } else {
       // Key binding
       fill(selected ? color(200, 170, 90) : color(140, 120, 85));
-      textSize(7);
+      textSize(10);
       textAlign(CENTER, TOP);
       if (bp.key) text(bp.key, tx + slotW / 2, ty + 32);
       // Name
       fill(selected ? color(220, 200, 160) : (affordable ? color(140, 120, 85) : color(120, 60, 50)));
-      textSize(6);
+      textSize(9);
       text(bp.name, tx + slotW / 2, ty + 42);
     }
   }
@@ -1944,7 +2099,7 @@ function drawBuildUI() {
   // Selected item tooltip with cost or lock message
   let bp = BLUEPRINTS[state.buildType];
   let unlocked = isBuildingUnlocked(state.buildType);
-  textSize(8);
+  textSize(11);
   textAlign(CENTER, BOTTOM);
   if (!unlocked) {
     fill(160, 110, 55);
@@ -2352,10 +2507,15 @@ function drawHUDPanel(x, y, w, h) {
   fill(0, 0, 0, 25);
   rect(x + 1, y + 1, w, h, 3);
   // Semi-transparent dark background
-  fill(25, 20, 15, 200);
+  fill(15, 12, 8, 230);
   rect(x, y, w, h, 3);
-  // Single pixel golden border
-  stroke(180, 150, 80, 120);
+  // Single pixel faction-tinted border
+  if (typeof getFactionData === 'function') {
+    let ac = getFactionData().accentColor;
+    stroke(ac[0], ac[1], ac[2], 120);
+  } else {
+    stroke(180, 150, 80, 120);
+  }
   strokeWeight(0.8);
   noFill();
   rect(x, y, w, h, 3);
@@ -2400,8 +2560,15 @@ function drawBarHUD(x, y, w, h, frac, colFull, colEmpty, label) {
   rect(x, y, w, h, 2);
   fill(color(colFull));
   rect(x, y, w * frac, h, 2);
+  // Glow pulse on bar edge when filling
+  if (frac > 0.01 && frac < 0.99) {
+    let _glPulse = sin(frameCount * 0.12) * 0.4 + 0.6;
+    let _cf = color(colFull);
+    fill(red(_cf), green(_cf), blue(_cf), 80 * _glPulse);
+    rect(x + w * frac - 3, y, 6, h, 2);
+  }
   fill(color(C.textDim));
-  textSize(7);
+  textSize(10);
   textAlign(LEFT, TOP);
   text(label, x + w + 5, y + 1);
 }
@@ -2466,6 +2633,60 @@ function drawTutorialHintUI() {
   textAlign(CENTER, CENTER);
   text(h.text, floor(sx), hy + 10);
   textAlign(LEFT, TOP);
+}
+
+// ─── CURRENT GOAL HUD — top-left below resources ───────────────────────
+function drawCurrentGoalHUD() {
+  if (!state.tutorialGoal) return;
+  if (state.tutorialGoalComplete) return;
+  if (photoMode || screenshotMode || dialogState.active) return;
+  let goal = state.tutorialGoal;
+  let gx = width - 185, gy = 46;
+  let fadeAlpha = 220;
+
+  // Panel
+  noStroke();
+  fill(15, 12, 8, fadeAlpha * 0.85);
+  rect(gx, gy, 172, 28, 3);
+  stroke(180, 150, 60, fadeAlpha * 0.4);
+  strokeWeight(0.5);
+  noFill();
+  rect(gx, gy, 172, 28, 3);
+  noStroke();
+
+  // Label
+  fill(180, 150, 60, fadeAlpha);
+  textSize(7);
+  textAlign(LEFT, TOP);
+  text('CURRENT GOAL', gx + 6, gy + 3);
+
+  // Goal text
+  fill(240, 230, 200, fadeAlpha);
+  textSize(9);
+  text(goal.text, gx + 6, gy + 14);
+
+  // Subtle arrow pointing toward objective (world space)
+  if (goal.targetWX !== undefined && goal.targetWY !== undefined) {
+    let psx = w2sX(state.player.x), psy = w2sY(state.player.y);
+    let tsx = w2sX(goal.targetWX), tsy = w2sY(goal.targetWY);
+    let tdist = dist(psx, psy, tsx, tsy);
+    if (tdist > 60) {
+      let ang = atan2(tsy - psy, tsx - psx);
+      let arrowR = 40;
+      let ax = psx + cos(ang) * arrowR, ay = psy + sin(ang) * arrowR;
+      let bob2 = sin(frameCount * 0.07) * 2;
+      push();
+      translate(floor(ax + bob2 * cos(ang + HALF_PI)), floor(ay + bob2 * sin(ang + HALF_PI)));
+      rotate(ang);
+      let arrAlpha = 100 + sin(frameCount * 0.05) * 30;
+      fill(180, 150, 60, arrAlpha);
+      noStroke();
+      triangle(7, 0, -3, -4, -3, 4);
+      fill(150, 120, 40, arrAlpha * 0.5);
+      rect(-5, -2, 5, 4, 1);
+      pop();
+    }
+  }
 }
 
 // ─── DISCOVERY EVENT UI ─────────────────────────────────────────────────
@@ -2537,7 +2758,7 @@ function drawRuinOverlays() {
       // Help text glow
       if (dist(state.player.x, state.player.y, WORLD.islandCX + WORLD.islandRX - 100, WORLD.islandCY + 20) < 70) {
         fill(255, 200, 100, 60 + sin(frameCount * 0.06) * 30);
-        textSize(8); textAlign(CENTER, CENTER);
+        textSize(11); textAlign(CENTER, CENTER);
         text('Someone is trapped...', floor(mx), floor(my - 18));
         textAlign(LEFT, TOP);
       }
@@ -2616,7 +2837,7 @@ function drawHarvestArcs() {
     if (a.life > a.maxLife * 0.6) {
       let la = map(a.life, a.maxLife * 0.6, a.maxLife, 0, 255);
       fill(red(c), green(c), blue(c), la);
-      textSize(8);
+      textSize(11);
       textAlign(CENTER, BOTTOM);
       text(a.label, floor(a.x), floor(a.y) - 5);
       textAlign(LEFT, TOP);
@@ -2657,24 +2878,24 @@ function _drawNatEntryWithDiscovery(x, y, w, label, rarity, desc, countStr, disc
   }
   fill(bg); noStroke(); rect(x, y, w, 42, 4);
   if (discovered) {
-    fill(color(NAT_RARITY_COLORS[rarity] || '#aabbcc')); textSize(7); textAlign(LEFT, TOP);
+    fill(color(NAT_RARITY_COLORS[rarity] || '#aabbcc')); textSize(10); textAlign(LEFT, TOP);
     text(rarity, x + 6, y + 3);
     fill(60, 40, 20); textSize(9); textStyle(BOLD);
     text(label, x + 6, y + 12);
-    textStyle(NORMAL); fill(90, 70, 45); textSize(7);
+    textStyle(NORMAL); fill(90, 70, 45); textSize(10);
     text(desc, x + 6, y + 24, w - 60);
-    if (countStr) { fill(100, 140, 80); textSize(7); textAlign(RIGHT, TOP); text(countStr, x + w - 6, y + 12); }
+    if (countStr) { fill(100, 140, 80); textSize(10); textAlign(RIGHT, TOP); text(countStr, x + w - 6, y + 12); }
     // NEW badge
     if (isNew) {
       fill(255, 200, 40);
-      textSize(7); textStyle(BOLD); textAlign(RIGHT, TOP);
+      textSize(10); textStyle(BOLD); textAlign(RIGHT, TOP);
       text('NEW!', x + w - 6, y + 3);
       textStyle(NORMAL);
     }
   } else {
     fill(140, 130, 110); textSize(9); textAlign(LEFT, TOP); textStyle(ITALIC);
     text('???', x + 6, y + 14);
-    textStyle(NORMAL); textSize(7); fill(150, 140, 120);
+    textStyle(NORMAL); textSize(10); fill(150, 140, 120);
     text('Not yet discovered', x + 6, y + 26);
   }
   textAlign(LEFT, TOP); textStyle(NORMAL);
@@ -2728,11 +2949,11 @@ function drawCatchCard() {
   textStyle(NORMAL);
   // Rarity label
   fill(red(rc), green(rc), blue(rc));
-  textSize(8);
+  textSize(11);
   text(c.rarity, cx + cardW / 2, cy + 23);
   // Weight
   fill(180, 170, 150);
-  textSize(8);
+  textSize(11);
   text('Weight: ' + c.weight, cx + cardW / 2, cy + 35);
   // NEW badge
   if (c.isNew) {
@@ -2741,6 +2962,324 @@ function drawCatchCard() {
     text('NEW!', cx + cardW / 2, cy + 46);
     textStyle(NORMAL);
   }
+  textAlign(LEFT, TOP);
+}
+
+// ─── TECH TREE UI (Y key) ──────────────────────────────────────────────────
+let _techTreeScroll = 0;
+let _techTreeHover = null;
+
+function drawTechTreeUI() {
+  if (!state.techTreeOpen) return;
+  let pw = min(width - 40, 580), ph = min(height - 40, 420);
+  let panX = width / 2 - pw / 2, panY = height / 2 - ph / 2;
+
+  // Dim background
+  noStroke(); fill(0, 0, 0, 180); rect(0, 0, width, height);
+
+  // Panel
+  drawParchmentPanel(panX, panY, pw, ph);
+
+  // Title
+  fill(200, 170, 90); textAlign(CENTER, TOP); textSize(14);
+  text('RESEARCH & TECHNOLOGY', width / 2, panY + 10);
+  // Subtitle: current research
+  textSize(9); fill(160, 140, 100);
+  if (state.research.current) {
+    let ct = TECH_TREE[state.research.current];
+    let pct = floor((state.research.progress / ct.cost) * 100);
+    text('Researching: ' + ct.name + ' (' + pct + '%)', width / 2, panY + 28);
+  } else {
+    text('No active research. Click a tech to begin.', width / 2, panY + 28);
+  }
+  // RP display
+  textSize(9);
+  fill(140, 180, 220);
+  text('RP/day: ' + getResearchRate() + '  |  Total RP: ' + (state.research.points || 0), width / 2, panY + 40);
+
+  // Draw branches
+  let branchY = panY + 58;
+  let branchH = 68;
+  let nodeW = 88, nodeH = 48, gap = 10;
+  _techTreeHover = null;
+
+  for (let bi = 0; bi < TECH_BRANCHES.length; bi++) {
+    let branch = TECH_BRANCHES[bi];
+    let bCol = TECH_BRANCH_COLORS[branch];
+    let by = branchY + bi * branchH;
+
+    // Branch label
+    fill(bCol[0], bCol[1], bCol[2], 200); textAlign(LEFT, TOP); textSize(9);
+    text(TECH_BRANCH_NAMES[branch].toUpperCase(), panX + 8, by + 2);
+
+    // Get techs in this branch sorted by tier
+    let techs = [];
+    for (let tid in TECH_TREE) {
+      if (TECH_TREE[tid].branch === branch) techs.push({ id: tid, ...TECH_TREE[tid] });
+    }
+    techs.sort((a, b) => a.tier - b.tier);
+
+    // Draw connector line
+    let lineY = by + 30;
+    stroke(bCol[0], bCol[1], bCol[2], 60); strokeWeight(1);
+    let startNodeX = panX + 8 + 0 * (nodeW + gap) + nodeW / 2;
+    let endNodeX = panX + 8 + (techs.length - 1) * (nodeW + gap) + nodeW / 2;
+    line(startNodeX, lineY, endNodeX, lineY);
+    noStroke();
+
+    for (let ti = 0; ti < techs.length; ti++) {
+      let tech = techs[ti];
+      let tx = panX + 8 + ti * (nodeW + gap);
+      let ty = by + 8;
+      let completed = hasTech(tech.id);
+      let available = canResearch(tech.id);
+      let isCurrent = state.research.current === tech.id;
+      let isHovered = mouseX >= tx && mouseX <= tx + nodeW && mouseY >= ty && mouseY <= ty + nodeH;
+
+      if (isHovered) _techTreeHover = tech.id;
+
+      // Node background
+      if (completed) {
+        fill(40, 80, 40, 220);
+        stroke(80, 180, 80, 180);
+      } else if (isCurrent) {
+        fill(40, 50, 80, 220);
+        stroke(100, 140, 220, 180);
+      } else if (available) {
+        fill(50, 42, 30, 220);
+        stroke(bCol[0], bCol[1], bCol[2], 120);
+      } else {
+        fill(30, 25, 18, 200);
+        stroke(60, 50, 40, 80);
+      }
+      strokeWeight(isHovered ? 1.5 : 0.8);
+      rect(tx, ty, nodeW, nodeH, 3);
+      noStroke();
+
+      // Tech name
+      textAlign(CENTER, TOP); textSize(8);
+      if (completed) fill(120, 220, 120);
+      else if (available) fill(200, 190, 160);
+      else fill(100, 90, 70);
+      text(tech.name, tx + nodeW / 2, ty + 3);
+
+      // Cost or status
+      textSize(7);
+      if (completed) {
+        fill(80, 180, 80);
+        text('COMPLETE', tx + nodeW / 2, ty + 15);
+      } else if (isCurrent) {
+        fill(120, 160, 220);
+        let pct = floor((state.research.progress / tech.cost) * 100);
+        text(pct + '%', tx + nodeW / 2, ty + 15);
+        // Progress bar
+        fill(30, 35, 50); rect(tx + 4, ty + 25, nodeW - 8, 4, 1);
+        fill(100, 140, 220); rect(tx + 4, ty + 25, (nodeW - 8) * (state.research.progress / tech.cost), 4, 1);
+      } else {
+        fill(available ? color(180, 160, 120) : color(80, 70, 55));
+        text(tech.cost + ' RP', tx + nodeW / 2, ty + 15);
+      }
+
+      // Desc on hover
+      if (isHovered) {
+        textSize(7); fill(180, 170, 140);
+        text(tech.desc, tx + nodeW / 2, ty + 35);
+      }
+
+      // Capstone star
+      if (tech.capstone) {
+        fill(255, 220, 60, completed ? 255 : 80);
+        textSize(10);
+        text('\u2605', tx + nodeW - 8, ty + 2);
+      }
+    }
+  }
+
+  // Controls hint
+  fill(120, 100, 70); textAlign(CENTER, TOP); textSize(9);
+  text('Click to research  |  Y or ESC to close', width / 2, panY + ph - 18);
+  textAlign(LEFT, TOP);
+}
+
+function handleTechTreeClick(mx, my) {
+  if (!state.techTreeOpen) return false;
+  let pw = min(width - 40, 580), ph = min(height - 40, 420);
+  let panX = width / 2 - pw / 2, panY = height / 2 - ph / 2;
+  let branchY = panY + 58, branchH = 68;
+  let nodeW = 88, nodeH = 48, gap = 10;
+
+  for (let bi = 0; bi < TECH_BRANCHES.length; bi++) {
+    let branch = TECH_BRANCHES[bi];
+    let by = branchY + bi * branchH;
+    let techs = [];
+    for (let tid in TECH_TREE) {
+      if (TECH_TREE[tid].branch === branch) techs.push({ id: tid, ...TECH_TREE[tid] });
+    }
+    techs.sort((a, b) => a.tier - b.tier);
+
+    for (let ti = 0; ti < techs.length; ti++) {
+      let tech = techs[ti];
+      let tx = panX + 8 + ti * (nodeW + gap);
+      let ty = by + 8;
+      if (mx >= tx && mx <= tx + nodeW && my >= ty && my <= ty + nodeH) {
+        if (canResearch(tech.id)) {
+          startResearch(tech.id);
+          addFloatingText(width / 2, height * 0.25, 'Now researching: ' + tech.name, '#88ccff');
+          return true;
+        } else if (hasTech(tech.id)) {
+          addFloatingText(width / 2, height * 0.25, tech.name + ' already complete!', '#88aa88');
+          return true;
+        } else {
+          addFloatingText(width / 2, height * 0.25, 'Requires: ' + TECH_TREE[tech.requires].name, '#ff8866');
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+// ─── VICTORY SCREEN ────────────────────────────────────────────────────────
+function drawVictoryScreen() {
+  if (!state.victoryScreen) return;
+  let vs = state.victoryScreen;
+  vs.timer = (vs.timer || 0) + 1;
+  let fadeIn = min(1, vs.timer / 60);
+
+  // Full screen overlay
+  noStroke();
+  fill(0, 0, 0, fadeIn * 220);
+  rect(0, 0, width, height);
+
+  let titles = {
+    domination: 'DOMINATION VICTORY',
+    diplomatic: 'DIPLOMATIC VICTORY',
+    economic: 'ECONOMIC VICTORY',
+    research: 'RESEARCH VICTORY',
+  };
+  let descs = {
+    domination: 'Through military might, you have conquered all rival nations.\nThe Mediterranean bows to your legions.',
+    diplomatic: 'Through wisdom and goodwill, all nations call you friend.\nPeace reigns across the sea.',
+    economic: 'Your golden treasury overflows, trade routes span the world.\nWealth is the truest power.',
+    research: 'All four branches of knowledge mastered.\nYour civilization has reached enlightenment.',
+  };
+  let colors = {
+    domination: [200, 60, 60],
+    diplomatic: [60, 180, 120],
+    economic: [220, 180, 40],
+    research: [100, 160, 240],
+  };
+  let col = colors[vs.type] || [200, 200, 200];
+
+  // Victory particles
+  if (vs.timer % 3 === 0 && vs.timer < 300) {
+    particles.push({
+      x: random(width * 0.2, width * 0.8), y: height + 4,
+      vx: random(-1.5, 1.5), vy: random(-4, -1.5),
+      life: random(60, 120), maxLife: 120,
+      type: 'burst', size: random(3, 7),
+      r: col[0], g: col[1], b: col[2],
+      world: false,
+    });
+  }
+
+  push();
+  let alpha = fadeIn * 255;
+
+  // Title
+  textAlign(CENTER, CENTER); textSize(22);
+  fill(col[0], col[1], col[2], alpha);
+  text(titles[vs.type] || 'VICTORY', width / 2, height * 0.25);
+
+  // Decorative line
+  stroke(col[0], col[1], col[2], alpha * 0.5); strokeWeight(1);
+  line(width * 0.3, height * 0.32, width * 0.7, height * 0.32);
+  noStroke();
+
+  // Description
+  textSize(11); fill(220, 210, 190, alpha);
+  let descLines = (descs[vs.type] || '').split('\n');
+  for (let i = 0; i < descLines.length; i++) {
+    text(descLines[i], width / 2, height * 0.38 + i * 16);
+  }
+
+  // Stats
+  textSize(10); fill(180, 170, 140, alpha);
+  text('Days: ' + (vs.day || state.day), width / 2, height * 0.52);
+  text('Island Level: ' + (state.islandLevel || 1), width / 2, height * 0.56);
+  text('Gold Earned: ' + ((state.score && state.score.goldEarned) || 0), width / 2, height * 0.60);
+  text('Techs Researched: ' + ((state.research && state.research.completed) || []).length + '/20', width / 2, height * 0.64);
+
+  // Final score
+  let score = (vs.day || 1) * 10 + (state.islandLevel || 1) * 50 + ((state.research && state.research.completed) || []).length * 25;
+  textSize(14); fill(col[0], col[1], col[2], alpha);
+  text('FINAL SCORE: ' + score, width / 2, height * 0.72);
+
+  // Options
+  if (vs.timer > 120) {
+    textSize(10); fill(180, 170, 140, min(255, (vs.timer - 120) * 4));
+    text('Press ENTER to continue playing  |  Press N for New Game+', width / 2, height * 0.82);
+  }
+  pop();
+  textAlign(LEFT, TOP);
+}
+
+// ─── VICTORY PROGRESS HUD (4 icons below minimap) ──────────────────────────
+function drawVictoryProgressHUD() {
+  if (photoMode || screenshotMode) return;
+  if (dialogState.active) return;
+  if (!state.nations || Object.keys(state.nations).length === 0) return;
+  if (state.victoryAchieved) return;
+
+  let prog = getVictoryProgress();
+  let mmW = 110, mmX = width - mmW - 16, mmY = 90;
+  let iconSize = 18, gap = 4;
+  let totalW = 4 * iconSize + 3 * gap;
+  let startX = mmX + (mmW - totalW) / 2;
+
+  // Player proximity fade
+  let _psx = w2sX(state.player.x), _psy = w2sY(state.player.y);
+  let _vhFade = (_psx > width * 0.6 && _psy < height * 0.3) ? 0.25 : 0.85;
+  drawingContext.globalAlpha = _vhFade;
+
+  let icons = [
+    { label: 'DOM', prog: prog.domination, col: [200, 60, 60], symbol: '\u2694' },
+    { label: 'DIP', prog: prog.diplomatic, col: [60, 180, 120], symbol: '\u2764' },
+    { label: 'ECO', prog: prog.economic, col: [220, 180, 40], symbol: '\u25C9' },
+    { label: 'RES', prog: prog.research, col: [100, 160, 240], symbol: '\u2605' },
+  ];
+
+  for (let i = 0; i < icons.length; i++) {
+    let ic = icons[i];
+    let ix = startX + i * (iconSize + gap);
+    let iy = mmY;
+
+    // Background
+    noStroke(); fill(20, 18, 14, 200);
+    rect(ix, iy, iconSize, iconSize + 8, 2);
+
+    // Fill meter
+    let fillH = floor(iconSize * ic.prog);
+    fill(ic.col[0], ic.col[1], ic.col[2], 80);
+    rect(ix + 1, iy + iconSize - fillH, iconSize - 2, fillH, 1);
+
+    // Border
+    stroke(ic.col[0], ic.col[1], ic.col[2], ic.prog >= 1 ? 200 : 60);
+    strokeWeight(0.8); noFill();
+    rect(ix, iy, iconSize, iconSize, 2);
+    noStroke();
+
+    // Symbol
+    fill(ic.col[0], ic.col[1], ic.col[2], 180);
+    textAlign(CENTER, CENTER); textSize(10);
+    text(ic.symbol, ix + iconSize / 2, iy + iconSize / 2);
+
+    // Label
+    fill(120, 110, 90, 160); textSize(6); textAlign(CENTER, TOP);
+    text(ic.label, ix + iconSize / 2, iy + iconSize + 1);
+  }
+
+  drawingContext.globalAlpha = 1.0;
   textAlign(LEFT, TOP);
 }
 
