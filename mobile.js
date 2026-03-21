@@ -15,7 +15,7 @@ function _initTouchButtons() {
   _touchButtons = [
     { key: ' ', label: 'ATK',   x: rx - sz - pad, y: by + sz + pad, w: sz, h: sz, col: [180, 60, 60] },
     { key: 'e', label: 'USE',   x: rx, y: by, w: sz, h: sz, col: [60, 160, 120] },
-    { key: 'SHIFT', label: 'DASH', x: rx - sz - pad, y: by, w: sz, h: sz, col: [60, 120, 200] },
+    { key: 'ALT', label: 'DODGE', x: rx - sz - pad, y: by, w: sz, h: sz, col: [60, 120, 200] },
     { key: 'b', label: 'BUILD', x: rx, y: by + sz + pad, w: sz, h: sz, col: [180, 160, 60] },
     { key: 'f', label: 'FISH',  x: rx - (sz + pad) * 2, y: by + sz + pad, w: sz, h: sz, col: [60, 140, 200] },
   ];
@@ -58,14 +58,8 @@ function _processTouchActions() {
   if (!state || !state.player) return;
   while (_touchActionQueue.length > 0) {
     let k = _touchActionQueue.shift();
-    if (k === 'SHIFT') {
-      if (state.player.dashCooldown <= 0 && state.solar >= 10) {
-        state.player.dashTimer = 10;
-        state.player.dashCooldown = 60;
-        state.solar -= 10;
-        if (snd) snd.playSFX('dash');
-        spawnParticles(state.player.x, state.player.y, 'dash', 5);
-      }
+    if (k === 'ALT') {
+      if (typeof tryDodgeRoll === 'function') tryDodgeRoll();
     } else {
       let savedKey = window.key, savedCode = window.keyCode;
       window.key = k;

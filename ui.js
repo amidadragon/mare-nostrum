@@ -808,7 +808,7 @@ function drawAdventureHUD() {
   fill(160, 150, 130, 120);
   textSize(11);
   textAlign(RIGHT, BOTTOM);
-  text('WASD move | SPACE attack | SHIFT dash', width - 10, height - 10);
+  text('WASD move | SPACE attack | SHIFT sprint | ALT dodge', width - 10, height - 10);
 
   pop();
 }

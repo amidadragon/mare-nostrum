@@ -1031,7 +1031,8 @@ function drawHowToPlayPanel(fadeA) {
   cy = drawHead('COMBAT', cy);
   cy = drawKey('Click', 'Attack (when enemies near)', cy);
   cy = drawKey('1-3', 'Combat skills (unlockable)', cy);
-  cy = drawKey('SPACE', 'Dodge roll', cy);
+  cy = drawKey('SHIFT', 'Sprint (hold)', cy);
+  cy = drawKey('ALT', 'Dodge roll', cy);
   cy += 6;
 
   cy = drawHead('GENERAL', cy);

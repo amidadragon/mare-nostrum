@@ -831,13 +831,13 @@ const CITY_SLOTS = [
   // ERA 1: VILLAGE (Lv 2-8)
   // ===============================================================
 
-  // --- FARM DISTRICT (left, x:150-380) ---
-  { id: 'fence_farm_e1',   x: 200, y: 375, w: 32, h:  8, type: 'fence',       level: 2,  district: 'farm' },
-  { id: 'fence_farm_e2',   x: 200, y: 405, w: 32, h:  8, type: 'fence',       level: 2,  district: 'farm' },
-  { id: 'fence_nw1',       x: 310, y: 360, w: 32, h:  8, type: 'fence',       level: 4,  district: 'farm' },
-  { id: 'crystal_coll',    x: 180, y: 370, w: 40, h: 30, type: 'crystal_collector', level: 5, district: 'farm' },
-  { id: 'granary',         x: 330, y: 380, w: 58, h: 44, type: 'granary',     level: 5,  district: 'farm' },
-  { id: 'torch_gran_l',    x: 295, y: 384, w:  8, h: 16, type: 'torch',       level: 5,  district: 'farm' },
+  // --- FARM DISTRICT (left, x:100-430) ---
+  { id: 'fence_farm_e1',   x: 145, y: 380, w: 32, h:  8, type: 'fence',       level: 2,  district: 'farm' },
+  { id: 'fence_farm_e2',   x: 145, y: 410, w: 32, h:  8, type: 'fence',       level: 2,  district: 'farm' },
+  { id: 'fence_nw1',       x: 310, y: 340, w: 32, h:  8, type: 'fence',       level: 4,  district: 'farm' },
+  { id: 'crystal_coll',    x: 100, y: 370, w: 40, h: 30, type: 'crystal_collector', level: 5, district: 'farm' },
+  { id: 'granary',         x: 392, y: 420, w: 58, h: 44, type: 'granary',     level: 5,  district: 'farm' },
+  { id: 'torch_gran_l',    x: 430, y: 420, w:  8, h: 16, type: 'torch',       level: 5,  district: 'farm' },
 
   // --- CIVIC / PLAZA (center, x:560-700) ---
   { id: 'torch_center',    x: 620, y: 415, w:  8, h: 16, type: 'torch',       level: 2,  district: 'center' },
@@ -859,14 +859,14 @@ const CITY_SLOTS = [
   // --- BATH (residential south, x:440-520) ---
   { id: 'bath_1',          x: 480, y: 430, w: 70, h: 52, type: 'bath',        level: 8,  district: 'residential' },
 
-  // --- MILITARY (far right, x:870-980) ---
-  { id: 'castrum',         x: 920, y: 440, w: 130, h: 100, type: 'castrum',    level: 8,  district: 'military' },
-  { id: 'wall_cast_l',     x: 878, y: 440, w:  8, h: 50, type: 'wall',        level: 8,  district: 'military' },
-  { id: 'wall_cast_r',     x: 962, y: 440, w:  8, h: 50, type: 'wall',        level: 8,  district: 'military' },
-  { id: 'wall_cast_top',   x: 920, y: 408, w: 80, h:  8, type: 'wall',        level: 8,  district: 'military' },
-  { id: 'watchtower_cast', x: 968, y: 408, w: 24, h: 56, type: 'watchtower',  level: 8,  district: 'military' },
-  { id: 'torch_cast_l',    x: 900, y: 460, w:  8, h: 16, type: 'torch',       level: 8,  district: 'military' },
-  { id: 'torch_cast_r',    x: 940, y: 460, w:  8, h: 16, type: 'torch',       level: 8,  district: 'military' },
+  // --- MILITARY (far right, x:855-985) ---
+  { id: 'castrum',         x: 920, y: 480, w: 130, h: 100, type: 'castrum',    level: 8,  district: 'military' },
+  { id: 'wall_cast_l',     x: 855, y: 480, w:  8, h: 50, type: 'wall',        level: 8,  district: 'military' },
+  { id: 'wall_cast_r',     x: 985, y: 480, w:  8, h: 50, type: 'wall',        level: 8,  district: 'military' },
+  { id: 'wall_cast_top',   x: 920, y: 430, w: 80, h:  8, type: 'wall',        level: 8,  district: 'military' },
+  { id: 'watchtower_cast', x: 985, y: 430, w: 24, h: 56, type: 'watchtower',  level: 8,  district: 'military' },
+  { id: 'torch_cast_l',    x: 900, y: 500, w:  8, h: 16, type: 'torch',       level: 8,  district: 'military' },
+  { id: 'torch_cast_r',    x: 940, y: 500, w:  8, h: 16, type: 'torch',       level: 8,  district: 'military' },
 
   // ===============================================================
   // ERA 2: CITY (Lv 9-17)
@@ -884,11 +884,11 @@ const CITY_SLOTS = [
   { id: 'torch_temp_r',    x: 800, y: 340, w:  8, h: 16, type: 'torch',       level: 10, district: 'civic' },
   { id: 'floor_temp',      x: 760, y: 370, w: 32, h: 22, type: 'floor',       level: 10, district: 'civic' },
 
-  // --- MARKET expansion (x:850-960) ---
-  { id: 'market_2',        x: 870, y: 420, w: 44, h: 34, type: 'market',      level: 10, district: 'market' },
+  // --- MARKET expansion (x:790-830) ---
+  { id: 'market_2',        x: 810, y: 420, w: 44, h: 34, type: 'market',      level: 10, district: 'market' },
 
   // --- PLAZA floor (center, x:580-660) ---
-  { id: 'plaza_floor',     x: 620, y: 410, w: 64, h: 48, type: 'floor',       level: 10, district: 'center' },
+  { id: 'plaza_floor',     x: 620, y: 490, w: 64, h: 48, type: 'floor',       level: 10, district: 'center' },
   { id: 'lantern_civ_n',   x: 700, y: 370, w: 10, h: 20, type: 'lantern',     level: 10, district: 'civic' },
 
   // --- RESIDENTIAL expansion (x:400-540) ---
@@ -18857,10 +18857,11 @@ function updateNationIslandVisit(dt) {
   if (keyIsDown(68) || keyIsDown(RIGHT_ARROW)) dx += 1;
   if (keyIsDown(87) || keyIsDown(UP_ARROW)) dy -= 1;
   if (keyIsDown(83) || keyIsDown(DOWN_ARROW)) dy += 1;
+  let niSpd = p.speed * (keyIsDown(SHIFT) ? 1.6 : 1);
   if (dx || dy) {
     let m = sqrt(dx * dx + dy * dy);
-    p.vx = (dx / m) * p.speed * dt;
-    p.vy = (dy / m) * p.speed * dt;
+    p.vx = (dx / m) * niSpd * dt;
+    p.vy = (dy / m) * niSpd * dt;
     p.moving = true;
     if (abs(dx) > abs(dy)) p.facing = dx > 0 ? 'right' : 'left';
     else p.facing = dy > 0 ? 'down' : 'up';
@@ -21205,7 +21206,7 @@ function drawConquestHUD() {
   fill(160, 150, 130, 140); textSize(11); textAlign(RIGHT, BOTTOM);
   text(WEAPONS[p.weapon].name + ' | ' + ARMORS[p.armor].name, width - 10, height - 14);
   fill(130, 120, 100, 120);
-  text('WASD move | SPACE attack | SHIFT dash | B build | Q potion | E board ship (near dock)', width - 10, height - 3);
+  text('WASD move | SPACE attack | SHIFT sprint | ALT dodge | B build | Q potion | E board ship (near dock)', width - 10, height - 3);
 
   // Build mode UI
   if (c.buildMode) drawConquestBuildUI();
@@ -22089,15 +22090,10 @@ function keyPressed() {
     if (!cq.buildMode && typeof handleCombatSkillKey === 'function') {
       if (handleCombatSkillKey(key)) return;
     }
-    // Dodge roll on SHIFT (enhanced via combat.js)
-    if (keyCode === SHIFT) {
+    // Dodge roll on ALT (enhanced via combat.js)
+    if (keyCode === ALT) {
       if (typeof tryDodgeRoll === 'function') tryDodgeRoll();
-      if (state.player.dashCooldown <= 0 && state.solar >= 10) {
-        state.player.dashTimer = 10;
-        state.player.dashCooldown = 60;
-        state.solar -= 10;
-        spawnParticles(state.player.x, state.player.y, 'dash', 5);
-      }
+      return false;
     }
     return;
   }
@@ -22115,12 +22111,10 @@ function keyPressed() {
     if (typeof handleFactionAbilityKey === 'function') {
       if (handleFactionAbilityKey(key)) return;
     }
-    // Dash works in arena too
-    if (keyCode === SHIFT && state.player.dashCooldown <= 0 && state.solar >= 10) {
-      state.player.dashTimer = 10;
-      state.player.dashCooldown = 60;
-      state.solar -= 10;
-      spawnParticles(state.player.x, state.player.y, 'dash', 5);
+    // Dodge roll on ALT in arena too
+    if (keyCode === ALT) {
+      if (typeof tryDodgeRoll === 'function') tryDodgeRoll();
+      return false;
     }
     return; // Block all other keys during adventure
   }
@@ -22142,13 +22136,10 @@ function keyPressed() {
     if (keyCode === 27 || key === 'e' || key === 'E') { state.activeEvent.data.shopOpen = false; return; }
     return;
   }
-  // Dash
-  if (keyCode === SHIFT && state.player.dashCooldown <= 0 && state.solar >= 10) {
-    state.player.dashTimer = 10;
-    state.player.dashCooldown = 60;
-    state.solar -= 10;
-    if (snd) snd.playSFX('dash');
-    spawnParticles(state.player.x, state.player.y, 'dash', 5);
+  // Dodge roll on ALT
+  if (keyCode === ALT) {
+    if (typeof tryDodgeRoll === 'function') tryDodgeRoll();
+    return false;
   }
 
   // Interact
@@ -25436,8 +25427,9 @@ function getExpandCostString() {
 }
 
 function canPlaceBuilding(x, y, w, h) {
-  // Check against existing buildings
+  // Check against existing buildings (skip ground-level decorative tiles)
   let buildingOverlap = state.buildings.some(b => {
+    if (b.type === 'floor' || b.type === 'mosaic') return false;
     return Math.abs(b.x - x) < (b.w + w) / 2 + 4 &&
            Math.abs(b.y - y) < (b.h + h) / 2 + 4;
   });
@@ -25535,7 +25527,16 @@ function placeEraBuildings(lvl) {
   // Place all CITY_SLOTS for this level (absolute coordinates, no drift)
   CITY_SLOTS.forEach(slot => {
     if (slot.level !== lvl) return;
-    placeBuildingChecked({ x: slot.x, y: slot.y, w: slot.w, h: slot.h, type: slot.type, rot: 0 });
+    let bld = { x: slot.x, y: slot.y, w: slot.w, h: slot.h, type: slot.type, rot: 0 };
+    // Force-place decorative ground tiles (floors, mosaics) and castrum compound
+    // parts that intentionally overlap parent structures
+    let forcePlace = slot.type === 'floor' || slot.type === 'mosaic'
+      || (slot.id && (slot.id.startsWith('wall_cast') || slot.id.startsWith('torch_cast') || slot.id === 'watchtower_cast'));
+    if (forcePlace) {
+      state.buildings.push(bld);
+    } else {
+      placeBuildingChecked(bld);
+    }
   });
 
   // Helper: resource placement (clamped to island surface)
@@ -25592,7 +25593,8 @@ function placeEraBuildings(lvl) {
     tree(cx + 320, cy - 25);
     tree(cx + 150, cy - 60);
     ruin(cx + 260, cy - 70, 30, 20);
-    addFloatingText(width / 2, height * 0.3, 'Shrine consecrated — the gods watch!', '#ffaaff');
+    addFarmPlots(farmCX, farmCY, lvl);
+    addFloatingText(width / 2, height * 0.3, 'Shrine consecrated — farm expands!', '#ffaaff');
     spawnParticles(760, 298, 'build', 10);
   }
 
@@ -25624,7 +25626,8 @@ function placeEraBuildings(lvl) {
     tree(cx + 240, cy + 60);
     tree(cx + 350, cy - 40);
     ruin(cx, cy + 80, 35, 22);
-    addFloatingText(width / 2, height * 0.25, 'Granary & Well constructed!', '#88cc66');
+    addFarmPlots(farmCX, farmCY, lvl);
+    addFloatingText(width / 2, height * 0.25, 'Granary & Well constructed — farm fully expanded!', '#88cc66');
     spawnParticles(375, 340, 'build', 12);
   }
 
@@ -25651,14 +25654,14 @@ function placeEraBuildings(lvl) {
     // Update legia state with absolute castrum coords
     if (state.legia) {
       state.legia.castrumLevel = 1;
-      state.legia.castrumX = 840;
-      state.legia.castrumY = 470;
+      state.legia.castrumX = 920;
+      state.legia.castrumY = 480;
     }
     unlockJournal('legia_founded');
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
     addFarmPlots(farmCX, farmCY, lvl);
     addFloatingText(width / 2, height * 0.3, 'Baths & Castrum — Rome grows strong!', '#cc4444');
-    spawnParticles(840, 470, 'build', 12);
+    spawnParticles(920, 480, 'build', 12);
   }
 
   if (lvl === 9) {
