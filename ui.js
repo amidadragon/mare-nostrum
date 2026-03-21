@@ -757,12 +757,23 @@ function drawNatLoreTab(cx, cy, cw, ch) {
 }
 
 // ─── MERCHANT SHOP UI ───────────────────────────────────────────────────
+function _getShopTabOffers(tab, offers) {
+  if (tab === 'buy') return offers.filter(o => o.type === 'sell'); // type 'sell' = player buys from merchant
+  if (tab === 'sell') return offers.filter(o => o.type === 'buy'); // type 'buy' = merchant buys from player
+  if (tab === 'upgrade') return offers.filter(o => o.type === 'tool');
+  return offers;
+}
+
 function drawShopUI() {
   let ship = state.ship;
   if (!ship.shopOpen || ship.state !== 'docked') return;
+  if (!ship.shopTab) ship.shopTab = 'buy';
 
-  let panW = min(300, width - 20);
-  let panH = min(64 + ship.offers.length * 28 + 24, height - 20);
+  let tab = ship.shopTab;
+  let filtered = _getShopTabOffers(tab, ship.offers);
+  let panW = min(320, width - 20);
+  let headerH = 90; // title + gold + tabs
+  let panH = min(headerH + filtered.length * 28 + 28, height - 20);
   let panX = max(10, width / 2 - panW / 2);
   let panY = max(10, height / 2 - panH / 2);
 
@@ -774,29 +785,69 @@ function drawShopUI() {
 
   drawParchmentPanel(panX, panY, panW, panH);
 
-  // Title with Roman flair
+  // Title
   textFont('Cinzel, Georgia, serif');
   fill(210, 180, 80);
   textSize(15);
   textAlign(CENTER, TOP);
-  text('MERCATOR', width / 2, panY + 10);
-  // Subtitle
-  fill(180, 160, 120);
-  textSize(11);
-  text('Merchant Ship', width / 2, panY + 28);
+  text('MERCATOR', width / 2, panY + 8);
   textFont('monospace');
   fill(210, 180, 80);
   textSize(11);
-  text('Gold: ' + state.gold, width / 2, panY + 40);
-  // Decorative line under title
-  stroke(140, 110, 55, 100);
+  text('Gold: ' + state.gold, width / 2, panY + 26);
+
+  // Tab bar
+  let tabs = ['buy', 'sell', 'upgrade'];
+  let tabLabels = ['BUY', 'SELL', 'UPGRADE'];
+  let tabKeys = ['1', '2', '3'];
+  let tabW = floor((panW - 36) / 3);
+  let tabY = panY + 42;
+  for (let t = 0; t < 3; t++) {
+    let tx = panX + 12 + t * (tabW + 6);
+    let active = tab === tabs[t];
+    // Tab background
+    fill(active ? color(65, 55, 38, 220) : color(35, 28, 20, 160));
+    noStroke();
+    rect(tx, tabY, tabW, 22, 4, 4, 0, 0);
+    // Active: gold border
+    if (active) {
+      stroke(210, 180, 80, 200);
+      strokeWeight(1.5);
+      noFill();
+      rect(tx, tabY, tabW, 22, 4, 4, 0, 0);
+      noStroke();
+    }
+    // Label
+    fill(active ? color(220, 200, 150) : color(120, 100, 70));
+    textSize(10);
+    textAlign(CENTER, TOP);
+    text(tabLabels[t] + ' [' + tabKeys[t] + ']', tx + tabW / 2, tabY + 6);
+  }
+  // Line under tabs
+  stroke(140, 110, 55, 80);
   strokeWeight(0.5);
-  line(panX + 20, panY + 52, panX + panW - 20, panY + 52);
+  line(panX + 12, tabY + 23, panX + panW - 12, tabY + 23);
   noStroke();
 
+  // Category label
+  fill(160, 140, 100);
+  textSize(9);
+  textAlign(CENTER, TOP);
+  let catLabel = tab === 'buy' ? 'Resources & Seeds' : tab === 'sell' ? 'Your Goods' : 'Tool Upgrades';
+  text(catLabel, width / 2, tabY + 27);
+
+  // Offer rows
+  let listY = tabY + 40;
   textAlign(LEFT, TOP);
-  ship.offers.forEach((offer, i) => {
-    let oy = panY + 64 + i * 28;
+  if (filtered.length === 0) {
+    fill(120, 100, 70);
+    textSize(10);
+    textAlign(CENTER, TOP);
+    text(tab === 'upgrade' ? 'All tools purchased!' : 'No items available', width / 2, listY + 10);
+    textAlign(LEFT, TOP);
+  }
+  filtered.forEach((offer, i) => {
+    let oy = listY + i * 28;
     let canDo = offer.type === 'buy' ?
       state[offer.item] >= offer.qty :
       state.gold >= offer.price;
@@ -805,7 +856,8 @@ function drawShopUI() {
     fill(canDo ? color(60, 50, 35, 150) : color(40, 30, 25, 100));
     rect(panX + 12, oy, panW - 24, 24, 3);
     // Left accent bar
-    fill(canDo ? color(180, 150, 60) : color(80, 60, 40));
+    let accentCol = tab === 'buy' ? [80, 160, 80] : tab === 'sell' ? [180, 150, 60] : [100, 140, 200];
+    fill(canDo ? color(accentCol[0], accentCol[1], accentCol[2]) : color(80, 60, 40));
     rect(panX + 12, oy, 3, 24, 3, 0, 0, 3);
 
     // Label
@@ -820,7 +872,7 @@ function drawShopUI() {
 
     // Click hint
     if (canDo) {
-      fill(180, 150, 60);
+      fill(accentCol[0], accentCol[1], accentCol[2]);
       textAlign(RIGHT, TOP);
       textSize(11);
       text('CLICK', panX + panW - 18, oy + 9);
@@ -2094,7 +2146,7 @@ function drawHUD() {
   let cr = width - hudMargin, cb = height - hudMargin;
   let controlLines = [];
   if (state.buildMode) {
-    controlLines = [state.demolishMode ? 'CLICK building to demolish  |  X cancel  |  B close' : 'WASD move  |  CLICK place  |  Q rotate  |  X demolish  |  B close'];
+    controlLines = [state.demolishConfirm ? 'E confirm  |  ESC cancel' : state.demolishMode ? 'CLICK building to demolish  |  X cancel  |  B close' : 'WASD move  |  CLICK place  |  Q rotate  |  X demolish  |  B close'];
   } else if (state.rowing && state.rowing.active) {
     controlLines = ['WASD row  |  E dock  |  ESC menu'];
   } else if (state.wreck && state.wreck.active) {
@@ -2513,6 +2565,46 @@ function drawBuildUI() {
     text(bp.name.toUpperCase() + '  --  ' + costStr, width / 2, barY - 16);
   }
   textAlign(LEFT, TOP);
+
+  // Demolish confirmation overlay
+  if (state.demolishConfirm) {
+    let dc = state.demolishConfirm;
+    let b = dc.building;
+    let bpDem = BLUEPRINTS[b.type];
+    let bName = bpDem ? bpDem.name : b.type;
+    let refundStr = '';
+    let parts = [];
+    for (let res in dc.refund) {
+      let name = res === 'ironOre' ? 'iron' : res;
+      parts.push(dc.refund[res] + ' ' + name);
+    }
+    refundStr = parts.length > 0 ? parts.join(', ') : 'nothing';
+
+    let dlgW = 280, dlgH = 72;
+    let dlgX = width / 2 - dlgW / 2, dlgY = height / 2 - dlgH / 2 - 40;
+
+    // Dim backdrop
+    fill(0, 0, 0, 120);
+    noStroke();
+    rect(0, 0, width, height);
+
+    // Panel
+    drawParchmentPanel(dlgX, dlgY, dlgW, dlgH);
+
+    fill(220, 180, 80);
+    textFont('Cinzel, Georgia, serif');
+    textSize(12);
+    textAlign(CENTER, TOP);
+    text('Demolish ' + bName + '?', width / 2, dlgY + 8);
+    textFont('monospace');
+    fill(140, 200, 140);
+    textSize(10);
+    text('Refund: ' + refundStr, width / 2, dlgY + 26);
+    fill(180, 160, 120);
+    textSize(10);
+    text('[E] Confirm    [ESC] Cancel', width / 2, dlgY + 44);
+    textAlign(LEFT, TOP);
+  }
 }
 
 function drawBuildIcon(type, selected) {

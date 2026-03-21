@@ -199,10 +199,11 @@ function startFishing() {
     f.bobberDip = 0;
     f.missLine = '';
     f.streak = f.streak || 0;
-    // Bobber lands ahead of player toward water
-    let facingRight = state.player.facing === 'right' || state.player.facing === 'down';
-    f.bobberX = state.player.x + (facingRight ? 40 : -40);
-    f.bobberY = state.player.y + 20;
+    // Bobber lands outward from island center (toward water)
+    let castAngle = atan2(state.player.y - WORLD.islandCY, state.player.x - WORLD.islandCX);
+    f.bobberX = state.player.x + cos(castAngle) * 45;
+    f.bobberY = state.player.y + sin(castAngle) * 30;
+    f.castAngle = castAngle;
     state.player.vx = 0;
     state.player.vy = 0;
     state.player.moving = false;
@@ -303,11 +304,12 @@ function drawFishing() {
   if (!f || !f.active || !f.phase) return;
   let px = w2sX(state.player.x);
   let py = w2sY(state.player.y);
-  // Fishing rod from player
+  // Fishing rod from player — points toward water (away from island center)
   stroke(140, 100, 40);
   strokeWeight(2);
-  let rodEndX = px + (state.player.facing === 'left' ? -30 : 30);
-  let rodEndY = py - 20;
+  let castA = f.castAngle || atan2(state.player.y - WORLD.islandCY, state.player.x - WORLD.islandCX);
+  let rodEndX = px + cos(castA) * 30;
+  let rodEndY = py - 20 + sin(castA) * 10;
   line(px, py - 10, rodEndX, rodEndY);
 
   if (f.phase === 'cooldown') { noStroke(); return; }

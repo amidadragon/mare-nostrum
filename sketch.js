@@ -844,6 +844,7 @@ let _juiceSpeedLines = []; // speed line particles for dashing
 let _juiceHpShakeTimer = 0; // HP bar shake on damage
 let _juiceToolArc = 0; // tool swing arc timer
 let _juicePickupMagnetism = true; // pickup magnetism enabled
+let _doorTransition = null; // {timer, duration, callback, phase: 'out'|'in'}
 let starPositions = null;
 
 // Fixed absolute building coordinates — organized districts, no overlaps
@@ -1496,6 +1497,7 @@ function initState() {
       dockY: 0, // computed dynamically
       nextArrival: 600,
       shopOpen: false,
+      shopTab: 'buy', // 'buy', 'sell', 'upgrade'
       offers: [],
       gangplank: [],  // temporary bridge tiles when docked
       autoSellTimer: 0,
@@ -1578,6 +1580,7 @@ function initState() {
     // Build mode
     buildMode: false,
     demolishMode: false,
+    demolishConfirm: null, // { buildingIndex, building, refund }
     buildType: 'wall',
     buildRotation: 0,
 
@@ -2853,6 +2856,7 @@ function drawInner() {
 
   // === TEMPLE INTERIOR ===
   if (state.insideTemple) {
+    updateDoorTransition();
     updateTime(dt);
     drawTempleInterior(dt);
     drawHUD();
@@ -2861,6 +2865,7 @@ function drawInner() {
     drawScreenshotFilter();
     drawScreenshotIndicator();
     drawPhotoModeOverlay();
+    drawDoorTransition();
     drawSaveIndicator();
     return;
   }
@@ -3153,6 +3158,7 @@ function drawInner() {
       state.progression.tutorialsSeen.invScreen = true;
       showTutorialHint('Press I to open Inventory', state.player.x, state.player.y - 40);
     }
+    updateDoorTransition();
     updatePlayer(dt);
     updatePlayerAnim(dt);
     resetDailyWantsIfNeeded();
@@ -3615,6 +3621,7 @@ function drawInner() {
     // Photo mode overlays (watermark, vignette, tip, flash)
     drawPhotoModeOverlay();
   }
+  drawDoorTransition();
   drawSaveIndicator();
 
   // Debug perf overlay
@@ -5703,6 +5710,62 @@ function drawScreenFlash() {
   if (f.timer <= 0) state.screenFlash = null;
 }
 
+function startDoorTransition(callback) {
+  _doorTransition = { timer: 0, duration: 18, callback: callback, phase: 'out', doorAngle: 0 };
+}
+
+function updateDoorTransition() {
+  if (!_doorTransition) return;
+  let dt = _doorTransition;
+  dt.timer++;
+  if (dt.phase === 'out') {
+    dt.doorAngle = min(HALF_PI * 0.8, (dt.timer / dt.duration) * HALF_PI * 0.8);
+    if (dt.timer >= dt.duration) {
+      if (dt.callback) dt.callback();
+      dt.phase = 'in';
+      dt.timer = 0;
+    }
+  } else {
+    if (dt.timer >= dt.duration) _doorTransition = null;
+  }
+}
+
+function drawDoorTransition() {
+  if (!_doorTransition) return;
+  let dt = _doorTransition;
+  let t;
+  if (dt.phase === 'out') {
+    t = dt.timer / dt.duration;
+  } else {
+    t = 1 - dt.timer / dt.duration;
+  }
+  // Dim screen
+  noStroke();
+  fill(0, 0, 0, t * 180);
+  rect(0, 0, width, height);
+  // Door panels swinging open from center
+  let doorW = width * 0.15;
+  let doorH = height * 0.6;
+  let doorY = height * 0.2;
+  let openAmt = dt.phase === 'out' ? t : (1 - t);
+  push();
+  fill(90, 60, 30);
+  stroke(60, 40, 20);
+  strokeWeight(2);
+  // Left door
+  let lx = width / 2 - doorW * openAmt;
+  rect(lx - doorW, doorY, doorW, doorH);
+  // Right door
+  let rx = width / 2 + doorW * openAmt;
+  rect(rx, doorY, doorW, doorH);
+  // Door handles
+  fill(180, 150, 80);
+  noStroke();
+  ellipse(lx - 6, doorY + doorH / 2, 5, 5);
+  ellipse(rx + 6, doorY + doorH / 2, 5, 5);
+  pop();
+}
+
 // ─── SPEED LINES (dash juice) ─────────────────────────────────────────────
 function drawSpeedLines() {
   let p = state.player;
@@ -6483,9 +6546,9 @@ function drawTempleInterior(dt) {
   state.templePlayerY = tpy;
 
   // Exit if player walks to bottom
-  if (tpy > height * 0.9) {
-    state.insideTemple = false;
+  if (tpy > height * 0.9 && !_doorTransition) {
     if (snd) snd.playSFX('door_close');
+    startDoorTransition(function() { state.insideTemple = false; });
     return;
   }
 
@@ -12507,7 +12570,7 @@ function updateCenturion(dt) {
   // Clamp centurion to island FIRST (before follow logic to prevent edge oscillation)
   if (!state.conquest.active) {
     let ix = WORLD.islandCX, iy = WORLD.islandCY;
-    let rx = getSurfaceRX() * 0.90, ry = getSurfaceRY() * 0.90;
+    let rx = getSurfaceRX() * 0.80, ry = getSurfaceRY() * 0.80;
     let ex = (cen.x - ix) / rx, ey = (cen.y - iy) / ry;
     if (ex * ex + ey * ey > 1) {
       let a = atan2(cen.y - iy, cen.x - ix);
@@ -12537,14 +12600,18 @@ function updateCenturion(dt) {
   let playerNearEdge = false;
   if (!state.conquest.active) {
     let pix = WORLD.islandCX, piy = WORLD.islandCY;
-    let prx = getSurfaceRX() * 0.90, pry = getSurfaceRY() * 0.90;
+    let prx = getSurfaceRX() * 0.80, pry = getSurfaceRY() * 0.80;
     let pex = (p.x - pix) / prx, pey = (p.y - piy) / pry;
-    playerNearEdge = pex * pex + pey * pey > 0.85;
+    playerNearEdge = pex * pex + pey * pey > 0.72;
   }
 
   if (d > 200 && !state.conquest.active) {
-    // Too far — snap to player (prevents rubber-banding across island)
-    cen.x = p.x + 20; cen.y = p.y + 10; cen.vx = 0; cen.vy = 0;
+    // Too far — snap closer to center than player (not right on edge)
+    let snapA = atan2(p.y - WORLD.islandCY, p.x - WORLD.islandCX);
+    let snapD = sqrt((p.x - WORLD.islandCX) * (p.x - WORLD.islandCX) + (p.y - WORLD.islandCY) * (p.y - WORLD.islandCY)) * 0.85;
+    cen.x = WORLD.islandCX + cos(snapA) * snapD;
+    cen.y = WORLD.islandCY + sin(snapA) * snapD;
+    cen.vx = 0; cen.vy = 0;
   } else if (d > 20 && !playerNearEdge) {
     let spd = min(cen.speed * 1.2, cen.speed + d * 0.005);
     cen.vx = (dx / d) * spd;
@@ -22511,6 +22578,8 @@ function mousePressed() {
   }
   if (state.buildMode) {
     if (state.demolishMode) {
+      // If confirm dialog is showing, ignore clicks (use E/ESC keys)
+      if (state.demolishConfirm) return;
       let wx = s2wX(mouseX), wy = s2wY(mouseY);
       let landmark = ['granary', 'well', 'temple', 'market', 'forum'];
       for (let i = state.buildings.length - 1; i >= 0; i--) {
@@ -22522,10 +22591,16 @@ function mousePressed() {
             repairBuilding(b);
             return;
           }
-          state.buildings.splice(i, 1);
-          addFloatingText(w2sX(wx), w2sY(wy) - 20, 'Demolished', '#ff6644');
-          spawnParticles(wx, wy, 'chop', 6);
-          if (snd) snd.playSFX('chop');
+          // Calculate 50% refund
+          let bp = BLUEPRINTS[b.type];
+          let refund = {};
+          if (bp && bp.cost) {
+            for (let res in bp.cost) {
+              let amt = floor(bp.cost[res] * 0.5);
+              if (amt > 0) refund[res] = amt;
+            }
+          }
+          state.demolishConfirm = { buildingIndex: i, building: b, refund: refund };
           return;
         }
       }
@@ -22538,16 +22613,34 @@ function mousePressed() {
     return;
   }
 
-  // Ship shop click handling
+  // Ship shop click handling (tabbed UI)
   if (state.ship.shopOpen && state.ship.state === 'docked') {
-    let panW = 300;
-    let panH = 54 + state.ship.offers.length * 28 + 24;
-    let panX = width / 2 - panW / 2;
-    let panY = height / 2 - panH / 2;
-    for (let i = 0; i < state.ship.offers.length; i++) {
-      let oy = panY + 54 + i * 28;
+    if (!state.ship.shopTab) state.ship.shopTab = 'buy';
+    let panW = min(320, width - 20);
+    let tab = state.ship.shopTab;
+    let filtered = typeof _getShopTabOffers === 'function' ? _getShopTabOffers(tab, state.ship.offers) : state.ship.offers;
+    let headerH = 90;
+    let panH = min(headerH + filtered.length * 28 + 28, height - 20);
+    let panX = max(10, width / 2 - panW / 2);
+    let panY = max(10, height / 2 - panH / 2);
+    // Tab click detection
+    let tabs = ['buy', 'sell', 'upgrade'];
+    let tabW = floor((panW - 36) / 3);
+    let tabY = panY + 42;
+    for (let t = 0; t < 3; t++) {
+      let tx = panX + 12 + t * (tabW + 6);
+      if (mouseX > tx && mouseX < tx + tabW && mouseY > tabY && mouseY < tabY + 22) {
+        state.ship.shopTab = tabs[t];
+        return;
+      }
+    }
+    // Offer click detection
+    let listY = tabY + 40;
+    for (let i = 0; i < filtered.length; i++) {
+      let oy = listY + i * 28;
       if (mouseX > panX + 12 && mouseX < panX + panW - 12 && mouseY > oy && mouseY < oy + 24) {
-        doTrade(i);
+        let origIdx = state.ship.offers.indexOf(filtered[i]);
+        if (origIdx >= 0) doTrade(origIdx);
         return;
       }
     }
@@ -22971,6 +23064,7 @@ function keyPressed() {
       camSmooth.x = cam.x; camSmooth.y = cam.y;
       return;
     }
+    if (state.demolishConfirm) { state.demolishConfirm = null; return; }
     if (state.buildMode) { state.buildMode = false; return; }
     if (state.insideTemple) { state.insideTemple = false; return; }
     if (wardrobeOpen) { wardrobeOpen = false; return; }
@@ -23586,12 +23680,15 @@ function keyPressed() {
       }
     }
     // Temple interior entry — near door (front of pyramid)
-    if (!state.insideTemple && dist(state.player.x, state.player.y, state.pyramid.x, state.pyramid.y + 5) < 40) {
-      state.insideTemple = true;
-      state.templePlayerX = width / 2;
-      state.templePlayerY = height * 0.75;
+    if (!state.insideTemple && !_doorTransition && dist(state.player.x, state.player.y, state.pyramid.x, state.pyramid.y + 5) < 40) {
       if (snd) snd.playSFX('door_creak');
-      addFloatingText(width / 2, height * 0.3, 'Entering the Temple of Sol Invictus', '#ffd080');
+      state.player.vx = 0; state.player.vy = 0; state.player.moving = false;
+      startDoorTransition(function() {
+        state.insideTemple = true;
+        state.templePlayerX = width / 2;
+        state.templePlayerY = height * 0.75;
+        addFloatingText(width / 2, height * 0.3, 'Entering the Temple of Sol Invictus', '#ffd080');
+      });
       return;
     }
     // Upgrade Forge at pyramid
@@ -23753,11 +23850,12 @@ function keyPressed() {
     return; // block all other keys while legiaUI open
   }
 
-  // Trade number keys when shop is open
+  // Shop tab switching with number keys when shop is open
   if (state.ship.shopOpen && state.ship.state === 'docked') {
-    let tradeIdx = parseInt(key) - 1;
-    if (tradeIdx >= 0 && tradeIdx < state.ship.offers.length) {
-      doTrade(tradeIdx);
+    let tabs = ['buy', 'sell', 'upgrade'];
+    let tabIdx = parseInt(key) - 1;
+    if (tabIdx >= 0 && tabIdx < 3) {
+      state.ship.shopTab = tabs[tabIdx];
     }
   }
 
@@ -23913,10 +24011,36 @@ function keyPressed() {
     return;
   }
 
+  // Demolish confirmation: E to confirm, ESC handled above
+  if (state.demolishConfirm && (key === 'e' || key === 'E')) {
+    let dc = state.demolishConfirm;
+    let b = dc.building;
+    let idx = state.buildings.indexOf(b);
+    if (idx >= 0) {
+      state.buildings.splice(idx, 1);
+      let refundParts = [];
+      for (let res in dc.refund) {
+        state[res] = (state[res] || 0) + dc.refund[res];
+        let name = res === 'ironOre' ? 'iron' : res;
+        refundParts.push('+' + dc.refund[res] + ' ' + name);
+      }
+      let sx = w2sX(b.x), sy = w2sY(b.y);
+      addFloatingText(sx, sy - 20, 'Demolished', '#ff6644');
+      if (refundParts.length > 0) {
+        addFloatingText(sx, sy - 40, refundParts.join(', '), '#44cc44');
+      }
+      spawnParticles(b.x, b.y, 'chop', 6);
+      if (snd) snd.playSFX('chop');
+    }
+    state.demolishConfirm = null;
+    return;
+  }
+
   // Build mode toggle
   if (key === 'b' || key === 'B') {
     state.buildMode = !state.buildMode;
     state.demolishMode = false;
+    state.demolishConfirm = null;
     if (state.buildMode) {
       addFloatingText(width / 2, height * 0.4, 'BUILD MODE ON', C.crystalGlow);
     } else {
@@ -23941,6 +24065,7 @@ function keyPressed() {
     if (key === 'q' || key === 'Q') state.buildRotation = (state.buildRotation + 1) % 2;
     if (key === 'x' || key === 'X') {
       state.demolishMode = !state.demolishMode;
+      state.demolishConfirm = null;
       addFloatingText(width / 2, height * 0.4, state.demolishMode ? 'DEMOLISH MODE — click building' : 'DEMOLISH OFF', state.demolishMode ? '#ff6644' : C.textDim);
     }
   }
