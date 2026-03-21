@@ -22321,6 +22321,10 @@ function mousePressed() {
     return;
   }
   if (state.cutscene) { skipCutscene(); return; }
+  // Multiplayer trade offer click
+  if (typeof MP !== 'undefined' && MP.connected && state._mpTradeOffer) {
+    if (MP.handleTradeOfferClick(mouseX, mouseY)) return;
+  }
   // Army battle — allow clicks during deploy for formation picker
   if (typeof _armyBattle !== 'undefined' && _armyBattle) {
     if (typeof handleArmyBattleClick === 'function') handleArmyBattleClick(mouseX, mouseY);
