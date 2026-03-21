@@ -24,25 +24,129 @@ function updateNotifications(dt) {
 
 function drawNotifications() {
   if (notifications.length === 0) return;
-  let nx = width - 14;
-  let ny = height - 70;
-  textAlign(RIGHT, BOTTOM);
-  for (let i = notifications.length - 1; i >= 0; i--) {
+  textSize(10);
+  let maxVisible = 3;
+  let startIdx = max(0, notifications.length - maxVisible);
+  let slotY = 8;
+
+  for (let i = notifications.length - 1; i >= startIdx; i--) {
     let n = notifications[i];
     let fadeOut = n.timer < 40 ? n.timer / 40 : 1;
     let alpha = n.fadeIn * fadeOut;
-    let slideX = (1 - n.fadeIn) * 60;
-    let c = color(n.col);
-    fill(20, 15, 10, 180 * alpha);
+    // Slide down from top
+    let slideY = (1 - n.fadeIn) * -30;
+    let tw = textWidth(n.text) + 32;
+    let th = 22;
+    let px = width / 2 - tw / 2;
+    let py = slotY + slideY;
+
+    // Parchment background
     noStroke();
-    let tw = textWidth(n.text) + 16;
-    rect(nx - tw + slideX, ny - 11, tw, 14, 3);
-    fill(red(c), green(c), blue(c), 255 * alpha);
-    textSize(10);
-    text(n.text, nx - 4 + slideX, ny);
-    ny -= 16;
+    fill(235, 220, 190, 210 * alpha);
+    rect(px + 4, py + 2, tw - 8, th - 4);
+    // Ragged edges — small triangular notches on top and bottom
+    for (let e = 0; e < tw - 12; e += 8) {
+      let ex = px + 6 + e;
+      // Top notches
+      fill(235, 220, 190, 210 * alpha);
+      triangle(ex, py + 2, ex + 4, py - 1, ex + 8, py + 2);
+      // Bottom notches
+      triangle(ex, py + th - 2, ex + 4, py + th + 1, ex + 8, py + th - 2);
+    }
+    // Darker border lines
+    stroke(180, 160, 120, 140 * alpha);
+    strokeWeight(0.7);
+    // Left and right borders
+    line(px + 4, py + 1, px + 4, py + th - 1);
+    line(px + tw - 4, py + 1, px + tw - 4, py + th - 1);
+    noStroke();
+
+    // Text in dark brown
+    textAlign(CENTER, CENTER);
+    fill(60, 40, 20, 240 * alpha);
+    text(n.text, width / 2, py + th / 2);
+    slotY += th + 4;
   }
   textAlign(LEFT, TOP);
+}
+
+// ─── DAY/NIGHT CLOCK HUD ────────────────────────────────────────────────
+function drawClockHUD() {
+  if (photoMode || screenshotMode) return;
+  if (dialogState && dialogState.active) return;
+  let h = state.time / 60;
+  let cx = width / 2, cy = 28, r = 16;
+
+  // Fade when player is near top center
+  let _psx = w2sX(state.player.x), _psy = w2sY(state.player.y);
+  let clockFade = (_psx > width * 0.35 && _psx < width * 0.65 && _psy < height * 0.15) ? 0.3 : 1.0;
+  drawingContext.globalAlpha = clockFade;
+
+  // Dark semi-transparent background
+  noStroke();
+  fill(15, 12, 8, 160);
+  ellipse(cx, cy, r * 2, r * 2);
+
+  // Hour markers (12 ticks)
+  for (let i = 0; i < 12; i++) {
+    let a = (i / 12) * TWO_PI - HALF_PI;
+    let ix = cx + cos(a) * (r - 3);
+    let iy = cy + sin(a) * (r - 3);
+    fill(180, 160, 120, 120);
+    ellipse(ix, iy, 1.5, 1.5);
+  }
+
+  // Determine if day or night, and icon angle
+  // Sun: visible 5-21, moon: visible 21-5 (next day)
+  let isDay = h >= 5 && h < 21;
+  let iconAngle;
+  if (isDay) {
+    // Map 5-21 to left(-PI) -> top(-HALF_PI) -> right(0)
+    iconAngle = map(h, 5, 21, PI, 0) - HALF_PI;
+  } else {
+    // Map 21-29(5) to left(PI) -> top(HALF_PI) -> right(0)
+    let nightH = h >= 21 ? h - 21 : h + 3; // 0-8 range
+    iconAngle = map(nightH, 0, 8, PI, 0) - HALF_PI;
+  }
+  let iconX = cx + cos(iconAngle) * (r - 7);
+  let iconY = cy + sin(iconAngle) * (r - 7);
+
+  if (isDay) {
+    // Sun - yellow circle with tiny rays
+    fill(255, 220, 60);
+    ellipse(iconX, iconY, 7, 7);
+    stroke(255, 220, 60, 150);
+    strokeWeight(0.5);
+    for (let i = 0; i < 8; i++) {
+      let ra = (i / 8) * TWO_PI;
+      line(iconX + cos(ra) * 4.5, iconY + sin(ra) * 4.5,
+           iconX + cos(ra) * 6, iconY + sin(ra) * 6);
+    }
+    noStroke();
+  } else {
+    // Moon - white crescent
+    fill(230, 230, 245);
+    ellipse(iconX, iconY, 6, 6);
+    fill(15, 12, 8, 160);
+    ellipse(iconX + 2, iconY - 1, 5, 5);
+  }
+
+  // Time period label below clock
+  let period;
+  if (h >= 5 && h < 7) period = 'Dawn';
+  else if (h >= 7 && h < 11) period = 'Morning';
+  else if (h >= 11 && h < 13) period = 'Noon';
+  else if (h >= 13 && h < 17) period = 'Afternoon';
+  else if (h >= 17 && h < 21) period = 'Dusk';
+  else if (h >= 21 && h < 24 || h >= 0 && h < 1) period = 'Night';
+  else period = 'Midnight';
+
+  textAlign(CENTER, TOP);
+  textSize(7);
+  fill(200, 180, 140, 180 * clockFade);
+  text(period, cx, cy + r + 3);
+  textAlign(LEFT, TOP);
+  drawingContext.globalAlpha = 1;
 }
 
 // ─── ACHIEVEMENT POPUP ──────────────────────────────────────────────────
@@ -1149,7 +1253,7 @@ function drawLegiaUI() {
 
   // Close hint
   fill(100, 90, 70); textSize(9); textAlign(CENTER, TOP);
-  text('[L] or [ESC] Close', px + pw / 2, py + ph - 16);
+  text('[E] [L] or [ESC] Close', px + pw / 2, py + ph - 16);
   pop();
 }
 
@@ -1332,6 +1436,8 @@ function drawColonyOverlay() {
 
 // ─── MAIN HUD ────────────────────────────────────────────────────────────
 // ─── HUD ──────────────────────────────────────────────────────────────────
+// UI scale (set per frame in drawHUD, used by drawHudResource)
+let _uiScale = 1;
 // Track resource changes for HUD pop animation
 let _hudPrev = {};
 function trackHudResource(key, val) {
@@ -1356,7 +1462,8 @@ function drawHudResource(x, y, label, val, col, key) {
   translate(x, y);
   scale(sc);
   fill(col);
-  textSize(9);
+  let _resTs = max(9, floor(10 * _uiScale));
+  textSize(_resTs);
   textAlign(LEFT, TOP);
   text(label + val, 0, 0);
   if (flashAlpha > 0) {
@@ -1365,7 +1472,7 @@ function drawHudResource(x, y, label, val, col, key) {
     text(label + val, 0, 0);
     if (_fDelta !== 0) {
       fill(_fDelta > 0 ? 80 : 220, _fDelta > 0 ? 220 : 80, 80, 200 * flashAlpha);
-      textSize(7);
+      textSize(max(7, floor(8 * _uiScale)));
       text((_fDelta > 0 ? '+' : '') + _fDelta, textWidth(label + val) + 4, -2 - floor(flashAlpha * 4));
     }
   }
@@ -1448,11 +1555,11 @@ function drawHotbar() {
   if (screenshotMode) return;
   let p = state.player;
   let slot = p.hotbarSlot;
-  let slotW = (typeof _isMobile !== 'undefined' && _isMobile) ? 44 : 36;
-  let slotH = slotW, gap = 3;
+  let slotW = (typeof _isMobile !== 'undefined' && _isMobile) ? 44 : max(36, floor(40 * _uiScale));
+  let slotH = slotW, gap = max(3, floor(4 * _uiScale));
   let totalW = HOTBAR_ITEMS.length * (slotW + gap) - gap;
   let bx = floor((width - totalW) / 2);
-  let by = height - slotH - 12;
+  let by = height - slotH - max(12, floor(14 * _uiScale));
 
   noStroke();
   // Track hotbar selection change for bounce
@@ -1518,7 +1625,7 @@ function drawHotbar() {
 
     // Key number label (top-left of slot)
     fill(selected ? 212 : 120, selected ? 160 : 100, selected ? 64 : 60, selected ? 220 : 120);
-    textSize(9); textAlign(LEFT, TOP);
+    textSize(max(9, floor(10 * _uiScale))); textAlign(LEFT, TOP);
     text(HOTBAR_ITEMS[i].key, sx + 2, by + 1);
 
     // Pixel icon in slot
@@ -1710,6 +1817,17 @@ function drawPhotoModeOverlay() {
 function drawHUD() {
   if (photoMode || screenshotMode) return;
   if (dialogState.active) return;
+
+  // UI scale factor — 1.0 at 1280x800, scales with screen size
+  let uiScale = min(width / 1280, height / 800);
+  _uiScale = uiScale;
+  let hudTextSize = max(10, floor(11 * uiScale));
+  let hudBigText = max(12, floor(14 * uiScale));
+  let hudSmallText = max(8, floor(9 * uiScale));
+  let hudLineH = max(11, floor(12 * uiScale));
+  let hudMargin = max(12, floor(16 * uiScale));
+  let hudPanelW = max(195, floor(210 * uiScale));
+
   let h = state.time / 60;
   let mins = floor(state.time % 60);
   let ampm = h >= 12 ? 'PM' : 'AM';
@@ -1721,193 +1839,197 @@ function drawHUD() {
   let _hudFade = (_psx < width * 0.35 && _psy < height * 0.45) ? 0.35 : 1.0;
   drawingContext.globalAlpha = _hudFade;
 
-  // Top-left panel — compact
-  let hudH = 195;
-  if (state.ironOre > 0) hudH += 12;
-  if (state.rareHide > 0) hudH += 12;
-  if (state.ancientRelic > 0) hudH += 12;
-  if (state.titanBone > 0) hudH += 12;
-  if (state.meals > 0) hudH += 12;
-  if (state.wine > 0) hudH += 12;
-  if (state.oil > 0) hudH += 12;
-  if ((state.islandLevel || 1) >= 3 && state._dailyFoodNeeded > 0) hudH += 12;
-  if (state.blessing && state.blessing.type) hudH += 12;
-  if (state.quest) hudH += 12;
-  if (state.weather && state.weather.type !== 'clear') hudH += 12;
-  if ((state.daysSinceRain || 0) >= 3) hudH += 12;
-  hudH += 12; // crop select line
-  if (state.quarrier && state.quarrier.unlocked) hudH += 14;
+  // Top-left panel — compact, scaled
+  let hudH = floor(195 * uiScale);
+  if (state.ironOre > 0) hudH += hudLineH;
+  if (state.rareHide > 0) hudH += hudLineH;
+  if (state.ancientRelic > 0) hudH += hudLineH;
+  if (state.titanBone > 0) hudH += hudLineH;
+  if (state.meals > 0) hudH += hudLineH;
+  if (state.wine > 0) hudH += hudLineH;
+  if (state.oil > 0) hudH += hudLineH;
+  if ((state.islandLevel || 1) >= 3 && state._dailyFoodNeeded > 0) hudH += hudLineH;
+  if (state.blessing && state.blessing.type) hudH += hudLineH;
+  if (state.quest) hudH += hudLineH;
+  if (state.weather && state.weather.type !== 'clear') hudH += hudLineH;
+  if ((state.daysSinceRain || 0) >= 3) hudH += hudLineH;
+  hudH += hudLineH; // crop select line
+  if (state.quarrier && state.quarrier.unlocked) hudH += floor(14 * uiScale);
   hudH = min(hudH, height - 80); // clamp to avoid going off-screen
-  drawHUDPanel(12, 12, 195, hudH - 14);
+  drawHUDPanel(hudMargin, hudMargin, hudPanelW, hudH - floor(14 * uiScale));
   textAlign(LEFT, TOP);
 
-  drawBarHUD(22, 20, 100, 8, state.maxSolar > 0 ? state.solar / state.maxSolar : 0, C.solarBright, C.solarGold, 'SOLAR');
+  let hudX = hudMargin + 10;
+  let barW = max(100, floor(110 * uiScale));
+  drawBarHUD(hudX, hudMargin + 8, barW, max(8, floor(9 * uiScale)), state.maxSolar > 0 ? state.solar / state.maxSolar : 0, C.solarBright, C.solarGold, 'SOLAR');
 
   // Core resources — always show
-  let resY = 38;
-  drawHudResource(22, resY, 'SEEDS    ', state.seeds, color(C.textBright), 'seeds'); resY += 11;
-  drawHudResource(22, resY, 'HARVEST  ', state.harvest, color(C.textBright), 'harvest'); resY += 11;
-  drawHudResource(22, resY, 'WOOD     ', state.wood, color(140, 100, 40), 'wood'); resY += 11;
-  drawHudResource(22, resY, 'STONE    ', state.stone, color(C.stoneLight), 'stone'); resY += 11;
-  drawHudResource(22, resY, 'CRYSTALS ', state.crystals, color(C.crystalGlow), 'crystals'); resY += 11;
+  let resY = hudMargin + floor(26 * uiScale);
+  drawHudResource(hudX, resY, 'SEEDS    ', state.seeds, color(C.textBright), 'seeds'); resY += hudLineH;
+  drawHudResource(hudX, resY, 'HARVEST  ', state.harvest, color(C.textBright), 'harvest'); resY += hudLineH;
+  drawHudResource(hudX, resY, 'WOOD     ', state.wood, color(140, 100, 40), 'wood'); resY += hudLineH;
+  drawHudResource(hudX, resY, 'STONE    ', state.stone, color(C.stoneLight), 'stone'); resY += hudLineH;
+  drawHudResource(hudX, resY, 'CRYSTALS ', state.crystals, color(C.crystalGlow), 'crystals'); resY += hudLineH;
   // Conditional resources — only when player has them
-  drawHudResource(22, resY, 'GOLD     ', state.gold, color(C.solarBright), 'gold');
+  drawHudResource(hudX, resY, 'GOLD     ', state.gold, color(C.solarBright), 'gold');
   // Show daily upkeep next to gold
   let _bldUpkeep = (typeof calculateBuildingMaintenance === 'function') ? calculateBuildingMaintenance() : 0;
   let _armUpkeep = (typeof getArmyUpkeep === 'function') ? getArmyUpkeep() : 0;
   let _totalUpkeep = _bldUpkeep + _armUpkeep;
   if (_totalUpkeep > 0) {
-    fill(200, 80, 60); textSize(8);
-    text(' -' + _totalUpkeep + '/d', 120, resY);
+    fill(200, 80, 60); textSize(hudSmallText);
+    text(' -' + _totalUpkeep + '/d', hudX + barW, resY);
   }
-  resY += 11;
-  if (state.fish > 0) { drawHudResource(22, resY, 'FISH     ', state.fish, color(100, 180, 255), 'fish'); resY += 11; }
+  resY += hudLineH;
+  if (state.fish > 0) { drawHudResource(hudX, resY, 'FISH     ', state.fish, color(100, 180, 255), 'fish'); resY += hudLineH; }
   // Food consumption indicator (level 3+)
   if ((state.islandLevel || 1) >= 3 && state._dailyFoodNeeded > 0) {
     let needed = state._dailyFoodNeeded;
     let totalFood = (state.harvest || 0) + (state.fish || 0) + (state.meals || 0);
     let daysLeft = needed > 0 ? floor(totalFood / needed) : 99;
     let foodCol = daysLeft >= 5 ? color(80, 180, 80) : daysLeft >= 2 ? color(220, 180, 40) : color(255, 80, 60);
-    fill(foodCol); textSize(10);
-    text('FOOD -' + needed + '/day (' + daysLeft + 'd)', 22, resY); resY += 11;
+    fill(foodCol); textSize(hudTextSize);
+    text('FOOD -' + needed + '/day (' + daysLeft + 'd)', hudX, resY); resY += hudLineH;
   }
   // Expedition resources
   let expResY = resY;
   if (state.ironOre > 0 || state.rareHide > 0 || state.ancientRelic > 0 || state.titanBone > 0) {
-    fill(170, 185, 200);
-    if (state.ironOre > 0) { text('IRON     ' + state.ironOre, 22, expResY); expResY += 12; }
+    fill(170, 185, 200); textSize(hudTextSize);
+    if (state.ironOre > 0) { text('IRON     ' + state.ironOre, hudX, expResY); expResY += hudLineH; }
     fill(200, 160, 120);
-    if (state.rareHide > 0) { text('HIDE     ' + state.rareHide, 22, expResY); expResY += 12; }
+    if (state.rareHide > 0) { text('HIDE     ' + state.rareHide, hudX, expResY); expResY += hudLineH; }
     fill(220, 140, 220);
-    if (state.ancientRelic > 0) { text('RELIC    ' + state.ancientRelic, 22, expResY); expResY += 12; }
+    if (state.ancientRelic > 0) { text('RELIC    ' + state.ancientRelic, hudX, expResY); expResY += hudLineH; }
     fill(240, 220, 140);
-    if (state.titanBone > 0) { text('BONE     ' + state.titanBone, 22, expResY); expResY += 12; }
+    if (state.titanBone > 0) { text('BONE     ' + state.titanBone, hudX, expResY); expResY += hudLineH; }
   }
   // Cooked goods
   let cookedY = expResY;
   if (state.meals > 0 || state.wine > 0 || state.oil > 0) {
-    fill(220, 180, 80);
-    if (state.meals > 0) { text('MEALS    ' + state.meals, 22, cookedY); cookedY += 12; }
-    if (state.wine > 0) { fill(160, 50, 80); text('WINE     ' + state.wine, 22, cookedY); cookedY += 12; }
-    if (state.oil > 0) { fill(140, 160, 60); text('OIL      ' + state.oil, 22, cookedY); cookedY += 12; }
+    fill(220, 180, 80); textSize(hudTextSize);
+    if (state.meals > 0) { text('MEALS    ' + state.meals, hudX, cookedY); cookedY += hudLineH; }
+    if (state.wine > 0) { fill(160, 50, 80); text('WINE     ' + state.wine, hudX, cookedY); cookedY += hudLineH; }
+    if (state.oil > 0) { fill(140, 160, 60); text('OIL      ' + state.oil, hudX, cookedY); cookedY += hudLineH; }
   }
 
-  drawBarHUD(22, cookedY + 2, 100, 7, state.companion.energy / 100, C.companionG, C.companionD, 'CRITTER');
-  drawBarHUD(22, cookedY + 16, 100, 7, state.woodcutter.energy / 100, '#A0724A', '#4A3520', 'CUTTER');
-  if (state.quarrier.unlocked) drawBarHUD(22, cookedY + 30, 100, 7, state.quarrier.energy / 100, '#8A8078', '#3A3530', 'QUARRY');
-  let qOff = (state.quarrier && state.quarrier.unlocked) ? 14 : 0;
+  let barH = max(7, floor(8 * uiScale));
+  drawBarHUD(hudX, cookedY + 2, barW, barH, state.companion.energy / 100, C.companionG, C.companionD, 'CRITTER');
+  drawBarHUD(hudX, cookedY + 2 + barH + 7, barW, barH, state.woodcutter.energy / 100, '#A0724A', '#4A3520', 'CUTTER');
+  if (state.quarrier.unlocked) drawBarHUD(hudX, cookedY + 2 + (barH + 7) * 2, barW, barH, state.quarrier.energy / 100, '#8A8078', '#3A3530', 'QUARRY');
+  let qOff = (state.quarrier && state.quarrier.unlocked) ? floor(14 * uiScale) : 0;
+  let barBlockH = 2 + (barH + 7) * 2;
 
   // Island level — Cinzel for rank title
   textFont('Cinzel, Georgia, serif');
   fill(210, 180, 80);
-  textSize(10);
+  textSize(hudTextSize);
   let rankTitle = state.islandLevel >= 25 ? 'IMPERATOR' : state.islandLevel >= 20 ? 'CONSUL' : state.islandLevel >= 15 ? 'SENATOR' : state.islandLevel >= 10 ? 'GOVERNOR' : 'CITIZEN';
-  text(rankTitle + ' — LV.' + state.islandLevel, 22, cookedY + 30 + qOff);
+  text(rankTitle + ' — LV.' + state.islandLevel, hudX, cookedY + barBlockH + qOff);
   textFont('monospace');
   // Skill points alert
   let _skillOff = 0;
   if ((state.player.skillPoints || 0) > 0) {
-    fill(255, 220, 80); textSize(10);
-    text('[K] ' + state.player.skillPoints + ' skill pt' + (state.player.skillPoints > 1 ? 's' : '') + ' ready', 22, cookedY + 41 + qOff);
-    _skillOff = 11;
+    fill(255, 220, 80); textSize(hudTextSize);
+    text('[K] ' + state.player.skillPoints + ' skill pt' + (state.player.skillPoints > 1 ? 's' : '') + ' ready', hudX, cookedY + barBlockH + hudLineH + qOff);
+    _skillOff = hudLineH;
   }
   // Season
   let seasonCol = getSeason() === 2 ? color(200, 140, 40) : getSeason() === 3 ? color(180, 200, 220) : getSeason() === 1 ? color(200, 180, 60) : color(80, 160, 50);
   fill(seasonCol);
-  textSize(10);
-  text(getSeasonName(), 22, cookedY + 41 + _skillOff + qOff);
+  textSize(hudTextSize);
+  text(getSeasonName(), hudX, cookedY + barBlockH + hudLineH + _skillOff + qOff);
   // Seasonal crop hint
   let _scHint = typeof getSeasonalCrop === 'function' ? getSeasonalCrop() : null;
   if (_scHint) {
-    fill(160, 150, 110, 160); textSize(9);
-    text('Best crop: ' + _scHint.name, 22, cookedY + 50 + _skillOff + qOff);
+    fill(160, 150, 110, 160); textSize(hudSmallText);
+    text('Best crop: ' + _scHint.name, hudX, cookedY + barBlockH + hudLineH * 2 + _skillOff + qOff);
   }
 
   // Ship status
-  let hudY = cookedY + 53 + _skillOff;
+  let hudY = cookedY + barBlockH + hudLineH * 3 + _skillOff;
   if (state.ship.state !== 'gone') {
     fill(color(C.solarBright));
-    textSize(10);
-    text('SHIP: ' + state.ship.state.toUpperCase(), 22, hudY);
-    hudY += 12;
+    textSize(hudTextSize);
+    text('SHIP: ' + state.ship.state.toUpperCase(), hudX, hudY);
+    hudY += hudLineH;
   }
 
   // Grape/olive seeds — only show when player has some
   if (state.grapeSeeds > 0 || state.oliveSeeds > 0) {
     fill(140, 60, 160);
-    textSize(10);
+    textSize(hudTextSize);
     let seedStr = '';
     if (state.grapeSeeds > 0) seedStr += 'GRAPE ' + state.grapeSeeds + '  ';
     if (state.oliveSeeds > 0) seedStr += 'OLIVE ' + state.oliveSeeds;
-    text(seedStr.trim(), 22, hudY);
-    hudY += 11;
+    text(seedStr.trim(), hudX, hudY);
+    hudY += hudLineH;
   }
 
   // Crop select
-  fill(color(C.textDim));
+  fill(color(C.textDim)); textSize(hudTextSize);
   let sc = getSeasonalCrop();
   let hasNewSeeds = (state.flaxSeeds > 0 || state.pomegranateSeeds > 0 || state.lotusSeeds > 0);
   let cropHint = sc ? (hasNewSeeds ? '  (1-7)' : '  (1/2/3/4)') : (hasNewSeeds ? '  (1-3,5-7)' : '  (1/2/3)');
-  text('CROP: ' + (state.cropSelect || 'grain').toUpperCase() + cropHint, 22, hudY);
-  hudY += 11;
+  text('CROP: ' + (state.cropSelect || 'grain').toUpperCase() + cropHint, hudX, hudY);
+  hudY += hudLineH;
 
   // Blessing indicator
   if (state.blessing && state.blessing.type) {
     let blessCol = state.blessing.type === 'crops' ? '#88cc44' : state.blessing.type === 'solar' ? '#ffcc44' : state.blessing.type === 'speed' ? '#44ccff' : state.blessing.type === 'storm' ? '#8888ff' : '#ff88ff';
     fill(color(blessCol));
-    textSize(10);
+    textSize(hudTextSize);
     let bMin = floor((state.blessing.timer || 0) / 60);
-    text('BLESSING: ' + state.blessing.type.toUpperCase() + ' (' + bMin + 'm)', 22, hudY);
-    hudY += 12;
+    text('BLESSING: ' + state.blessing.type.toUpperCase() + ' (' + bMin + 'm)', hudX, hudY);
+    hudY += hudLineH;
   }
 
   // Weather indicator
   if (state.weather && state.weather.type !== 'clear') {
     let wCol = state.weather.type === 'rain' ? '#6699cc' : state.weather.type === 'heatwave' ? '#ff8844' : '#aabbcc';
     fill(color(wCol));
-    textSize(10);
+    textSize(hudTextSize);
     let wSec = floor((state.weather.timer || 0) / 60);
-    text('WEATHER: ' + state.weather.type.toUpperCase() + ' (' + wSec + 's)', 22, hudY);
-    hudY += 12;
+    text('WEATHER: ' + state.weather.type.toUpperCase() + ' (' + wSec + 's)', hudX, hudY);
+    hudY += hudLineH;
   }
 
   // Tech: natural_philosophy — predict tomorrow's weather
   if (typeof hasTech === 'function' && hasTech('natural_philosophy')) {
-    fill(140, 170, 200, 160); textSize(9);
+    fill(140, 170, 200, 160); textSize(hudSmallText);
     let nextWeather = (state.daysSinceRain || 0) >= 5 ? 'RAIN likely' : (state.daysSinceRain || 0) >= 3 ? 'DROUGHT continues' : 'CLEAR skies expected';
-    text('Tomorrow: ' + nextWeather, 22, hudY);
-    hudY += 11;
+    text('Tomorrow: ' + nextWeather, hudX, hudY);
+    hudY += hudLineH;
   }
 
   // Drought indicator
   if ((state.daysSinceRain || 0) >= 3) {
     fill(200, 140, 60);
-    textSize(10);
+    textSize(hudTextSize);
     let dLabel = (state.daysSinceRain || 0) >= 7 ? 'SEVERE DROUGHT' : 'DROUGHT';
-    text(dLabel + ' (day ' + (state.daysSinceRain || 0) + ')', 22, hudY);
-    hudY += 12;
+    text(dLabel + ' (day ' + (state.daysSinceRain || 0) + ')', hudX, hudY);
+    hudY += hudLineH;
   }
 
   // Quest tracker
   if (state.quest) {
     fill(color(C.solarGold));
-    textSize(10);
-    text('QUEST: ' + state.quest.desc + ' ' + state.quest.progress + '/' + state.quest.target, 22, hudY);
-    hudY += 12;
+    textSize(hudTextSize);
+    text('QUEST: ' + state.quest.desc + ' ' + state.quest.progress + '/' + state.quest.target, hudX, hudY);
+    hudY += hudLineH;
   }
 
   drawingContext.globalAlpha = 1.0;
 
   // Storm warning
   if (stormActive) {
-    fill(color(C.stormFlash));textSize(9);textAlign(CENTER,TOP);text('DRIFT STORM ACTIVE',width/2,40);textAlign(LEFT,TOP);
+    fill(color(C.stormFlash));textSize(hudSmallText);textAlign(CENTER,TOP);text('DRIFT STORM ACTIVE',width/2,40);textAlign(LEFT,TOP);
   }
 
   // Island name label (top center, subtle)
   if (state.islandName && !stormActive) {
     textFont('Cinzel, Georgia, serif');
     fill(200, 175, 120, 160);
-    textSize(12);
+    textSize(hudBigText);
     textAlign(CENTER, TOP);
     let _dayLbl = state.islandName + ' \u2014 Day ' + state.day;
     if (typeof isMarketDay === 'function' && isMarketDay(state.day)) _dayLbl += '  [MARKET DAY]';
@@ -1915,8 +2037,8 @@ function drawHUD() {
     text(_dayLbl, width / 2, 6);
     if (typeof isMarketDay === 'function' && isMarketDay(state.day)) {
       fill(255, 220, 80, 80 + Math.sin(frameCount * 0.05) * 30);
-      textSize(8);
-      text('Better shop prices today!', width / 2, 20);
+      textSize(hudSmallText);
+      text('Better shop prices today!', width / 2, 6 + hudBigText + 2);
     }
     textAlign(LEFT, TOP);
     textFont('monospace');
@@ -1958,16 +2080,18 @@ function drawHUD() {
   }
 
   // ─── QUEST TRACKER (right side) ───
-  if(state.quest){let qtX=width-170,qtY=122;noStroke();fill(25,20,14,180);rect(qtX,qtY,156,32,4);
-    stroke(180,145,70,100);strokeWeight(0.5);noFill();rect(qtX,qtY,156,32,4);noStroke();
-    fill(212,160,64);textSize(10);textAlign(LEFT,TOP);text('QUEST',qtX+6,qtY+3);
-    fill(200,190,160);textSize(10);text(state.quest.desc.length>22?state.quest.desc.substring(0,22)+'..':state.quest.desc,qtX+6,qtY+13);
-    let _qF=state.quest.progress/state.quest.target;fill(40,35,25);rect(qtX+6,qtY+24,100,4,2);
-    fill(212,160,64);rect(qtX+6,qtY+24,100*_qF,4,2);fill(160,140,100);textSize(9);textAlign(RIGHT,TOP);
-    text(state.quest.progress+'/'+state.quest.target,qtX+150,qtY+22);textAlign(LEFT,TOP);}
+  {let qtW=max(156,floor(170*uiScale)),qtH=max(32,floor(36*uiScale));
+  if(state.quest){let qtX=width-qtW-14,qtY=floor(122*uiScale);noStroke();fill(25,20,14,180);rect(qtX,qtY,qtW,qtH,4);
+    stroke(180,145,70,100);strokeWeight(0.5);noFill();rect(qtX,qtY,qtW,qtH,4);noStroke();
+    fill(212,160,64);textSize(hudTextSize);textAlign(LEFT,TOP);text('QUEST',qtX+6,qtY+3);
+    fill(200,190,160);textSize(hudTextSize);text(state.quest.desc.length>22?state.quest.desc.substring(0,22)+'..':state.quest.desc,qtX+6,qtY+3+hudTextSize+2);
+    let _qF=state.quest.progress/state.quest.target;fill(40,35,25);rect(qtX+6,qtY+qtH-8,qtW-56,4,2);
+    fill(212,160,64);rect(qtX+6,qtY+qtH-8,(qtW-56)*_qF,4,2);fill(160,140,100);textSize(hudSmallText);textAlign(RIGHT,TOP);
+    text(state.quest.progress+'/'+state.quest.target,qtX+qtW-6,qtY+qtH-10);textAlign(LEFT,TOP);}}
 
   // Controls (bottom right) — context-aware, minimal
-  let cr = width - 12, cb = height - 12;
+  let ctrlW = max(200, floor(220 * uiScale));
+  let cr = width - hudMargin, cb = height - hudMargin;
   let controlLines = [];
   if (state.buildMode) {
     controlLines = [state.demolishMode ? 'CLICK building to demolish  |  X cancel  |  B close' : 'WASD move  |  CLICK place  |  Q rotate  |  X demolish  |  B close'];
@@ -1978,19 +2102,19 @@ function drawHUD() {
   } else {
     controlLines = ['WASD move  |  1-5 tools  |  6-0 items  |  E interact', 'SPACE attack  |  B build  |  K skills  |  N codex  |  Y tech  |  ESC menu'];
   }
-  let controlH = 10 + controlLines.length * 12;
-  drawHUDPanel(cr - 200, cb - controlH, 200, controlH);
-  fill(160, 140, 100, 180); textSize(10); textAlign(LEFT, TOP);
+  let controlH = floor(10 * uiScale) + controlLines.length * hudLineH;
+  drawHUDPanel(cr - ctrlW, cb - controlH, ctrlW, controlH);
+  fill(160, 140, 100, 180); textSize(hudTextSize); textAlign(LEFT, TOP);
   for (let ci = 0; ci < controlLines.length; ci++) {
-    text(controlLines[ci], cr - 194, cb - controlH + 5 + ci * 12);
+    text(controlLines[ci], cr - ctrlW + 6, cb - controlH + 5 + ci * hudLineH);
   }
 
   noStroke();
   textAlign(LEFT, TOP);
 
   // ─── MINI-MAP (top right) ───
-  let mmW = 110, mmH = 70;
-  let mmX = width - mmW - 16, mmY = 16;
+  let mmW = max(110, floor(120 * uiScale)), mmH = max(70, floor(76 * uiScale));
+  let mmX = width - mmW - hudMargin, mmY = hudMargin;
   noStroke();
   fill(15, 20, 30, 230);
   rect(mmX, mmY, mmW, mmH, 4);
@@ -2005,7 +2129,7 @@ function drawHUD() {
   rect(mmX + 2, mmY + 2, mmW - 4, mmH - 4, 3);
   noStroke();
   // Island name label
-  fill(180, 160, 120, 160); textSize(5); textAlign(CENTER, TOP);
+  fill(180, 160, 120, 160); textSize(max(5, floor(6 * uiScale))); textAlign(CENTER, TOP);
   text('INSULA DOMUS', mmX + mmW / 2, mmY + 2); textAlign(LEFT, TOP);
   let mcx = mmX + mmW / 2, mcy = mmY + mmH / 2;
   let scaleX = (mmW - 12) / (state.islandRX * 2);
@@ -2906,7 +3030,7 @@ function drawBarHUD(x, y, w, h, frac, colFull, colEmpty, label) {
   rect(x + w, y, 2, h);
   // Label in warmer color
   fill(180, 160, 120);
-  textSize(10);
+  textSize(max(10, floor(11 * _uiScale)));
   textAlign(LEFT, TOP);
   text(label, x + w + 8, y + 1);
 }

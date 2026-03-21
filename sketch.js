@@ -820,7 +820,7 @@ let cam = { x: 600, y: 400 };
 let camSmooth = { x: 600, y: 400 };
 let camZoom = 1.0;
 let camZoomTarget = 1.0;
-const CAM_ZOOM_MIN = 0.5;
+const CAM_ZOOM_MIN = 1.0;
 const CAM_ZOOM_MAX = 2.0;
 let particles = [];
 let lightningBolts = [];
@@ -3549,6 +3549,7 @@ function drawInner() {
 
     if (!screenshotMode && !photoMode) {
       drawHUD();
+      if (typeof drawClockHUD === 'function') drawClockHUD();
       if (typeof drawCompassHUD === 'function') drawCompassHUD();
       if (typeof drawQuestTracker === 'function') drawQuestTracker();
       drawHotbar();
@@ -14442,8 +14443,8 @@ function spawnSeasonFanfare(seasonIdx) {
 function drawNightOverlay() {
   let bright = getSkyBrightness(); // 0 = deep night, 1 = full day
   if (bright >= 1) return; // no overlay needed during day
-  // Max darkness at night: ~40% opacity dark blue (moonlit feel)
-  let darkness = (1 - bright) * 0.40;
+  // Max darkness at night: ~28% opacity dark blue (moonlit feel)
+  let darkness = (1 - bright) * 0.28;
   noStroke();
   fill(10, 12, 40, darkness * 255);
   rect(0, 0, width, height);
@@ -14486,11 +14487,11 @@ function drawColorGrading() {
     // Dusk: deep purple settling
     let t = map(h, 19, 20.5, 0, 1);
     r = lerp(120, 15, t); g = lerp(50, 12, t); b = lerp(100, 50, t);
-    a = lerp(25, 30, t);
+    a = lerp(20, 22, t);
   } else if (h >= 20.5 || h < 5) {
     // Night: deep indigo-blue (subtle tint, not darkening)
     r = 8; g = 8; b = 30;
-    a = 22;
+    a = 15;
   }
 
   // Seasonal tint modifier
@@ -14506,7 +14507,7 @@ function drawColorGrading() {
   }
 
   // Vignette — darker edges for cinematic feel (always subtle)
-  let vigA = 18 + (h >= 20 || h < 6 ? 6 : 0);
+  let vigA = 14 + (h >= 20 || h < 6 ? 3 : 0);
   let vigW = width * 0.35, vigH = height * 0.35;
   // Top-left corner
   fill(0, 0, 0, vigA * 0.5);
@@ -17423,13 +17424,14 @@ function drawLegionPatrol() {
     rect(1, 2, 3, 5);
     pop();
   }
-  // [E] prompt when player near
+  // [E] prompt when player near gate (south side of castrum)
   let px = state.player.x, py2 = state.player.y;
-  if (dist(px, py2, cx, cy) < 50) {
+  let gateY = cy + 50;
+  if (dist(px, py2, cx, gateY) < 40) {
     push();
     fill(255, 255, 255, 200); noStroke();
     textAlign(CENTER, CENTER); textSize(10);
-    text('[E] Legia', w2sX(cx), w2sY(cy) - 35 + floatOffset);
+    text('[E] Enter Barracks', w2sX(cx), w2sY(gateY) - 20 + floatOffset);
     pop();
   }
 }
@@ -22841,6 +22843,13 @@ function keyPressed() {
   }
   // Island milestone overlay — dismiss on any key
   if (dismissIslandMilestone()) return;
+  // E/Enter dismisses popup overlays (lore tablet, narrative dialogue, dialog, victory screen)
+  if (keyCode === 69 || keyCode === 13) {
+    if (typeof loreTabletPopup !== 'undefined' && loreTabletPopup) { loreTabletPopup = null; return; }
+    if (typeof narrativeDialogue !== 'undefined' && narrativeDialogue) { narrativeDialogue = null; return; }
+    if (dialogState.active) { advanceDialog(); return; }
+    if (state.victoryScreen && state.victoryScreen.timer > 120) { state.victoryScreen = null; return; }
+  }
   // Island naming overlay intercepts all keys when open
   if (typeof handleIslandNamingKey === 'function' && handleIslandNamingKey(key, keyCode)) return;
   // Debug console intercepts all keys when open
@@ -23528,9 +23537,9 @@ function keyPressed() {
         return;
       }
     }
-    // Legia castrum interaction
+    // Legia castrum interaction — gate is on south side of building
     if (state.legia && state.legia.castrumLevel > 0 &&
-        dist(state.player.x, state.player.y, state.legia.castrumX, state.legia.castrumY) < 50) {
+        dist(state.player.x, state.player.y, state.legia.castrumX, state.legia.castrumY + 50) < 40) {
       state.legia.legiaUIOpen = !state.legia.legiaUIOpen;
       return;
     }
@@ -23733,6 +23742,7 @@ function keyPressed() {
   }
   // Legia UI number keys
   if (state.legia && state.legia.legiaUIOpen) {
+    if (key === 'l' || key === 'L' || key === 'e' || key === 'E') { state.legia.legiaUIOpen = false; return; }
     if ((key === 'r' || key === 'R') && state.legia.soldiers && state.legia.soldiers.length > 0) {
       state.legia.marching = true;
       state.legia.legiaUIOpen = false;

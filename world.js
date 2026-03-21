@@ -3016,13 +3016,17 @@ function drawNightLighting() {
       if (b.type !== 'torch' && b.type !== 'lantern' && b.type !== 'campfire') return;
       let sx = w2sX(b.x);
       let sy = w2sY(b.y);
-      if (sx < -40 || sx > width + 40 || sy < -40 || sy > height + 40) return;
-      fill(ng[0], ng[1], ng[2], 18 * nightAlpha);
-      ellipse(sx, sy, nr * 3.5, nr * 2.2);
-      fill(ng[0], ng[1], ng[2], 35 * nightAlpha);
-      ellipse(sx, sy, nr * 1.8, nr * 1.1);
-      fill(ng[0], ng[1], ng[2], 55 * nightAlpha);
-      ellipse(sx, sy, nr * 0.7, nr * 0.5);
+      if (sx < -80 || sx > width + 80 || sy < -80 || sy > height + 80) return;
+      // Warm pool-of-light gradient (outermost)
+      fill(255, 200, 80, 40 * nightAlpha);
+      ellipse(sx, sy, 160, 100);
+      // Boosted glow layers (+50% radius, +30% brightness)
+      fill(ng[0], ng[1], ng[2], 23 * nightAlpha);
+      ellipse(sx, sy, nr * 5.25, nr * 3.3);
+      fill(ng[0], ng[1], ng[2], 46 * nightAlpha);
+      ellipse(sx, sy, nr * 2.7, nr * 1.65);
+      fill(ng[0], ng[1], ng[2], 72 * nightAlpha);
+      ellipse(sx, sy, nr * 1.05, nr * 0.75);
     });
   }
   if (state.crystalNodes) {

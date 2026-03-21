@@ -257,6 +257,7 @@ class AmbientManager {
     gain.connect(o.dest);
     src.start(t);
     src.stop(t + o.duration + 0.02);
+    src.onended = () => { try { src.disconnect(); filter.disconnect(); gain.disconnect(); } catch(_e){} };
   }
 
   // Fire a short tone (for bird chirps, cricket chirps, bubbles)
