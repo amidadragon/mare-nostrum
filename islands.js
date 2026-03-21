@@ -11,7 +11,7 @@ function _getIslandDist(ix, iy) {
 }
 
 // ======================================================================
-// === ISLE OF VULCAN — Volcanic Island (Southeast) ====================
+// === ISLE OF VULCAN — Volcanic Island (Northwest) ====================
 // ======================================================================
 function isOnVulcanIsland(wx, wy) { let v = state.vulcan; let ex = (wx - v.isleX) / (v.isleRX - 20); let ey = (wy - v.isleY) / (v.isleRY - 20); return ex * ex + ey * ey < 1; }
 function enterVulcan() {
@@ -499,7 +499,7 @@ function drawHyperboreHUD() {
 }
 
 // ======================================================================
-// === ISLE OF PLENTY — Tropical Paradise (East) =======================
+// === ISLE OF PLENTY — Tropical Paradise (Southeast) ==================
 // ======================================================================
 function isOnPlentyIsland(wx, wy) { let pl = state.plenty; let ex = (wx - pl.isleX) / (pl.isleRX - 20); let ey = (wy - pl.isleY) / (pl.isleRY - 20); return ex * ex + ey * ey < 1; }
 function enterPlenty() {

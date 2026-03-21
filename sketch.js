@@ -1304,8 +1304,8 @@ function initState() {
     // Conquest Island — wild forested island to colonize (WEST of home)
     conquest: {
       active: false,
-      isleX: WORLD.islandCX - 2200,
-      isleY: WORLD.islandCY,
+      isleX: WORLD.islandCX - 2400,
+      isleY: WORLD.islandCY + 0,
       isleRX: 450,
       isleRY: 300,
       trees: [],         // { x, y, hp, maxHp, alive }
@@ -1451,18 +1451,18 @@ function initState() {
       loot: [],
       killCount: 0,
       bestWave: 0,
-      // Arena isle position (NORTH of home island)
-      isleX: WORLD.islandCX,
-      isleY: WORLD.islandCY - 900,
+      // Arena isle position (near-NORTH of home island)
+      isleX: WORLD.islandCX + 100,
+      isleY: WORLD.islandCY - 700,
       isleRX: 160,
       isleRY: 110,
       returnX: 0, returnY: 0, // saved player pos on home island
     },
 
-    // ─── ISLE OF VULCAN (Southeast) — Volcanic island ───
+    // ─── ISLE OF VULCAN (Northwest) — Volcanic island ───
     vulcan: {
       active: false,
-      isleX: WORLD.islandCX + 1800, isleY: WORLD.islandCY + 1700,
+      isleX: WORLD.islandCX - 1800, isleY: WORLD.islandCY - 1800,
       isleRX: 320, isleRY: 220,
       phase: 'unexplored', // unexplored | explored | forged
       lavaPools: [],      // { x, y, r, phase } — generated on first visit
@@ -1475,10 +1475,10 @@ function initState() {
       returnX: 0, returnY: 0,
     },
 
-    // ─── HYPERBOREA (Far North) — Frozen island ───
+    // ─── HYPERBOREA (North) — Frozen island ───
     hyperborea: {
       active: false,
-      isleX: WORLD.islandCX + 400, isleY: WORLD.islandCY - 3000,
+      isleX: WORLD.islandCX + 0, isleY: WORLD.islandCY - 2600,
       isleRX: 350, isleRY: 240,
       phase: 'unexplored', // unexplored | explored | settled
       frozenRuins: [],    // { x, y, looted }
@@ -1490,10 +1490,10 @@ function initState() {
       returnX: 0, returnY: 0,
     },
 
-    // ─── ISLE OF PLENTY (East) — Tropical paradise ───
+    // ─── ISLE OF PLENTY (Southeast) — Tropical paradise ───
     plenty: {
       active: false,
-      isleX: WORLD.islandCX + 2000, isleY: WORLD.islandCY - 300,
+      isleX: WORLD.islandCX + 1800, isleY: WORLD.islandCY + 1800,
       isleRX: 380, isleRY: 260,
       phase: 'unexplored', // unexplored | explored | colonized
       fruitTrees: [],     // { x, y, type, fruit, timer }
@@ -1505,10 +1505,10 @@ function initState() {
       returnX: 0, returnY: 0,
     },
 
-    // ─── NECROPOLIS (Far Southwest) — Ancient burial island ───
+    // ─── NECROPOLIS (Southwest) — Ancient burial island ───
     necropolis: {
       active: false,
-      isleX: WORLD.islandCX - 2400, isleY: WORLD.islandCY + 2500,
+      isleX: WORLD.islandCX - 1800, isleY: WORLD.islandCY + 1800,
       isleRX: 300, isleRY: 200,
       phase: 'unexplored', // unexplored | explored | cleansed
       tombs: [],          // { x, y, looted, trapped }
@@ -1538,8 +1538,8 @@ function initState() {
       raidParty: [],
       raidWarning: 0,
       diplomacyOpen: false,
-      isleX: WORLD.islandCX + 2600,
-      isleY: WORLD.islandCY + 400,
+      isleX: WORLD.islandCX + 1800,
+      isleY: WORLD.islandCY - 1800,
       isleRX: 280,
       isleRY: 190,
     },
@@ -2148,7 +2148,7 @@ function s2wY(sy) {
 
 // Surface radii match the drawn grass ellipse
 function getSurfaceRX() { return state.islandRX * 0.90; }
-function getSurfaceRY() { return state.islandRY * 0.36; }
+function getSurfaceRY() { return state.islandRY * 0.55; }
 
 // Dynamic farm center — scales with island size so farm doesn't crowd temple
 function getFarmCenterX() { return WORLD.islandCX - getSurfaceRX() * 0.45; }
@@ -3671,59 +3671,139 @@ function drawOcean() {
   }
 }
 
-// Ambient ancient ships sailing in the distance
+// Ambient ships sailing between islands
 let _ambientShips = null;
-function drawAmbientShips() {
-  if (!_ambientShips) {
-    _ambientShips = [];
-    for (let i = 0; i < 4; i++) {
-      _ambientShips.push({
-        angle: random(TWO_PI),
-        dist: random(340, 480),
-        speed: random(0.0002, 0.0005) * (random() > 0.5 ? 1 : -1),
-        size: random(1.4, 2.2),
-        type: floor(random(3)), // 0=trireme, 1=merchant, 2=fishing
-      });
-    }
-  }
+function _initAmbientShips() {
+  _ambientShips = [];
   let cx = WORLD.islandCX, cy = WORLD.islandCY;
+  // Island targets for trade routes
+  let _targets = [
+    { x: cx, y: cy },
+    { x: state.conquest.isleX, y: state.conquest.isleY },
+    { x: state.vulcan.isleX, y: state.vulcan.isleY },
+    { x: state.hyperborea.isleX, y: state.hyperborea.isleY },
+    { x: state.plenty.isleX, y: state.plenty.isleY },
+    { x: state.necropolis.isleX, y: state.necropolis.isleY },
+  ];
+  let nKeys = Object.keys(state.nations || {});
+  for (let k of nKeys) {
+    let n = state.nations[k];
+    if (n && !n.defeated) _targets.push({ x: n.isleX, y: n.isleY, nation: k });
+  }
+  // 5 ambient ships with varied types
+  for (let i = 0; i < 5; i++) {
+    let fromIdx = floor(random(_targets.length));
+    let toIdx = floor(random(_targets.length));
+    while (toIdx === fromIdx) toIdx = floor(random(_targets.length));
+    let from = _targets[fromIdx], to = _targets[toIdx];
+    let isNationShip = _targets[fromIdx].nation || _targets[toIdx].nation;
+    let nationKey = _targets[fromIdx].nation || _targets[toIdx].nation || null;
+    let shipType; // 0=merchant(gold flag), 1=neutral(white), 2=war(red)
+    if (nationKey && state.nations[nationKey] && state.nations[nationKey].reputation <= -30) {
+      shipType = 2; // enemy
+    } else if (isNationShip && random() < 0.5) {
+      shipType = 0; // trade
+    } else {
+      shipType = 1; // neutral
+    }
+    // Curved path: lerp from→to with a midpoint offset for arc
+    let midX = (from.x + to.x) / 2 + random(-300, 300);
+    let midY = (from.y + to.y) / 2 + random(-200, 200);
+    _ambientShips.push({
+      fromX: from.x, fromY: from.y,
+      toX: to.x, toY: to.y,
+      midX: midX, midY: midY,
+      t: random(0, 1), // progress along path 0-1
+      speed: random(0.0003, 0.0008),
+      size: random(1.6, 2.5),
+      type: shipType,
+      nationKey: nationKey,
+    });
+  }
+}
+function drawAmbientShips() {
+  if (!_ambientShips) _initAmbientShips();
   let oceanTop = max(height * 0.06, height * 0.25 - horizonOffset);
   let bright = typeof getSkyBrightness === 'function' ? getSkyBrightness() : 0.5;
   noStroke();
   for (let ship of _ambientShips) {
-    ship.angle += ship.speed;
-    let wx = cx + cos(ship.angle) * ship.dist;
-    let wy = cy + sin(ship.angle) * ship.dist * 0.4;
+    ship.t += ship.speed;
+    if (ship.t > 1) {
+      // Reassign new route
+      ship.t = 0;
+      ship.fromX = ship.toX; ship.fromY = ship.toY;
+      let cx = WORLD.islandCX, cy = WORLD.islandCY;
+      let _newTargets = [{ x: cx, y: cy }];
+      let nk = Object.keys(state.nations || {});
+      for (let k of nk) { let n = state.nations[k]; if (n && !n.defeated) _newTargets.push({ x: n.isleX, y: n.isleY, nation: k }); }
+      _newTargets.push({ x: state.conquest.isleX, y: state.conquest.isleY });
+      _newTargets.push({ x: state.plenty.isleX, y: state.plenty.isleY });
+      let pick = _newTargets[floor(random(_newTargets.length))];
+      ship.toX = pick.x; ship.toY = pick.y;
+      ship.midX = (ship.fromX + ship.toX) / 2 + random(-300, 300);
+      ship.midY = (ship.fromY + ship.toY) / 2 + random(-200, 200);
+      ship.nationKey = pick.nation || null;
+      // Update type based on nation hostility
+      if (ship.nationKey && state.nations[ship.nationKey] && state.nations[ship.nationKey].reputation <= -30) {
+        ship.type = 2;
+      } else if (ship.nationKey) {
+        ship.type = random() < 0.5 ? 0 : 1;
+      } else {
+        ship.type = 1;
+      }
+    }
+    // Quadratic bezier: from → mid → to
+    let t = ship.t;
+    let u = 1 - t;
+    let wx = u * u * ship.fromX + 2 * u * t * ship.midX + t * t * ship.toX;
+    let wy = u * u * ship.fromY + 2 * u * t * ship.midY + t * t * ship.toY;
     let sx = w2sX(wx), sy = w2sY(wy);
     // Clamp to ocean
     sy = max(sy, oceanTop + 15);
-    if (sx < -50 || sx > width + 50 || sy > height - 30) continue;
-    // Distance fade — further from screen center = more transparent
-    let distFade = constrain(1 - abs(sy - height * 0.4) / (height * 0.4), 0.2, 1);
-    let sc = ship.size * distFade;
-    let dir = ship.speed > 0 ? 1 : -1;
+    if (sx < -80 || sx > width + 80 || sy > height - 20) continue;
+    // Distance-based scale (atmospheric perspective)
+    let dFromCam = sqrt((wx - camSmooth.x) * (wx - camSmooth.x) + (wy - camSmooth.y) * (wy - camSmooth.y));
+    let distScale = constrain(1 - dFromCam / 5000, 0.3, 1);
+    let distFade = constrain(1 - abs(sy - height * 0.4) / (height * 0.5), 0.15, 1);
+    let sc = ship.size * distFade * distScale;
+    // Direction: tangent of bezier curve
+    let dx = 2 * (1 - t) * (ship.midX - ship.fromX) + 2 * t * (ship.toX - ship.midX);
+    let dir = dx >= 0 ? 1 : -1;
     push();
     translate(floor(sx), floor(sy));
     scale(dir * sc, sc);
-    // Hull
-    let hAlpha = 140 * distFade * bright;
-    fill(100, 70, 35, hAlpha);
+    let hAlpha = 160 * distFade * bright;
+    // Hull — wooden planks
+    fill(90, 62, 28, hAlpha);
     beginShape();
-    vertex(-10, -1); vertex(-8, 3); vertex(8, 3); vertex(10, -1);
-    vertex(7, -2); vertex(-7, -2);
+    vertex(-12, -1); vertex(-10, 3); vertex(10, 3); vertex(12, -1);
+    vertex(9, -3); vertex(-9, -3);
     endShape(CLOSE);
+    // Hull stripe
+    fill(75, 50, 22, hAlpha * 0.7);
+    rect(-8, -1, 16, 1);
     // Mast
-    fill(80, 55, 25, hAlpha);
-    rect(-1, -12, 2, 11);
-    // Sail
-    let puff = sin(frameCount * 0.03 + ship.angle * 10) * 1;
-    fill(235, 225, 205, hAlpha * 0.9);
+    fill(70, 48, 20, hAlpha);
+    rect(-1, -16, 2, 14);
+    // Sail — colored by ship type
+    let puff = sin(frameCount * 0.025 + ship.t * 20) * 1.5;
+    let sailR, sailG, sailB;
+    if (ship.type === 0) { sailR = 240; sailG = 210; sailB = 140; } // gold trade
+    else if (ship.type === 2) { sailR = 200; sailG = 80; sailB = 70; } // red enemy
+    else { sailR = 235; sailG = 228; sailB = 210; } // white neutral
+    fill(sailR, sailG, sailB, hAlpha * 0.9);
     beginShape();
-    vertex(0, -11); vertex(6 + puff, -6); vertex(0, -1);
+    vertex(0, -15); vertex(7 + puff, -9); vertex(0, -2);
     endShape(CLOSE);
-    // Wake
-    fill(180, 210, 230, 20 * distFade);
-    ellipse(-12, 1, 6, 2);
+    // Small flag at top of mast
+    if (ship.type === 0) fill(220, 190, 60, hAlpha);
+    else if (ship.type === 2) fill(200, 50, 40, hAlpha);
+    else fill(200, 200, 200, hAlpha * 0.7);
+    rect(1, -17, 4, 2);
+    // Wake trail
+    fill(180, 210, 230, 18 * distFade);
+    ellipse(-14, 2, 8, 2);
+    ellipse(-18, 2, 5, 1);
     pop();
   }
 }
@@ -16436,13 +16516,13 @@ const NATION_BUILDING_TYPES = ['hut', 'hut', 'market', 'wall', 'barracks', 'towe
 
 const NATION_DEFAULTS = {
   carthage: { gold: 100, military: 3, population: 5, personality: 'aggressive',
-              position: { angle: 0.7, dist: 3200 }, isleRX: 400, isleRY: 280 },
+              position: { angle: -0.785, dist: 2800 }, isleRX: 400, isleRY: 280 }, // NE
   egypt:    { gold: 120, military: 2, population: 5, personality: 'trader',
-              position: { angle: 2.5, dist: 3000 }, isleRX: 420, isleRY: 290 },
+              position: { angle: 1.571, dist: 2800 }, isleRX: 420, isleRY: 290 },  // S
   greece:   { gold: 80,  military: 4, population: 5, personality: 'balanced',
-              position: { angle: 4.3, dist: 3100 }, isleRX: 390, isleRY: 270 },
+              position: { angle: 0, dist: 2800 }, isleRX: 390, isleRY: 270 },      // E
   rome:     { gold: 100, military: 3, population: 5, personality: 'balanced',
-              position: { angle: 5.5, dist: 3200 }, isleRX: 400, isleRY: 280 },
+              position: { angle: 3.927, dist: 2800 }, isleRX: 400, isleRY: 280 },  // NW (fallback if not player)
 };
 
 const NATION_PERSONALITIES = {
@@ -16993,82 +17073,196 @@ function drawSingleNationIsleDistant(key) {
   let hazeA = lerp(60, 30, bright);
   let fsx = floor(sx), fsy = floor(sy);
   let lv = rv.level;
-  let baseW = min(floor(rv.isleRX * 0.5 + lv * 4), floor(rv.isleRX * 0.8));
-  let baseH = min(floor(rv.isleRY * 0.2 + lv * 2), floor(rv.isleRY * 0.35));
-  // Glow aura
-  fill(bannerCol[0], bannerCol[1], bannerCol[2], 12 + floor(sin(frameCount * 0.01) * 6));
-  rect(fsx - floor(baseW * 0.7), fsy - floor(baseH * 0.6), floor(baseW * 1.4), floor(baseH * 1.2));
-  // Island mass — faction-tinted
-  let baseR = lerp(75, 95, bright) + bannerCol[0] * 0.1;
-  let baseG = lerp(55, 70, bright) + bannerCol[1] * 0.08;
-  let baseB = lerp(35, 50, bright) + bannerCol[2] * 0.06;
-  fill(baseR, baseG, baseB, hazeA + 50);
-  rect(fsx - floor(baseW / 2), fsy - floor(baseH / 2) + 2, baseW, baseH);
-  fill(170, 145, 100, hazeA + 30);
-  rect(fsx - floor(baseW / 2) - 2, fsy + floor(baseH * 0.3), baseW + 4, floor(baseH * 0.2));
-  // Buildings
-  fill(bannerCol[0] * 0.6 + 80 * bright, bannerCol[1] * 0.5 + 70 * bright, bannerCol[2] * 0.4 + 50 * bright, hazeA + 40);
-  let numB = min(lv * 2, 12);
+  let rx = rv.isleRX, ry = rv.isleRY;
+  let _bs = 0.25; // blue shift for distance
+
+  // Faction-specific terrain colors
+  let terrainCol, beachCol, treeCol;
+  if (key === 'carthage') {
+    terrainCol = [lerp(185, 170, _bs), lerp(155, 165, _bs), lerp(95, 130, _bs)]; // sandy
+    beachCol = [200, 180, 140]; treeCol = [40, 100, 35]; // palms
+  } else if (key === 'egypt') {
+    terrainCol = [lerp(200, 180, _bs), lerp(175, 175, _bs), lerp(110, 140, _bs)]; // golden sand
+    beachCol = [210, 190, 130]; treeCol = [50, 110, 40]; // papyrus
+  } else if (key === 'greece') {
+    terrainCol = [lerp(155, 160, _bs), lerp(170, 175, _bs), lerp(130, 155, _bs)]; // green-white
+    beachCol = [215, 210, 195]; treeCol = [55, 95, 40]; // olives
+  } else { // rome
+    terrainCol = [lerp(140, 150, _bs), lerp(130, 145, _bs), lerp(95, 130, _bs)]; // earthy
+    beachCol = [195, 180, 145]; treeCol = [45, 90, 35];
+  }
+
+  // Water shadow
+  fill(20, 60, 80, 30);
+  ellipse(fsx + 3, fsy + 4, rx * 2.1, ry * 2.1);
+  // Shallow water ring
+  fill(55, 140, 160, 45);
+  ellipse(fsx, fsy, rx * 2.05, ry * 2.05);
+  // Shore waves
+  stroke(200, 220, 255, 20 + sin(frameCount * 0.04) * 10);
+  strokeWeight(1.5); noFill();
+  ellipse(fsx, fsy, rx * 2.0 + sin(frameCount * 0.025) * 3, ry * 2.0 + sin(frameCount * 0.025) * 2);
+  noStroke();
+  // Beach ring
+  fill(beachCol[0], beachCol[1], beachCol[2]);
+  ellipse(fsx, fsy, rx * 1.95, ry * 1.95);
+  // Beach texture dots
+  fill(beachCol[0] - 15, beachCol[1] - 15, beachCol[2] - 10, 40);
+  for (let i = 0; i < 6; i++) {
+    let ba = (i / 6) * TWO_PI + 0.8;
+    ellipse(fsx + cos(ba) * rx * 0.92, fsy + sin(ba) * ry * 0.65, 8, 4);
+  }
+  // Main terrain
+  fill(terrainCol[0], terrainCol[1], terrainCol[2]);
+  ellipse(fsx, fsy, rx * 1.78, ry * 1.78);
+  // Lighter center meadow
+  fill(terrainCol[0] + 10, terrainCol[1] + 15, terrainCol[2] + 5, 60);
+  ellipse(fsx, fsy + ry * 0.05, rx * 0.9, ry * 0.6);
+
+  // Trees (faction-appropriate) — 4-7 based on level
+  let numTrees = min(4 + lv, 8);
+  for (let i = 0; i < numTrees; i++) {
+    let ta = (i * 2.39996) % TWO_PI;
+    let tr = 0.25 + ((i * 19 + 3) % 50) / 100 * 0.4;
+    let tpx = fsx + cos(ta) * rx * tr;
+    let tpy = fsy + sin(ta) * ry * tr * 0.7;
+    // Tree trunk
+    fill(treeCol[0] - 15, treeCol[1] - 20, treeCol[2] - 10, 100);
+    rect(floor(tpx - 1), floor(tpy - 2), 2, 5);
+    // Tree canopy
+    fill(treeCol[0], treeCol[1] + (i % 3) * 8, treeCol[2], hazeA + 80);
+    if (key === 'carthage' || key === 'egypt') {
+      // Palm-style: narrow top, fronds
+      ellipse(tpx, tpy - 5, 7 + (i % 2) * 3, 5);
+      ellipse(tpx - 2, tpy - 4, 5, 3);
+      ellipse(tpx + 2, tpy - 4, 5, 3);
+    } else {
+      // Round olive/deciduous canopy
+      ellipse(tpx, tpy - 4, 10 + (i % 3) * 2, 7 + (i % 2) * 2);
+    }
+  }
+
+  // Buildings — faction-colored, 3-5 visible
+  let numB = min(3 + floor(lv * 0.5), 6);
+  let _wallR = fac && fac.style ? fac.style.wall[0] : 180;
+  let _wallG = fac && fac.style ? fac.style.wall[1] : 170;
+  let _wallB = fac && fac.style ? fac.style.wall[2] : 150;
+  let _roofR = fac && fac.style ? fac.style.roof[0] : 160;
+  let _roofG = fac && fac.style ? fac.style.roof[1] : 90;
+  let _roofB = fac && fac.style ? fac.style.roof[2] : 50;
   for (let i = 0; i < numB; i++) {
-    let bx = fsx - floor(baseW * 0.35) + floor(i * baseW * 0.7 / max(1, numB - 1));
-    let bh = 3 + floor(random(2, 5 + lv * 0.5)), bw = floor(random(3, 6));
-    rect(bx, fsy - floor(baseH * 0.3) - bh, bw, bh);
+    let ba = (i / numB) * PI + 0.3;
+    let br = rx * 0.25 + (i % 3) * rx * 0.12;
+    let bx = fsx + cos(ba) * br - rx * 0.15;
+    let by = fsy + sin(ba) * br * 0.5 - ry * 0.15;
+    let bw = 6 + (i % 2) * 3, bh = 5 + floor(lv * 0.4) + (i % 3) * 2;
+    // Wall
+    fill(_wallR, _wallG, _wallB, hazeA + 70);
+    rect(floor(bx), floor(by - bh), bw, bh);
+    // Roof
+    fill(_roofR, _roofG, _roofB, hazeA + 60);
+    rect(floor(bx - 1), floor(by - bh - 2), bw + 2, 3);
   }
+
+  // Walls/towers at higher levels
   if (lv >= 3) {
-    fill(accentCol[0] * 0.7, accentCol[1] * 0.7, accentCol[2] * 0.7, hazeA + 35);
-    rect(fsx - floor(baseW * 0.4), fsy - floor(baseH * 0.35), floor(baseW * 0.8), 2);
-    rect(fsx - floor(baseW * 0.4) - 2, fsy - floor(baseH * 0.35) - 5, 4, 7);
-    rect(fsx + floor(baseW * 0.4) - 2, fsy - floor(baseH * 0.35) - 5, 4, 7);
+    fill(accentCol[0] * 0.7, accentCol[1] * 0.7, accentCol[2] * 0.7, hazeA + 40);
+    // Wall line
+    stroke(accentCol[0] * 0.6, accentCol[1] * 0.6, accentCol[2] * 0.6, hazeA + 30);
+    strokeWeight(1); noFill();
+    ellipse(fsx, fsy, rx * 1.3, ry * 1.3);
+    noStroke();
+    // Corner towers
+    for (let ti = 0; ti < 4; ti++) {
+      let twA = (ti / 4) * TWO_PI + 0.4;
+      let twx = fsx + cos(twA) * rx * 0.65;
+      let twy = fsy + sin(twA) * ry * 0.65;
+      fill(accentCol[0] * 0.8, accentCol[1] * 0.8, accentCol[2] * 0.8, hazeA + 45);
+      rect(floor(twx - 2), floor(twy - 6 - lv * 0.3), 5, 6 + floor(lv * 0.3));
+      // Tower cap
+      fill(bannerCol[0], bannerCol[1], bannerCol[2], hazeA + 40);
+      rect(floor(twx - 3), floor(twy - 8 - lv * 0.3), 7, 2);
+    }
   }
+
+  // Central tower at lv 5+
   if (lv >= 5) {
-    fill(accentCol[0], accentCol[1], accentCol[2], hazeA + 45);
-    let twH = 8 + lv;
-    rect(fsx - 3, fsy - floor(baseH * 0.3) - twH, 6, twH);
-    fill(bannerCol[0], bannerCol[1], bannerCol[2], hazeA + 50);
-    rect(fsx + 3, fsy - floor(baseH * 0.3) - twH, 6, 3);
+    let twH = 10 + lv;
+    fill(accentCol[0], accentCol[1], accentCol[2], hazeA + 50);
+    rect(fsx - 3, fsy - floor(ry * 0.15) - twH, 6, twH);
+    // Banner on tower
+    fill(bannerCol[0], bannerCol[1], bannerCol[2], hazeA + 55);
+    rect(fsx + 3, fsy - floor(ry * 0.15) - twH, 7, 4);
+    fill(accentCol[0], accentCol[1], accentCol[2], hazeA + 50);
+    rect(fsx + 2, fsy - floor(ry * 0.15) - twH - 2, 1, 8);
   }
+
+  // Smoke from chimneys
   if (lv >= 2) {
-    fill(180, 180, 170, 20 + sin(frameCount * 0.03) * 10);
+    fill(180, 180, 170, 18 + sin(frameCount * 0.03) * 8);
     for (let i = 0; i < min(lv, 4); i++) {
-      let smX = fsx - 10 + i * 8, smY = fsy - floor(baseH * 0.4) - 5 - sin(frameCount * 0.02 + i) * 3;
-      ellipse(smX, smY, 4 + sin(frameCount * 0.04 + i) * 2, 3);
+      let smX = fsx - 12 + i * 10, smY = fsy - floor(ry * 0.25) - 8 - sin(frameCount * 0.02 + i) * 3;
+      ellipse(smX, smY, 5 + sin(frameCount * 0.04 + i) * 2, 3);
+      ellipse(smX + 1, smY - 3, 3, 2);
     }
   }
-  if (lv >= 4) {
-    let nShips = min(floor(lv / 2), 4);
-    fill(bannerCol[0] * 0.6, bannerCol[1] * 0.5, bannerCol[2] * 0.4, hazeA + 35);
-    for (let i = 0; i < nShips; i++) {
-      let shX = fsx + floor(baseW * 0.3) + i * 8, shY = fsy + floor(baseH * 0.4) + 2;
-      rect(shX - 3, shY, 6, 2); rect(shX, shY - 4, 1, 4);
-      fill(220, 210, 190, hazeA + 25);
-      triangle(shX + 1, shY - 4, shX + 4, shY - 2, shX + 1, shY - 1);
-      fill(bannerCol[0] * 0.6, bannerCol[1] * 0.5, bannerCol[2] * 0.4, hazeA + 35);
-    }
-  }
-  fill(30 + 20 * bright, 50 + 30 * bright, 70 + 20 * bright, 12);
-  rect(fsx - floor(baseW * 0.4), fsy + floor(baseH * 0.5) + 2, floor(baseW * 0.8), 5);
-  // Flag icon — faction banner
-  let _flagY = sy - floor(baseH * 0.5) - 8;
-  fill(bannerCol[0], bannerCol[1], bannerCol[2], hazeA + 80);
-  rect(fsx + 2, _flagY - 8, 8, 6);
+
+  // Flag with faction colors at island peak
+  let _flagY = fsy - floor(ry * 0.6);
   fill(accentCol[0], accentCol[1], accentCol[2], hazeA + 60);
-  rect(fsx + 1, _flagY - 10, 1, 12);
+  rect(fsx, _flagY - 2, 1, 14);
+  fill(bannerCol[0], bannerCol[1], bannerCol[2], hazeA + 80);
+  beginShape();
+  vertex(fsx + 1, _flagY - 2); vertex(fsx + 10, _flagY + 1);
+  vertex(fsx + 1, _flagY + 4);
+  endShape(CLOSE);
+
+  // Dock at south shore
+  fill(110, 85, 50);
+  rect(fsx - 3, floor(fsy + ry * 0.88), 6, 12);
+  fill(130, 100, 60);
+  rect(fsx - 5, floor(fsy + ry * 0.86), 10, 3);
+
+  // Harbored ships at level 4+
+  if (lv >= 4) {
+    let nShips = min(floor(lv / 2), 3);
+    for (let i = 0; i < nShips; i++) {
+      let shX = fsx + 10 + i * 10, shY = fsy + floor(ry * 0.85);
+      fill(90, 65, 30, hazeA + 50);
+      beginShape();
+      vertex(shX - 5, shY); vertex(shX - 3, shY + 2); vertex(shX + 3, shY + 2); vertex(shX + 5, shY);
+      endShape(CLOSE);
+      fill(70, 50, 25, hazeA + 40);
+      rect(shX - 1, shY - 5, 1, 5);
+      fill(220, 210, 190, hazeA + 30);
+      triangle(shX, shY - 5, shX + 4, shY - 3, shX, shY - 1);
+    }
+  }
+
+  // Atmospheric distance haze overlay
+  fill(140 + 30 * bright, 165 + 20 * bright, 195 + 10 * bright, 20);
+  ellipse(fsx, fsy, rx * 2.2, ry * 2.2);
+
+  // Water reflection below island
+  fill(30 + 20 * bright, 60 + 30 * bright, 85 + 25 * bright, 12);
+  ellipse(fsx, fsy + ry * 1.05, rx * 1.5, ry * 0.3);
+
   // Sword icon
   fill(getNationStanceColor(rv)); textSize(12); textAlign(CENTER);
-  text('\u2694', sx, sy - floor(baseH * 0.5) - 16);
+  text('\u2694', sx, fsy - floor(ry * 0.7));
   // Name — color-coded by stance
   textSize(11); textStyle(ITALIC);
-  text(getNationName(key), sx, sy + floor(baseH * 0.5) + 14); textStyle(NORMAL);
+  text(getNationName(key), sx, fsy + ry + 14); textStyle(NORMAL);
   // Status + danger
   let _stanceLabel = getNationStanceLabel(rv);
   let _dangerIcon = (rv.reputation <= -20) ? '\u2620 ' : (rv.allied ? '\u262E ' : '');
   fill(getNationStanceColor(rv)); textSize(9);
-  text(_dangerIcon + _stanceLabel + ' (Lv.' + lv + ')', sx, sy + floor(baseH * 0.5) + 24);
+  text(_dangerIcon + _stanceLabel + ' (Lv.' + lv + ')', sx, fsy + ry + 24);
   // Distance
   if (typeof _getIslandDist === 'function') {
     let _nd = _getIslandDist(rv.isleX, rv.isleY);
     fill(180, 170, 140, 110); textSize(8);
-    text(_nd, sx, sy + floor(baseH * 0.5) + 34);
+    text(_nd, sx, fsy + ry + 34);
   }
   textAlign(LEFT, TOP);
   pop();
@@ -22253,7 +22447,7 @@ function loadGame() {
         n.tradeActive = sn.tradeActive || false; n.lastRaid = sn.lastRaid || 0;
         n.lastTradeDay = sn.lastTradeDay || 0; n.defeated = sn.defeated || false;
         n.allied = sn.allied || false; n.personality = sn.personality || n.personality;
-        if (sn.isleX) n.isleX = sn.isleX; if (sn.isleY) n.isleY = sn.isleY;
+        // Nation positions always use compass layout from NATION_DEFAULTS (not old saves)
         if (sn.isleRX) n.isleRX = sn.isleRX; if (sn.isleRY) n.isleRY = sn.isleRY;
         n.relations = sn.relations || {}; n.wars = sn.wars || []; n.allies = sn.allies || [];
         n.vassal = sn.vassal || false; n.tributePerDay = sn.tributePerDay || 0;
