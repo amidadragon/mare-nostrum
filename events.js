@@ -113,7 +113,7 @@ function drawFestivalDecorations() {
   let season = state.festival.season;
 
   // Floating lanterns near buildings during festivals
-  state.buildings.forEach((b, i) => {
+  (state.buildings || []).forEach((b, i) => {
     let lx = w2sX(b.x) + sin(frameCount * 0.02 + i * 1.7) * 8;
     let ly = w2sY(b.y) - 50 + cos(frameCount * 0.03 + i * 2.1) * 4;
     let pulse = sin(frameCount * 0.06 + i) * 0.3 + 0.7;
@@ -164,7 +164,7 @@ function drawFestivalDecorations() {
     }
   } else if (season === 2) {
     // VINALIA — purple/amber grape-colored orbs drifting near buildings
-    state.buildings.forEach((b, i) => {
+    (state.buildings || []).forEach((b, i) => {
       for (let j = 0; j < 2; j++) {
         let seed = i * 47 + j * 113;
         let ox = sin(frameCount * 0.015 + seed) * 30;
@@ -200,7 +200,7 @@ function drawFestivalDecorations() {
       }
     }
     // Extra torch glow on buildings
-    state.buildings.forEach((b, i) => {
+    (state.buildings || []).forEach((b, i) => {
       let bx = w2sX(b.x), by = w2sY(b.y);
       if (bx < -40 || bx > width + 40) return;
       let flicker = sin(frameCount * 0.08 + i * 2.5) * 0.2 + 0.8;
@@ -879,7 +879,7 @@ function updateActiveEvent(dt) {
           if (state.player.invincTimer <= 0) {
             let armor = state.player.armor || 0;
             let dmgReduce = armor === 1 ? 3 : armor === 2 ? 6 : armor === 3 ? 10 : 0;
-            state.player.hp -= max(1, p.damage - dmgReduce);
+            state.player.hp = max(0, state.player.hp - max(1, p.damage - dmgReduce));
             state.player.invincTimer = 30;
             p.attackCooldown = 50;
           }
@@ -973,7 +973,7 @@ function updateActiveEvent(dt) {
           if (state.player.invincTimer <= 0) {
             let armor = state.player.armor || 0;
             let dmgReduce = armor === 1 ? 2 : armor === 2 ? 5 : armor === 3 ? 8 : 0;
-            state.player.hp -= max(1, b.damage - dmgReduce);
+            state.player.hp = max(0, state.player.hp - max(1, b.damage - dmgReduce));
             state.player.invincTimer = 30;
             b.attackCooldown = 45;
           }
@@ -1547,8 +1547,8 @@ function drawWanderingMerchantUI() {
   if (!state.activeEvent || state.activeEvent.id !== 'wandering_merchant') return;
   if (!state.activeEvent.data.shopOpen) return;
   let stock = state.activeEvent.data.stock || [];
-  let panelW = 260, panelH = 40 + stock.length * 50;
-  let px = width / 2 - panelW / 2, py = height / 2 - panelH / 2;
+  let panelW = min(260, width - 20), panelH = min(40 + stock.length * 50, height - 20);
+  let px = max(10, width / 2 - panelW / 2), py = max(10, height / 2 - panelH / 2);
   push();
   noStroke();
   fill(30, 22, 12, 220);
@@ -1597,7 +1597,7 @@ function buyWanderingMerchantItem(idx) {
     addFloatingText(width / 2, height * 0.35, 'Need ' + item.cost + ' gold!', '#ff6644');
     return;
   }
-  state.gold -= item.cost;
+  state.gold = Math.max(0, state.gold - item.cost);
   state[item.resource] = (state[item.resource] || 0) + item.qty;
   item.sold = true;
   addFloatingText(width / 2, height * 0.3, 'Bought ' + item.name + '!', '#ffcc44');

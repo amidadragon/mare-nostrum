@@ -216,14 +216,14 @@ function onHarvestCombo(plot, baseYield) {
 function checkCropMutation(plot) {
   if (plot.blessed) return; // already mutated
   let chance = 0.05;
-  if (state.weather.type === 'rain') chance *= 2;
-  if (state.blessing.type === 'luck') chance *= 2;
+  if (state.weather && state.weather.type === 'rain') chance *= 2;
+  if (state.blessing && state.blessing.type === 'luck') chance *= 2;
   if (state.prophecy && state.prophecy.type === 'mutation') chance *= 3;
   let fest = getFestival();
   if (fest && fest.effect.mutation) chance *= fest.effect.mutation;
-  if (state.heartRewards.includes('golden')) chance *= 1.5;
+  if (state.heartRewards && state.heartRewards.includes('golden')) chance *= 1.5;
   // Aqueduct bonus
-  let nearAqueduct = state.buildings.some(b => b.type === 'aqueduct' && dist2(b.x, b.y, plot.x, plot.y) < 80);
+  let nearAqueduct = state.buildings && state.buildings.some(b => b.type === 'aqueduct' && dist2(b.x, b.y, plot.x, plot.y) < 80);
   if (nearAqueduct) chance *= 1.5;
 
   if (random() < chance) {

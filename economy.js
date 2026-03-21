@@ -54,8 +54,8 @@ function createTradeRoute(good) {
     addFloatingText(width / 2, height * 0.3, 'Need 50 gold + 20 wood!', '#ff6644');
     return false;
   }
-  state.gold -= TRADE_ROUTE_COST.gold;
-  state.wood -= TRADE_ROUTE_COST.wood;
+  state.gold = max(0, state.gold - TRADE_ROUTE_COST.gold);
+  state.wood = max(0, state.wood - TRADE_ROUTE_COST.wood);
 
   let homePort = getPortPosition();
   let colonyPort = {
@@ -859,8 +859,8 @@ function buyAutomation(autoKey) {
   if (!canAffordAutomation(autoKey)) return false;
   let cost = AUTOMATION_COSTS[autoKey];
   for (let k in cost) {
-    if (k === 'gold') state.gold -= cost[k];
-    else state[k] -= cost[k];
+    if (k === 'gold') state.gold = Math.max(0, state.gold - cost[k]);
+    else state[k] = Math.max(0, (state[k] || 0) - cost[k]);
   }
   state.automation[autoKey] = true;
   addFloatingText(width / 2, height * 0.25, 'Automation unlocked!', '#44ffaa');
@@ -889,8 +889,8 @@ function buyPrestigeBuilding(bType) {
   if (!canAffordPrestigeBuilding(bType)) return false;
   let pb = PRESTIGE_BUILDINGS[bType];
   for (let k in pb.cost) {
-    if (k === 'gold') state.gold -= pb.cost[k];
-    else state[k] -= pb.cost[k];
+    if (k === 'gold') state.gold = Math.max(0, state.gold - pb.cost[k]);
+    else state[k] = Math.max(0, (state[k] || 0) - pb.cost[k]);
   }
   state.prestige.unlockedBuildings.push(bType);
   addFloatingText(width / 2, height * 0.2, pb.name + ' built!', '#ffdd44');

@@ -632,7 +632,7 @@ function getExpandedDialogue(npcName) {
       if (d.timeMin < d.timeMax) { if (t < d.timeMin || t > d.timeMax) return false; }
       else { if (t < d.timeMin && t > d.timeMax) return false; }
     }
-    if (d.weather && state.weather.type !== d.weather) return false;
+    if (d.weather && (!state.weather || state.weather.type !== d.weather)) return false;
     if (d.requires) {
       let rNpc = d.requires.npc === 'livia' ? state.npc :
                  d.requires.npc === 'marcus' ? state.marcus :
@@ -789,8 +789,8 @@ function initNarrativeState() {
   }
   if (!state.narrativeFlags) state.narrativeFlags = {};
   if (!state.npcReactionQueue) state.npcReactionQueue = [];
-  if (!state.mainQuest.counters) state.mainQuest.counters = {};
-  if (!state.npcQuests.counters) state.npcQuests.counters = {};
+  if (state.mainQuest && !state.mainQuest.counters) state.mainQuest.counters = {};
+  if (state.npcQuests && !state.npcQuests.counters) state.npcQuests.counters = {};
 }
 
 // ─── EARLY GAME TUTORIAL NUDGES — guide new players through gather→build→reward ───

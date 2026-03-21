@@ -114,7 +114,7 @@ const MP = {
   },
 
   update() {
-    if (!this.connected) return;
+    if (!this.connected || !state || !state.player) return;
     let now = Date.now();
 
     if (now - this._lastPos > 100) {
@@ -128,8 +128,8 @@ const MP = {
     if (now - this._lastSync > 5000) {
       this.send('sync', {
         level: state.islandLevel,
-        buildings: state.buildings.map(b => ({ x: b.x, y: b.y, type: b.type })),
-        military: state.legia ? state.legia.army.length : 0,
+        buildings: (state.buildings || []).map(b => ({ x: b.x, y: b.y, type: b.type })),
+        military: (state.legia && state.legia.army) ? state.legia.army.length : 0,
         gold: state.gold
       });
       this._lastSync = now;

@@ -460,10 +460,11 @@ function drawMenuScreen() {
   let itemSize = max(13, floor(min(w * 0.02, h * 0.028)));
   textSize(itemSize);
 
-  let _rs = localStorage.getItem('sunlitIsles_save');
+  let _rs = null;
+  try { _rs = localStorage.getItem('sunlitIsles_save'); } catch(e) {}
   let hasSave = false;
   if (_rs) { try { let _d = JSON.parse(_rs); hasSave = _d && _d.version >= 8; } catch(e) {} }
-  if (!hasSave && _rs) localStorage.removeItem('sunlitIsles_save');
+  if (!hasSave && _rs) { try { localStorage.removeItem('sunlitIsles_save'); } catch(e) {} }
   let items = [];
   if (hasSave) items.push('CONTINUE VOYAGE');
   items.push('NEW VOYAGE');
@@ -1146,7 +1147,7 @@ function handleMenuClick() {
     accY += 28;
     let delY = accY + 8;
     if (mouseX > width/2 - 60 && mouseX < width/2 + 60 && mouseY > delY - 10 && mouseY < delY + 12) {
-      if (localStorage.getItem('sunlitIsles_save')) localStorage.removeItem('sunlitIsles_save');
+      try { if (localStorage.getItem('sunlitIsles_save')) localStorage.removeItem('sunlitIsles_save'); } catch(e) {}
       return;
     }
     let backY = py + panH - 25;
@@ -1168,10 +1169,11 @@ function handleMenuClick() {
     return;
   }
   if (menuHover < 0 || menuFadeOut > 0) return;
-  let _rs = localStorage.getItem('sunlitIsles_save');
+  let _rs = null;
+  try { _rs = localStorage.getItem('sunlitIsles_save'); } catch(e) {}
   let hasSave = false;
   if (_rs) { try { let _d = JSON.parse(_rs); hasSave = _d && _d.version >= 8; } catch(e) {} }
-  if (!hasSave && _rs) localStorage.removeItem('sunlitIsles_save');
+  if (!hasSave && _rs) { try { localStorage.removeItem('sunlitIsles_save'); } catch(e) {} }
   let btns = [];
   if (hasSave) btns.push('load');
   btns.push('new', 'multiplayer', 'howtoplay', 'settings', 'credits');
@@ -1323,10 +1325,11 @@ function handleMultiplayerClick() {
     if (mouseX > w/2 - 60 && mouseX < w/2 + 60 && mouseY > btnY - 12 && mouseY < btnY + 12) {
       state._mpMenuOpen = false;
       menuFadeOut = 1;
-      let _rs = localStorage.getItem('sunlitIsles_save');
+      let _rs = null;
+  try { _rs = localStorage.getItem('sunlitIsles_save'); } catch(e) {}
   let hasSave = false;
   if (_rs) { try { let _d = JSON.parse(_rs); hasSave = _d && _d.version >= 8; } catch(e) {} }
-  if (!hasSave && _rs) localStorage.removeItem('sunlitIsles_save');
+  if (!hasSave && _rs) { try { localStorage.removeItem('sunlitIsles_save'); } catch(e) {} }
       menuFadeAction = hasSave ? startLoadGame : startNewGame;
       return;
     }

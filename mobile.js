@@ -36,7 +36,7 @@ function _handleTouchButton(tx, ty) {
 }
 
 function _handleHotbarTap(tx, ty) {
-  if (typeof HOTBAR_ITEMS === 'undefined' || !state) return false;
+  if (typeof HOTBAR_ITEMS === 'undefined' || !state || !state.player) return false;
   let slotW = _isMobile ? 44 : 36, slotH = _isMobile ? 44 : 36, gap = 3;
   let totalW = HOTBAR_ITEMS.length * (slotW + gap) - gap;
   let bx = floor((width - totalW) / 2);
@@ -55,6 +55,7 @@ function _handleHotbarTap(tx, ty) {
 }
 
 function _processTouchActions() {
+  if (!state || !state.player) return;
   while (_touchActionQueue.length > 0) {
     let k = _touchActionQueue.shift();
     if (k === 'SHIFT') {

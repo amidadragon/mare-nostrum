@@ -142,9 +142,9 @@ function drawScreenTransition() {
 // ─── JOURNAL / CODEX UI ─────────────────────────────────────────────────
 function drawJournalUI() {
   if (!state.journalOpen) return;
-  let pw = 360, ph = 340;
-  let panX = width / 2 - pw / 2;
-  let panY = height / 2 - ph / 2;
+  let pw = min(360, width - 20), ph = min(340, height - 20);
+  let panX = max(10, width / 2 - pw / 2);
+  let panY = max(10, height / 2 - ph / 2);
 
   rectMode(CORNER);
   noStroke();
@@ -216,9 +216,9 @@ function drawJournalUI() {
 function drawCodexUI() {
   if (!state.codexOpen) return;
   if (state.journalOpen) { drawJournalUI(); return; }
-  let pw = 340, ph = 320;
-  let panX = width / 2 - pw / 2;
-  let panY = height / 2 - ph / 2;
+  let pw = min(340, width - 20), ph = min(320, height - 20);
+  let panX = max(10, width / 2 - pw / 2);
+  let panY = max(10, height / 2 - ph / 2);
 
   rectMode(CORNER);
   noStroke();
@@ -332,9 +332,9 @@ function drawRecipeBookUI() {
   if (!recipeBookOpen) return;
   push();
 
-  let pw = 340, ph = 340;
-  let panX = width / 2 - pw / 2;
-  let panY = height / 2 - ph / 2;
+  let pw = min(340, width - 20), ph = min(340, height - 20);
+  let panX = max(10, width / 2 - pw / 2);
+  let panY = max(10, height / 2 - ph / 2);
 
   rectMode(CORNER);
   noStroke();
@@ -657,10 +657,10 @@ function drawShopUI() {
   let ship = state.ship;
   if (!ship.shopOpen || ship.state !== 'docked') return;
 
-  let panW = 300;
-  let panH = 64 + ship.offers.length * 28 + 24;
-  let panX = width / 2 - panW / 2;
-  let panY = height / 2 - panH / 2;
+  let panW = min(300, width - 20);
+  let panH = min(64 + ship.offers.length * 28 + 24, height - 20);
+  let panX = max(10, width / 2 - panW / 2);
+  let panY = max(10, height / 2 - panH / 2);
 
   // Dim backdrop
   rectMode(CORNER);
@@ -817,8 +817,8 @@ function drawAdventureHUD() {
 function drawUpgradeShopUI() {
   if (!state.upgradeShopOpen) return;
   push();
-  let panW = 360, panH = 320;
-  let px = width / 2 - panW / 2, py = height / 2 - panH / 2;
+  let panW = min(360, width - 20), panH = min(320, height - 20);
+  let px = max(10, width / 2 - panW / 2), py = max(10, height / 2 - panH / 2);
 
   // Parchment background
   drawParchmentPanel(px, py, panW, panH);
@@ -1019,8 +1019,8 @@ function drawLegiaUI() {
 
   // Dynamic height based on unlocked units
   let trainRows = unlockedTypes.length;
-  let pw = 320, ph = 200 + trainRows * 16 + (armyCount > 0 ? 50 : 0);
-  let px = width / 2 - pw / 2, py = height / 2 - ph / 2;
+  let pw = min(320, width - 20), ph = min(200 + trainRows * 16 + (armyCount > 0 ? 50 : 0), height - 20);
+  let px = max(10, width / 2 - pw / 2), py = max(10, height / 2 - ph / 2);
 
   // Dark panel background
   drawParchmentPanel(px, py, pw, ph);
@@ -1144,8 +1144,8 @@ function drawExpeditionSummaryOverlay() {
   rect(0, 0, width, height);
 
   let lootEntries = Object.entries(s.loot);
-  let bw = 340, bh = 200 + (s.soldiersStart > 0 ? 30 : 0) + lootEntries.length * 22;
-  let bx = width / 2 - bw / 2, by = height / 2 - bh / 2;
+  let bw = min(340, width - 20), bh = min(200 + (s.soldiersStart > 0 ? 30 : 0) + lootEntries.length * 22, height - 20);
+  let bx = max(10, width / 2 - bw / 2), by = max(10, height / 2 - bh / 2);
 
   fill(30, 20, 10, alpha);
   stroke(200, 170, 80, alpha); strokeWeight(2);
@@ -1707,16 +1707,17 @@ function drawHUD() {
   if (state.meals > 0) hudH += 12;
   if (state.wine > 0) hudH += 12;
   if (state.oil > 0) hudH += 12;
-  if (state.blessing.type) hudH += 12;
+  if (state.blessing && state.blessing.type) hudH += 12;
   if (state.quest) hudH += 12;
-  if (state.weather.type !== 'clear') hudH += 12;
+  if (state.weather && state.weather.type !== 'clear') hudH += 12;
   if ((state.daysSinceRain || 0) >= 3) hudH += 12;
   hudH += 12; // crop select line
   if (state.quarrier && state.quarrier.unlocked) hudH += 14;
+  hudH = min(hudH, height - 80); // clamp to avoid going off-screen
   drawHUDPanel(12, 12, 195, hudH - 14);
   textAlign(LEFT, TOP);
 
-  drawBarHUD(22, 20, 100, 8, state.solar / state.maxSolar, C.solarBright, C.solarGold, 'SOLAR');
+  drawBarHUD(22, 20, 100, 8, state.maxSolar > 0 ? state.solar / state.maxSolar : 0, C.solarBright, C.solarGold, 'SOLAR');
 
   // Core resources — always show
   let resY = 38;
@@ -1809,21 +1810,21 @@ function drawHUD() {
   hudY += 11;
 
   // Blessing indicator
-  if (state.blessing.type) {
+  if (state.blessing && state.blessing.type) {
     let blessCol = state.blessing.type === 'crops' ? '#88cc44' : state.blessing.type === 'solar' ? '#ffcc44' : state.blessing.type === 'speed' ? '#44ccff' : state.blessing.type === 'storm' ? '#8888ff' : '#ff88ff';
     fill(color(blessCol));
     textSize(10);
-    let bMin = floor(state.blessing.timer / 60);
+    let bMin = floor((state.blessing.timer || 0) / 60);
     text('BLESSING: ' + state.blessing.type.toUpperCase() + ' (' + bMin + 'm)', 22, hudY);
     hudY += 12;
   }
 
   // Weather indicator
-  if (state.weather.type !== 'clear') {
+  if (state.weather && state.weather.type !== 'clear') {
     let wCol = state.weather.type === 'rain' ? '#6699cc' : state.weather.type === 'heatwave' ? '#ff8844' : '#aabbcc';
     fill(color(wCol));
     textSize(10);
-    let wSec = floor(state.weather.timer / 60);
+    let wSec = floor((state.weather.timer || 0) / 60);
     text('WEATHER: ' + state.weather.type.toUpperCase() + ' (' + wSec + 's)', 22, hudY);
     hudY += 12;
   }
@@ -1882,7 +1883,7 @@ function drawHUD() {
   // Prestige UI hint (after winning)
   if (state.won && !state.conquest.active && !state.rowing.active) {
     fill(200, 180, 100, 120); textSize(8); textAlign(CENTER, TOP);
-    text('[P] Prestige & Score', width / 2, height - 18);
+    text('[P] Prestige & Score', width / 2, height - 64);
     textAlign(LEFT, TOP);
   }
 
@@ -1915,7 +1916,7 @@ function drawHUD() {
   }
 
   // ─── QUEST TRACKER (right side) ───
-  if(state.quest){let qtX=width-170,qtY=100;noStroke();fill(25,20,14,180);rect(qtX,qtY,156,32,4);
+  if(state.quest){let qtX=width-170,qtY=122;noStroke();fill(25,20,14,180);rect(qtX,qtY,156,32,4);
     stroke(180,145,70,100);strokeWeight(0.5);noFill();rect(qtX,qtY,156,32,4);noStroke();
     fill(212,160,64);textSize(10);textAlign(LEFT,TOP);text('QUEST',qtX+6,qtY+3);
     fill(200,190,160);textSize(10);text(state.quest.desc.length>22?state.quest.desc.substring(0,22)+'..':state.quest.desc,qtX+6,qtY+13);
@@ -2771,7 +2772,7 @@ function drawCurrentGoalHUD() {
   if (state.tutorialGoalComplete) return;
   if (photoMode || screenshotMode || dialogState.active) return;
   let goal = state.tutorialGoal;
-  let gx = width - 185, gy = 46;
+  let gx = width - 185, gy = 158;
   let fadeAlpha = 220;
 
   // Panel

@@ -36,8 +36,8 @@ function isGoldenHour() {
 
 // Weather catch rate multiplier: rain = 1.5x rare chance, storm = 2x
 function getWeatherFishingMult() {
-  if (stormActive || state.weather.type === 'storm') return 2.0;
-  if (state.weather.type === 'rain') return 1.5;
+  if (stormActive || (state.weather && state.weather.type === 'storm')) return 2.0;
+  if (state.weather && state.weather.type === 'rain') return 1.5;
   return 1.0;
 }
 
@@ -45,8 +45,8 @@ function rollFishType() {
   let h = state.time / 60;
   let season = getSeason();
   let eligible = FISH_TYPES.filter(f => {
-    if (f.stormOnly && !stormActive && !(state.weather.type === 'storm' || state.weather.type === 'rain')) return false;
-    if (f.fogOnly && state.weather.type !== 'fog') return false;
+    if (f.stormOnly && !stormActive && !(state.weather && (state.weather.type === 'storm' || state.weather.type === 'rain'))) return false;
+    if (f.fogOnly && (!state.weather || state.weather.type !== 'fog')) return false;
     // Time check — wraps around midnight
     if (f.minH < f.maxH) {
       if (h < f.minH || h > f.maxH) return false;
@@ -101,7 +101,7 @@ const NAT_FISH_DATA = {
 
 function updateFishing(dt) {
   let f = state.fishing;
-  if (!f.active) return;
+  if (!f || !f.active) return;
 
   if (f.phase === 'cast') {
     f.phaseTimer -= dt;
@@ -109,7 +109,7 @@ function updateFishing(dt) {
       f.phase = 'wait';
       let rodBonus = state.tools.ironRod ? 0.7 : state.tools.copperRod ? 0.85 : 1.0;
       let _natFishBonus = typeof getNatFishingSpeedBonus === 'function' ? getNatFishingSpeedBonus() : 1.0;
-      let weatherBonus = (state.weather.type === 'rain' || state.weather.type === 'storm') ? 0.7 : 1.0;
+      let weatherBonus = (state.weather && (state.weather.type === 'rain' || state.weather.type === 'storm')) ? 0.7 : 1.0;
       let goldenBonus = isGoldenHour() ? 0.8 : 1.0;
       f.waitDuration = floor(random(90, 300) * rodBonus / _natFishBonus * weatherBonus * goldenBonus);
       // Day 1 first fish: guaranteed quick bite
@@ -210,13 +210,14 @@ function startFishing() {
     state.player.targetY = null;
     addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 30, 'Casting line...', '#66ccff');
     if (isGoldenHour()) addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 48, 'Golden hour!', '#ffcc33');
-    if (state.weather.type === 'rain') addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 60, 'Rain bonus!', '#88bbdd');
+    if (state.weather && state.weather.type === 'rain') addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 60, 'Rain bonus!', '#88bbdd');
   } else {
     addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 30, 'Go to island edge to fish!', C.buildInvalid);
   }
 }
 
 function reelFish() {
+  if (!state.fishing) return;
   let f = state.fishing;
   if (f.active && (f.bite || f.phase === 'strike')) {
     f.streak = (f.streak || 0) + 1;
@@ -231,10 +232,10 @@ function reelFish() {
     }
 
     // Storm fishing bonus: double yield
-    if (stormActive || state.weather.type === 'storm' || state.weather.type === 'rain') amt *= 2;
+    if (stormActive || (state.weather && (state.weather.type === 'storm' || state.weather.type === 'rain'))) amt *= 2;
     // Event fish multiplier (whale sighting = 2x)
     if (typeof getEventFishMult === 'function') amt = floor(amt * getEventFishMult());
-    if (state.heartRewards.includes('golden')) amt *= 2;
+    if (state.heartRewards && state.heartRewards.includes('golden')) amt *= 2;
     if (state.prophecy && state.prophecy.type === 'fish') amt += 1;
     let fest = getFestival();
     if (fest && fest.effect.fish) amt *= fest.effect.fish;
@@ -247,13 +248,16 @@ function reelFish() {
     state.fish += amt;
     if (state.score) state.score.fishCaught += amt;
     if (snd) snd.playSFX('fish_catch');
-    state.dailyActivities.fished += amt;
+    if (state.dailyActivities) state.dailyActivities.fished += amt;
     if (typeof trackStat === 'function') trackStat('fishCaught', amt);
     if (typeof checkDailyQuestProgress === 'function') checkDailyQuestProgress('fish', amt);
     if (typeof stormActive !== 'undefined' && stormActive && typeof unlockAchievement === 'function') unlockAchievement('storm_fisher');
     checkQuestProgress('fish', amt);
     if (typeof triggerNPCReaction === 'function') triggerNPCReaction('fish', state.player.x, state.player.y);
     if (typeof grantXP === 'function') grantXP(fishType.weight * (isPerfect ? 10 : 5));
+    if (!state.codex) state.codex = {};
+    if (!state.codex.fishCaught) state.codex.fishCaught = {};
+    if (!state.codex.fish) state.codex.fish = {};
     state.codex.fishCaught[fishType.name.toLowerCase()] = true;
     let _fk = fishType.name.toLowerCase();
     let _isFirstCatch = !state.codex.fish[_fk];
@@ -296,7 +300,7 @@ function reelFish() {
 
 function drawFishing() {
   let f = state.fishing;
-  if (!f.active || !f.phase) return;
+  if (!f || !f.active || !f.phase) return;
   let px = w2sX(state.player.x);
   let py = w2sY(state.player.y);
   // Fishing rod from player

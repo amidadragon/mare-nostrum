@@ -83,7 +83,7 @@ function checkAchievements() {
   // Completionist
   if (typeof FISH_TYPES !== 'undefined' && state.codex && Object.keys(state.codex.fishCaught || {}).length >= FISH_TYPES.length) unlockAchievement('all_fish');
   let _allCrops = ['grain','grape','olive','wildflower','sunfruit','pumpkin','frostherb'];
-  if (state.codex && _allCrops.every(c => state.codex.cropsGrown[c])) unlockAchievement('all_crops');
+  if (state.codex && state.codex.cropsGrown && _allCrops.every(c => state.codex.cropsGrown[c])) unlockAchievement('all_crops');
   if (state.npc && state.npc.hearts >= 10 && state.marcus && state.marcus.hearts >= 10 && state.vesta && state.vesta.hearts >= 10 && state.felix && state.felix.hearts >= 10) unlockAchievement('all_hearts');
   if (state.vulcan && state.vulcan.phase !== 'unexplored' && state.hyperborea && state.hyperborea.phase !== 'unexplored' && state.plenty && state.plenty.phase !== 'unexplored' && state.necropolis && state.necropolis.phase !== 'unexplored') unlockAchievement('all_islands');
   if ((state.harvestCombo && state.harvestCombo.bestEver >= 10) || (state.codex && state.codex.bestCombo >= 10)) unlockAchievement('combo_10');
@@ -320,7 +320,8 @@ function drawDailyQuestHUD() {
   if (typeof screenshotMode !== 'undefined' && screenshotMode) return;
   if (typeof dialogState !== 'undefined' && dialogState.active) return;
 
-  let dqX = width - 170, dqY = height - 170;
+  let dqPanelH = 14 + state.dailyQuests.length * 16;
+  let dqX = max(0, width - 170), dqY = max(0, min(height - 170, height - dqPanelH - 50));
   // Fade if player is in bottom-right
   let _psx = typeof w2sX === 'function' ? w2sX(state.player.x) : 0;
   let _psy = typeof w2sY === 'function' ? w2sY(state.player.y) : 0;

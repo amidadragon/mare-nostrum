@@ -57,12 +57,12 @@ function trackMilestone(name) {
   let d = _loadAnalytics();
   if (d[name]) return;
   d[name] = { ts: Date.now(), t: new Date().toISOString() };
-  localStorage.setItem(_ANALYTICS_KEY, JSON.stringify(d));
+  try { localStorage.setItem(_ANALYTICS_KEY, JSON.stringify(d)); } catch(e) {}
 }
 function trackPlayTime() {
   let d = _loadAnalytics();
   d.play_time = (d.play_time || 0) + 60;
-  localStorage.setItem(_ANALYTICS_KEY, JSON.stringify(d));
+  try { localStorage.setItem(_ANALYTICS_KEY, JSON.stringify(d)); } catch(e) {}
 }
 setInterval(trackPlayTime, 60000);
 
@@ -2043,7 +2043,9 @@ function startNewGame() {
 
 function startLoadGame() {
   initState();
-  if (localStorage.getItem('sunlitIsles_save')) {
+  let _hasSave = false;
+  try { _hasSave = !!localStorage.getItem('sunlitIsles_save'); } catch(e) {}
+  if (_hasSave) {
     loadGame();
     state.introPhase = 'done';
     initConquestIsland();
@@ -2335,10 +2337,10 @@ function draw() {
   if (!state.isInitialized) return;
   try { drawInner(); } catch(err) {
     console.error('draw error:', err.message, err.stack);
-    console.error('state:', state.conquest.active ? 'conquest' : state.adventure.active ? 'adventure' : 'home',
-      'enemies:', state.conquest.enemies?.length, 'soldiers:', state.conquest.soldiers?.length,
-      'workers:', state.conquest.workers?.length, 'trees:', state.conquest.trees?.length);
-    if (state.conquest.active && state._drawErrors > 5) {
+    console.error('state:', (state.conquest && state.conquest.active) ? 'conquest' : (state.adventure && state.adventure.active) ? 'adventure' : 'home',
+      'enemies:', state.conquest && state.conquest.enemies ? state.conquest.enemies.length : 0,
+      'soldiers:', state.conquest && state.conquest.soldiers ? state.conquest.soldiers.length : 0);
+    if (state.conquest && state.conquest.active && state._drawErrors > 5) {
       console.error('Too many conquest errors, forcing exit');
       state.conquest.active = false;
       state.conquest.enemies = [];
@@ -3098,7 +3100,7 @@ function drawInner() {
       push(); noStroke();
       fill(160, 140, 100, 102);
       textSize(10); textAlign(RIGHT, BOTTOM);
-      text('[ P ] PHOTO  [ F9 ] SCREENSHOT', width - 18, height - 6);
+      text('[ P ] PHOTO  [ F9 ] SCREENSHOT', width - 18, height - 58);
       pop();
       drawCursor();
     }
@@ -3157,6 +3159,7 @@ function updateTime(dt) {
   }
   if (hr < 19) state._vestaObsNight = false;
   // Night market at 7 PM on every 7th day
+  if (!state.nightMarket) state.nightMarket = { active: false, shopOpen: false, stock: [] };
   if (state.day % 7 === 0 && state.day > 0 && state.time >= 19 * 60 && !state.nightMarket.active) {
     openNightMarket();
   }
@@ -3238,6 +3241,9 @@ function updateTime(dt) {
     if (bathhouses.length > 0 && state.npc && state.day % 3 === 0) {
       state.npc.hearts = min(10, state.npc.hearts + 1);
       if (state.livia) state.livia.hearts = min(10, state.livia.hearts + 1);
+      if (state.marcus) state.marcus.hearts = min(10, state.marcus.hearts + 1);
+      if (state.vesta) state.vesta.hearts = min(10, state.vesta.hearts + 1);
+      if (state.felix) state.felix.hearts = min(10, state.felix.hearts + 1);
       addFloatingText(width / 2, height * 0.28, 'Thermae: NPCs feel happy', '#88ccff');
     }
     // Sculptor: +1 gold/day per sculptor (statue commissions)
@@ -3930,9 +3936,9 @@ function drawNightMarket() {
 
 function drawMarketUI() {
   if (!state.nightMarket.shopOpen) return;
-  let panW = 310, panH = 230;
-  let panX = width / 2 - panW / 2;
-  let panY = height / 2 - panH / 2 - 10;
+  let panW = min(310, width - 20), panH = min(230, height - 20);
+  let panX = max(10, width / 2 - panW / 2);
+  let panY = max(10, height / 2 - panH / 2 - 10);
 
   // Backdrop
   rectMode(CORNER);
@@ -9500,11 +9506,11 @@ function canAfford(buildType) {
 function payCost(buildType) {
   let cost = BLUEPRINTS[buildType].cost;
   let d = getBuildDiscount();
-  state.crystals -= ceil((cost.crystals || 0) * d);
-  state.wood -= ceil((cost.wood || 0) * d);
-  state.stone -= ceil((cost.stone || 0) * d);
-  if (cost.gold) state.gold -= ceil(cost.gold * d);
-  if (cost.ironOre) state.ironOre -= ceil(cost.ironOre * d);
+  state.crystals = max(0, state.crystals - ceil((cost.crystals || 0) * d));
+  state.wood = max(0, state.wood - ceil((cost.wood || 0) * d));
+  state.stone = max(0, state.stone - ceil((cost.stone || 0) * d));
+  if (cost.gold) state.gold = max(0, state.gold - ceil(cost.gold * d));
+  if (cost.ironOre) state.ironOre = max(0, state.ironOre - ceil(cost.ironOre * d));
 }
 
 function getCostString(buildType) {
@@ -11361,13 +11367,14 @@ function companionLevelName(lvl) {
 function addCompanionXp(pet, amount) {
   pet.xp += amount;
   let needed = companionXpForLevel(pet.level);
+  let leveled = false;
   while (pet.xp >= needed && pet.level < 10) {
     pet.xp -= needed;
     pet.level++;
+    leveled = true;
     needed = companionXpForLevel(pet.level);
-    return true; // leveled up
   }
-  return false;
+  return leveled;
 }
 
 function getFirstAdoptedCat() {
@@ -13111,8 +13118,8 @@ function drawPortrait(id) {
     fill(180, 140, 100); rect(-3, -1, 6, 2);
     // Beard
     fill(50, 40, 30); rect(-6, 1, 12, 4);
-    // Helmet crest
-    fill(180, 30, 30); rect(-3, -18, 6, 4);
+    // Helmet crest — faction color
+    { let _fc2 = (typeof getFactionData === 'function') ? getFactionData() : null; let _hc = _fc2 && _fc2.player ? _fc2.player.cape : [180, 30, 30]; fill(_hc[0], _hc[1], _hc[2]); } rect(-3, -18, 6, 4);
   } else if (id === 'vesta') {
     fill(200, 160, 120); rect(-10, -12, 20, 18);
     fill(100, 80, 60); rect(-12, -16, 24, 7); rect(-12, -12, 3, 14); rect(9, -12, 3, 14);
@@ -13544,7 +13551,7 @@ function doTrade(offerIdx) {
   if (offer.type === 'tool') {
     let finalPrice = max(1, floor(offer.price * priceMult));
     if (state.gold >= finalPrice) {
-      state.gold -= finalPrice;
+      state.gold = max(0, state.gold - finalPrice);
       state.tools[offer.tool] = 1;
       if (snd) snd.playSFX('coin_clink');
       addFloatingText(width / 2, height * 0.5, 'Got ' + offer.tool + '!', C.solarBright);
@@ -13568,7 +13575,7 @@ function doTrade(offerIdx) {
   } else {
     let finalPrice = max(1, floor(offer.price * priceMult));
     if (state.gold >= finalPrice) {
-      state.gold -= finalPrice;
+      state.gold = max(0, state.gold - finalPrice);
       state[offer.item] += offer.qty;
       if (snd) snd.playSFX('coin_clink');
       addFloatingText(width / 2, height * 0.5, '+' + offer.qty + ' ' + offer.item + '!', C.crystalGlow);
@@ -14138,7 +14145,7 @@ function updateEnemyAI(e, dt, p, a) {
         if (typeof getFactionDamageReduction === 'function') {
           dmg = max(1, floor(dmg * (1 - getFactionDamageReduction())));
         }
-        p.hp -= dmg;
+        p.hp = max(0, p.hp - dmg);
         p.invincTimer = 45;
         addFloatingText(w2sX(p.x), w2sY(p.y) - 25, '-' + dmg, '#ff6644');
         { let _hda = atan2(p.y - e.y, p.x - e.x); triggerScreenShake(6, 10, cos(_hda), sin(_hda), 'directional'); }
@@ -14180,7 +14187,7 @@ function updateEnemyAI(e, dt, p, a) {
           if (typeof getFactionDamageReduction === 'function') {
             eDmg = max(1, floor(eDmg * (1 - getFactionDamageReduction())));
           }
-          p.hp -= eDmg;
+          p.hp = max(0, p.hp - eDmg);
           p.invincTimer = 30;
           addFloatingText(w2sX(p.x), w2sY(p.y) - 25, '-' + eDmg, '#ff6644');
           { let _hda = atan2(p.y - e.y, p.x - e.x); triggerScreenShake(4, 8, cos(_hda), sin(_hda), 'directional'); }
@@ -14243,6 +14250,7 @@ function enemyDeath(e, a) {
     _killComboDisplayTimer = 90;
   }
   if (e.type && state && state.codex) {
+    if (!state.codex.enemies) state.codex.enemies = {};
     if (!state.codex.enemies[e.type]) state.codex.enemies[e.type] = { defeated: true, count: 0, firstDay: state.day };
     state.codex.enemies[e.type].count++;
     state.codex.enemies[e.type].defeated = true;
@@ -15449,7 +15457,7 @@ function useAmbrosia() {
 function buyWeapon(tier) {
   let w = WEAPONS[tier];
   if (!w || state.gold < w.cost || state.player.weapon >= tier) return false;
-  state.gold -= w.cost;
+  state.gold = max(0, state.gold - w.cost);
   state.player.weapon = tier;
   addFloatingText(width / 2, height * 0.3, w.name + ' acquired!', '#ffcc44');
   if (snd) snd.playSFX('purchase');
@@ -15459,7 +15467,7 @@ function buyWeapon(tier) {
 function buyArmor(tier) {
   let a = ARMORS[tier];
   if (!a || state.gold < a.cost || state.player.armor >= tier) return false;
-  state.gold -= a.cost;
+  state.gold = max(0, state.gold - a.cost);
   state.player.armor = tier;
   addFloatingText(width / 2, height * 0.3, a.name + ' Armor!', '#aaccff');
   if (snd) snd.playSFX('purchase');
@@ -15468,7 +15476,7 @@ function buyArmor(tier) {
 
 function buyPotion() {
   if (state.gold < POTION_COST) return false;
-  state.gold -= POTION_COST;
+  state.gold = max(0, state.gold - POTION_COST);
   state.player.potions++;
   return true;
 }
@@ -15505,7 +15513,7 @@ function buyExpeditionUpgrade(key) {
 
   // Deduct costs
   for (let [k, v] of Object.entries(cost)) {
-    if (k === 'gold') state.gold -= v;
+    if (k === 'gold') state.gold = max(0, state.gold - v);
     if (k === 'wood') state.wood -= v;
     if (k === 'ironOre') state.ironOre -= v;
     if (k === 'rareHide') state.rareHide -= v;
@@ -15628,7 +15636,7 @@ function handleLegiaKey(k) {
       if (state.gold < 20) { addFloatingText(width / 2, height * 0.3, 'Need 20 gold', '#ff6644'); return true; }
       if (state.meals < 1) { addFloatingText(width / 2, height * 0.3, 'Need 1 meal', '#ff6644'); return true; }
       if (lg.recruits + lg.trainingQueue >= lg.maxRecruits + getFactionData().recruitBonus) { addFloatingText(width / 2, height * 0.3, 'Legion at capacity!', '#ff6644'); return true; }
-      state.gold -= 20; state.meals -= 1;
+      state.gold = max(0, state.gold - 20); state.meals = max(0, state.meals - 1);
       lg.trainingQueue++; if (lg.trainingTimer <= 0) lg.trainingTimer = 300;
       addFloatingText(width / 2, height * 0.3, 'Training legionary...', '#cc8844');
     }
@@ -15645,7 +15653,7 @@ function handleLegiaKey(k) {
       if (state.stone < (c.stone || 0)) { addFloatingText(width / 2, height * 0.3, 'Need ' + c.stone + ' stone', '#ff6644'); return true; }
       if (state.ironOre < (c.ironOre || 0)) { addFloatingText(width / 2, height * 0.3, 'Need ' + c.ironOre + ' iron', '#ff6644'); return true; }
       if ((c.crystals || 0) > 0 && state.crystals < c.crystals) { addFloatingText(width / 2, height * 0.3, 'Need ' + c.crystals + ' crystals', '#ff6644'); return true; }
-      state.gold -= (c.gold || 0); state.stone -= (c.stone || 0); state.ironOre -= (c.ironOre || 0); state.crystals -= (c.crystals || 0);
+      state.gold = max(0, state.gold - (c.gold || 0)); state.stone = max(0, state.stone - (c.stone || 0)); state.ironOre = max(0, state.ironOre - (c.ironOre || 0)); state.crystals = max(0, state.crystals - (c.crystals || 0));
       lg.castrumLevel = nextLv;
       lg.maxRecruits = lvData.maxSoldiers;
       addFloatingText(width / 2, height * 0.3, 'Castrum upgraded to ' + lvData.name + '!', '#cc8844');
@@ -16269,7 +16277,7 @@ function colonizeTerraNovaAction() {
     addFloatingText(width / 2, height * 0.4, 'Need: ' + cost.gold + 'g, ' + cost.wood + ' wood, ' + cost.stone + ' stone, ' + cost.ironOre + ' iron, ' + cost.ancientRelic + ' relics', C.buildInvalid);
     return;
   }
-  state.gold -= cost.gold;
+  state.gold = max(0, state.gold - cost.gold);
   state.wood -= cost.wood;
   state.stone -= cost.stone;
   state.ironOre -= cost.ironOre;
@@ -16343,7 +16351,7 @@ function upgradeColony() {
     addFloatingText(width / 2, height * 0.4, 'Need more resources to upgrade colony!', C.buildInvalid);
     return;
   }
-  state.gold -= cost.gold;
+  state.gold = max(0, state.gold - cost.gold);
   state.wood -= cost.wood;
   state.stone -= cost.stone;
   if (cost.ironOre > 0) state.ironOre -= cost.ironOre;
@@ -16640,7 +16648,7 @@ function updateSingleNationRaid(key, dt) {
       r.stealTimer += dt;
       if (r.stealTimer > 120) {
         r.stealTimer = 0;
-        if (state.gold > 0) { let amt = min(state.gold, floor(2 + rv.level)); state.gold -= amt; rv.gold += amt; addFloatingText(w2sX(r.x), w2sY(r.y) - 10, 'Stolen!', '#ff6644'); }
+        if (state.gold > 0) { let amt = min(state.gold, floor(2 + rv.level)); state.gold = max(0, state.gold - amt); rv.gold += amt; addFloatingText(w2sX(r.x), w2sY(r.y) - 10, 'Stolen!', '#ff6644'); }
         else if (state.wood > 0) { state.wood -= min(state.wood, 2); addFloatingText(w2sX(r.x), w2sY(r.y) - 10, 'Stolen!', '#ff6644'); }
         else if (state.stone > 0) { state.stone -= min(state.stone, 1); addFloatingText(w2sX(r.x), w2sY(r.y) - 10, 'Stolen!', '#ff6644'); }
       }
@@ -16654,7 +16662,7 @@ function updateSingleNationRaid(key, dt) {
     }
     if (pDist < 35 && r.attackTimer <= 0) {
       let dmg = max(1, floor(8 + rv.level * 2) - (p.armor || 0) * 3);
-      p.hp -= dmg; p.invincTimer = 20; r.attackTimer = 60;
+      p.hp = max(0, p.hp - dmg); p.invincTimer = 20; r.attackTimer = 60;
       addFloatingText(w2sX(p.x), w2sY(p.y) - 15, '-' + dmg, '#ff4444');
       triggerScreenShake(3, 6);
     }
@@ -16755,7 +16763,7 @@ function nationTrade(key) {
   if (rv.lastTradeDay === state.day) { addFloatingText(width / 2, height * 0.3, 'Already traded today', '#ccaa44'); return; }
   let tradeCost = rv.personality === 'trader' ? 12 : 15;
   if (state.gold < tradeCost) { addFloatingText(width / 2, height * 0.3, 'Need ' + tradeCost + ' gold to trade', '#ff6644'); return; }
-  state.gold -= tradeCost;
+  state.gold = max(0, state.gold - tradeCost);
   let gain = floor(10 + rv.level * 2 + random(5));
   if (rv.personality === 'aggressive') gain = floor(gain * 1.2);
   state.gold += gain;
@@ -16783,7 +16791,7 @@ function nationGift(key) {
   let rv = state.nations[key];
   if (!rv) return;
   if (state.gold < 25) { addFloatingText(width / 2, height * 0.3, 'Need 25 gold to gift', '#ff6644'); return; }
-  state.gold -= 25; rv.gold += 25;
+  state.gold = max(0, state.gold - 25); rv.gold += 25;
   let repGain = rv.personality === 'trader' ? 12 : rv.personality === 'balanced' ? 10 : 7;
   rv.reputation = min(100, rv.reputation + repGain);
   addFloatingText(width / 2, height * 0.25, 'Gift to ' + getNationName(key) + ': +' + repGain + ' rep', '#ddaa44');
@@ -16851,7 +16859,7 @@ function nationPeaceTreaty(key) {
   if (!rv) return;
   let peaceCost = 50 + rv.level * 10;
   if (state.gold < peaceCost) { addFloatingText(width / 2, height * 0.3, 'Need ' + peaceCost + ' gold for peace treaty', '#ff6644'); return; }
-  state.gold -= peaceCost;
+  state.gold = max(0, state.gold - peaceCost);
   rv.reputation = 0; rv.aggression = 0.3; rv.raidParty = [];
   addFloatingText(width / 2, height * 0.2, 'PEACE WITH ' + getNationName(key).toUpperCase() + '!', '#88cc88');
   addNotification('Peace treaty signed with ' + getNationName(key) + '.', '#88cc88');
@@ -17727,12 +17735,14 @@ function generateWorldEvent(keys) {
 
 function checkVictoryConditions() {
   if (state.victoryAchieved) return;
-  if (keys.length === 0) return;
-  let allDefeated = keys.every(k => state.nations[k].defeated || state.nations[k].reputation <= -100);
+  if (!state.nations) return;
+  let nk = Object.keys(state.nations);
+  if (nk.length === 0) return;
+  let allDefeated = nk.every(k => state.nations[k].defeated || state.nations[k].reputation <= -100);
   if (allDefeated) { state.victoryAchieved = 'domination'; showVictoryScreen('domination'); return; }
-  let allAllied = keys.every(k => state.nations[k].allied || state.nations[k].reputation >= 50);
+  let allAllied = nk.every(k => state.nations[k].allied || state.nations[k].reputation >= 50);
   if (allAllied) { state.victoryAchieved = 'diplomatic'; showVictoryScreen('diplomatic'); return; }
-  let allTrading = keys.every(k => state.nations[k].tradeActive);
+  let allTrading = nk.every(k => state.nations[k].tradeActive);
   if (state.gold >= 10000 && allTrading) { state.victoryAchieved = 'economic'; showVictoryScreen('economic'); return; }
 }
 
@@ -18254,7 +18264,7 @@ function updateConquestEnemy(e, dt, p, c) {
             if (typeof getFactionDamageReduction === 'function') {
               dmg = max(1, floor(dmg * (1 - getFactionDamageReduction())));
             }
-            p.hp -= dmg;
+            p.hp = max(0, p.hp - dmg);
             p.invincTimer = 30;
             addFloatingText(w2sX(p.x), w2sY(p.y) - 25, '-' + dmg, '#ff6644');
             { let _hda = atan2(p.y - e.y, p.x - e.x); triggerScreenShake(3, 6, cos(_hda), sin(_hda), 'directional'); }
@@ -19544,7 +19554,7 @@ function drawConquestHUD() {
   fill(160, 120, 60); rect(lx, ly, 8, 8, 1);
   fill(220, 200, 150); text('Wood: ' + c.woodPile, lx + 12, ly);
   // Soldiers
-  fill(180, 50, 40); rect(lx, ly + 13, 8, 8, 1);
+  { let _fc3 = (typeof getFactionData === 'function' ) ? getFactionData() : null; let _sc = _fc3 ? _fc3.bannerColor : [180, 50, 40]; fill(_sc[0], _sc[1], _sc[2]); }; rect(lx, ly + 13, 8, 8, 1);
   fill(220, 200, 150);
   let aliveSoldiers = c.soldiers.filter(s => s.hp > 0).length;
   text('Soldiers: ' + aliveSoldiers, lx + 12, ly + 13);
@@ -19738,7 +19748,7 @@ function mousePressed() {
           if (state.gold < supplyCost.gold) { addFloatingText(width / 2, height * 0.3, 'Need ' + supplyCost.gold + ' gold!', '#ff6644'); return; }
           if (state.wood < supplyCost.wood) { addFloatingText(width / 2, height * 0.3, 'Need ' + supplyCost.wood + ' wood!', '#ff6644'); return; }
           if (state.meals < supplyCost.meals) { addFloatingText(width / 2, height * 0.3, 'Need ' + supplyCost.meals + ' meals!', '#ff6644'); return; }
-          state.gold -= supplyCost.gold;
+          state.gold = max(0, state.gold - supplyCost.gold);
           state.wood -= supplyCost.wood;
           state.meals -= supplyCost.meals;
           state.expeditionModifierSelect = false;
@@ -19897,10 +19907,10 @@ function mousePressed() {
         let wasBlessed = p.blessed;
         p.planted = false; p.ripe = false; p.glowing = false;
         p.timer = 0; p.stage = 0; p.blessed = false;
-        let harvestAmt = state.npc.hearts >= 5 ? 2 : 1;
-        if (state.tools.sickle) harvestAmt *= 2;
-        if (state.blessing.type === 'luck') harvestAmt *= 2;
-        if (state.heartRewards.includes('golden')) harvestAmt *= 2;
+        let harvestAmt = (state.npc && state.npc.hearts >= 5) ? 2 : 1;
+        if (state.tools && state.tools.sickle) harvestAmt *= 2;
+        if (state.blessing && state.blessing.type === 'luck') harvestAmt *= 2;
+        if (state.heartRewards && state.heartRewards.includes('golden')) harvestAmt *= 2;
         if (wasBlessed) harvestAmt *= 3;
         if (state.prophecy && state.prophecy.type === 'harvest') harvestAmt += 1;
         let festR = getFestival();
@@ -19925,8 +19935,10 @@ function mousePressed() {
         if (snd) snd.playSFX('harvest');
         triggerPlayerJoy();
         unlockJournal('first_harvest');
+        if (!state.codex.cropsGrown) state.codex.cropsGrown = {};
         state.codex.cropsGrown[p.cropType || 'grain'] = true;
         let _ck = p.cropType || 'grain';
+        if (!state.codex.crops) state.codex.crops = {};
         if (!state.codex.crops[_ck]) state.codex.crops[_ck] = { harvested: true, count: 0, firstDay: state.day };
         state.codex.crops[_ck].count += harvestAmt;
         state.codex.crops[_ck].harvested = true;
@@ -20377,7 +20389,7 @@ function keyPressed() {
         return;
       }
       // Deduct food — use meals first, then stew
-      state.gold -= supplyCost.gold;
+      state.gold = max(0, state.gold - supplyCost.gold);
       state.wood -= supplyCost.wood;
       let foodNeeded = supplyCost.meals;
       let mealsUsed = min(state.meals, foodNeeded);
@@ -21699,6 +21711,7 @@ function saveGame() {
       centurion: { level: state.companionPets.centurion.level, xp: state.companionPets.centurion.xp },
     } : null,
     playerSkills: state.player.skills, playerMaxHp: state.player.maxHp,
+    playerWeapon: state.player.weapon || 0, playerArmor: state.player.armor || 0, playerPotions: state.player.potions || 0,
     playerXpBoost: state.player.xpBoost || 0, playerXpBoostTimer: state.player.xpBoostTimer || 0,
     npcHearts: state.npc.hearts,
     companionX: state.companion.x, companionY: state.companion.y, companionEnergy: state.companion.energy,
@@ -21712,14 +21725,14 @@ function saveGame() {
     cropSelect: state.cropSelect,
     cats: state.cats ? state.cats.map(c => ({ x: c.x, y: c.y, facing: c.facing, color: c.color })) : [],
     citizens: state.citizens ? state.citizens.map(c => ({ x: c.x, y: c.y, variant: c.variant, facing: c.facing, speed: c.speed })) : [],
-    plots: state.plots.map(p => ({ x: p.x, y: p.y, w: p.w, h: p.h, planted: p.planted, stage: p.stage, timer: p.timer, ripe: p.ripe, cropType: p.cropType || 'grain' })),
-    buildings: state.buildings.map(b => ({ x: b.x, y: b.y, w: b.w, h: b.h, type: b.type, rot: b.rot })),
-    trees: state.trees.map(t => ({ x: t.x, y: t.y, health: t.health, maxHealth: t.maxHealth, alive: t.alive, size: t.size, type: t.type })),
+    plots: (state.plots || []).map(p => ({ x: p.x, y: p.y, w: p.w, h: p.h, planted: p.planted, stage: p.stage, timer: p.timer, ripe: p.ripe, cropType: p.cropType || 'grain' })),
+    buildings: (state.buildings || []).map(b => ({ x: b.x, y: b.y, w: b.w, h: b.h, type: b.type, rot: b.rot })),
+    trees: (state.trees || []).map(t => ({ x: t.x, y: t.y, health: t.health, maxHealth: t.maxHealth, alive: t.alive, size: t.size, type: t.type })),
     crystalShrine: state.crystalShrine ? { x: state.crystalShrine.x, y: state.crystalShrine.y } : null,
     crystalNodes: state.crystalNodes.map(c => ({ x: c.x, y: c.y, size: c.size, phase: c.phase, charge: c.charge })),
     resources: state.resources.map(r => ({ x: r.x, y: r.y, type: r.type, active: r.active, respawnTimer: r.respawnTimer })),
     ruins: state.ruins.map(r => ({ x: r.x, y: r.y, w: r.w, h: r.h, rot: r.rot })),
-    grassTufts: state.grassTufts.map(g => ({ x: g.x, y: g.y, blades: g.blades, height: g.height, hue: g.hue, sway: g.sway })),
+    grassTufts: (state.grassTufts || []).map(g => ({ x: g.x, y: g.y, blades: g.blades, height: g.height, hue: g.hue, sway: g.sway })),
     codex: state.codex,
     journal: state.journal,
     // Expedition system
@@ -21752,7 +21765,7 @@ function saveGame() {
     // Colony specialization
     colonySpec: state.colonySpec,
     // Trade routes
-    tradeRoutes: state.tradeRoutes.map(r => ({ id: r.id, from: r.from, to: r.to, good: r.good, amount: r.amount, active: r.active, goldEarned: r.goldEarned || 0, tripPhase: r.tripPhase || 'outbound' })),
+    tradeRoutes: (state.tradeRoutes || []).map(r => ({ id: r.id, from: r.from, to: r.to, good: r.good, amount: r.amount, active: r.active, goldEarned: r.goldEarned || 0, tripPhase: r.tripPhase || 'outbound' })),
     // Nations (multi-rival system)
     nations: (function() {
       let saved = {};
@@ -22059,7 +22072,7 @@ function migrateSave(d) {
     d.islandName = d.islandName || null;
     d.playerXpBoost = d.playerXpBoost || 0;
     d.playerXpBoostTimer = d.playerXpBoostTimer || 0;
-    if (d.codex) {
+    if (d.codex && typeof d.codex === 'object') {
       d.codex.lore = d.codex.lore || {};
       d.codex.relics = d.codex.relics || {};
     }
@@ -22116,8 +22129,8 @@ function loadGame() {
     state.flaxSeeds = d.flaxSeeds || 0; state.pomegranateSeeds = d.pomegranateSeeds || 0; state.lotusSeeds = d.lotusSeeds || 0;
     state.meals = d.meals || 0; state.wine = d.wine || 0; state.oil = d.oil || 0;
     state.stew = d.stew || 0; state.garum = d.garum || 0; state.honeyedFigs = d.honeyedFigs || 0; state.ambrosia = d.ambrosia || 0;
-    state.heartRewards = d.heartRewards || [];
-    if (d.weather) state.weather = d.weather;
+    state.heartRewards = Array.isArray(d.heartRewards) ? d.heartRewards : [];
+    if (d.weather && typeof d.weather === 'object') state.weather = { type: d.weather.type || 'clear', timer: d.weather.timer || 0, intensity: d.weather.intensity || 0 };
     state.daysSinceRain = d.daysSinceRain || 0;
     state.stormMessageShown = false; // session only
     if (state.marcus) state.marcus.hearts = d.marcusHearts || 0;
@@ -22129,15 +22142,23 @@ function loadGame() {
     }
     if (state.felix) state.felix.hearts = d.felixHearts || 0;
     state.harvestCombo.bestEver = d.harvestComboBestEver || 0;
-    if (d.codex) {
+    if (d.codex && typeof d.codex === 'object') {
       state.codex = d.codex;
+      if (!state.codex.fishCaught || typeof state.codex.fishCaught !== 'object') state.codex.fishCaught = {};
+      if (!state.codex.cropsGrown || typeof state.codex.cropsGrown !== 'object') state.codex.cropsGrown = {};
+      if (!state.codex.buildingsBuilt || typeof state.codex.buildingsBuilt !== 'object') state.codex.buildingsBuilt = {};
       if (!state.codex.fish)    state.codex.fish    = {};
       if (!state.codex.crops)   state.codex.crops   = {};
       if (!state.codex.enemies) state.codex.enemies = {};
       if (!state.codex.relics)  state.codex.relics  = {};
       if (!state.codex.lore)    state.codex.lore    = {};
+      if (state.codex.npcMaxHearts === undefined) state.codex.npcMaxHearts = 0;
+      if (state.codex.treasuresFound === undefined) state.codex.treasuresFound = 0;
+      if (state.codex.festivalsAttended === undefined) state.codex.festivalsAttended = 0;
+      if (state.codex.visitorsTraded === undefined) state.codex.visitorsTraded = 0;
+      if (state.codex.bestCombo === undefined) state.codex.bestCombo = 0;
     }
-    if (d.journal) state.journal = d.journal;
+    if (Array.isArray(d.journal)) state.journal = d.journal;
     // Expedition resources
     state.ironOre = d.ironOre || 0;
     state.rareHide = d.rareHide || 0;
@@ -22174,7 +22195,7 @@ function loadGame() {
     if (d.conquestPhase) state.conquest.phase = d.conquestPhase;
     state.conquest.woodPile = d.conquestWoodPile || 0;
     state.conquest.expeditionNum = d.conquestExpeditionNum || 0;
-    if (d.bountyBoard) state.bountyBoard = d.bountyBoard;
+    if (d.bountyBoard && typeof d.bountyBoard === 'object') state.bountyBoard = d.bountyBoard;
     if (d.cook) { state.cook.unlocked = d.cook.unlocked; state.cook.x = d.cook.x || state.cook.x; state.cook.y = d.cook.y || state.cook.y; }
     if (d.fisherman) { state.fisherman.unlocked = d.fisherman.unlocked; state.fisherman.fishCaught = d.fisherman.fishCaught || 0; }
     if (d.conquestBuildings) state.conquest.buildings = d.conquestBuildings;
@@ -22207,7 +22228,7 @@ function loadGame() {
       if (d.conquestIsleRY) state.conquest.isleRY = d.conquestIsleRY;
     }
     // Imperial Bridge
-    if (d.imperialBridge) {
+    if (d.imperialBridge && typeof d.imperialBridge === 'object') {
       state.imperialBridge = d.imperialBridge;
     }
     // Colony specialization
@@ -22256,7 +22277,7 @@ function loadGame() {
     } else {
       initNations();
     }
-    state.worldEvents = d.worldEvents || [];
+    state.worldEvents = Array.isArray(d.worldEvents) ? d.worldEvents : [];
     state.victoryAchieved = d.victoryAchieved || null;
     state.nationDiplomacyOpen = null;
     state.visitingNation = null;
@@ -22310,9 +22331,9 @@ function loadGame() {
     }
     state.arenaHighWave = d.arenaHighWave || 0;
     // Random events
-    if (d.activeEvent) state.activeEvent = d.activeEvent;
-    if (d.eventCooldown) state.eventCooldown = d.eventCooldown;
-    if (d.eventHistory) state.eventHistory = d.eventHistory;
+    if (d.activeEvent && typeof d.activeEvent === 'object') state.activeEvent = d.activeEvent;
+    if (d.eventCooldown && typeof d.eventCooldown === 'object') state.eventCooldown = d.eventCooldown;
+    if (Array.isArray(d.eventHistory)) state.eventHistory = d.eventHistory;
     // Faction — default to 'rome' for existing saves
     state.faction = d.faction || 'rome';
     // Regenerate faction wildlife/flora (not saved, always regenerated)
@@ -22331,16 +22352,16 @@ function loadGame() {
     }
     state.victoryAchieved = d.victoryAchieved || null;
     // Victory state
-    state.won = d.won || false;
-    state.achievements = d.achievements || [];
-    state.playerStats = d.playerStats || { totalGoldEarned: 0, cropsHarvested: 0, fishCaught: 0, enemiesDefeated: 0, daysSurvived: 0, buildingsBuilt: 0, islandsDiscovered: 0, timePlayed: 0, treesChopped: 0, giftsGiven: 0, crystalsCollected: 0, questsCompleted: 0, expeditionsCompleted: 0, divesCompleted: 0, catsAdopted: 0, mealsCooked: 0 };
-    state.dailyQuests = d.dailyQuests || [];
+    state.won = !!d.won;
+    state.achievements = Array.isArray(d.achievements) ? d.achievements : [];
+    state.playerStats = (d.playerStats && typeof d.playerStats === 'object') ? d.playerStats : { totalGoldEarned: 0, cropsHarvested: 0, fishCaught: 0, enemiesDefeated: 0, daysSurvived: 0, buildingsBuilt: 0, islandsDiscovered: 0, timePlayed: 0, treesChopped: 0, giftsGiven: 0, crystalsCollected: 0, questsCompleted: 0, expeditionsCompleted: 0, divesCompleted: 0, catsAdopted: 0, mealsCooked: 0 };
+    state.dailyQuests = Array.isArray(d.dailyQuests) ? d.dailyQuests : [];
     state.dailyQuestsDay = d.dailyQuestsDay || 0;
-    state.milestonesClaimed = d.milestonesClaimed || [];
+    state.milestonesClaimed = Array.isArray(d.milestonesClaimed) ? d.milestonesClaimed : [];
     // Prestige / Score / Automation
-    if (d.prestige) state.prestige = d.prestige;
-    if (d.score) state.score = d.score;
-    if (d.automation) state.automation = d.automation;
+    if (d.prestige && typeof d.prestige === 'object') state.prestige = d.prestige;
+    if (d.score && typeof d.score === 'object') state.score = d.score;
+    if (d.automation && typeof d.automation === 'object') state.automation = d.automation;
     if (!state.prestige) state.prestige = { count: 0, totalScore: 0, unlockedBuildings: [] };
     if (!state.score) state.score = { goldEarned: 0, buildingsBuilt: 0, questsCompleted: 0, fishCaught: 0, enemiesDefeated: 0, daysSurvived: 0 };
     if (!state.automation) state.automation = { granaryAuto: false, fishingPier: false, tradeRouteAuto: false, watchtowerAuto: false };
@@ -22361,17 +22382,17 @@ function loadGame() {
       state.progression.gameStarted = false; // false = old save, skip progression gates
     }
     // Load narrative engine state
-    if (d.mainQuest) state.mainQuest = d.mainQuest;
-    if (d.npcFavor) state.npcFavor = d.npcFavor;
+    if (d.mainQuest && typeof d.mainQuest === 'object') state.mainQuest = d.mainQuest;
+    if (d.npcFavor && typeof d.npcFavor === 'object') state.npcFavor = d.npcFavor;
     state.lastWantDate = d.lastWantDate || '';
-    state.todayWantsSatisfied = d.todayWantsSatisfied || [];
-    state.zonesVisitedToday = d.zonesVisitedToday || [];
-    if (d.npcQuests) state.npcQuests = d.npcQuests;
-    if (d.npcMemory) state.npcMemory = d.npcMemory;
-    if (d.loreTablets) state.loreTablets = d.loreTablets;
-    if (d.narrativeFlags) state.narrativeFlags = d.narrativeFlags;
+    state.todayWantsSatisfied = Array.isArray(d.todayWantsSatisfied) ? d.todayWantsSatisfied : [];
+    state.zonesVisitedToday = Array.isArray(d.zonesVisitedToday) ? d.zonesVisitedToday : [];
+    if (d.npcQuests && typeof d.npcQuests === 'object') state.npcQuests = d.npcQuests;
+    if (d.npcMemory && typeof d.npcMemory === 'object') state.npcMemory = d.npcMemory;
+    if (d.loreTablets && typeof d.loreTablets === 'object') state.loreTablets = d.loreTablets;
+    if (d.narrativeFlags && typeof d.narrativeFlags === 'object') state.narrativeFlags = d.narrativeFlags;
     // Load wreck state
-    if (d.wreck) {
+    if (d.wreck && typeof d.wreck === 'object') {
       state.wreck = d.wreck;
       // Compat defaults for saves before raft system
       if (state.wreck.raftProgress === undefined) state.wreck.raftProgress = 0;
@@ -22421,6 +22442,9 @@ function loadGame() {
     if (d.playerSkillPoints !== undefined) state.player.skillPoints = d.playerSkillPoints;
     if (d.playerSkills) state.player.skills = d.playerSkills;
     if (d.playerMaxHp) state.player.maxHp = d.playerMaxHp;
+    state.player.weapon = d.playerWeapon || 0;
+    state.player.armor = d.playerArmor || 0;
+    state.player.potions = d.playerPotions || 0;
     if (d.playerXpBoost) state.player.xpBoost = d.playerXpBoost;
     if (d.playerXpBoostTimer) state.player.xpBoostTimer = d.playerXpBoostTimer;
     state.npc.hearts = d.npcHearts || 0;
@@ -22442,9 +22466,9 @@ function loadGame() {
       state.harvester.x = d.harvesterX; state.harvester.y = d.harvesterY;
     }
     // Restore new systems
-    if (d.blessing) state.blessing = d.blessing;
+    if (d.blessing && typeof d.blessing === 'object') state.blessing = { type: d.blessing.type || null, timer: d.blessing.timer || 0, cooldown: d.blessing.cooldown || 0 };
     if (d.quest) state.quest = d.quest;
-    if (d.tools) state.tools = d.tools;
+    if (d.tools && typeof d.tools === 'object') state.tools = { sickle: d.tools.sickle || 0, axe: d.tools.axe || 0, net: d.tools.net || 0 };
     if (d.cropSelect) state.cropSelect = d.cropSelect;
     // Rebuild farm grid based on level instead of loading chaotic positions
     rebuildFarmGrid(state.islandLevel);

@@ -21,18 +21,19 @@ let wardrobeOpen = false;
 
 
 function updatePlayer(dt) {
-  if (state.rowing.active) { updateRowing(dt); return; }
+  if (!state || !state.player) return;
+  if (state.rowing && state.rowing.active) { updateRowing(dt); return; }
   let p = state.player;
   // Heart bonuses: 2+ hearts = +15% speed, 4+ hearts = +30% speed
-  let heartSpeedBonus = state.npc.hearts >= 4 ? 1.3 : (state.npc.hearts >= 2 ? 1.15 : 1);
+  let heartSpeedBonus = (state.npc && state.npc.hearts >= 4) ? 1.3 : ((state.npc && state.npc.hearts >= 2) ? 1.15 : 1);
   let spd = p.speed * heartSpeedBonus;
   // Storm slows movement
-  if (stormActive || state.weather.type === 'storm') spd *= 0.7;
+  if (stormActive || (state.weather && state.weather.type === 'storm')) spd *= 0.7;
   if (state.prophecy && state.prophecy.type === 'speed') spd *= 1.25;
   // Faction passive speed modifiers (Greece +15%, Testudo/Phalanx lock)
   if (typeof getFactionMoveSpeedMult === 'function') {
     let fSpd = getFactionMoveSpeedMult();
-    if (fSpd <= 0 && (state.conquest.active || state.adventure.active)) { spd = 0; }
+    if (fSpd <= 0 && ((state.conquest && state.conquest.active) || (state.adventure && state.adventure.active))) { spd = 0; }
     else spd *= fSpd;
   }
 
@@ -320,9 +321,9 @@ function triggerPlayerAlert() {
 function drawWardrobe() {
   if (!wardrobeOpen) return;
 
-  let pw = 220, ph = 280;
-  let px = width / 2 - pw / 2;
-  let py = height / 2 - ph / 2;
+  let pw = min(220, width - 20), ph = min(280, height - 20);
+  let px = max(10, width / 2 - pw / 2);
+  let py = max(10, height / 2 - ph / 2);
 
   noStroke();
   fill(0, 0, 0, 120);

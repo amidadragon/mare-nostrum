@@ -48,7 +48,7 @@ let _fortifyTimer = 0;
 let _battleCryTimer = 0;
 
 function activateSkill(name) {
-  if (!state.conquest.active && !state.adventure.active) return;
+  if (!(state.conquest && state.conquest.active) && !(state.adventure && state.adventure.active)) return;
   if (_skillCooldowns[name] > 0) return;
   // Skills that require a skill point investment (level >= 1) to use
   let skillGated = ['battleCry', 'charge', 'fortify'];
@@ -62,7 +62,7 @@ function activateSkill(name) {
       // Lv3: CD -1s (60 frames)
       if (wLv >= 3) _skillCooldowns.whirlwind -= 60;
       p.slashPhase = 12;
-      let enemies = state.conquest.active ? state.conquest.enemies : (state.adventure.enemies || []);
+      let enemies = (state.conquest && state.conquest.active) ? (state.conquest.enemies || []) : (state.adventure && state.adventure.enemies || []);
       // Lv2: radius +10px
       let wRadius = 50 + (wLv >= 2 ? 10 : 0);
       // Lv1: 20dmg, Lv2: 35dmg, Lv3: 35dmg + double knockback
@@ -95,7 +95,7 @@ function activateSkill(name) {
       let sbLv = getSkillLevel('shieldBash');
       // Lv2: stun +30 frames (1.5s total), Lv3: +15 dmg on top
       let stunFrames = sbLv >= 2 ? 90 : 60;
-      let enemies = state.conquest.active ? state.conquest.enemies : (state.adventure.enemies || []);
+      let enemies = (state.conquest && state.conquest.active) ? (state.conquest.enemies || []) : (state.adventure && state.adventure.enemies || []);
       let nearest = null, nearD = Infinity;
       for (let e of enemies) {
         if (e.state === 'dying' || e.state === 'dead') continue;
@@ -163,7 +163,7 @@ function activateSkill(name) {
       p.y = chTargetY;
       p.invincTimer = max(p.invincTimer, 12);
       // Stagger & optionally damage enemies near landing point
-      let enemies2 = state.conquest.active ? state.conquest.enemies : (state.adventure.enemies || []);
+      let enemies2 = (state.conquest && state.conquest.active) ? (state.conquest.enemies || []) : (state.adventure && state.adventure.enemies || []);
       for (let e of enemies2) {
         if (e.state === 'dying' || e.state === 'dead') continue;
         if (dist(p.x, p.y, e.x, e.y) < 35 + (e.size || 10)) {
@@ -195,8 +195,8 @@ function activateSkill(name) {
 }
 
 function handleCombatSkillKey(k) {
-  if (!state.conquest.active && !state.adventure.active) return false;
-  if (state.conquest.buildMode) return false;
+  if (!(state.conquest && state.conquest.active) && !(state.adventure && state.adventure.active)) return false;
+  if (state.conquest && state.conquest.buildMode) return false;
   for (let name in COMBAT_SKILLS) {
     if (k === COMBAT_SKILLS[name].key) {
       activateSkill(name);
@@ -212,7 +212,7 @@ let _dodgeState = { timer: 0, cooldown: 0, invincFrames: 0, dx: 0, dy: 0, motion
 
 function tryDodgeRoll() {
   if (_dodgeState.cooldown > 0) return false;
-  if (!state.conquest.active && !state.adventure.active) return false;
+  if (!(state.conquest && state.conquest.active) && !(state.adventure && state.adventure.active)) return false;
   let p = state.player;
   let angle = getFacingAngle();
   _dodgeState.timer = 8;
@@ -328,7 +328,7 @@ function updateCombatSystem(dt) {
   if (typeof updateFactionCombat === 'function') updateFactionCombat(dt);
 
   // Enemy stun timers
-  let enemies = state.conquest.active ? state.conquest.enemies : (state.adventure.enemies || []);
+  let enemies = (state.conquest && state.conquest.active) ? (state.conquest.enemies || []) : (state.adventure && state.adventure.enemies || []);
   for (let e of enemies) {
     if (e.stunTimer && e.stunTimer > 0) {
       e.stunTimer -= dt;
@@ -369,7 +369,7 @@ function updateCombatSystem(dt) {
   let currentCount = enemies.length;
   if (currentCount < _combatLastEnemyCount) {
     let killed = _combatLastEnemyCount - currentCount;
-    let dangerLevel = state.conquest.active ? (state.conquest.dangerLevel || 1) : 1;
+    let dangerLevel = (state.conquest && state.conquest.active) ? (state.conquest.dangerLevel || 1) : 1;
     let xpPerKill = 25 + dangerLevel * 5;
     grantXP(killed * xpPerKill);
     for (let i = 0; i < killed; i++) _registerComboHit();
@@ -384,7 +384,7 @@ function drawCombatOverlay() {
   push();
 
   // ─── FORTIFY VISUAL: blue shield shimmer around player ─────────────────
-  if (_fortifyTimer > 0 && (state.conquest.active || state.adventure.active)) {
+  if (_fortifyTimer > 0 && ((state.conquest && state.conquest.active) || (state.adventure && state.adventure.active))) {
     let p = state.player;
     let psx = w2sX(p.x), psy = w2sY(p.y);
     let fortAlpha = min(1, _fortifyTimer / 30) * (0.5 + sin(frameCount * 0.12) * 0.2);
@@ -414,7 +414,7 @@ function drawCombatOverlay() {
   }
 
   // ─── BATTLE CRY VISUAL: expanding red ring/pulse from player ──────────
-  if (_battleCryTimer > 0 && (state.conquest.active || state.adventure.active)) {
+  if (_battleCryTimer > 0 && ((state.conquest && state.conquest.active) || (state.adventure && state.adventure.active))) {
     let p = state.player;
     let psx = w2sX(p.x), psy = w2sY(p.y);
     let cryAlpha = min(1, _battleCryTimer / 60);
@@ -447,7 +447,7 @@ function drawCombatOverlay() {
   }
 
   // Enemy HP bars
-  let enemies = state.conquest.active ? state.conquest.enemies : (state.adventure.enemies || []);
+  let enemies = (state.conquest && state.conquest.active) ? (state.conquest.enemies || []) : (state.adventure && state.adventure.enemies || []);
   for (let e of enemies) {
     if (!e || e.state === 'dead' || e.state === 'dying') continue;
     if (isNaN(e.x) || isNaN(e.y)) continue;
@@ -536,7 +536,7 @@ function drawCombatOverlay() {
   }
 
   // XP bar (below danger bar in conquest HUD area)
-  if (state.conquest.active || state.adventure.active) {
+  if ((state.conquest && state.conquest.active) || (state.adventure && state.adventure.active)) {
     let p = state.player;
     let level = p.level || 1;
     let xp = p.xp || 0;
@@ -744,9 +744,9 @@ function handleSkillTreeClick(mx, my) {
   let p = state.player;
   let pts = p.skillPoints || 0;
 
-  let panelW = 460, panelH = 400;
-  let panelX = width / 2 - panelW / 2;
-  let panelY = height / 2 - panelH / 2;
+  let panelW = min(460, width - 20), panelH = min(400, height - 20);
+  let panelX = max(10, width / 2 - panelW / 2);
+  let panelY = max(10, height / 2 - panelH / 2);
 
   // Close button (top-right X)
   if (mx > panelX + panelW - 22 && mx < panelX + panelW - 6 &&
@@ -807,9 +807,9 @@ function drawSkillTree() {
   let pts = p.skillPoints || 0;
   let level = p.level || 1;
 
-  let panelW = 460, panelH = 400;
-  let panelX = width / 2 - panelW / 2;
-  let panelY = height / 2 - panelH / 2;
+  let panelW = min(460, width - 20), panelH = min(400, height - 20);
+  let panelX = max(10, width / 2 - panelW / 2);
+  let panelY = max(10, height / 2 - panelH / 2);
 
   push();
   // Backdrop
@@ -993,7 +993,7 @@ function updateArenaProjectiles(dt, p) {
       if (typeof getFactionDamageReduction === 'function') {
         dmg = max(1, floor(dmg * (1 - getFactionDamageReduction())));
       }
-      p.hp -= dmg;
+      p.hp = max(0, p.hp - dmg);
       p.invincTimer = 20;
       _juiceCombatVignette = min(1, _juiceCombatVignette + 0.4);
       _juiceHpShakeTimer = 12;
@@ -1177,7 +1177,7 @@ function trainUnit(type) {
     addFloatingText(width / 2, height * 0.3, 'Need ' + def.cost + ' gold', '#ff6644');
     return false;
   }
-  state.gold -= def.cost;
+  state.gold = max(0, state.gold - def.cost);
   let data = getCastrumLevelData();
   let maxHp = floor(def.hp * (data.hpMult || 1));
   let damage = floor(def.damage * (data.damageMult || 1));
@@ -1204,7 +1204,7 @@ function processArmyUpkeep() {
   if (!lg || !lg.army || lg.army.length === 0) return;
   let cost = getArmyUpkeep();
   if (state.gold >= cost) {
-    state.gold -= cost;
+    state.gold = max(0, state.gold - cost);
     lg.morale = min(100, (lg.morale || 100) + 2);
   } else {
     // Can't pay -- morale drops, soldiers may desert
@@ -2007,11 +2007,11 @@ function getFactionCombatData() {
 // ─── FACTION Q ABILITY ──────────────────────────────────────────────────
 
 function activateFactionQ() {
-  if (!state.conquest.active && !state.adventure.active) return;
+  if (!(state.conquest && state.conquest.active) && !(state.adventure && state.adventure.active)) return;
   if (_factionAbilities.q.cooldown > 0) return;
   let p = state.player;
   let f = state.faction || 'rome';
-  let enemies = state.conquest.active ? state.conquest.enemies : (state.adventure.enemies || []);
+  let enemies = (state.conquest && state.conquest.active) ? (state.conquest.enemies || []) : (state.adventure && state.adventure.enemies || []);
 
   switch (f) {
     case 'rome': {
@@ -2131,7 +2131,7 @@ function activateFactionQ() {
 // ─── FACTION R ABILITY ──────────────────────────────────────────────────
 
 function activateFactionR() {
-  if (!state.conquest.active && !state.adventure.active) return;
+  if (!(state.conquest && state.conquest.active) && !(state.adventure && state.adventure.active)) return;
   if (_factionAbilities.r.cooldown > 0) return;
   let p = state.player;
   let f = state.faction || 'rome';
@@ -2217,8 +2217,8 @@ function activateFactionR() {
 // ─── FACTION ABILITY KEY HANDLER ────────────────────────────────────────
 
 function handleFactionAbilityKey(k) {
-  if (!state.conquest.active && !state.adventure.active) return false;
-  if (state.conquest.buildMode) return false;
+  if (!(state.conquest && state.conquest.active) && !(state.adventure && state.adventure.active)) return false;
+  if (state.conquest && state.conquest.buildMode) return false;
   if (k === 'q' || k === 'Q') {
     activateFactionQ();
     return true;
@@ -2543,8 +2543,8 @@ function drawFactionAoEs() {
 // ─── FACTION COMBAT UPDATE (called from updateCombatSystem) ─────────────
 
 function updateFactionCombat(dt) {
-  if (!state.conquest.active && !state.adventure.active) return;
-  let enemies = state.conquest.active ? state.conquest.enemies : (state.adventure.enemies || []);
+  if (!(state.conquest && state.conquest.active) && !(state.adventure && state.adventure.active)) return;
+  let enemies = (state.conquest && state.conquest.active) ? (state.conquest.enemies || []) : (state.adventure && state.adventure.enemies || []);
 
   // Ability cooldowns
   if (_factionAbilities.q.cooldown > 0) _factionAbilities.q.cooldown -= dt;
@@ -2586,7 +2586,7 @@ function factionPlayerAttack() {
   if (p.hotbarSlot !== 4) { p.hotbarSlot = 4; addFloatingText(width / 2, height - 110, 'Switched to Weapon', '#aaddaa'); }
   triggerPlayerAlert();
 
-  let enemies = state.conquest.active ? state.conquest.enemies : (state.adventure.enemies || []);
+  let enemies = (state.conquest && state.conquest.active) ? (state.conquest.enemies || []) : (state.adventure && state.adventure.enemies || []);
 
   switch (f) {
     case 'rome': {
@@ -2613,7 +2613,7 @@ function factionPlayerAttack() {
       let lg = state.legia;
       if (lg && lg.deployed > 0) baseDmg = floor(baseDmg * (1 + lg.deployed * 0.15));
       // Campfire bonus
-      if (state.conquest.active && state.conquest.buildings && state.conquest.buildings.some(b => b.type === 'campfire')) baseDmg += 3;
+      if (state.conquest && state.conquest.active && state.conquest.buildings && state.conquest.buildings.some(b => b.type === 'campfire')) baseDmg += 3;
       // Tech bonus
       if (typeof hasTech === 'function' && hasTech('siege_weapons')) baseDmg = floor(baseDmg * 1.3);
 
@@ -2800,7 +2800,7 @@ function onPlayerDodge() {
 // ─── FACTION COMBAT HUD ────────────────────────────────────────────────
 
 function drawFactionAbilityHUD() {
-  if (!state.conquest.active && !state.adventure.active) return;
+  if (!(state.conquest && state.conquest.active) && !(state.adventure && state.adventure.active)) return;
   let f = state.faction || 'rome';
   let fData = FACTION_ABILITIES[f];
   if (!fData) return;

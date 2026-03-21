@@ -309,7 +309,7 @@ function updateDiving(dt) {
   if (d.breath <= 0) {
     d.breath = 0;
     exitDive();
-    state.player.hp -= 15;
+    state.player.hp = Math.max(0, state.player.hp - 15);
     addFloatingText(width / 2, height * 0.25, 'Out of breath! -15 HP', '#ff6644');
     return;
   }
@@ -438,7 +438,7 @@ function updateDiving(dt) {
     e.x += e.vx * dt; e.y += e.vy * dt;
     e.attackTimer -= dt;
     if (ed < 20 && e.attackTimer <= 0) {
-      state.player.hp -= e.dmg;
+      state.player.hp = Math.max(0, state.player.hp - e.dmg);
       e.attackTimer = 60;
       addFloatingText(w2sX(px), w2sY(py) - 20, '-' + e.dmg + ' HP', '#ff4444');
       if (typeof snd !== 'undefined' && snd) snd.playSFX('player_hurt');
