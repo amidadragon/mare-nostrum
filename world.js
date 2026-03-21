@@ -273,11 +273,13 @@ function drawSunbeams(sunX, sunY, h) {
   ellipse(sunX, sunY, 110, 110);
 }
 
+let _cachedSkyTop = null, _cachedSkyBot = null, _cachedSkyFrame = -1;
 function drawSky() {
   let bright = getSkyBrightness();
   let h = state.time / 60;
 
   let skyTop, skyBot;
+  if (frameCount % 30 === 0 || !_cachedSkyTop) {
   if (stormActive) {
     skyTop = lerpColor(color(C.skyDeep), color(C.stormCloud), 0.7);
     skyBot = lerpColor(color(C.skyMid), color(C.stormLight), 0.5);
@@ -312,6 +314,9 @@ function drawSky() {
     skyTop = color(10, 12, 30);
     skyBot = color(16, 20, 42);
   }
+  _cachedSkyTop = skyTop; _cachedSkyBot = skyBot;
+  }
+  skyTop = _cachedSkyTop; skyBot = _cachedSkyBot;
 
   noStroke();
   let skyH = max(height * 0.12, height * 0.25 - horizonOffset); // never compress sky below 12% of screen
@@ -403,6 +408,7 @@ function drawSun(x, y, bright) {
 }
 
 function drawStarField(alpha) {
+  if (frameCount % 3 !== 0) return;
   if (!starPositions) {
     starPositions = [];
     // Background stars — varied sizes and colors
@@ -2548,9 +2554,12 @@ function drawGrassTufts() {
   let bright = getSkyBrightness();
   let windPhase = sin(frameCount * 0.018) * 1.5;
   noStroke();
-  state.grassTufts.forEach(g => {
-    let gx = floor(w2sX(g.x));
-    let gy = floor(w2sY(g.y));
+  for (let _gi = 0; _gi < state.grassTufts.length; _gi++) {
+    let g = state.grassTufts[_gi];
+    let sx = w2sX(g.x), sy = w2sY(g.y);
+    if (sx < -50 || sx > width + 50 || sy < -50 || sy > height + 50) continue;
+    let gx = floor(sx);
+    let gy = floor(sy);
     let sw = floor(windPhase * sin(g.sway + frameCount * 0.004));
     let baseG = floor(130 * g.hue * (0.4 + bright * 0.6));
     let sg = getSeasonGrass();
@@ -2579,7 +2588,7 @@ function drawGrassTufts() {
       else fill(145, 125, 205, 140);
       rect(gx + sw, gy - floor(g.height * 0.7), 2, 2);
     }
-  });
+  }
 }
 
 // ─── DIRT PATHS — worn walking paths between major buildings ─────────────

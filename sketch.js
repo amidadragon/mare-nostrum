@@ -3743,12 +3743,18 @@ function updateTime(dt) {
   });
 }
 
+let _cachedSkyBrightness = -1, _skyBrightnessFrame = -1;
 function getSkyBrightness() {
+  if (frameCount === _skyBrightnessFrame) return _cachedSkyBrightness;
   let h = state.time / 60;
-  if (h < 5 || h > 21) return 0.18;
-  if (h < 7) return map(h, 5, 7, 0.18, 1);
-  if (h < 17) return 1;
-  return map(h, 17, 21, 1, 0.18);
+  let result;
+  if (h < 5 || h > 21) result = 0.18;
+  else if (h < 7) result = map(h, 5, 7, 0.18, 1);
+  else if (h < 17) result = 1;
+  else result = map(h, 17, 21, 1, 0.18);
+  _cachedSkyBrightness = result;
+  _skyBrightnessFrame = frameCount;
+  return result;
 }
 
 // ─── SKY BIRDS ───────────────────────────────────────────────────────────
@@ -3872,6 +3878,7 @@ function drawOcean() {
       rect(wx, wy, segW, 3);
     }
     // Secondary sine wave (counter-phase for depth) — every other row
+    if (frameCount % 2 === 0) {
     let off2 = floor(sin(t * 0.35 + wy * 0.05 + 2) * 8);
     fill(90 + 50 * dayMix, 150 + 40 * dayMix, 195 + 25 * dayMix, waveAlpha * 0.5);
     for (let wx = off2 % 90; wx < width; wx += 90) {
@@ -3881,6 +3888,7 @@ function drawOcean() {
     fill(10 + 20 * dayMix, 25 + 50 * dayMix, 50 + 70 * dayMix, waveAlpha * 0.6);
     for (let wx = (offsetX + 14) % 72; wx < width; wx += 90) {
       rect(wx, wy + 7, 16, 2);
+    }
     }
   }
 
@@ -3901,6 +3909,7 @@ function drawOcean() {
   }
 
   // Pixel foam whitecaps
+  if (frameCount % 2 === 0)
   for (let fy = oceanTop + 12; fy < height; fy += 36) {
     let depthFade = 1 - (fy - oceanTop) / (height - oceanTop) * 0.5;
     for (let fx = 0; fx < width; fx += 64) {
@@ -4144,6 +4153,7 @@ function drawAmbientShips() {
 // Shore waves — drawn in the island context (after all island objects)
 // Creates foam ring around the full island perimeter
 function drawShoreWaves() {
+  if (frameCount % 2 !== 0) return;
   let ix = w2sX(WORLD.islandCX);
   let iy = w2sY(WORLD.islandCY);
   // Outermost shallow water ring: ellipse(ix, iy-10, iw*1.12, ih*0.50)
@@ -4895,13 +4905,15 @@ function drawWeatherEffects() {
       let fadedAlpha = 130 * (1 - fadeT);
       stroke(130, 170, 210, fadedAlpha);
       strokeWeight(1.2);
-      for (let i = raindrops.length - 1; i >= 0; i--) {
+      let _aliveFade = [];
+      for (let i = 0; i < raindrops.length; i++) {
         let r = raindrops[i];
         line(r.x, r.y, r.x + (r.wind || -1) * 3, r.y + r.len);
         r.y += r.speed;
         r.x += r.wind || -1;
-        if (r.y > height) raindrops.splice(i, 1);
+        if (r.y <= height) _aliveFade.push(r);
       }
+      raindrops = _aliveFade;
       noStroke();
     }
     // Spawn a few stragglers early in the transition
@@ -4939,7 +4951,8 @@ function drawWeatherEffects() {
     // Draw and update raindrops
     stroke(140, 180, 220, 110 * w.intensity);
     strokeWeight(1.2);
-    for (let i = raindrops.length - 1; i >= 0; i--) {
+    let _aliveDrops = [];
+    for (let i = 0; i < raindrops.length; i++) {
       let r = raindrops[i];
       line(r.x, r.y, r.x + (r.wind || -0.5) * 3, r.y + r.len);
       r.y += r.speed;
@@ -4951,9 +4964,11 @@ function drawWeatherEffects() {
           fill(140, 180, 220, 50 * w.intensity);
           circle(r.x, height * 0.75 + random(-20, 20), random(2, 4));
         }
-        raindrops.splice(i, 1);
+      } else {
+        _aliveDrops.push(r);
       }
     }
+    raindrops = _aliveDrops;
     noStroke();
 
     // Ground puddle reflections — subtle wet look
@@ -5049,7 +5064,8 @@ function _drawStormRain() {
   // Draw and update raindrops
   stroke(130, 170, 210, 130);
   strokeWeight(1.5);
-  for (let i = raindrops.length - 1; i >= 0; i--) {
+  let _aliveStorm = [];
+  for (let i = 0; i < raindrops.length; i++) {
     let r = raindrops[i];
     let wx = r.wind || -1.5;
     line(r.x, r.y, r.x + wx * 4, r.y + r.len);
@@ -5064,9 +5080,11 @@ function _drawStormRain() {
         stroke(130, 170, 210, 130);
         strokeWeight(1.5);
       }
-      raindrops.splice(i, 1);
+    } else {
+      _aliveStorm.push(r);
     }
   }
+  raindrops = _aliveStorm;
   noStroke();
 
   // Ground puddle reflections

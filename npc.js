@@ -955,6 +955,8 @@ function spawnCitizen() {
 }
 
 function drawOneCitizen(c) {
+  let screenDist = dist(w2sX(c.x), w2sY(c.y), width/2, height/2);
+  if (screenDist > width * 0.8) return; // skip citizens far offscreen
   let sx = w2sX(c.x), sy = w2sY(c.y);
   if (sx < -30 || sx > width + 30 || sy < -30 || sy > height + 30) return;
 

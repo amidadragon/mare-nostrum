@@ -1,6 +1,9 @@
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
 
+app.commandLine.appendSwitch('ignore-gpu-blocklist');
+app.commandLine.appendSwitch('enable-gpu-rasterization');
+
 let win;
 
 function createWindow() {
@@ -16,11 +19,12 @@ function createWindow() {
     backgroundColor: '#0a0e1a',
   });
 
-  // Always clear cache on launch — never serve stale files
-  win.webContents.session.clearCache().then(() => {
-    win.webContents.session.clearStorageData({ storages: ['serviceworkers','cachestorage'] });
-    win.loadFile('index.html');
-  });
+  // Load index.html, clear cache if possible
+  win.webContents.session.clearCache()
+    .catch(() => {})
+    .then(() => win.webContents.session.clearStorageData({ storages: ['serviceworkers','cachestorage'] }).catch(() => {}))
+    .then(() => win.loadFile('index.html'))
+    .catch(() => win.loadFile('index.html'));
 
   // Open DevTools with F12
   win.webContents.on('before-input-event', (event, input) => {
