@@ -5,6 +5,29 @@
 // unlockJournal, startSailingCutscene, exitDive, getSkyBrightness, etc.
 // ═══════════════════════════════════════════════════════════════════════════
 
+// ─── SPACE KEY for rock skip — DOM listener, always works ─────
+document.addEventListener('keydown', function(e) {
+  if (e.code === 'Space' && typeof _wreckMiniGames !== 'undefined' && typeof state !== 'undefined') {
+    let mg = _wreckMiniGames;
+    // Bounce during active rock skip
+    if (mg.rockSkip && (mg.rockPhase === 'throwing' || mg.rockPhase === 'bouncing')) {
+      e.preventDefault();
+      handleRockBounce();
+      return;
+    }
+    // Start rock skip if near tide pools
+    if (!mg.rockSkip && !mg.fishing && !mg.cooking && state.player) {
+      let tpX = WRECK.cx + WRECK.rx * 0.4;
+      let tpY = WRECK.cy + WRECK.ry * 0.15;
+      if (typeof dist === 'function' && dist(state.player.x, state.player.y, tpX, tpY) < 40) {
+        e.preventDefault();
+        startRockSkip();
+        return;
+      }
+    }
+  }
+});
+
 // ─── MINI-GAME STATE — fishing, rock skipping, shells, campfire rest ─────
 let _wreckMiniGames = {
   // Fishing
@@ -362,8 +385,8 @@ function startRockSkip() {
   mg.rockY = state.player.y;
   mg.rockVX = 2.5;
   mg.rockVY = 0.3;
-  mg.rockBounceWindow = 40; // frames to press E for next bounce
-  addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 15, 'Skipping...', '#aaddee');
+  mg.rockBounceWindow = 40; // frames to press SPACE for next bounce
+  addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 15, 'Press SPACE to bounce!', '#aaddee');
 }
 
 function updateRockSkip(dt) {
@@ -649,8 +672,8 @@ function updateWreckBeach(dt) {
   } else if (dist(p.x, p.y, wbX, wbY) < 55) {
     // Show what can be crafted
     if (!inv.hammer) showTutorialHint('WORKBENCH — Need hammer (search the wreck)', wbX, wbY - 25);
-    else if (!inv.raftFrame && inv.driftwood >= 3 && inv.rope >= 1) showTutorialHint('Press E: Craft Raft Frame (3 driftwood + 1 rope)', wbX, wbY - 25);
-    else if (inv.raftFrame && !inv.seaworthyRaft && inv.sailcloth >= 2) showTutorialHint('Press E: Craft Seaworthy Raft (frame + 2 sailcloth)', wbX, wbY - 25);
+    else if (!inv.raftFrame && inv.driftwood >= 3 && inv.rope >= 1) showTutorialHint('Press E: Craft Raft Frame (2 driftwood + 1 rope)', wbX, wbY - 25);
+    else if (inv.raftFrame && !inv.seaworthyRaft && inv.sailcloth >= 1) showTutorialHint('Press E: Craft Seaworthy Raft (frame + 1 sailcloth)', wbX, wbY - 25);
     else if (!w.shelter && inv.driftwood >= 2 && inv.palmFrond >= 1) showTutorialHint('Press E: Build Shelter (2 driftwood + 1 frond)', wbX, wbY - 25);
     else if (!w.hasFire && inv.driftwood >= 1 && inv.flint) showTutorialHint('Press E: Light Campfire (1 driftwood + flint)', wbX, wbY - 25);
     else showTutorialHint('WORKBENCH — Gather more materials', wbX, wbY - 25);
@@ -683,10 +706,10 @@ function updateWreckBeach(dt) {
   let tidePoolX = WRECK.cx + WRECK.rx * 0.4;
   let tidePoolY = WRECK.cy + WRECK.ry * 0.15;
   if (dist(p.x, p.y, tidePoolX, tidePoolY) < 40 && !mg.rockSkip && !mg.fishing && !mg.cooking) {
-    showTutorialHint('Press E to skip rocks' + (mg.rockHighScore > 0 ? ' (best: ' + mg.rockHighScore + ')' : ''), tidePoolX, tidePoolY - 20);
+    showTutorialHint('Press SPACE to skip rocks' + (mg.rockHighScore > 0 ? ' (best: ' + mg.rockHighScore + ')' : ''), tidePoolX, tidePoolY - 20);
   }
   if (mg.rockSkip && mg.rockPhase === 'bouncing') {
-    showTutorialHint('Press E to bounce!', mg.rockX, mg.rockY - 15);
+    showTutorialHint('Press SPACE to bounce!', mg.rockX, mg.rockY - 15);
   }
 
   // ── Shell collecting hint ───────────────────────────────────────────
@@ -838,9 +861,9 @@ function handleWorkbenchCraft() {
     return;
   }
 
-  // Priority 1: Craft raft frame (3 driftwood + 1 rope)
-  if (!inv.raftFrame && inv.driftwood >= 3 && inv.rope >= 1) {
-    inv.driftwood -= 3; inv.rope -= 1;
+  // Priority 1: Craft raft frame (2 driftwood + 1 rope) — reduced from 3
+  if (!inv.raftFrame && inv.driftwood >= 2 && inv.rope >= 1) {
+    inv.driftwood -= 2; inv.rope -= 1;
     inv.raftFrame = true;
     if (snd) snd.playSFX('repair');
     addFloatingText(w2sX(wbX), w2sY(wbY) - 15, 'RAFT FRAME CRAFTED!', C.solarGold);
@@ -852,9 +875,9 @@ function handleWorkbenchCraft() {
     return;
   }
 
-  // Priority 2: Craft seaworthy raft (raft frame + 2 sailcloth)
-  if (inv.raftFrame && !inv.seaworthyRaft && inv.sailcloth >= 2) {
-    inv.sailcloth -= 2;
+  // Priority 2: Craft seaworthy raft (raft frame + 1 sailcloth)
+  if (inv.raftFrame && !inv.seaworthyRaft && inv.sailcloth >= 1) {
+    inv.sailcloth -= 1;
     inv.seaworthyRaft = true;
     w.raftBuilt = true;
     w.raftProgress = 100;
@@ -872,7 +895,7 @@ function handleWorkbenchCraft() {
   if (!w.shelter && inv.driftwood >= 2 && inv.palmFrond >= 1) {
     inv.driftwood -= 2; inv.palmFrond -= 1;
     w.shelter = true;
-    w.shelterX = WRECK.cx + 20; w.shelterY = WRECK.cy + 5;
+    w.shelterX = WRECK.cx + 160; w.shelterY = WRECK.cy - 80;
     if (snd) snd.playSFX('repair');
     addFloatingText(w2sX(wbX), w2sY(wbY) - 15, 'LEAN-TO SHELTER BUILT!', C.solarGold);
     return;
@@ -890,8 +913,8 @@ function handleWorkbenchCraft() {
 
   // Show what can be crafted
   let hints = [];
-  if (!inv.raftFrame) hints.push('Raft Frame: 3 driftwood + 1 rope (have ' + inv.driftwood + '/3 wood, ' + inv.rope + '/1 rope)');
-  else if (!inv.seaworthyRaft) hints.push('Raft: frame + 2 sailcloth (have ' + inv.sailcloth + '/2)');
+  if (!inv.raftFrame) hints.push('Raft Frame: 2 driftwood + 1 rope (have ' + inv.driftwood + '/2 driftwood, ' + inv.rope + '/1 rope)');
+  else if (!inv.seaworthyRaft) hints.push('Raft: frame + 1 sailcloth (have ' + inv.sailcloth + '/1)');
   if (!w.shelter) hints.push('Shelter: 2 driftwood + 1 palm frond');
   if (!w.hasFire) hints.push('Campfire: 1 driftwood + flint');
   let hint = hints.length > 0 ? hints[0] : 'Nothing left to craft!';
@@ -959,32 +982,40 @@ function handleWreckInteract() {
     return;
   }
 
-  // ── Active mini-game input: rock bounce ────────────────────────────────
+  // ── Rock bounce is handled by SPACE key only (not E) ────────────────
   if (mg.rockSkip && (mg.rockPhase === 'throwing' || mg.rockPhase === 'bouncing')) {
-    handleRockBounce();
-    return;
+    return; // block E during rock skip — use SPACE to bounce
   }
 
-  // ── Campfire cooking / resting ─────────────────────────────────────────
-  let cfX = WRECK.cx + 40, cfY = WRECK.cy + 15;
-  if (w.campfire && dist(p.x, p.y, cfX, cfY) < 30 && !mg.cooking) {
-    // Cooking takes priority if player has fish
-    if (state.fish > 0 && !mg.campfireResting) {
-      startCooking();
+  // ── SHELTER SLEEP — check FIRST (highest priority at sundown) ─────────
+  if (w.shelter && !w.sleepingInShelter) {
+    let hr = state.time / 60;
+    if (dist(p.x, p.y, w.shelterX || WRECK.cx + 160, w.shelterY || WRECK.cy - 80) < 40 && (hr >= 17 || hr < 6)) {
+      w.sleepingInShelter = true;
+      w._sleepStartDay = state.day;
+      addFloatingText(w2sX(p.x), w2sY(p.y) - 15, 'Sleeping until dawn...', '#aaddff');
       return;
     }
-    // Otherwise toggle campfire resting
-    if (!mg.campfireResting) {
-      mg.campfireResting = true;
-      w._starsShown = false;
-      addFloatingText(w2sX(p.x), w2sY(p.y) - 15, 'Sitting by the fire...', '#ffcc66');
-      if (snd) snd.playSFX('page_turn');
-      return;
-    } else {
+  }
+
+  // ── Campfire cooking / resting (moved far from workbench: cx+180, cy-60) ──
+  let cfX = WRECK.cx + 180, cfY = WRECK.cy - 60;
+  if (w.campfire && dist(p.x, p.y, cfX, cfY) < 35 && !mg.cooking) {
+    if (mg.campfireResting) {
       mg.campfireResting = false;
       addFloatingText(w2sX(p.x), w2sY(p.y) - 15, 'Stood up.', '#ccbb88');
       return;
     }
+    // Cook if have fish, rest if not
+    if (state.fish > 0) {
+      startCooking();
+      return;
+    }
+    mg.campfireResting = true;
+    w._starsShown = false;
+    addFloatingText(w2sX(p.x), w2sY(p.y) - 15, 'Sitting by the fire...', '#ffcc66');
+    if (snd) snd.playSFX('page_turn');
+    return;
   }
 
   // ── Shell collecting ───────────────────────────────────────────────────
@@ -1017,13 +1048,7 @@ function handleWreckInteract() {
     return;
   }
 
-  // ── Rock skipping — near tide pools ────────────────────────────────────
-  let tidePoolX = WRECK.cx + WRECK.rx * 0.4;
-  let tidePoolY = WRECK.cy + WRECK.ry * 0.15;
-  if (dist(p.x, p.y, tidePoolX, tidePoolY) < 40 && !mg.rockSkip && !mg.fishing && !mg.cooking) {
-    startRockSkip();
-    return;
-  }
+  // Rock skipping is handled by SPACE key via DOM listener — not E
 
   // ── Fishing — in ankle/waist water ─────────────────────────────────────
   let curDepth = getWreckDepth(p.x, p.y);
@@ -1035,16 +1060,7 @@ function handleWreckInteract() {
     return;
   }
 
-  // Sleep in shelter (if near shelter and it's sundown+)
-  if (w.shelter && !w.sleepingInShelter) {
-    let hr = state.time / 60;
-    if (dist(p.x, p.y, w.shelterX || WRECK.cx + 20, w.shelterY || WRECK.cy + 5) < 40 && (hr >= 17 || hr < 6)) {
-      w.sleepingInShelter = true;
-      w._sleepStartDay = state.day;
-      addFloatingText(w2sX(p.x), w2sY(p.y) - 15, 'Sleeping until dawn...', '#aaddff');
-      return;
-    }
-  }
+  // Shelter sleep handled above (before campfire/shells/fishing)
 
   // Drop fish near cat to befriend
   let cat = w.cat;
@@ -2949,6 +2965,7 @@ function drawWreckHUD() {
   let w = state.wreck;
   let inv = w.inventory || {};
   let panelH = 190;
+
 
   // Starvation/dehydration screen dim
   if (w.thirst <= 0 || w.hunger <= 0) {

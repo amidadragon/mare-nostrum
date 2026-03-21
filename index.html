@@ -116,28 +116,28 @@
     <div class="sub">NAVIGATING THE ANCIENT WATERS...</div>
   </div>
 
-  <script src="engine.js?v=100"></script>
-  <script src="sound.js?v=100"></script>
-  <script src="narrative.js?v=100"></script>
-  <script src="progression.js?v=100"></script>
-  <script src="cinematics.js?v=100"></script>
-  <script src="fishing.js?v=100"></script>
-  <script src="farming.js?v=100"></script>
-  <script src="npc.js?v=100"></script>
-  <script src="events.js?v=100"></script>
-  <script src="world.js?v=100"></script>
-  <script src="player.js?v=100"></script>
-  <script src="ui.js?v=100"></script>
-  <script src="multiplayer.js?v=100"></script>
-  <script src="sketch.js?v=100"></script>
-  <script src="wreck.js?v=200"></script>
-  <script src="menu.js?v=100"></script>
-  <script src="islands.js?v=100"></script>
-  <script src="diving.js?v=100"></script>
-  <script src="combat.js?v=100"></script>
-  <script src="economy.js?v=100"></script>
-  <script src="debug.js?v=100"></script>
-  <script src="mobile.js?v=100"></script>
+  <script src="engine.js?v=1774097012"></script>
+  <script src="sound.js?v=1774097012"></script>
+  <script src="narrative.js?v=1774097012"></script>
+  <script src="progression.js?v=1774097012"></script>
+  <script src="cinematics.js?v=1774097012"></script>
+  <script src="fishing.js?v=1774097012"></script>
+  <script src="farming.js?v=1774097012"></script>
+  <script src="npc.js?v=1774097012"></script>
+  <script src="events.js?v=1774097012"></script>
+  <script src="world.js?v=1774097012"></script>
+  <script src="player.js?v=1774097012"></script>
+  <script src="ui.js?v=1774097012"></script>
+  <script src="multiplayer.js?v=1774097012"></script>
+  <script src="sketch.js?v=1774097012"></script>
+  <script src="wreck.js?v=1774097012"></script>
+  <script src="menu.js?v=1774097012"></script>
+  <script src="islands.js?v=1774097012"></script>
+  <script src="diving.js?v=1774097012"></script>
+  <script src="combat.js?v=1774097012"></script>
+  <script src="economy.js?v=1774097012"></script>
+  <script src="debug.js?v=1774097012"></script>
+  <script src="mobile.js?v=1774097012"></script>
   <script>
     // Hide loading screen after p5 starts
     document.addEventListener('click', () => { document.querySelector('canvas')?.focus(); });
@@ -147,9 +147,29 @@
     }, 1500);
   </script>
   <script>
+    // DEV MODE: nuke everything stale
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js').catch(() => {});
+      navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister()));
+      if (window.caches) caches.keys().then(k => k.forEach(n => caches.delete(n)));
     }
+    // Auto-delete incompatible saves (version < 8)
+    try {
+      let raw = localStorage.getItem('sunlitIsles_save');
+      if (raw) {
+        let d = JSON.parse(raw);
+        if (!d.version || d.version < 8) {
+          localStorage.removeItem('sunlitIsles_save');
+          localStorage.removeItem('sunlitIsles_backup');
+          console.log('[SAVE] Removed incompatible save (v' + (d.version || '?') + ')');
+        }
+      }
+    } catch(e) {
+      localStorage.removeItem('sunlitIsles_save');
+      localStorage.removeItem('sunlitIsles_backup');
+    }
+    sessionStorage.clear();
+    // Re-enable this line for production/itch.io release:
+    // if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
   </script>
 </body>
 </html>

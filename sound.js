@@ -133,7 +133,7 @@ class AmbientManager {
     for (let i = 0; i < 4; i++) {
       this._cricketTimers.push({
         timer: 30 + Math.random() * 90,
-        baseFreq: 4000 + i * 300 + Math.random() * 200,
+        baseFreq: 2500 + i * 200 + Math.random() * 150,
         active: false
       });
     }
@@ -216,22 +216,31 @@ class AmbientManager {
   }
 
   // Fire a short noise burst (for rain ticks, fire crackle, etc.)
-  _noiseBurst(opts) {
-    let ctx = this.ctx;
-    let o = Object.assign({
-      type: 'white', filterType: 'highpass', freq: 3000, Q: 1,
-      volume: 0.05, duration: 0.01, attack: 0.001, dest: this._uwFilter
-    }, opts);
-    let sr = ctx.sampleRate;
-    let len = Math.floor(sr * (o.duration + 0.02));
-    let buf = ctx.createBuffer(1, len, sr);
+  // Cached noise buffers to avoid per-call allocation
+  _getCachedNoiseBuf(type, duration) {
+    if (!this._noiseCache) this._noiseCache = {};
+    let key = type + '_' + duration;
+    if (this._noiseCache[key]) return this._noiseCache[key];
+    let sr = this.ctx.sampleRate;
+    let len = Math.floor(sr * (duration + 0.02));
+    let buf = this.ctx.createBuffer(1, len, sr);
     let data = buf.getChannelData(0);
-    if (o.type === 'brown') {
+    if (type === 'brown') {
       let last = 0;
       for (let i = 0; i < len; i++) { let w = Math.random() * 2 - 1; last = (last + 0.02 * w) / 1.02; data[i] = last * 3.5; }
     } else {
       for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
     }
+    this._noiseCache[key] = buf;
+    return buf;
+  }
+  _noiseBurst(opts) {
+    let ctx = this.ctx;
+    let o = Object.assign({
+      type: 'white', filterType: 'highpass', freq: 2000, Q: 1,
+      volume: 0.03, duration: 0.01, attack: 0.001, dest: this._uwFilter
+    }, opts);
+    let buf = this._getCachedNoiseBuf(o.type, o.duration);
     let src = ctx.createBufferSource();
     src.buffer = buf;
     let filter = ctx.createBiquadFilter();
@@ -252,6 +261,8 @@ class AmbientManager {
 
   // Fire a short tone (for bird chirps, cricket chirps, bubbles)
   _toneBurst(opts) {
+    // Disabled — real CC0 ambient samples handle birds/crickets now
+    return;
     let ctx = this.ctx;
     let o = Object.assign({
       type: 'sine', freq: 1000, freqEnd: null, volume: 0.05,
@@ -361,8 +372,8 @@ class AmbientManager {
         this._dropTimer = 0.02 + Math.random() * (0.15 - intensity * 0.12);
         this._noiseBurst({
           type: 'white', filterType: 'bandpass',
-          freq: 3000 + Math.random() * 4000, Q: 2,
-          volume: (0.01 + Math.random() * 0.02) * masterVol,
+          freq: 2000 + Math.random() * 2500, Q: 2,
+          volume: (0.008 + Math.random() * 0.015) * masterVol,
           duration: 0.005, attack: 0.001, dest: this._uwFilter
         });
       }
@@ -378,7 +389,8 @@ class AmbientManager {
     if (island === 'plenty') birdVolumeScale *= 1.5;
     if (island === 'vulcan') birdVolumeScale *= 0.4;
 
-    if (!birdMute) {
+    // Skip procedural bird chirps if real ambient bird samples are loaded
+    if (!birdMute && !(this.sm && this.sm._samples && this.sm._samples.birds)) {
       for (let i = 0; i < this._birdTimers.length; i++) {
         let b = this._birdTimers[i];
         b.timer -= dt * 60;
@@ -386,7 +398,7 @@ class AmbientManager {
           b.timer = 120 + Math.random() * 480; // 2-8 seconds
           if (island === 'plenty') b.timer *= 0.4;
           let freq = b.baseFreq + Math.random() * b.range;
-          let vol = (0.02 + Math.random() * 0.04) * masterVol * birdVolumeScale;
+          let vol = (0.008 + Math.random() * 0.015) * masterVol * birdVolumeScale;
           // Chirp: rapid frequency sweep
           let chirpDur = 0.05 + Math.random() * 0.05;
           this._toneBurst({ freq: freq, freqEnd: freq * (0.7 + Math.random() * 0.6), volume: vol, duration: chirpDur, attack: 0.003 });
@@ -410,16 +422,16 @@ class AmbientManager {
       }
     }
 
-    // --- CRICKETS ---
+    // --- CRICKETS (skip if real samples loaded) ---
     let cricketActive = !diving && (hour >= 20 || hour < 5);
-    if (cricketActive) {
+    if (cricketActive && !(this.sm && this.sm._samples && this.sm._samples.crickets)) {
       for (let i = 0; i < this._cricketTimers.length; i++) {
         let c = this._cricketTimers[i];
         c.timer -= dt * 60;
         if (c.timer <= 0) {
           c.timer = 30 + Math.random() * 120; // 0.5-2s between chirps
           let freq = c.baseFreq + (Math.random() - 0.5) * 300;
-          let vol = (0.015 + Math.random() * 0.025) * masterVol;
+          let vol = (0.006 + Math.random() * 0.01) * masterVol;
           // Cricket chirp: rapid on/off oscillation
           let burstCount = 2 + Math.floor(Math.random() * 4);
           let burstGap = 0.025 + Math.random() * 0.015;
@@ -459,8 +471,8 @@ class AmbientManager {
         // Random noise burst for crackle
         this._noiseBurst({
           type: 'white', filterType: 'highpass',
-          freq: 2000 + Math.random() * 4000, Q: 1 + Math.random() * 2,
-          volume: (0.03 + Math.random() * 0.06) * masterVol,
+          freq: 1500 + Math.random() * 2000, Q: 1 + Math.random() * 1.5,
+          volume: (0.02 + Math.random() * 0.03) * masterVol,
           duration: 0.01 + Math.random() * 0.02, attack: 0.001,
           dest: this._fireGain
         });
@@ -1083,43 +1095,8 @@ class SoundManager {
     } else {
       this._thunderTimer = 0;
     }
-    // Home island: chicken clucks & companion animal sounds
-    if (island === 'home' && !diving && typeof state !== 'undefined') {
-      if (state.chickens && state.chickens.length > 0 && frameCount % 400 < 1 && Math.random() < 0.5) this.playSFX('chicken_cluck');
-      if (state.cats && state.cats.some(c => c.adopted) && frameCount % 2400 < 1 && Math.random() < 0.5) {
-        let nearCat = state.cats.find(c => c.adopted && dist(c.x, c.y, px, py) < 150);
-        if (nearCat) this.playSFX('cat_meow');
-      }
-      if (state.islandLevel >= 2 && frameCount % 3600 < 1 && Math.random() < 0.5) this.playSFX('crow_caw');
-      if (state.islandLevel >= 3 && frameCount % 5400 < 1 && Math.random() < 0.4) this.playSFX('tortoise_blip');
-    }
-
-    // Ambient seagulls: daytime home island
-    if (island === 'home' && !diving && bright > 0.4) {
-      this._seagullTimer--;
-      if (this._seagullTimer <= 0) {
-        this._seagullTimer = floor(random(1200, 2400));
-        let sg = this._getSfxSlot();
-        if (sg) {
-          let gullVol = random(0.04, 0.07) * masterVol;
-          sg.osc.setType('sine'); sg.osc.freq(800);
-          sg._vol = gullVol; sg._peak = gullVol;
-          sg.gain.amp(0, 0); sg.gain.amp(gullVol, 0.02);
-          let step = 0, dur = 25;
-          let tick = () => {
-            step++; let t = step / dur;
-            if (t >= 1) { sg.gain.amp(0, 0.08); sg.busy = false; return; }
-            let freq = t < 0.4 ? 800 + (t / 0.4) * 400 : 1200 - ((t - 0.4) / 0.6) * 600;
-            freq += Math.sin(step * 0.5) * 15;
-            try { sg.osc.freq(freq); sg.gain.amp(Math.max(0, Math.sin(t * Math.PI) * gullVol), 0.02); } catch(e) {}
-            setTimeout(tick, 22);
-          };
-          sg.busy = true; setTimeout(tick, 22);
-        }
-      }
-    } else {
-      this._seagullTimer = floor(random(600, 1200));
-    }
+    // Procedural animal sounds disabled — real CC0 ambient samples handle this
+    // Real ambient_birds.mp3 and ambient_crickets.mp3 play via the sample loop system
 
     // Dawn/Dusk transition sounds
     if (typeof state !== 'undefined') {

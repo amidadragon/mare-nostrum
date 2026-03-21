@@ -10,7 +10,7 @@ const DIST = join(__dirname, 'dist');
 
 // JS load order from index.html (excluding libs — those stay separate)
 const JS_FILES = [
-  'engine.js', 'sound.js', 'narrative.js', 'cinematics.js',
+  'engine.js', 'sound.js', 'narrative.js', 'progression.js', 'cinematics.js',
   'fishing.js', 'farming.js', 'npc.js', 'events.js',
   'world.js', 'player.js', 'ui.js', 'sketch.js',
   'wreck.js', 'menu.js', 'islands.js', 'diving.js',
@@ -50,7 +50,7 @@ unlinkSync(tmpFile);
 let html = readFileSync(join(__dirname, 'index.html'), 'utf8');
 
 // Remove all individual game script tags (keep p5 libs)
-html = html.replace(/\s*<script src="(engine|sound|narrative|cinematics|fishing|farming|npc|events|world|player|ui|sketch|wreck|menu|islands|diving|combat|economy|debug|multiplayer|mobile)\.js[^"]*"><\/script>/g, '');
+html = html.replace(/\s*<script src="(engine|sound|narrative|progression|cinematics|fishing|farming|npc|events|world|player|ui|sketch|wreck|menu|islands|diving|combat|economy|debug|multiplayer|mobile)\.js[^"]*"><\/script>/g, '');
 
 // Insert single bundle before the inline scripts
 html = html.replace(
@@ -61,19 +61,17 @@ html = html.replace(
 writeFileSync(join(DIST, 'index.html'), html);
 
 // 4. Copy static assets
+const { readdirSync } = await import('fs');
+const soundFiles = readdirSync(join(__dirname, 'sounds'))
+  .filter(f => /\.(ogg|mp3|wav|flac)$/.test(f))
+  .map(f => 'sounds/' + f);
 const ASSETS = [
   'libs/p5.min.js', 'libs/p5.sound.min.js',
   'libs/cinzel-latin.woff2', 'libs/cinzel-latin-ext.woff2',
   'menu_bg.webp', 'favicon.ico', 'manifest.json',
   'icon-72.png', 'icon-96.png', 'icon-128.png', 'icon-144.png',
   'icon-152.png', 'icon-192.png', 'icon-384.png', 'icon-512.png',
-  'sounds/ambient_ocean.flac', 'sounds/ambient_birds.mp3',
-  'sounds/ambient_wind.wav', 'sounds/ambient_rain.ogg',
-  'sounds/ambient_fire.ogg', 'sounds/ambient_crickets.mp3',
-  'sounds/sfx_step_sand.ogg', 'sounds/sfx_step_stone.ogg',
-  'sounds/sfx_hit.wav', 'sounds/sfx_splash.wav',
-  'sounds/sfx_harvest.ogg', 'sounds/sfx_build.ogg',
-  'sounds/sfx_coin.wav', 'sounds/sfx_levelup.mp3',
+  ...soundFiles,
 ];
 
 for (const a of ASSETS) {
@@ -83,7 +81,8 @@ for (const a of ASSETS) {
 }
 
 // 5. Generate dist-specific service worker (caches game.min.js instead of individual files)
-const distSW = `const CACHE_NAME = 'mare-nostrum-v6';
+const distSoundEntries = soundFiles.map(f => `  '${f}',`).join('\n');
+const distSW = `const CACHE_NAME = 'mare-nostrum-v8';
 const ASSETS = [
   'index.html',
   'libs/p5.min.js',
@@ -94,20 +93,7 @@ const ASSETS = [
   'menu_bg.webp',
   'favicon.ico',
   'manifest.json',
-  'sounds/ambient_ocean.flac',
-  'sounds/ambient_birds.mp3',
-  'sounds/ambient_wind.wav',
-  'sounds/ambient_rain.ogg',
-  'sounds/ambient_fire.ogg',
-  'sounds/ambient_crickets.mp3',
-  'sounds/sfx_step_sand.ogg',
-  'sounds/sfx_step_stone.ogg',
-  'sounds/sfx_hit.wav',
-  'sounds/sfx_splash.wav',
-  'sounds/sfx_harvest.ogg',
-  'sounds/sfx_build.ogg',
-  'sounds/sfx_coin.wav',
-  'sounds/sfx_levelup.mp3',
+${distSoundEntries}
 ];
 
 self.addEventListener('install', (e) => {

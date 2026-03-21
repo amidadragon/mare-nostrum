@@ -113,6 +113,7 @@ const FACTIONS = {
       wallTexture: 'ashlar', groundTint: [165, 155, 140],
     },
     player: { tunic: [175, 58, 44], sash: [200, 170, 50], cape: [196, 64, 50], helm: [196, 162, 70] },
+    npcNames: { livia: 'Livia', marcus: 'Marcus', vesta: 'Vesta', felix: 'Felix' },
   },
   carthage: {
     name: 'CARTHAGE',
@@ -140,6 +141,7 @@ const FACTIONS = {
       wallTexture: 'mudbrick', groundTint: [200, 178, 135],
     },
     player: { tunic: [240, 230, 210], sash: [120, 50, 160], cape: [120, 50, 160], helm: [140, 80, 180] },
+    npcNames: { livia: 'Tanit', marcus: 'Hanno', vesta: 'Astarte', felix: 'Bomilcar' },
   },
   egypt: {
     name: 'EGYPT',
@@ -167,6 +169,7 @@ const FACTIONS = {
       wallTexture: 'smooth', groundTint: [220, 195, 140],
     },
     player: { tunic: [245, 240, 224], sash: [200, 170, 40], cape: [64, 176, 160], helm: [200, 170, 40] },
+    npcNames: { livia: 'Nefertari', marcus: 'Imhotep', vesta: 'Isis', felix: 'Khufu' },
   },
   greece: {
     name: 'GREECE',
@@ -194,6 +197,7 @@ const FACTIONS = {
       wallTexture: 'marble', groundTint: [210, 208, 200],
     },
     player: { tunic: [240, 238, 230], sash: [80, 144, 192], cape: [80, 144, 192], helm: [200, 195, 185] },
+    npcNames: { livia: 'Helena', marcus: 'Leonidas', vesta: 'Athena', felix: 'Socrates' },
   },
 };
 
@@ -208,6 +212,11 @@ function getFactionBuildingColors() {
 
 function getFactionData() {
   return FACTIONS[state.faction] || FACTIONS.rome;
+}
+
+function getNPCDisplayName(npcKey) {
+  let fac = getFactionData();
+  return (fac.npcNames && fac.npcNames[npcKey]) || npcKey.charAt(0).toUpperCase() + npcKey.slice(1);
 }
 
 function getFactionTreeTypes(factionKey) {
@@ -243,6 +252,41 @@ const FACTION_FLORA = {
     { col: [220, 220, 210], w: 2, h: 2 },
   ],
 };
+
+const FACTION_MILITARY = {
+  rome: {
+    tunic: [160, 50, 40], cape: [145, 28, 22], armor: [175, 172, 180],
+    helm: [175, 150, 60], helmCrest: [200, 35, 25], shield: [158, 32, 25],
+    shieldBoss: [200, 170, 55], legs: [120, 40, 30], plume: [180, 30, 20],
+    shieldShape: 'rect', helmStyle: 'galea', weapon: 'gladius',
+    conquestFlag: [185, 38, 28],
+  },
+  carthage: {
+    tunic: [240, 230, 210], cape: [120, 50, 160], armor: [180, 160, 120],
+    helm: [240, 230, 210], helmCrest: [120, 50, 160], shield: [120, 50, 160],
+    shieldBoss: [200, 170, 60], legs: [100, 70, 50], plume: [160, 100, 170],
+    shieldShape: 'round', helmStyle: 'turban', weapon: 'curved_sword',
+    conquestFlag: [120, 50, 160],
+  },
+  egypt: {
+    tunic: [245, 240, 224], cape: [64, 176, 160], armor: [200, 170, 40],
+    helm: [200, 170, 40], helmCrest: [64, 176, 160], shield: [200, 170, 40],
+    shieldBoss: [64, 176, 160], legs: [140, 110, 70], plume: [64, 176, 160],
+    shieldShape: 'round', helmStyle: 'nemes', weapon: 'khopesh',
+    conquestFlag: [200, 170, 40],
+  },
+  greece: {
+    tunic: [240, 238, 230], cape: [80, 144, 192], armor: [200, 195, 185],
+    helm: [200, 195, 185], helmCrest: [80, 144, 192], shield: [80, 144, 192],
+    shieldBoss: [200, 195, 185], legs: [110, 85, 55], plume: [80, 144, 192],
+    shieldShape: 'round', helmStyle: 'corinthian', weapon: 'spear',
+    conquestFlag: [50, 100, 170],
+  },
+};
+
+function getFactionMilitary() {
+  return FACTION_MILITARY[state.faction] || FACTION_MILITARY.rome;
+}
 
 const FACTION_WILDLIFE = {
   rome: [
@@ -489,10 +533,10 @@ let starPositions = null;
 const CITY_SLOTS = [
   // ERA 1: VILLAGE (Lv 2-8)
   // --- Farm district (west, x:220-400) ---
-  { id: 'fence_farm_e1',   x: 160, y: 365, w: 32, h:  8, type: 'fence',       level: 2,  district: 'farm' },
-  { id: 'fence_farm_e2',   x: 160, y: 395, w: 32, h:  8, type: 'fence',       level: 2,  district: 'farm' },
+  { id: 'fence_farm_e1',   x: 260, y: 365, w: 32, h:  8, type: 'fence',       level: 2,  district: 'farm' },
+  { id: 'fence_farm_e2',   x: 260, y: 395, w: 32, h:  8, type: 'fence',       level: 2,  district: 'farm' },
   { id: 'granary',         x: 260, y: 340, w: 58, h: 44, type: 'granary',     level: 5,  district: 'farm' },
-  { id: 'torch_gran_l',    x: 230, y: 354, w:  8, h: 16, type: 'torch',       level: 5,  district: 'farm' },
+  { id: 'torch_gran_l',    x: 250, y: 354, w:  8, h: 16, type: 'torch',       level: 5,  district: 'farm' },
   { id: 'fence_nw1',       x: 320, y: 318, w: 32, h:  8, type: 'fence',       level: 4,  district: 'farm' },
   // --- Center (x:560-660, y:400-470) ---
   { id: 'torch_center',    x: 600, y: 415, w:  8, h: 16, type: 'torch',       level: 2,  district: 'center' },
@@ -703,7 +747,7 @@ function canResearch(techId) {
 }
 function getResearchRate() {
   let base = 25;
-  let libLevel = state.research.libraryLevel || 0;
+  let libLevel = (state.research && state.research.libraryLevel) || 0;
   let rate = base + libLevel * 10;
   // NPC max hearts bonus: +5 per maxed NPC
   let maxH = 10;
@@ -714,12 +758,13 @@ function getResearchRate() {
   return rate;
 }
 function startResearch(techId) {
+  if (!state.research) return;
   if (!canResearch(techId)) return;
   state.research.current = techId;
   state.research.progress = 0;
 }
 function advanceResearch() {
-  if (!state.research.current) return;
+  if (!state.research || !state.research.current) return;
   let tech = TECH_TREE[state.research.current];
   if (!tech) return;
   let rate = getResearchRate();
@@ -1818,6 +1863,7 @@ function setup() {
   createCanvas(windowWidth, windowHeight);
   noSmooth();
   frameRate(60);
+  noCursor();
   initState();
   colorMode(RGB);
   textFont('monospace');
@@ -2232,7 +2278,7 @@ let _prevTime = 0;
 let _delta = 0.016; // seconds per frame
 let _fpsSmooth = 60;
 let _lowFpsFrames = 0;
-let _particleCap = 300;
+let _particleCap = 200;
 let _jumpingFish = [];
 
 function draw() {
@@ -2256,11 +2302,11 @@ function draw() {
 
   // ─── FPS WATCHDOG ───
   if (_fpsSmooth < 30) { _lowFpsFrames++; } else { _lowFpsFrames = 0; }
-  if (_lowFpsFrames > 60 && _particleCap > 150) {
-    _particleCap = 150;
-    console.warn('[perf] FPS below 30 for 60+ frames — particle cap reduced to 150');
-  } else if (_lowFpsFrames === 0 && _particleCap < 300) {
-    _particleCap = min(_particleCap + 1, 300);
+  if (_lowFpsFrames > 60 && _particleCap > 100) {
+    _particleCap = 100;
+    console.warn('[perf] FPS below 30 for 60+ frames — particle cap reduced to 100');
+  } else if (_lowFpsFrames === 0 && _particleCap < 200) {
+    _particleCap = min(_particleCap + 1, 200);
   }
 
   // ─── MUSIC (plays on all screens) ───
@@ -2280,6 +2326,8 @@ function draw() {
       if (menuFadeOut >= 255 && menuFadeAction) { menuFadeAction(); menuFadeAction = null; menuFadeOut = 0; }
     }
     drawMenuScreen();
+    // Debug console — must draw on menu screens too
+    if (typeof Debug !== 'undefined') Debug.draw();
     return;
   }
 
@@ -2307,6 +2355,8 @@ function draw() {
     }
     state._drawErrors = (state._drawErrors || 0) + 1;
   }
+  // Debug console — ALWAYS draw on top of everything, every screen
+  if (typeof Debug !== 'undefined') Debug.draw();
 }
 // ─── DITHER HELPERS ───
 let _b4 = [0,8,2,10, 12,4,14,6, 3,11,1,9, 15,7,13,5]; // 4x4 Bayer matrix (constant)
@@ -2368,7 +2418,7 @@ function drawInner() {
 
   updateTime(dt);
   updateTutorialHint(dt);
-  if (snd) { snd.updateAmbient(); }
+  if (snd && frameCount % 10 === 0) { snd.updateAmbient(); }
 
   // === WRECK BEACH MODE — before home island is reached ===
   if (state.progression.gameStarted && !state.progression.homeIslandReached &&
@@ -2655,18 +2705,18 @@ function drawInner() {
     updateTrees(dt);
     updateFishing(dt);
     updateChickens(dt);
-    updateFactionWildlife(dt);
+    if (frameCount % 5 === 0) updateFactionWildlife(dt * 5);
     { let _pg = state.progression;
       let _full = !_pg.gameStarted || _pg.villaCleared;
       if (_full || _pg.companionsAwakened.harvester) updateHarvester(dt);
     }
     updateBlessing(dt);
     updateCats(dt);
-    updateCitizens(dt);
+    if (frameCount % 3 === 0) updateCitizens(dt * 3);
     if (typeof updateVestaCrystalGathering === 'function') updateVestaCrystalGathering(dt);
-    if (typeof updateAllNPCSchedules === 'function') updateAllNPCSchedules(dt);
+    if (typeof updateAllNPCSchedules === 'function' && frameCount % 60 === 0) updateAllNPCSchedules(dt * 60);
     updateCooking(dt);
-    updateWeather(dt);
+    if (frameCount % 3 === 0) updateWeather(dt * 3);
     updatePickupMagnetism(dt);
     // Storm fishing message (first storm per session)
     if (!state.stormMessageShown && (stormActive || state.weather.type === 'storm' || state.weather.type === 'rain')) {
@@ -2995,6 +3045,7 @@ function drawInner() {
 
     if (!screenshotMode && !photoMode) {
       drawHUD();
+      if (typeof drawCompassHUD === 'function') drawCompassHUD();
       if (typeof drawQuestTracker === 'function') drawQuestTracker();
       drawHotbar();
       drawFestivalBanner();
@@ -3042,6 +3093,7 @@ function drawInner() {
       drawScreenTransition();
       drawImperatorCeremony();
       drawIslandNamingOverlay();
+      if (typeof drawWorldMap === 'function') drawWorldMap();
       if (typeof drawMobileControls === 'function') drawMobileControls();
       if (typeof _processTouchActions === 'function') _processTouchActions();
       push(); noStroke();
@@ -3078,8 +3130,7 @@ function drawInner() {
     pop();
   }
 
-  // Debug console — always on top of everything
-  if (typeof Debug !== 'undefined') Debug.draw();
+  // Debug console — drawn by draw() wrapper, not here
 }
 
 // ─── TIME ─────────────────────────────────────────────────────────────────
@@ -3472,7 +3523,7 @@ function drawOcean() {
 
   // Animated sine wave scan-lines — stepped pixel art (larger step, fewer rects)
   let waveStep = floor(t * 0.8);
-  for (let wy = oceanTop + 4; wy < height; wy += 14) {
+  for (let wy = oceanTop + 4; wy < height; wy += 20) {
     let depthFade = 1 - (wy - oceanTop) / (height - oceanTop) * 0.6;
     let waveAlpha = (25 + 22 * dayMix) * depthFade;
     let offsetX = floor(sin(t * 0.5 + wy * 0.03) * 12);
@@ -3498,7 +3549,7 @@ function drawOcean() {
   // Caustic light patterns on shallow water (near island)
   if (dayMix > 0.3) {
     let causticA = (dayMix - 0.3) * 25;
-    for (let ci = 0; ci < 15; ci++) {
+    for (let ci = 0; ci < 8; ci++) {
       let cx = floor(noise(ci * 7.3 + frameCount * 0.004) * width);
       let cy = floor(oceanTop + noise(ci * 11.1 + frameCount * 0.003) * (height - oceanTop) * 0.4);
       let cSize = 4 + floor(sin(frameCount * 0.06 + ci * 2.1) * 3);
@@ -3512,9 +3563,9 @@ function drawOcean() {
   }
 
   // Pixel foam whitecaps
-  for (let fy = oceanTop + 12; fy < height; fy += 20) {
+  for (let fy = oceanTop + 12; fy < height; fy += 28) {
     let depthFade = 1 - (fy - oceanTop) / (height - oceanTop) * 0.5;
-    for (let fx = 0; fx < width; fx += 38) {
+    for (let fx = 0; fx < width; fx += 50) {
       let foamPhase = sin(t * 1.2 + fx * 0.05 + fy * 0.06);
       if (foamPhase > 0.45) {
         let foamAlpha = (foamPhase - 0.45) * 65 * depthFade * max(0.3, dayMix);
@@ -3529,10 +3580,10 @@ function drawOcean() {
     }
   }
 
-  // Sun sparkles on water
-  if (dayMix > 0.5) {
+  // Sun sparkles on water (only when FPS is healthy)
+  if (dayMix > 0.5 && _fpsSmooth > 40) {
     let sparkleAlpha = (dayMix - 0.5) * 2;
-    for (let i = 0; i < 25; i++) {
+    for (let i = 0; i < 15; i++) {
       let sx2 = floor(noise(i * 10 + frameCount * 0.003) * width);
       let sy2 = floor(oceanTop + noise(i * 20 + frameCount * 0.002) * (height - oceanTop) * 0.6);
       let sparkle = sin(frameCount * 0.1 + i * 2.5);
@@ -3564,7 +3615,7 @@ function drawOcean() {
   // Bioluminescence at night — glowing plankton sparkles
   if (dayMix < 0.3) {
     let bioAlpha = map(dayMix, 0, 0.3, 1, 0);
-    for (let bi = 0; bi < 18; bi++) {
+    for (let bi = 0; bi < 10; bi++) {
       let bx = floor(noise(bi * 13.7 + frameCount * 0.002) * width);
       let by = floor(oceanTop + 15 + noise(bi * 9.3 + frameCount * 0.0015) * (height - oceanTop - 30));
       let pulse = sin(frameCount * 0.04 + bi * 2.3) * 0.5 + 0.5;
@@ -5017,7 +5068,7 @@ function drawSeasonalEffects() {
   if (season === 0) {
     // === SPRING (Ver) — Cherry blossoms + butterflies + pollen ===
     // Cherry blossom petals — pink/white pixel petals drifting down
-    if (frameCount % 12 === 0 && seasonLeaves.length < 25) {
+    if (frameCount % 18 === 0 && seasonLeaves.length < 18) {
       seasonLeaves.push({
         x: ix + random(-220, 220), y: iy - random(60, 120),
         vx: random(-0.3, 0.5), vy: random(0.3, 0.7),
@@ -5061,7 +5112,7 @@ function drawSeasonalEffects() {
       }
     }
     // Floating pollen motes (fewer, supplemental)
-    if (frameCount % 40 === 0 && bright > 0.3) {
+    if (frameCount % 60 === 0 && bright > 0.3) {
       particles.push({
         x: WORLD.islandCX + random(-200, 200), y: WORLD.islandCY + random(-80, -20),
         vx: random(-0.2, 0.3), vy: random(-0.3, -0.1),
@@ -7105,95 +7156,108 @@ function drawAmbientHouses() {}
 
 // ─── Y-SORTED WORLD RENDERING ────────────────────────────────────────────
 const _flatBuildTypes = ['floor', 'mosaic', 'bridge'];
+let _groundItems = [];
+let _sortItems = [];
+let _groundSortFrame = -999;
 function drawWorldObjectsSorted() {
-  // Layer 0: ground-level flat objects (always behind characters)
-  let ground = [];
-  let templeX = state.pyramid.x, templeY = state.pyramid.y;
-  let inTemple = (x, y) => abs(x - templeX) < 70 && y > templeY - 80 && y < templeY + 15;
-  state.plots.forEach(p => ground.push({ y: p.y, draw: () => drawOnePlot(p) }));
-  state.resources.forEach(r => { if (!inTemple(r.x, r.y)) ground.push({ y: r.y, draw: () => drawOneResource(r) }); });
-  state.crystalNodes.forEach(c => ground.push({ y: c.y, draw: () => drawOneCrystal(c) }));
-  // Faction flora ground cover
-  if (state.factionFlora) state.factionFlora.forEach(fl => ground.push({ y: fl.y, draw: () => drawOneFlora(fl) }));
-  ground.sort((a, b) => a.y - b.y);
-  ground.forEach(i => i.draw());
+  // Layer 0: ground-level flat objects — re-sort only every 30 frames (static)
+  if (frameCount - _groundSortFrame > 30) {
+    _groundItems.length = 0;
+    let templeX = state.pyramid.x, templeY = state.pyramid.y;
+    state.plots.forEach(p => _groundItems.push({ y: p.y, draw: () => drawOnePlot(p) }));
+    state.resources.forEach(r => { if (!(abs(r.x - templeX) < 70 && r.y > templeY - 80 && r.y < templeY + 15)) _groundItems.push({ y: r.y, draw: () => drawOneResource(r) }); });
+    state.crystalNodes.forEach(c => _groundItems.push({ y: c.y, draw: () => drawOneCrystal(c) }));
+    if (state.factionFlora) state.factionFlora.forEach(fl => _groundItems.push({ y: fl.y, draw: () => drawOneFlora(fl) }));
+    _groundItems.sort((a, b) => a.y - b.y);
+    _groundSortFrame = frameCount;
+  }
+  for (let i = 0; i < _groundItems.length; i++) _groundItems[i].draw();
 
   // Layer 1: tall objects + all characters (Y-sorted together)
-  let items = [];
-  // Temple and ruins — sort by bottom edge (steps extend ~12px below center)
-  // Pyramid — sort well behind so player always walks in front of it
-  items.push({ y: state.pyramid.y - 40, draw: drawPyramid });
-  items.push({ y: WORLD.islandCY - 30, draw: drawRuins });
+  _sortItems.length = 0;
+  _sortItems.push({ y: state.pyramid.y - 40, draw: drawPyramid });
+  _sortItems.push({ y: WORLD.islandCY - 30, draw: drawRuins });
   // Buildings — flat items (floor, mosaic, bridge) sort BEHIND everything at their position
   // Tall items (wall, door, etc.) sort by bottom edge for correct overlap
   state.buildings.forEach(b => {
     let sortY = _flatBuildTypes.includes(b.type) ? b.y - 9999 : b.y + (b.h || 0) / 2;
-    items.push({ y: sortY, draw: () => drawOneBuilding(b) });
+    _sortItems.push({ y: sortY, draw: () => drawOneBuilding(b) });
   });
   // Trees
-  state.trees.forEach(t => items.push({ y: t.y, draw: () => drawOneTree(t) }));
+  state.trees.forEach(t => _sortItems.push({ y: t.y, draw: () => drawOneTree(t) }));
   // Ambient houses + market clutter (Y-sorted with everything else)
   let amb = getAmbientHouses();
-  amb.houses.forEach(h => items.push({ y: h.y, draw: () => drawOneAmbientHouse(h) }));
-  amb.clutter.forEach(c => items.push({ y: c.y, draw: () => drawOneClutter(c) }));
+  amb.houses.forEach(h => _sortItems.push({ y: h.y, draw: () => drawOneAmbientHouse(h) }));
+  amb.clutter.forEach(c => _sortItems.push({ y: c.y, draw: () => drawOneClutter(c) }));
   // Crystal shrine
-  if (state.crystalShrine) items.push({ y: state.crystalShrine.y, draw: drawCrystalShrine });
+  if (state.crystalShrine) _sortItems.push({ y: state.crystalShrine.y, draw: drawCrystalShrine });
   // Fountain
-  items.push({ y: WORLD.islandCY + 35, draw: drawFountain });
+  _sortItems.push({ y: WORLD.islandCY + 35, draw: drawFountain });
   // Chickens
-  if (state.chickens) state.chickens.forEach((ch, i) => items.push({ y: ch.y, draw: () => drawOneChicken(ch) }));
+  if (state.chickens) state.chickens.forEach((ch, i) => _sortItems.push({ y: ch.y, draw: () => drawOneChicken(ch) }));
   // Faction wildlife
-  if (state.factionWildlife) state.factionWildlife.forEach(w => items.push({ y: w.y, draw: () => drawOneFactionCreature(w) }));
+  if (state.factionWildlife) state.factionWildlife.forEach(w => _sortItems.push({ y: w.y, draw: () => drawOneFactionCreature(w) }));
   // Harvester companion — only if awakened
   let prog = state.progression;
   let fullyUnlocked = !prog.gameStarted || prog.villaCleared; // old saves = fully unlocked
   if (state.harvester && (fullyUnlocked || prog.companionsAwakened.harvester))
-    items.push({ y: state.harvester.y, draw: drawHarvester });
+    _sortItems.push({ y: state.harvester.y, draw: drawHarvester });
   // Cats
-  if (state.cats && fullyUnlocked) state.cats.forEach(cat => items.push({ y: cat.y, draw: () => drawOneCat(cat) }));
+  if (state.cats && fullyUnlocked) state.cats.forEach(cat => _sortItems.push({ y: cat.y, draw: () => drawOneCat(cat) }));
   // Ambient citizens
-  if (state.citizens) state.citizens.forEach(c => items.push({ y: c.y, draw: () => drawOneCitizen(c) }));
+  // Ambient citizens — cap visible at 15
+  if (state.citizens) {
+    let _visCount = 0;
+    for (let _ci = 0; _ci < state.citizens.length && _visCount < 15; _ci++) {
+      let c = state.citizens[_ci];
+      let _csx = w2sX(c.x), _csy = w2sY(c.y);
+      if (_csx > -30 && _csx < width + 30 && _csy > -30 && _csy < height + 30) {
+        _visCount++;
+        _sortItems.push({ y: c.y, draw: () => drawOneCitizen(c) });
+      }
+    }
+  }
   // Legion soldiers on home island
-  if (state.legia && state.legia.soldiers) state.legia.soldiers.forEach(s => items.push({ y: s.y, draw: () => drawLegionAmbientSoldier(s) }));
+  if (state.legia && state.legia.soldiers) state.legia.soldiers.forEach(s => _sortItems.push({ y: s.y, draw: () => drawLegionAmbientSoldier(s) }));
   // Characters — gated by progression
   if (fullyUnlocked || prog.companionsAwakened.lares)
-    items.push({ y: state.companion.y, draw: drawCompanion });
+    _sortItems.push({ y: state.companion.y, draw: drawCompanion });
   if (state.woodcutter && (fullyUnlocked || prog.companionsAwakened.woodcutter))
-    items.push({ y: state.woodcutter.y, draw: drawWoodcutter });
+    _sortItems.push({ y: state.woodcutter.y, draw: drawWoodcutter });
   if (state.quarrier && state.quarrier.unlocked)
-    items.push({ y: state.quarrier.y, draw: drawQuarrier });
+    _sortItems.push({ y: state.quarrier.y, draw: drawQuarrier });
   if (state.cook && state.cook.unlocked)
-    items.push({ y: state.cook.y, draw: drawCook });
+    _sortItems.push({ y: state.cook.y, draw: drawCook });
   if (state.fisherman && state.fisherman.unlocked)
-    items.push({ y: state.fisherman.boatY, draw: drawFisherman });
+    _sortItems.push({ y: state.fisherman.boatY, draw: drawFisherman });
   if (!state.rowing.active && (fullyUnlocked || prog.companionsAwakened.centurion))
-    items.push({ y: state.centurion.y, draw: drawCenturion });
+    _sortItems.push({ y: state.centurion.y, draw: drawCenturion });
   // Companion pets — tortoise and crow
   if (state.companionPets && fullyUnlocked) {
-    items.push({ y: state.companionPets.tortoise.y, draw: drawTortoise });
-    items.push({ y: state.companionPets.crow.y, draw: drawCrow });
+    _sortItems.push({ y: state.companionPets.tortoise.y, draw: drawTortoise });
+    _sortItems.push({ y: state.companionPets.crow.y, draw: drawCrow });
   }
   // Main NPC — always present once home reached
   if (fullyUnlocked || prog.homeIslandReached)
-    items.push({ y: state.npc.y, draw: drawNPC });
+    _sortItems.push({ y: state.npc.y, draw: drawNPC });
   // New NPCs — gated by discovery
   if (state.marcus && state.marcus.present && (fullyUnlocked || prog.npcsFound.marcus))
-    items.push({ y: state.marcus.y, draw: () => drawNewNPC(state.marcus, 'marcus') });
+    _sortItems.push({ y: state.marcus.y, draw: () => drawNewNPC(state.marcus, 'marcus') });
   if (fullyUnlocked || prog.npcsFound.vesta)
-    items.push({ y: state.vesta.y, draw: () => drawNewNPC(state.vesta, 'vesta') });
+    _sortItems.push({ y: state.vesta.y, draw: () => drawNewNPC(state.vesta, 'vesta') });
   if (fullyUnlocked || prog.npcsFound.felix)
-    items.push({ y: state.felix.y, draw: () => drawNewNPC(state.felix, 'felix') });
+    _sortItems.push({ y: state.felix.y, draw: () => drawNewNPC(state.felix, 'felix') });
   // Night market
   if (state.nightMarket.active) {
     let mp = getMarketPosition();
-    items.push({ y: mp.y, draw: drawNightMarket });
+    _sortItems.push({ y: mp.y, draw: drawNightMarket });
   }
   // Visitor
-  if (state.visitor) items.push({ y: state.visitor.y, draw: drawVisitor });
-  items.push({ y: state.player.y, draw: drawPlayer });
+  if (state.visitor) _sortItems.push({ y: state.visitor.y, draw: drawVisitor });
+  _sortItems.push({ y: state.player.y, draw: drawPlayer });
   // Sort by Y (back to front)
-  items.sort((a, b) => a.y - b.y);
-  items.forEach(i => i.draw());
+  _sortItems.sort((a, b) => a.y - b.y);
+  for (let i = 0; i < _sortItems.length; i++) _sortItems[i].draw();
 }
 
 // ─── BUILDINGS (BLUEPRINTS) ──────────────────────────────────────────────
@@ -9970,8 +10034,9 @@ function drawRowingBoat() {
       rect(rx - 1, 4, 3, 3);
     }
 
-    // Flag — pixel rects
-    fill(160, 40, 30);
+    // Flag — pixel rects, faction color
+    let _sf = getFactionMilitary();
+    fill(_sf.conquestFlag[0], _sf.conquestFlag[1], _sf.conquestFlag[2]);
     let fw = floor(sin(frameCount * 0.04) * 2);
     rect(-12 + fw, -2, 7, 4);
     rect(-10 + fw, -1, 3, 2);
@@ -10078,9 +10143,10 @@ function drawRowingBoat() {
     line(-7, -42, -40, -6);
     line(-7, -42, 44, -6);
     noStroke();
-    // Flag — pixel rect
+    // Flag — pixel rect, faction color
     let flagWave = floor(sin(frameCount * 0.04) * 2);
-    fill(160, 40, 30);
+    let _sf2 = getFactionMilitary();
+    fill(_sf2.conquestFlag[0], _sf2.conquestFlag[1], _sf2.conquestFlag[2]);
     rect(-7, -50, 10 + flagWave, 4);
     rect(-7, -48, 6 + flagWave, 2);
 
@@ -10127,15 +10193,16 @@ function drawRowingBoat() {
   if (state.legia && state.legia.marching && state.legia.soldiers) {
     let boatX = floor(sx);
     let boatY = floor(sy + bob);
+    let _bm = getFactionMilitary();
     noStroke();
     state.legia.soldiers.forEach((s, i) => {
       let ox = -20 - (i % 3) * 12;
       let oy = 10 + floor(i / 3) * 8;
-      // Small soldier body in formation
-      fill(160, 50, 40);
+      // Small soldier body in formation — faction tunic
+      fill(_bm.tunic[0], _bm.tunic[1], _bm.tunic[2]);
       rect(boatX + ox, boatY + oy, 4, 5);
-      // Helmet
-      fill(150, 140, 120);
+      // Helmet — faction
+      fill(_bm.helm[0], _bm.helm[1], _bm.helm[2]);
       rect(boatX + ox, boatY + oy - 2, 4, 2);
     });
   }
@@ -11069,6 +11136,8 @@ function drawCenturion() {
   let bobY = floor(sin(frameCount * 0.06) * 1);
   let f = cen.facing;
   let breath = sin(frameCount * 0.04 + 2) * 0.5;
+  let mil = getFactionMilitary();
+  let fk = state.faction || 'rome';
 
   push();
   translate(floor(sx), floor(sy + bobY));
@@ -11081,131 +11150,120 @@ function drawCenturion() {
   fill(0, 0, 0, 40);
   rect(-8, s + 1, 16, 2);
 
-  // Caligae (military sandals) with studs
+  // Sandals
   fill(90, 60, 25);
   rect(-5, s - 2, 4, 3);
   rect(1, s - 2, 4, 3);
-  // Hobnail studs
   fill(140, 130, 100);
   rect(-4, s, 1, 1);
   rect(2, s, 1, 1);
 
-  // Legs — greaves (shin guards)
+  // Legs
   fill(200, 165, 130);
   rect(-4, 4, 3, 7);
   rect(1, 4, 3, 7);
-  // Bronze greaves
-  fill(180, 150, 55);
+  // Greaves — faction armor tint
+  fill(mil.armor[0], max(0, mil.armor[1] - 22), max(0, mil.armor[2] - 125));
   rect(-4, 6, 3, 4);
   rect(1, 6, 3, 4);
-  fill(195, 165, 65, 80);
+  fill(min(255, mil.armor[0] + 15), max(0, mil.armor[1] - 7), max(0, mil.armor[2] - 115), 80);
   rect(-3, 7, 1, 2);
   rect(2, 7, 1, 2);
 
-  // Red paludamentum (commander's cape — behind body)
-  fill(145, 28, 22, 180);
+  // Cape — faction
+  fill(mil.cape[0], mil.cape[1], mil.cape[2], 180);
   let cw = floor(sin(frameCount * 0.07) * 2);
   rect(-6 * f, -5, 5, 16 + cw);
-  // Cape edge highlight
-  fill(165, 40, 32, 120);
+  fill(min(255, mil.cape[0] + 20), min(255, mil.cape[1] + 12), min(255, mil.cape[2] + 10), 120);
   rect(-6 * f, -5, 1, 16 + cw);
 
-  // Crimson tunica
-  fill(158, 38, 32);
+  // Tunic — faction
+  fill(mil.tunic[0], mil.tunic[1], mil.tunic[2]);
   rect(-6, -4, 12, 10);
-  // Tunica shadow fold
-  fill(140, 30, 26);
+  fill(max(0, mil.tunic[0] - 18), max(0, mil.tunic[1] - 8), max(0, mil.tunic[2] - 6));
   rect(-6, -4, 4, 10);
 
-  // Lorica segmentata (plate armor)
-  fill(175, 172, 180);
+  // Armor — faction
+  fill(mil.armor[0], mil.armor[1], mil.armor[2]);
   rect(-5, -4, 10, 6);
-  // Armor bands
-  fill(148, 145, 155);
+  fill(max(0, mil.armor[0] - 27), max(0, mil.armor[1] - 27), max(0, mil.armor[2] - 25));
   rect(-5, -2, 10, 1);
   rect(-5, 0, 10, 1);
-  // Armor highlight — polished
-  fill(195, 192, 200, 80);
+  fill(min(255, mil.armor[0] + 20), min(255, mil.armor[1] + 20), min(255, mil.armor[2] + 20), 80);
   rect(-4, -4, 3, 2);
 
-  // Pteruges (leather skirt strips)
+  // Leather skirt strips
   fill(130, 95, 40);
   for (let i = -2; i <= 2; i++) {
     rect(i * 3 - 1, 2, 2, 4);
   }
-  // Pteruges tips — brass studs
   fill(180, 155, 55);
   for (let i = -2; i <= 2; i++) {
     rect(i * 3, 5, 1, 1);
   }
 
-  // Cingulum (military belt)
+  // Belt
   fill(195, 165, 55);
   rect(-5, 1, 10, 2);
-  // Belt medallion
   fill(210, 180, 60);
   rect(-1, 1, 2, 2);
 
-  // Pauldrons — polished bronze
-  fill(185, 155, 60);
+  // Pauldrons — faction armor
+  fill(min(255, mil.armor[0] + 10), max(0, mil.armor[1] - 17), max(0, mil.armor[2] - 120));
   rect(-8, -5, 4, 3);
   rect(4, -5, 4, 3);
-  // Pauldron highlights
-  fill(200, 175, 75, 80);
+  fill(min(255, mil.armor[0] + 25), min(255, mil.armor[1] + 3), max(0, mil.armor[2] - 105), 80);
   rect(-7, -5, 2, 1);
   rect(5, -5, 2, 1);
 
-  // Arms — battle-hardened
+  // Arms
   fill(200, 165, 130);
   rect(-8, -2, 2, 5);
   rect(6, -2, 2, 5);
-  // Vambrace (forearm guard)
-  fill(170, 140, 50);
+  fill(max(0, mil.armor[0] - 5), max(0, mil.armor[1] - 32), max(0, mil.armor[2] - 130));
   rect(-8, 0, 2, 3);
   rect(6, 0, 2, 3);
 
-  // Gladius — the Roman short sword
+  // Weapon
   if (cen.task === 'fight') {
     let swing = floor(sin(frameCount * 0.2) * 4);
-    // Blade
     fill(185, 185, 195);
     rect(6 * f + swing, -13, 2, 11);
-    // Blade edge highlight
     fill(210, 210, 220);
     rect(6 * f + swing, -13, 1, 11);
-    // Gold hilt
     fill(195, 165, 55);
     rect(6 * f + swing - 1, -2, 4, 2);
-    // Pommel
     fill(200, 170, 60);
     rect(6 * f + swing, 0, 2, 1);
   } else {
-    // Sheathed at hip
     fill(90, 65, 30);
-    rect(5 * f, 2, 2, 7); // scabbard
+    rect(5 * f, 2, 2, 7);
     fill(175, 145, 55);
-    rect(5 * f, 1, 2, 2); // hilt visible
+    rect(5 * f, 1, 2, 2);
   }
 
-  // Scutum (shield) — curved Roman infantry shield
+  // Shield — faction
   let shX = -7 * f;
-  fill(158, 32, 25);
-  rect(shX - 4, -5, 8, 13);
-  // Shield rim — gold
-  fill(190, 165, 55);
-  rect(shX - 4, -5, 8, 1);
-  rect(shX - 4, 7, 8, 1);
-  rect(shX - 4, -5, 1, 13);
-  rect(shX + 3, -5, 1, 13);
-  // Shield boss — iron
-  fill(180, 178, 185);
-  rect(shX - 1, 0, 2, 2);
-  // Shield lightning bolt emblem
-  fill(200, 170, 55);
-  rect(shX - 1, -3, 1, 2);
-  rect(shX, -1, 1, 2);
-  rect(shX - 1, 1, 1, 2);
-  rect(shX + 0, 3, 1, 2);
+  fill(mil.shield[0], mil.shield[1], mil.shield[2]);
+  if (mil.shieldShape === 'round') {
+    ellipse(shX, 1, 12, 12);
+    fill(mil.shieldBoss[0], mil.shieldBoss[1], mil.shieldBoss[2]);
+    ellipse(shX, 1, 4, 4);
+  } else {
+    rect(shX - 4, -5, 8, 13);
+    fill(mil.shieldBoss[0], mil.shieldBoss[1], mil.shieldBoss[2]);
+    rect(shX - 4, -5, 8, 1);
+    rect(shX - 4, 7, 8, 1);
+    rect(shX - 4, -5, 1, 13);
+    rect(shX + 3, -5, 1, 13);
+    fill(180, 178, 185);
+    rect(shX - 1, 0, 2, 2);
+    fill(mil.shieldBoss[0], mil.shieldBoss[1], mil.shieldBoss[2]);
+    rect(shX - 1, -3, 1, 2);
+    rect(shX, -1, 1, 2);
+    rect(shX - 1, 1, 1, 2);
+    rect(shX + 0, 3, 1, 2);
+  }
 
   // Neck
   fill(200, 165, 130);
@@ -11214,36 +11272,54 @@ function drawCenturion() {
   // Head
   fill(200, 165, 130);
   rect(-4, -11, 8, 6);
-  // Jaw — strong
   fill(190, 155, 120);
   rect(-4, -6, 2, 1);
   rect(2, -6, 2, 1);
 
-  // Galea (helmet) — bronze with iron
-  fill(175, 150, 60);
-  rect(-5, -13, 10, 4);
-  // Brow guard
-  fill(165, 140, 55);
-  rect(-5, -10, 10, 1);
-  // Cheek guards
-  fill(165, 140, 55);
-  rect(-5, -10, 2, 4);
-  rect(3, -10, 2, 4);
-  // Neck guard
-  fill(160, 135, 50);
-  rect(-4, -6, 8, 1);
+  // Helmet — faction-specific style
+  fill(mil.helm[0], mil.helm[1], mil.helm[2]);
+  if (fk === 'carthage') {
+    // Turban/headwrap
+    rect(-5, -14, 10, 6);
+    fill(mil.helmCrest[0], mil.helmCrest[1], mil.helmCrest[2]);
+    rect(-3, -15, 6, 2);
+  } else if (fk === 'egypt') {
+    // Nemes headdress
+    rect(-5, -13, 10, 4);
+    fill(mil.helmCrest[0], mil.helmCrest[1], mil.helmCrest[2]);
+    rect(-6, -10, 2, 6);
+    rect(4, -10, 2, 6);
+    fill(mil.helm[0], mil.helm[1], mil.helm[2]);
+    rect(-4, -15, 8, 3);
+  } else if (fk === 'greece') {
+    // Corinthian helmet
+    rect(-5, -13, 10, 5);
+    fill(max(0, mil.helm[0] - 10), max(0, mil.helm[1] - 10), max(0, mil.helm[2] - 10));
+    rect(-5, -10, 2, 4);
+    rect(3, -10, 2, 4);
+    fill(mil.helmCrest[0], mil.helmCrest[1], mil.helmCrest[2]);
+    rect(-2, -17, 4, 4);
+    rect(-1, -19, 2, 2);
+  } else {
+    // Roman galea
+    rect(-5, -13, 10, 4);
+    fill(max(0, mil.helm[0] - 10), max(0, mil.helm[1] - 10), max(0, mil.helm[2] - 5));
+    rect(-5, -10, 10, 1);
+    rect(-5, -10, 2, 4);
+    rect(3, -10, 2, 4);
+    fill(max(0, mil.helm[0] - 15), max(0, mil.helm[1] - 15), max(0, mil.helm[2] - 10));
+    rect(-4, -6, 8, 1);
+    // Transverse crest — faction helmCrest
+    fill(mil.helmCrest[0], mil.helmCrest[1], mil.helmCrest[2]);
+    rect(-6, -15, 12, 2);
+    rect(-4, -17, 8, 2);
+    let cf = floor(sin(frameCount * 0.1) * 1);
+    fill(max(0, mil.helmCrest[0] - 20), max(0, mil.helmCrest[1] - 5), max(0, mil.helmCrest[2] - 3));
+    rect(-5, -16 + cf, 2, 3);
+    rect(3, -16 - cf, 2, 3);
+  }
 
-  // Transverse crest — RED horsehair (marks centurion rank)
-  fill(200, 35, 25);
-  rect(-6, -15, 12, 2);
-  rect(-4, -17, 8, 2);
-  // Crest flutter
-  let cf = floor(sin(frameCount * 0.1) * 1);
-  fill(180, 30, 22);
-  rect(-5, -16 + cf, 2, 3);
-  rect(3, -16 - cf, 2, 3);
-
-  // Eyes — steely gaze, tracking facing
+  // Eyes
   let blinkC = (frameCount % 280 > 273);
   if (blinkC) {
     fill(185, 150, 118);
@@ -11258,11 +11334,12 @@ function drawCenturion() {
     rect(1 + (f > 0 ? 1 : 0), -10, 1, 1);
   }
 
-  // Rank text — gold
+  // Rank text — faction-appropriate title
+  let _cenTitles = { rome: 'CENTURION', carthage: 'CAPTAIN', egypt: 'MEDJAY', greece: 'STRATEGOS' };
   fill(195, 170, 60, 100);
   textSize(5);
   textAlign(CENTER);
-  text('CENTURION' + getCompanionPetCenturionLabel(), 0, -s * 1.3);
+  text((_cenTitles[fk] || 'CENTURION') + getCompanionPetCenturionLabel(), 0, -s * 1.3);
   textAlign(LEFT, TOP);
 
   pop();
@@ -11962,7 +12039,7 @@ function drawHeart(x, y, s) {
 function updateParticles(dt) {
   let bright = getSkyBrightness();
 
-  if (frameCount % 8 === 0) {
+  if (frameCount % 12 === 0) {
     // Spawn near player (visible area)
     let spawnX = state.player.x + random(-width * 0.5, width * 0.5);
     let spawnY = state.player.y + random(-height * 0.4, height * 0.3);
@@ -11991,7 +12068,7 @@ function updateParticles(dt) {
   if (bright > 0.4 && frameCount % 45 === 0) {
     for (let i = 0; i < particles.length && _bflyCount < 4; i++) { if (particles[i].type === 'butterfly') _bflyCount++; }
   }
-  if (_bflyCount < 4 && bright > 0.4 && frameCount % 45 === 0) {
+  if (_bflyCount < 3 && bright > 0.4 && frameCount % 60 === 0) {
     let bx = WORLD.islandCX - 220 + random(-100, 100);
     let by = WORLD.islandCY + random(-40, 30);
     particles.push({
@@ -12005,7 +12082,7 @@ function updateParticles(dt) {
   }
 
   // Sun dust motes — golden sparkles in bright light
-  if (bright > 0.6 && frameCount % 12 === 0) {
+  if (bright > 0.6 && frameCount % 20 === 0) {
     let dx = state.player.x + random(-150, 150);
     let dy = state.player.y + random(-100, 80);
     if (isOnIsland(dx, dy)) {
@@ -12019,10 +12096,10 @@ function updateParticles(dt) {
     }
   }
 
-  // Water ripples when player walks near shore  if (state.player.moving && frameCount % 12 === 0) {    let _rpx = state.player.x, _rpy = state.player.y;    let _rdx = (_rpx - WORLD.islandCX) / getSurfaceRX();    let _rdy = (_rpy - WORLD.islandCY) / getSurfaceRY();    let _rd = _rdx * _rdx + _rdy * _rdy;    if (_rd > 0.85 && _rd <= 1.0) {      let _rea = atan2(_rpy - WORLD.islandCY, _rpx - WORLD.islandCX);      particles.push({        x: _rpx + cos(_rea) * 15, y: _rpy + sin(_rea) * 10,        vx: 0, vy: 0, life: 30, maxLife: 30, type: 'ripple', size: 3,        r: 120, g: 190, b: 230, world: true,      });    }  }  // Extra fireflies at dusk/dawn  let _jHour = (state.time || 720) / 60;  if ((_jHour >= 18 && _jHour <= 20) || (_jHour >= 5 && _jHour <= 6.5)) {    if (frameCount % 4 === 0) {      let _jfx = state.player.x + random(-200, 200);      let _jfy = state.player.y + random(-120, 80);      if (isOnIsland(_jfx, _jfy)) {        particles.push({          x: _jfx, y: _jfy, vx: random(-0.3, 0.3), vy: random(-0.2, 0.2),          life: random(100, 200), maxLife: 200, type: 'firefly', size: random(2, 4),          r: 80, g: 255, b: 160, phase: random(TWO_PI), world: true,        });      }    }  }
+  // Water ripples when player walks near shore  if (state.player.moving && frameCount % 12 === 0) {    let _rpx = state.player.x, _rpy = state.player.y;    let _rdx = (_rpx - WORLD.islandCX) / getSurfaceRX();    let _rdy = (_rpy - WORLD.islandCY) / getSurfaceRY();    let _rd = _rdx * _rdx + _rdy * _rdy;    if (_rd > 0.85 && _rd <= 1.0) {      let _rea = atan2(_rpy - WORLD.islandCY, _rpx - WORLD.islandCX);      particles.push({        x: _rpx + cos(_rea) * 15, y: _rpy + sin(_rea) * 10,        vx: 0, vy: 0, life: 30, maxLife: 30, type: 'ripple', size: 3,        r: 120, g: 190, b: 230, world: true,      });    }  }  // Extra fireflies at dusk/dawn  let _jHour = (state.time || 720) / 60;  if ((_jHour >= 18 && _jHour <= 20) || (_jHour >= 5 && _jHour <= 6.5)) {    if (frameCount % 8 === 0) {      let _jfx = state.player.x + random(-200, 200);      let _jfy = state.player.y + random(-120, 80);      if (isOnIsland(_jfx, _jfy)) {        particles.push({          x: _jfx, y: _jfy, vx: random(-0.3, 0.3), vy: random(-0.2, 0.2),          life: random(100, 200), maxLife: 200, type: 'firefly', size: random(2, 4),          r: 80, g: 255, b: 160, phase: random(TWO_PI), world: true,        });      }    }  }
   // Storm rain particles (supplemental — main rain is in _drawStormRain)
   if (stormActive && frameCount % 2 === 0) {
-    for (let _ri = 0; _ri < 3; _ri++) {
+    for (let _ri = 0; _ri < 2; _ri++) {
       particles.push({
         x: random(width), y: random(-20, height * 0.3),
         vx: random(-2, -4), vy: random(3, 7),
@@ -12034,7 +12111,7 @@ function updateParticles(dt) {
   }
 
   // Hard cap: prevent particle explosion
-  if (particles.length > _particleCap) particles.splice(0, particles.length - (_particleCap - 50));
+  if (particles.length > _particleCap) particles.splice(0, particles.length - (_particleCap - 30));
 
   particles.forEach(p => {
     p.x += p.vx * dt;
@@ -12053,17 +12130,23 @@ function updateParticles(dt) {
       p.vy = constrain(p.vy, -0.5, 0.3);
     }
   });
-  particles = particles.filter(p => p.life > 0);
+  // In-place compaction to avoid new array allocation
+  let _pw = 0;
+  for (let _pr = 0; _pr < particles.length; _pr++) {
+    if (particles[_pr].life > 0) { particles[_pw++] = particles[_pr]; }
+  }
+  particles.length = _pw;
 }
 
 function drawParticles() {
+  if (_fpsSmooth < 25) return; // skip rendering when FPS critically low
   noStroke();
-  particles.forEach(p => {
+  for (let _pi = 0; _pi < particles.length; _pi++) { let p = particles[_pi];
     let a = map(p.life, 0, p.maxLife, 0, 1);
     let px = p.world ? w2sX(p.x) : p.x;
     let py = p.world ? w2sY(p.y) : p.y;
     // Cull offscreen particles
-    if (px < -50 || px > width + 50 || py < -50 || py > height + 50) return;
+    if (px < -50 || px > width + 50 || py < -50 || py > height + 50) continue;
 
     if (p.type === 'mote') {
       let s = floor(p.size * a);
@@ -12237,7 +12320,7 @@ function drawParticles() {
       fill(p.r, p.g, p.b, 200 * a);
       rect(floor(px) - s, floor(py) - s, s * 2, s * 2);
     }
-  });
+  }
   noStroke();
 }
 
@@ -12270,8 +12353,8 @@ function spawnCrystalPulse(wx, wy) {
     growRate: 2.0, world: true,
   });
   // Crystal shards floating up
-  for (let i = 0; i < 8; i++) {
-    let angle = (TWO_PI / 8) * i + random(-0.3, 0.3);
+  for (let i = 0; i < 5; i++) {
+    let angle = (TWO_PI / 5) * i + random(-0.3, 0.3);
     particles.push({
       x: wx, y: wy,
       vx: cos(angle) * random(1, 2.5),
@@ -12286,7 +12369,7 @@ function spawnCrystalPulse(wx, wy) {
 
 // ─── JUICE: WOOD CHIP SPRAY ──────────────────────────────────────────────
 function spawnWoodChips(wx, wy) {
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 5; i++) {
     let angle = random(-PI * 0.8, -PI * 0.2); // spray upward arc
     let speed = random(2, 4.5);
     particles.push({
@@ -12300,7 +12383,7 @@ function spawnWoodChips(wx, wy) {
     });
   }
   // Bark dust cloud
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 2; i++) {
     particles.push({
       x: wx + random(-6, 6), y: wy + random(-5, 5),
       vx: random(-0.5, 0.5), vy: random(-1, -0.3),
@@ -13608,9 +13691,10 @@ function drawShip() {
   rect(-52, -34, 2, 2);   // left wing
   rect(-44, -34, 2, 2);   // right wing
 
-  // Flag at mast top — pixel rect with wave
+  // Flag at mast top — pixel rect with wave, faction color
   let flagWave = floor(sin(frameCount * 0.04) * 2);
-  fill(160, 40, 30);
+  let _mf = getFactionMilitary();
+  fill(_mf.conquestFlag[0], _mf.conquestFlag[1], _mf.conquestFlag[2]);
   rect(1, -58, 10 + flagWave, 4);
   rect(1, -54, 8 + flagWave, 4);
 
@@ -14258,27 +14342,40 @@ function drawConquestDistantLabel() {
   let minY = max(height * 0.06, height * 0.25 - horizonOffset) + 10;
   sy = max(sy, minY);
   if (sx < -400 || sx > width + 400 || sy > height + 400) return;
+  let baseY = sy + c.isleRY + 12;
   push();
-  noStroke();
-  fill(170, 160, 130, 140);
-  textSize(9); textAlign(CENTER); textStyle(ITALIC);
+  noStroke(); textAlign(CENTER);
+  // Sword icon
+  fill(170, 160, 130, 180); textSize(14);
+  text('\u2694', sx, baseY - 2);
+  // Name
+  fill(170, 160, 130, 180); textSize(11); textStyle(ITALIC);
   let label = c.colonized ? 'Terra Nova (Colony LV.' + c.colonyLevel + ')' :
               c.phase === 'settled' ? 'Terra Nova (Settled)' :
               c.phase === 'unexplored' ? 'Terra Nova' : 'Terra Nova';
-  text(label, sx, sy + c.isleRY + 18);
-  textStyle(NORMAL);
+  text(label, sx, baseY + 12); textStyle(NORMAL);
+  // Status
+  let status = c.colonized ? 'Colonized' : c.phase === 'settled' ? 'Settled' : c.phase === 'unexplored' ? 'Unexplored' : 'Discovered';
+  let _di = c.colonized ? '\u262E ' : '\u2694 ';
+  fill(c.colonized ? color(100, 200, 100, 160) : color(200, 180, 130, 160)); textSize(9);
+  text(_di + status, sx, baseY + 24);
   if (c.colonized) {
-    fill(160, 200, 130, 140);
-    textSize(10);
-    text(c.colonyWorkers + ' colonists  +' + c.colonyIncome + 'g/day', sx, sy + c.isleRY + 28);
+    fill(160, 200, 130, 140); textSize(9);
+    text(c.colonyWorkers + ' colonists  +' + c.colonyIncome + 'g/day', sx, baseY + 34);
     if (state.imperialBridge.built) {
-      fill(200, 180, 100, 120); textSize(9);
-      text('BRIDGE CONNECTED', sx, sy + c.isleRY + 38);
+      fill(200, 180, 100, 120); textSize(8);
+      text('BRIDGE CONNECTED', sx, baseY + 44);
     }
   } else if (c.buildings.length > 0) {
-    fill(160, 150, 115, 110);
-    textSize(10);
-    text(c.buildings.length + ' buildings, ' + c.workers.length + ' workers', sx, sy + c.isleRY + 28);
+    fill(160, 150, 115, 110); textSize(9);
+    text(c.buildings.length + ' buildings, ' + c.workers.length + ' workers', sx, baseY + 34);
+  }
+  // Distance
+  if (typeof _getIslandDist === 'function') {
+    let _yOff = c.colonized ? (state.imperialBridge.built ? 54 : 44) : c.buildings.length > 0 ? 44 : 34;
+    let _d = _getIslandDist(c.isleX, c.isleY);
+    fill(180, 170, 140, 110); textSize(8);
+    text(_d, sx, baseY + _yOff);
   }
   pop();
 }
@@ -14312,24 +14409,37 @@ function drawArenaIsleDistant() {
   push();
   noStroke();
   let fsx = floor(sx), fsy = floor(sy);
-  // Haze — distant blue tint
+  // Atmospheric perspective — distant blue-grey haze
   let bright = getSkyBrightness();
   let hazeA = lerp(60, 30, bright);
-  // Tiny island silhouette (very small — it's far away)
-  fill(60 + 30 * bright, 75 + 25 * bright, 50 + 20 * bright, hazeA + 40);
+  let blueShift = 0.35;
+  // Haze fog between viewer and island
+  fill(140, 165, 190, 20 * bright);
+  ellipse(fsx, fsy, 70, 14);
+  // Island silhouette — faded toward blue-grey with distance
+  let gr = lerp(60 + 30 * bright, 120, blueShift);
+  let gg = lerp(75 + 25 * bright, 140, blueShift);
+  let gb = lerp(50 + 20 * bright, 160, blueShift);
+  fill(gr, gg, gb, hazeA + 40);
   rect(fsx - 20, fsy - 3, 40, 5, 2);
-  fill(80 + 30 * bright, 95 + 25 * bright, 65 + 20 * bright, hazeA + 30);
+  fill(gr + 20, gg + 20, gb + 15, hazeA + 30);
   rect(fsx - 16, fsy - 5, 32, 4, 1);
-  // Tiny colosseum silhouette
-  fill(120 + 30 * bright, 115 + 25 * bright, 100 + 20 * bright, hazeA + 25);
+  // Colosseum silhouette — simplified, blue-shifted
+  let cr = lerp(120 + 30 * bright, 140, blueShift);
+  let cg = lerp(115 + 25 * bright, 150, blueShift);
+  let cb = lerp(100 + 20 * bright, 165, blueShift);
+  fill(cr, cg, cb, hazeA + 25);
   rect(fsx - 8, fsy - 8, 16, 3);
   for (let i = -1; i <= 1; i++) {
     let ch = i === 0 ? 5 : 3;
     rect(fsx + i * 5 - 1, fsy - 5 - ch, 2, ch);
   }
-  // Subtle water reflection below
+  // Water reflection below
   fill(30 + 20 * bright, 60 + 40 * bright, 80 + 30 * bright, 15);
   rect(fsx - 18, fsy + 3, 36, 4);
+  // Final atmospheric wash
+  fill(160, 185, 210, 12 * bright);
+  rect(fsx - 22, fsy - 10, 44, 18);
   // Label
   fill(200, 185, 150, hazeA + 60);
   textSize(10); textAlign(CENTER); textStyle(ITALIC);
@@ -15585,18 +15695,20 @@ function drawLegionPatrol() {
     if (sx < -20 || sx > width + 20 || sy < -20 || sy > height + 20) continue;
     push();
     translate(sx, sy + floatOffset);
-    // Body — red tunic
-    fill(170, 40, 40); noStroke();
+    let _m = getFactionMilitary();
+    // Body — faction tunic
+    fill(_m.tunic[0], _m.tunic[1], _m.tunic[2]); noStroke();
     rect(-4, -6, 8, 8);
-    // Helmet
-    fill(160, 140, 80);
+    // Helmet — faction
+    fill(_m.helm[0], _m.helm[1], _m.helm[2]);
     ellipse(0, -8, 8, 6);
     rect(-4, -10, 8, 4);
-    // Shield (left arm)
-    fill(120, 90, 50); stroke(80, 60, 30); strokeWeight(1);
-    rect(-7, -5, 4, 8, 1);
+    // Shield — faction
+    fill(_m.shield[0], _m.shield[1], _m.shield[2]); stroke(_m.shield[0]*0.6, _m.shield[1]*0.6, _m.shield[2]*0.6); strokeWeight(1);
+    if (_m.shieldShape === 'round') ellipse(-5, -1, 7, 7);
+    else rect(-7, -5, 4, 8, 1);
     // Legs
-    fill(90, 70, 50); noStroke();
+    fill(_m.legs[0], _m.legs[1], _m.legs[2]); noStroke();
     rect(-4, 2, 3, 5);
     rect(1, 2, 3, 5);
     pop();
@@ -15641,6 +15753,7 @@ function updateLegionAmbient(dt) {
 function drawLegionAmbientSoldier(s) {
   let sx = w2sX(s.x), sy = w2sY(s.y);
   if (sx < -30 || sx > width + 30 || sy < -30 || sy > height + 30) return;
+  let mil = getFactionMilitary();
   push();
   translate(sx, sy + floatOffset);
   scale(s.facing, 1);
@@ -15648,34 +15761,35 @@ function drawLegionAmbientSoldier(s) {
   // Shadow
   fill(0, 0, 0, 30);
   ellipse(0, 2, 10, 4);
-  // Body (red tunic)
-  fill(160, 50, 40);
+  // Body — faction tunic
+  fill(mil.tunic[0], mil.tunic[1], mil.tunic[2]);
   rect(-3, -8, 6, 10);
   // Armor plate
-  fill(180, 170, 150);
+  fill(mil.armor[0], mil.armor[1], mil.armor[2]);
   rect(-3, -7, 6, 4);
   // Head
   fill(195, 165, 130);
   rect(-2, -12, 4, 4);
-  // Helmet
-  fill(150, 140, 120);
+  // Helmet — faction
+  fill(mil.helm[0], mil.helm[1], mil.helm[2]);
   rect(-3, -13, 6, 3);
   // Spear
   stroke(100, 80, 60);
   strokeWeight(1);
   line(3, -16, 3, 4);
   noStroke();
-  // Shield
-  fill(140, 50, 35);
-  rect(-5, -6, 2, 6);
-  // Walking animation
+  // Shield — faction
+  fill(mil.shield[0], mil.shield[1], mil.shield[2]);
+  if (mil.shieldShape === 'round') ellipse(-4, -3, 5, 5);
+  else rect(-5, -6, 2, 6);
+  // Walking animation — faction leg color
   if (s.state === 'patrol') {
     let step = sin(frameCount * 0.12 + s.x) * 2;
-    fill(120, 40, 30);
+    fill(mil.legs[0], mil.legs[1], mil.legs[2]);
     rect(-2, 2, 2, 3);
     rect(0 + step * 0.3, 2, 2, 3);
   } else {
-    fill(120, 40, 30);
+    fill(mil.legs[0], mil.legs[1], mil.legs[2]);
     rect(-2, 2, 2, 3);
     rect(1, 2, 2, 3);
   }
@@ -16926,14 +17040,29 @@ function drawSingleNationIsleDistant(key) {
   }
   fill(30 + 20 * bright, 50 + 30 * bright, 70 + 20 * bright, 12);
   rect(fsx - floor(baseW * 0.4), fsy + floor(baseH * 0.5) + 2, floor(baseW * 0.8), 5);
-  // Label — color-coded by stance
-  fill(getNationStanceColor(rv)); textSize(11); textAlign(CENTER); textStyle(ITALIC);
+  // Flag icon — faction banner
+  let _flagY = sy - floor(baseH * 0.5) - 8;
+  fill(bannerCol[0], bannerCol[1], bannerCol[2], hazeA + 80);
+  rect(fsx + 2, _flagY - 8, 8, 6);
+  fill(accentCol[0], accentCol[1], accentCol[2], hazeA + 60);
+  rect(fsx + 1, _flagY - 10, 1, 12);
+  // Sword icon
+  fill(getNationStanceColor(rv)); textSize(12); textAlign(CENTER);
+  text('\u2694', sx, sy - floor(baseH * 0.5) - 16);
+  // Name — color-coded by stance
+  textSize(11); textStyle(ITALIC);
   text(getNationName(key), sx, sy + floor(baseH * 0.5) + 14); textStyle(NORMAL);
-  if (rv.allied) { fill(100, 200, 100, 140); textSize(9); text('Allied', sx, sy + floor(baseH * 0.5) + 22); }
-  else if (rv.reputation <= -50) { fill(200, 40, 40, 160); textSize(9); text('War', sx, sy + floor(baseH * 0.5) + 22); }
-  else if (rv.reputation < -19) { fill(200, 80, 60, 140); textSize(9); text('Hostile', sx, sy + floor(baseH * 0.5) + 22); }
-  else if (rv.reputation >= 20) { fill(140, 200, 100, 140); textSize(9); text('Friendly', sx, sy + floor(baseH * 0.5) + 22); }
-  else { fill(180, 170, 130, 100); textSize(9); text('Lv.' + lv, sx, sy + floor(baseH * 0.5) + 22); }
+  // Status + danger
+  let _stanceLabel = getNationStanceLabel(rv);
+  let _dangerIcon = (rv.reputation <= -20) ? '\u2620 ' : (rv.allied ? '\u262E ' : '');
+  fill(getNationStanceColor(rv)); textSize(9);
+  text(_dangerIcon + _stanceLabel + ' (Lv.' + lv + ')', sx, sy + floor(baseH * 0.5) + 24);
+  // Distance
+  if (typeof _getIslandDist === 'function') {
+    let _nd = _getIslandDist(rv.isleX, rv.isleY);
+    fill(180, 170, 140, 110); textSize(8);
+    text(_nd, sx, sy + floor(baseH * 0.5) + 34);
+  }
   textAlign(LEFT, TOP);
   pop();
 }
@@ -18585,10 +18714,17 @@ function drawConquestIsleDistant() {
   if (sx < -350 || sx > width + 350 || sy < -350 || sy > height + 350) return;
   push();
   noStroke();
+  let _cBright = getSkyBrightness();
+
+  // Atmospheric perspective — blue-grey haze between viewer and island
+  let _hazeW = max(c.isleRX, c.isleRY) * 2.5;
+  fill(140, 165, 190, 15 * _cBright);
+  ellipse(sx, sy, _hazeW, _hazeW * 0.5);
 
   if (c.colonized) {
-    // Colonized: proper island terrain (water, beach, grass ellipses)
+    // Colonized: proper island terrain — blue-shifted with distance
     let rx = c.isleRX, ry = c.isleRY;
+    let _bs = 0.2; // blue shift factor
     // Water shadow
     fill(20, 60, 80, 35);
     ellipse(sx + 4, sy + 5, rx * 2.15, ry * 2.15);
@@ -18600,8 +18736,8 @@ function drawConquestIsleDistant() {
     strokeWeight(1.5); noFill();
     ellipse(sx, sy, rx * 2.08 + sin(frameCount * 0.025) * 3, ry * 2.08 + sin(frameCount * 0.025) * 2);
     noStroke();
-    // Beach
-    fill(195, 180, 135);
+    // Beach — slightly blue-shifted
+    fill(lerp(195, 180, _bs), lerp(180, 185, _bs), lerp(135, 160, _bs));
     ellipse(sx, sy, rx * 2, ry * 2);
     // Beach detail
     fill(180, 165, 120, 50);
@@ -18609,8 +18745,8 @@ function drawConquestIsleDistant() {
       let ba = (i / 6) * TWO_PI + 1.1;
       ellipse(sx + cos(ba) * rx * 0.94, sy + sin(ba) * ry * 0.65, 10, 5);
     }
-    // Grass
-    fill(60, 105, 42);
+    // Grass — blue-shifted for distance
+    fill(lerp(60, 80, _bs), lerp(105, 120, _bs), lerp(42, 75, _bs));
     ellipse(sx, sy, rx * 1.85, ry * 1.85);
     // Lighter meadow center
     fill(70, 120, 48, 50);
@@ -18624,38 +18760,93 @@ function drawConquestIsleDistant() {
     fill(100, 75, 40);
     rect(floor(sx - 6), floor(sy + ry * 0.86), 12, 3);
   } else {
-    // Unexplored / in-progress: dark silhouette
-    // Mist halo — pixel rect
-    fill(180, 210, 190, 25 + floor(sin(frameCount * 0.012) * 12));
-    let mhW = floor(c.isleRX * 0.8), mhH = floor(c.isleRY * 0.45);
-    rect(floor(sx - mhW / 2), floor(sy - mhH / 2), mhW, mhH);
-    // Dark forested island body — pixel rect
-    fill(35, 65, 30);
-    let ibW = floor(c.isleRX * 0.55), ibH = floor(c.isleRY * 0.22);
-    rect(floor(sx - ibW / 2), floor(sy + 2 - ibH / 2), ibW, ibH);
-    // Beach rim — pixel rect
-    fill(170, 155, 115, 80);
-    let brW = floor(c.isleRX * 0.58), brH = floor(c.isleRY * 0.18);
-    rect(floor(sx - brW / 2), floor(sy + 3 - brH / 2), brW, brH);
-    // Tree silhouettes — stacked pixel rects
-    fill(25, 55, 22);
-    for (let i = -4; i <= 4; i++) {
-      let th = 8 + (4 - abs(i)) * 2;
-      let tx = floor(sx + i * 8);
-      for (let r = 0; r < th; r += 2) {
-        let w = floor(map(r, 0, th, 2, 10));
-        rect(tx - floor(w / 2), floor(sy - 2 - th + r), w, 2);
+    // Unexplored / in-progress: full island terrain (wild, uncolonized)
+    let rx = c.isleRX, ry = c.isleRY;
+    let ct = frameCount * 0.01;
+    // Water shadow
+    fill(20, 60, 80, 35);
+    ellipse(sx + 4, sy + 5, rx * 2.15, ry * 2.15);
+    // Shallow water ring
+    fill(45, 130, 150, 50);
+    ellipse(sx, sy, rx * 2.12, ry * 2.12);
+    // Shore waves
+    stroke(200, 220, 255, 20 + sin(frameCount * 0.04) * 10);
+    strokeWeight(1.5); noFill();
+    ellipse(sx, sy, rx * 2.08 + sin(frameCount * 0.025) * 3, ry * 2.08 + sin(frameCount * 0.025) * 2);
+    noStroke();
+    // Beach ring — scanline fill
+    for (let row = -ry; row < ry; row += 2) {
+      let t = row / ry;
+      let w2 = rx * sqrt(max(0, 1 - t * t));
+      let wobble = sin(row * 0.06 + 0.7) * 3;
+      fill(175, 160, 120);
+      rect(floor(sx - w2 + wobble), floor(sy + row), floor(w2 * 2), 2);
+    }
+    // Dense forest interior — scanline fill
+    for (let row = -ry * 0.88; row < ry * 0.88; row += 2) {
+      let t = row / (ry * 0.88);
+      let w2 = rx * 0.88 * sqrt(max(0, 1 - t * t));
+      let wobble = sin(row * 0.08 + 1.5) * 3;
+      let greenVar = sin(row * 0.1 + ct) * 5;
+      fill(28 + greenVar, 62 + greenVar, 25);
+      rect(floor(sx - w2 + wobble), floor(sy + row), floor(w2 * 2), 2);
+    }
+    // Hills / ridgeline
+    fill(22, 55, 20); ellipse(sx - 15, sy - 8, 100, 65);
+    fill(28, 68, 25); ellipse(sx + 10, sy - 14, 75, 48);
+    fill(35, 78, 32); ellipse(sx - 5, sy - 18, 52, 32);
+    // Tree canopy clusters
+    for (let i = 0; i < 14; i++) {
+      let ta = (i * 2.39996) % TWO_PI;
+      let tr = ((i * 17 + 5) % 70) / 100 * 0.65;
+      let tpx = sx + cos(ta) * rx * tr;
+      let tpy = sy + sin(ta) * ry * tr * 0.69;
+      fill(20, 50 + (i % 4) * 5, 18, 120);
+      ellipse(tpx, tpy, 16 + (i % 3) * 4, 10 + (i % 3) * 3);
+      fill(30, 65 + (i % 3) * 6, 28, 80);
+      ellipse(tpx - 2, tpy - 2, 10 + (i % 2) * 3, 6 + (i % 2) * 2);
+    }
+    // Mist over wild island
+    fill(160, 180, 160, 18 + sin(frameCount * 0.015) * 10);
+    ellipse(sx, sy, rx * 1.8, ry * 1.3);
+    // Enemy camp fires visible from distance (if explored)
+    if (c.phase !== 'unexplored' && c.phase !== 'locked') {
+      for (let i = 0; i < 3; i++) {
+        let fa = (i / 3) * TWO_PI + 0.8;
+        let fr = rx * 0.35;
+        let fx = sx + cos(fa) * fr;
+        let fy = sy + sin(fa) * fr * 0.6;
+        let fl = sin(frameCount * 0.12 + i * 2) * 2;
+        fill(255, 140, 30, 120); rect(floor(fx - 2), floor(fy - 6 + fl), 4, 5);
+        fill(255, 80, 15, 60); rect(floor(fx - 1), floor(fy - 8 + fl), 2, 3);
+        fill(120, 110, 100, 20); ellipse(fx, fy - 12 + fl, 8, 4);
       }
     }
-    // Beacon fire on settled islands — pixel rects
+    // Resource deposits (wood piles, ore veins)
+    fill(100, 70, 35, 80);
+    rect(floor(sx + rx * 0.3), floor(sy + ry * 0.2), 8, 5);
+    rect(floor(sx + rx * 0.32), floor(sy + ry * 0.18), 6, 4);
+    fill(120, 110, 95, 60);
+    rect(floor(sx - rx * 0.35), floor(sy - ry * 0.15), 6, 4);
+    rect(floor(sx - rx * 0.33), floor(sy - ry * 0.17), 4, 3);
+    // Beacon fire on settled islands
     if (c.phase === 'settled' || c.buildings.length > 0) {
       let fl = floor(sin(frameCount * 0.12) * 2);
       fill(255, 160, 40, 140);
-      rect(floor(sx - 2), floor(sy - 17 + fl), 5, 7);
+      rect(floor(sx - 2), floor(sy - 22 + fl), 5, 7);
       fill(255, 100, 20, 80);
-      rect(floor(sx - 1), floor(sy - 18 + fl), 3, 4);
+      rect(floor(sx - 1), floor(sy - 24 + fl), 3, 4);
     }
+    // Dock indicator
+    fill(100, 75, 40);
+    rect(floor(sx - 3), floor(sy + ry * 0.88), 6, 12);
+    fill(120, 90, 50);
+    rect(floor(sx - 5), floor(sy + ry * 0.86), 10, 3);
   }
+  // Final atmospheric wash over entire island
+  let _cRX = c.isleRX, _cRY = c.isleRY;
+  fill(160, 185, 210, 10 * _cBright);
+  ellipse(sx, sy, _cRX * 2.2, _cRY * 2.2);
   pop();
 }
 
@@ -18860,9 +19051,10 @@ function drawConquestIsland() {
   fill(140, 170, 180, 80);
   rect(-48, -3, 4, 2, 0.5);
 
-  // Flag at mast top
+  // Flag at mast top — faction color
   let flagWave = sin(frameCount * 0.04) * 3;
-  fill(160, 40, 30);
+  let _cmf = getFactionMilitary();
+  fill(_cmf.conquestFlag[0], _cmf.conquestFlag[1], _cmf.conquestFlag[2]);
   beginShape();
   vertex(0, -45);
   vertex(0, -53);
@@ -19071,8 +19263,9 @@ function drawConquestBuilding(b) {
       for (let i = -1; i <= 1; i++) {
         rect(sx + i * 8 - 3, sy - 43, 5, 5);
       }
-      // Flag — crimson SPQR
-      fill(185, 38, 28, 210);
+      // Flag — faction color
+      let _cfm = getFactionMilitary();
+      fill(_cfm.conquestFlag[0], _cfm.conquestFlag[1], _cfm.conquestFlag[2], 210);
       let fw = sin(frameCount * 0.05) * 2.5;
       rect(sx + 8, sy - 50, 2, 14);
       triangle(sx + 10, sy - 50, sx + 20 + fw, sy - 47, sx + 10, sy - 44);
@@ -19088,8 +19281,9 @@ function drawConquestBuilding(b) {
       // Door (wide)
       fill(80, 55, 30);
       rect(sx - 6, sy - 6, 12, 16, 1);
-      // Barracks emblem
-      fill(160, 40, 30);
+      // Barracks emblem — faction
+      let _bfm = getFactionMilitary();
+      fill(_bfm.conquestFlag[0], _bfm.conquestFlag[1], _bfm.conquestFlag[2]);
       ellipse(sx, sy - 10, 6, 6);
       fill(200, 180, 80);
       rect(sx - 0.5, sy - 13, 1, 6);
@@ -19158,6 +19352,7 @@ function drawConquestSoldier(s) {
   let sx = w2sX(s.x);
   let sy = w2sY(s.y);
   if (s.hp <= 0) return;
+  let mil = getFactionMilitary();
   push();
   translate(floor(sx), floor(sy));
   noStroke();
@@ -19165,30 +19360,31 @@ function drawConquestSoldier(s) {
   // Pixel shadow
   fill(0, 0, 0, 25);
   rect(-7, 6, 14, 2);
-  // Pixel legs
-  fill(f ? 255 : 120, f ? 255 : 100, f ? 255 : 70);
+  // Pixel legs — faction
+  fill(f ? 255 : mil.legs[0], f ? 255 : mil.legs[1], f ? 255 : mil.legs[2]);
   let leg = floor(sin(frameCount * 0.12 + s.x) * 1.5);
   rect(-3, 4 + leg, 2, 6);
   rect(1, 4 - leg, 2, 6);
-  // Pixel body (red tunic)
-  fill(f ? 255 : 160, f ? 255 : 45, f ? 255 : 35);
+  // Pixel body — faction tunic
+  fill(f ? 255 : mil.tunic[0], f ? 255 : mil.tunic[1], f ? 255 : mil.tunic[2]);
   rect(-6, -6, 12, 12);
-  // Pixel armor plate
-  fill(f ? 255 : 170, f ? 255 : 160, f ? 255 : 135);
+  // Pixel armor plate — faction
+  fill(f ? 255 : mil.armor[0], f ? 255 : mil.armor[1], f ? 255 : mil.armor[2]);
   rect(-4, -5, 8, 8);
   // Pixel head
   fill(f ? 255 : 200, f ? 255 : 175, f ? 255 : 135);
   rect(-4, -12, 8, 6);
-  // Pixel helmet
-  fill(f ? 255 : 155, f ? 255 : 145, f ? 255 : 120);
+  // Pixel helmet — faction
+  fill(f ? 255 : mil.helm[0], f ? 255 : mil.helm[1], f ? 255 : mil.helm[2]);
   rect(-5, -14, 10, 4);
-  // Pixel plume
-  fill(f ? 255 : 180, f ? 255 : 30, f ? 255 : 20);
+  // Pixel plume — faction
+  fill(f ? 255 : mil.plume[0], f ? 255 : mil.plume[1], f ? 255 : mil.plume[2]);
   rect(-1, -18, 2, 4);
-  // Pixel shield
-  fill(f ? 255 : 140, f ? 255 : 35, f ? 255 : 25);
-  rect(-s.facing * 8 - 3, -4, 6, 10);
-  fill(f ? 255 : 180, f ? 255 : 160, f ? 255 : 80);
+  // Pixel shield — faction
+  fill(f ? 255 : mil.shield[0], f ? 255 : mil.shield[1], f ? 255 : mil.shield[2]);
+  if (mil.shieldShape === 'round') ellipse(-s.facing * 8, 0, 9, 9);
+  else rect(-s.facing * 8 - 3, -4, 6, 10);
+  fill(f ? 255 : mil.shieldBoss[0], f ? 255 : mil.shieldBoss[1], f ? 255 : mil.shieldBoss[2]);
   rect(-s.facing * 8 - 1, -1, 2, 4);
   // Pixel sword
   fill(f ? 255 : 195, f ? 255 : 195, f ? 255 : 205);
@@ -20049,6 +20245,7 @@ function keyPressed() {
 
   // ESC — close overlays first, then menu as last resort
   if (keyCode === 27) {
+    if (typeof worldMapOpen !== 'undefined' && worldMapOpen) { worldMapOpen = false; return; }
     if (state.nationDiplomacyOpen) { closeNationDiplomacy(); return; }
     if (state.visitingNation) { exitNationIsland(); return; }
     if (state.buildMode) { state.buildMode = false; return; }
@@ -20114,6 +20311,7 @@ function keyPressed() {
   if (state.progression.gameStarted && !state.progression.homeIslandReached &&
       !state.rowing.active && !state.conquest.active && !state.adventure.active) {
     if (key === 'e' || key === 'E') handleWreckInteract();
+    if (key === ' ' && typeof _wreckMiniGames !== 'undefined' && _wreckMiniGames.rockSkip && (_wreckMiniGames.rockPhase === 'throwing' || _wreckMiniGames.rockPhase === 'bouncing')) { handleRockBounce(); return false; }
     return; // block all other game keys on wreck
   }
 
@@ -20808,6 +21006,15 @@ function keyPressed() {
   if (key === 'y' || key === 'Y') {
     state.techTreeOpen = !state.techTreeOpen;
     if (snd) snd.playSFX('page_turn');
+    return;
+  }
+
+  // World Map toggle (M key)
+  if (key === 'm' || key === 'M') {
+    if (typeof worldMapOpen !== 'undefined') {
+      worldMapOpen = !worldMapOpen;
+      if (snd) snd.playSFX('page_turn');
+    }
     return;
   }
 
@@ -22112,6 +22319,8 @@ function loadGame() {
     if (d.progression) {
       state.progression = d.progression;
       if (!state.progression.tutorialsSeen) state.progression.tutorialsSeen = {};
+      if (!state.progression.companionsAwakened) state.progression.companionsAwakened = { lares: false, woodcutter: false, harvester: false, centurion: false };
+      if (!state.progression.npcsFound) state.progression.npcsFound = { livia: false, marcus: false, vesta: false, felix: false };
       // Safety: if player has hearts with Livia, villa must be cleared
       if (state.npc.hearts >= 2 && !state.progression.villaCleared) {
         state.progression.villaCleared = true;
@@ -22820,6 +23029,7 @@ function drawCrystalShrine() {
   let sx = w2sX(sh.x);
   let sy = w2sY(sh.y);
   let pulse = sin(frameCount * 0.03) * 0.3 + 0.7;
+  let fac = state.faction || 'rome';
 
   push();
   translate(sx, sy);
@@ -22829,78 +23039,343 @@ function drawCrystalShrine() {
   fill(0, 0, 0, 35);
   rect(-38, 8, 76, 12);
 
-  // Stone platform — pixel tiers
-  fill(150, 145, 135);
-  rect(-33, 2, 66, 12);
-  fill(165, 158, 148);
-  rect(-28, 0, 56, 10);
-  // Inner platform
-  fill(175, 168, 158);
-  rect(-21, -2, 42, 8);
+  if (fac === 'rome') {
+    // ─── ROME: Classical Roman Temple ───
+    // Marble stepped platform
+    fill(200, 195, 185);
+    rect(-36, 4, 72, 10);
+    fill(210, 205, 195);
+    rect(-32, 1, 64, 8);
+    fill(220, 215, 205);
+    rect(-28, -1, 56, 6);
 
-  // Four corner columns — pixel
-  let colPositions = [
-    { x: -22, y: -2, h: 28 },
-    { x: 22, y: -2, h: 24 },
-    { x: -16, y: 8, h: 20 },
-    { x: 16, y: 8, h: 22 },
-  ];
-  colPositions.forEach(col => {
-    fill(170, 163, 153);
-    rect(col.x - 4, col.y, 8, 4);
-    fill(185, 178, 168);
-    rect(col.x - 3, col.y - col.h, 6, col.h);
-    fill(170, 163, 153, 80);
-    rect(col.x - 1, col.y - col.h, 1, col.h);
-    rect(col.x + 2, col.y - col.h, 1, col.h);
-    // Broken top — pixel jagged
+    // Four fluted marble columns
+    let cols = [{x:-24,y:-1,h:30},{x:-10,y:-1,h:30},{x:10,y:-1,h:30},{x:24,y:-1,h:30}];
+    cols.forEach(c => {
+      // Column base
+      fill(195, 190, 180);
+      rect(c.x - 4, c.y, 8, 3);
+      // Column shaft — marble white
+      fill(230, 225, 218);
+      rect(c.x - 3, c.y - c.h, 6, c.h);
+      // Fluting lines
+      fill(210, 205, 198, 80);
+      rect(c.x - 1, c.y - c.h, 1, c.h);
+      rect(c.x + 2, c.y - c.h, 1, c.h);
+      // Capital — Corinthian style
+      fill(215, 210, 200);
+      rect(c.x - 5, c.y - c.h - 3, 10, 3);
+      fill(225, 220, 210);
+      rect(c.x - 4, c.y - c.h - 4, 8, 2);
+    });
+
+    // Architrave — horizontal beam
+    fill(215, 210, 200);
+    rect(-30, -34, 60, 4);
+    // Triangular pediment
+    fill(225, 220, 210);
+    for (let i = 0; i < 10; i++) {
+      rect(-25 + i * 2.5, -38 - i * 1, 50 - i * 5, 1);
+    }
+    // Pediment face
+    fill(235, 230, 222);
+    rect(-22, -38, 44, 4);
+    // SPQR inscription
+    fill(175, 28, 28);
+    textSize(6); textAlign(CENTER, CENTER);
+    text('SPQR', 0, -36);
+    textAlign(LEFT, TOP);
+
+    // Red tile roof behind pediment
+    fill(185, 100, 58);
+    rect(-28, -42, 56, 5);
+    fill(175, 90, 50);
+    rect(-26, -43, 52, 2);
+    // Roof tile lines
+    fill(170, 85, 48, 80);
+    for (let t = -24; t < 24; t += 6) rect(t, -42, 2, 5);
+
+    // Eternal flame on altar
+    fill(160, 155, 145);
+    rect(-6, -4, 12, 6);
     fill(175, 168, 158);
-    rect(col.x - 1, col.y - col.h - 3, 2, 3);
-    rect(col.x - 2, col.y - col.h - 1, 1, 1);
-  });
+    rect(-5, -6, 10, 3);
+    // Flame
+    let fFlicker = floor(sin(frameCount * 0.1) * 2);
+    fill(255, 160, 30, 220);
+    rect(-2 + fFlicker, -14, 4, 8);
+    fill(255, 200, 50, 180);
+    rect(-1 + fFlicker, -16, 2, 4);
+    fill(255, 240, 100, 140);
+    rect(0, -18 + fFlicker, 1, 2);
+    // Flame glow
+    fill(255, 180, 50, 15 * pulse);
+    ellipse(0, -10, 20, 24);
 
-  // Central altar stone
-  fill(160, 155, 145);
-  rect(-12, -6, 24, 10);
-  fill(175, 168, 158);
-  rect(-12, -8, 24, 4);
-  fill(140, 133, 123, 80);
-  rect(-11, -7, 22, 1);
+  } else if (fac === 'carthage') {
+    // ─── CARTHAGE: Tophet Sanctuary ───
+    // Sandstone platform
+    fill(195, 155, 95);
+    rect(-34, 2, 68, 12);
+    fill(205, 165, 105);
+    rect(-30, 0, 60, 8);
 
-  // Green crystal — pixel cross glow
+    // Sandstone walls — thick mudbrick
+    fill(212, 170, 100);
+    rect(-28, -30, 10, 34);
+    rect(18, -30, 10, 34);
+    // Wall texture — mudbrick lines
+    fill(195, 155, 90, 60);
+    for (let row = -28; row < 4; row += 4) {
+      rect(-27, row, 8, 1);
+      rect(19, row, 8, 1);
+    }
+
+    // Tanit symbol carved in left wall
+    fill(160, 120, 70);
+    // Triangle body
+    rect(-25, -18, 1, 6); rect(-24, -16, 1, 4); rect(-23, -14, 1, 2);
+    rect(-21, -14, 1, 2); rect(-20, -16, 1, 4); rect(-19, -18, 1, 6);
+    // Horizontal arms
+    rect(-26, -20, 8, 1);
+    // Circle head
+    rect(-24, -23, 4, 3); rect(-23, -24, 2, 1);
+
+    // Arched doorway
+    fill(50, 35, 22);
+    rect(-8, -20, 16, 24);
+    // Pointed arch top
+    fill(50, 35, 22);
+    rect(-6, -24, 12, 4);
+    rect(-4, -26, 8, 2);
+    rect(-2, -27, 4, 1);
+    // Arch trim
+    fill(220, 180, 110);
+    rect(-9, -20, 1, 24); rect(8, -20, 1, 24);
+    rect(-7, -24, 1, 4); rect(6, -24, 1, 4);
+
+    // Flat roof with crenellations
+    fill(200, 160, 95);
+    rect(-30, -32, 60, 3);
+    for (let cr = -28; cr < 28; cr += 8) {
+      rect(cr, -35, 4, 3);
+    }
+
+    // Crescent moon symbol on top center
+    fill(220, 195, 80);
+    rect(-4, -42, 8, 8);
+    fill(200, 160, 95); // cut inner circle for crescent
+    rect(-2, -42, 6, 7);
+    fill(220, 195, 80);
+    rect(-1, -40, 1, 3); // crescent tip detail
+
+    // Incense braziers — left and right
+    for (let bx of [-16, 16]) {
+      fill(140, 100, 45);
+      rect(bx - 3, -4, 6, 6);
+      fill(160, 120, 55);
+      rect(bx - 2, -5, 4, 2);
+      // Smoke wisps
+      let sw = floor(sin(frameCount * 0.04 + bx) * 2);
+      fill(180, 170, 160, 60);
+      rect(bx - 1 + sw, -10, 2, 5);
+      fill(180, 170, 160, 30);
+      rect(bx + sw, -16, 1, 5);
+    }
+
+  } else if (fac === 'egypt') {
+    // ─── EGYPT: Solar Temple ───
+    // Golden sandstone platform
+    fill(210, 185, 110);
+    rect(-34, 2, 68, 12);
+    fill(225, 198, 120);
+    rect(-30, 0, 60, 8);
+
+    // Golden sandstone walls
+    fill(232, 200, 114);
+    rect(-26, -28, 12, 32);
+    rect(14, -28, 12, 32);
+    // Smooth wall texture
+    fill(220, 188, 105, 50);
+    rect(-25, -26, 10, 28);
+    rect(15, -26, 10, 28);
+
+    // Lotus columns flanking door
+    for (let lx of [-14, 14]) {
+      // Column shaft
+      fill(245, 240, 224);
+      rect(lx - 2, -26, 4, 30);
+      // Lotus capital — petals
+      fill(64, 176, 160);
+      rect(lx - 4, -30, 8, 4);
+      fill(80, 190, 170);
+      rect(lx - 3, -31, 6, 2);
+      // Lotus tip
+      fill(64, 176, 160);
+      rect(lx - 1, -32, 2, 2);
+    }
+
+    // Rectangular doorway
+    fill(58, 58, 74);
+    rect(-8, -20, 16, 24);
+    // Door frame — gold trim
+    fill(200, 170, 40);
+    rect(-9, -22, 1, 26); rect(8, -22, 1, 26);
+    rect(-9, -22, 18, 1);
+
+    // Eye of Horus above door
+    fill(64, 176, 160);
+    // Main eye shape
+    rect(-5, -26, 10, 3);
+    fill(58, 58, 74);
+    rect(-2, -26, 4, 2); // pupil
+    fill(64, 176, 160);
+    // Horus tail (curved line extending right)
+    rect(5, -25, 3, 1); rect(7, -24, 2, 1); rect(8, -23, 1, 1);
+    // Tear drop below
+    rect(-1, -23, 2, 2); rect(0, -21, 1, 1);
+
+    // Pyramid-shaped roof
+    fill(200, 170, 40);
+    for (let i = 0; i < 12; i++) {
+      rect(-28 + i * 2, -30 - i * 1.5, 56 - i * 4, 2);
+    }
+    // Pyramid cap — gold
+    fill(230, 200, 60);
+    rect(-4, -48, 8, 3);
+    fill(245, 220, 80, 120 * pulse);
+    rect(-2, -49, 4, 2);
+
+    // Obelisks flanking entrance
+    for (let ox of [-34, 34]) {
+      fill(210, 185, 110);
+      rect(ox - 2, -20, 4, 24);
+      fill(225, 198, 120);
+      rect(ox - 1, -24, 2, 4);
+      // Pyramidion top
+      fill(200, 170, 40);
+      rect(ox - 1, -26, 2, 2);
+      rect(ox, -27, 1, 1);
+      // Hieroglyph marks
+      fill(64, 176, 160, 120);
+      rect(ox - 1, -14, 2, 1);
+      rect(ox - 1, -8, 2, 1);
+      rect(ox - 1, -2, 2, 1);
+    }
+
+    // Turquoise and gold sun disk on top
+    fill(64, 176, 160, 100 * pulse);
+    ellipse(0, -46, 10, 10);
+    fill(230, 200, 60, 160 * pulse);
+    ellipse(0, -46, 6, 6);
+
+  } else if (fac === 'greece') {
+    // ─── GREECE: Parthenon-style Temple ───
+    // White marble stepped platform
+    fill(220, 220, 230);
+    rect(-36, 4, 72, 10);
+    fill(230, 230, 238);
+    rect(-32, 1, 64, 8);
+    fill(238, 238, 245);
+    rect(-28, -1, 56, 6);
+
+    // Six Ionic columns with scroll capitals
+    let cols = [{x:-24},{x:-14},{x:-4},{x:4},{x:14},{x:24}];
+    cols.forEach(c => {
+      // Column base — attic base
+      fill(220, 220, 228);
+      rect(c.x - 4, -1, 8, 3);
+      // Column shaft — white marble, slender
+      fill(240, 240, 248);
+      rect(c.x - 2, -28, 4, 28);
+      // Fluting
+      fill(225, 225, 235, 80);
+      rect(c.x, -28, 1, 28);
+      // Ionic scroll capital
+      fill(235, 235, 242);
+      rect(c.x - 5, -31, 10, 3);
+      // Scroll volutes — small curls
+      fill(220, 220, 230);
+      rect(c.x - 5, -33, 3, 3);
+      rect(c.x + 2, -33, 3, 3);
+      fill(240, 240, 248);
+      rect(c.x - 4, -32, 1, 1);
+      rect(c.x + 3, -32, 1, 1);
+    });
+
+    // Architrave and frieze
+    fill(235, 235, 242);
+    rect(-30, -34, 60, 3);
+    // Blue trim frieze
+    fill(80, 144, 192);
+    rect(-28, -37, 56, 3);
+    // Meander pattern in frieze
+    fill(240, 240, 248);
+    for (let m = -26; m < 26; m += 6) {
+      rect(m, -36, 2, 1);
+      rect(m + 2, -37, 2, 1);
+    }
+
+    // Triangular pediment
+    fill(238, 238, 245);
+    for (let i = 0; i < 10; i++) {
+      rect(-25 + i * 2.5, -40 - i * 1, 50 - i * 5, 1);
+    }
+    // Pediment face
+    fill(245, 245, 250);
+    rect(-22, -40, 44, 3);
+
+    // Owl relief in pediment center
+    fill(200, 200, 210);
+    // Owl body
+    rect(-3, -44, 6, 4);
+    // Owl head
+    rect(-2, -46, 4, 2);
+    // Owl eyes
+    fill(80, 144, 192);
+    rect(-1, -46, 1, 1);
+    rect(1, -46, 1, 1);
+    // Owl wings
+    fill(200, 200, 210);
+    rect(-5, -43, 2, 3);
+    rect(4, -43, 2, 3);
+
+    // Olive wreath above door
+    fill(90, 140, 50);
+    rect(-5, -30, 2, 1); rect(-3, -31, 2, 1); rect(-1, -31, 2, 1);
+    rect(1, -31, 2, 1); rect(3, -30, 2, 1);
+    fill(75, 120, 40);
+    rect(-4, -31, 1, 1); rect(3, -31, 1, 1);
+
+    // Roof — terracotta with blue trim
+    fill(208, 112, 64);
+    rect(-28, -48, 56, 5);
+    fill(80, 144, 192);
+    rect(-28, -48, 56, 1);
+
+    // Doorway
+    fill(90, 65, 40);
+    rect(-6, -18, 12, 22);
+    // Arched top
+    fill(90, 65, 40);
+    rect(-4, -20, 8, 2);
+    // Door frame — blue trim
+    fill(80, 144, 192);
+    rect(-7, -20, 1, 24); rect(6, -20, 1, 24);
+  }
+
+  // Crystal on altar (all factions keep the sacred crystal)
   fill(0, 255, 136, 20 * pulse);
-  rect(-1, -30, 2, 30);
-  rect(-12, -16, 24, 2);
-  // Main crystal — stacked rects
+  rect(-1, -18, 2, 14);
   fill(0, 180, 100, 200);
-  rect(-1, -28, 2, 2);  // tip
-  rect(-2, -26, 4, 4);
-  rect(-4, -22, 8, 6);
-  rect(-5, -16, 10, 4);
-  rect(-5, -12, 10, 4);
-  // Inner highlight
+  rect(-2, -16, 4, 4);
+  rect(-3, -12, 6, 4);
   fill(0, 220, 120, 180);
-  rect(-1, -26, 2, 2);
-  rect(-2, -24, 4, 6);
-  rect(-2, -18, 4, 6);
-  // Bright core
+  rect(-1, -15, 2, 5);
   fill(0, 255, 180, 150 * pulse);
-  rect(-1, -22, 2, 8);
+  rect(0, -14, 1, 4);
 
-  // Side crystals — pixel
-  fill(0, 160, 90, 180);
-  rect(-11, -16, 4, 8);
-  rect(-10, -18, 2, 2);
-  fill(0, 200, 110, 150);
-  rect(-10, -15, 2, 5);
-
-  fill(0, 160, 90, 180);
-  rect(8, -14, 4, 7);
-  rect(9, -16, 2, 2);
-  fill(0, 200, 110, 150);
-  rect(9, -13, 2, 5);
-
-  // Floating energy particles — pixel rects
+  // Floating energy particles
   for (let p = 0; p < 5; p++) {
     let angle = frameCount * 0.015 + p * TWO_PI / 5;
     let radius = 25 + floor(sin(frameCount * 0.04 + p * 1.5) * 6);
@@ -22909,16 +23384,6 @@ function drawCrystalShrine() {
     fill(0, 255, 136, 80 * pulse);
     rect(px - 1, py - 1, 2, 2);
   }
-
-  // Vine growth on columns — pixel leaves
-  colPositions.forEach((col, i) => {
-    fill(60, 120, 40, 100);
-    for (let v = 0; v < 3; v++) {
-      let vy = floor(col.y - col.h * (0.3 + v * 0.25));
-      let vx = col.x + (i % 2 === 0 ? 3 : -3);
-      rect(vx - 2, vy - 1, 4, 2);
-    }
-  });
 
   pop();
 }

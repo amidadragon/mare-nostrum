@@ -154,12 +154,14 @@ function drawJournalUI() {
   drawParchmentPanel(panX, panY, pw, ph);
 
   // Title
-  fill(200, 170, 90);
+  textFont('Cinzel, Georgia, serif');
+  fill(210, 180, 80);
   textAlign(CENTER, TOP);
-  textSize(14);
+  textSize(15);
   text("EXILE'S JOURNAL", width / 2, panY + 12);
+  textFont('monospace');
 
-  fill(160, 140, 100);
+  fill(180, 160, 120);
   textSize(9);
   text(state.journal.length + ' / ' + JOURNAL_ENTRIES.length + ' entries discovered', width / 2, panY + 30);
 
@@ -226,10 +228,12 @@ function drawCodexUI() {
   drawParchmentPanel(panX, panY, pw, ph);
 
   // Title
-  fill(200, 170, 90);
+  textFont('Cinzel, Georgia, serif');
+  fill(210, 180, 80);
   textAlign(CENTER, TOP);
-  textSize(14);
+  textSize(15);
   text('VILLA CODEX', width / 2, panY + 12);
+  textFont('monospace');
 
   let comp = getCodexCompletion();
   fill(160, 140, 100);
@@ -340,12 +344,14 @@ function drawRecipeBookUI() {
   drawParchmentPanel(panX, panY, pw, ph);
 
   // Title
-  fill(200, 170, 90);
+  textFont('Cinzel, Georgia, serif');
+  fill(210, 180, 80);
   textAlign(CENTER, TOP);
-  textSize(14);
+  textSize(15);
   text('RECIPE BOOK', width / 2, panY + 12);
+  textFont('monospace');
 
-  fill(160, 140, 100);
+  fill(180, 160, 120);
   textSize(11);
   text('Cook at the Cookpot near your villa', width / 2, panY + 29);
 
@@ -470,19 +476,18 @@ function drawNaturalistCodex() {
   let pw = min(width - 40, 560), ph = min(height - 60, 480);
   let px = (width - pw) / 2, py = (height - ph) / 2;
   // Parchment background
-  fill(245, 235, 210, 250); stroke(160, 130, 80); strokeWeight(2);
-  rect(px, py, pw, ph, 8);
-  noStroke();
+  drawParchmentPanel(px, py, pw, ph);
   // Title
-  fill(80, 55, 30); textSize(16); textAlign(CENTER, TOP); textStyle(BOLD);
+  textFont('Cinzel, Georgia, serif');
+  fill(210, 180, 80); textSize(16); textAlign(CENTER, TOP);
   text("Naturalist's Codex", px + pw / 2, py + 10);
-  textStyle(NORMAL);
+  textFont('monospace');
   // Overall progress bar
   let comp = getNatCodexCompletion();
   let barW = pw - 80, barX = px + 40, barY = py + 33;
-  fill(200, 185, 150); rect(barX, barY, barW, 8, 4);
+  fill(60, 50, 35); rect(barX, barY, barW, 8, 4);
   fill(120, 170, 100); rect(barX, barY, barW * (comp.done / max(comp.total, 1)), 8, 4);
-  fill(100, 80, 50); textSize(10); textAlign(RIGHT, TOP);
+  fill(180, 160, 120); textSize(10); textAlign(RIGHT, TOP);
   text(comp.done + '/' + comp.total, px + pw - 35, barY);
   // Tab strip
   let tabW = pw / 6, tabY = py + 48;
@@ -490,17 +495,17 @@ function drawNaturalistCodex() {
     let tx = px + i * tabW;
     let tc = getNatTabCompletion(i);
     let active = state.naturalistTab === i;
-    fill(active ? [220, 200, 160] : [190, 175, 145]);
-    stroke(160, 130, 80); strokeWeight(1);
+    fill(active ? [65, 52, 35] : [40, 32, 22]);
+    stroke(120, 95, 55, 120); strokeWeight(0.8);
     rect(tx, tabY, tabW, 20, active ? [4, 4, 0, 0] : 0);
     noStroke();
-    fill(tc.complete ? [80, 140, 70] : (active ? [60, 40, 20] : [100, 80, 55]));
+    fill(tc.complete ? [140, 200, 100] : (active ? [210, 180, 80] : [140, 120, 80]));
     textSize(11); textAlign(CENTER, CENTER);
     text(NAT_TAB_NAMES[i] + ' ' + tc.done + '/' + tc.total, tx + tabW / 2, tabY + 10);
   }
   // Content area
   let cx = px + 10, cy = tabY + 24, cw = pw - 20, ch = ph - (cy - py) - 30;
-  fill(235, 225, 200, 180); noStroke(); rect(cx, cy - 2, cw, ch + 4, 4);
+  fill(35, 28, 20, 180); noStroke(); rect(cx, cy - 2, cw, ch + 4, 4);
   // Dispatch
   if (state.naturalistTab === 0) drawNatFishTab(cx, cy, cw, ch);
   else if (state.naturalistTab === 1) drawNatCropsTab(cx, cy, cw, ch);
@@ -550,7 +555,7 @@ function drawNatFishTab(cx, cy, cw, ch) {
   }
   // Completion reward note
   let tc = getNatTabCompletion(0);
-  fill(tc.complete ? [80, 140, 70] : [130, 110, 75]); textSize(10); textAlign(LEFT, BOTTOM);
+  fill(tc.complete ? [140, 200, 100] : [160, 140, 100]); textSize(10); textAlign(LEFT, BOTTOM);
   text(tc.complete ? 'REWARD ACTIVE: +50% fishing speed' : 'Complete all ' + tc.total + ' fish for +50% fishing speed', cx + 4, cy + ch - 2);
 }
 
@@ -567,7 +572,7 @@ function drawNatCropsTab(cx, cy, cw, ch) {
     _drawNatEntryWithDiscovery(ex, ey, colW, d.label, d.rarity, d.desc, countStr, !!rec, 'crops', k);
   }
   let tc = getNatTabCompletion(1);
-  fill(tc.complete ? [80, 140, 70] : [130, 110, 75]); textSize(10); textAlign(LEFT, BOTTOM);
+  fill(tc.complete ? [140, 200, 100] : [160, 140, 100]); textSize(10); textAlign(LEFT, BOTTOM);
   text(tc.complete ? 'REWARD ACTIVE: +1 seed per harvest' : 'Grow all ' + tc.total + ' crops for +1 bonus seed per harvest', cx + 4, cy + ch - 2);
 }
 
@@ -584,7 +589,7 @@ function drawNatBestiaryTab(cx, cy, cw, ch) {
     _drawNatEntryWithDiscovery(ex, ey, colW, d.label, d.rarity, d.desc, countStr, !!rec, 'enemies', k);
   }
   let tc = getNatTabCompletion(2);
-  fill(tc.complete ? [80, 140, 70] : [130, 110, 75]); textSize(10); textAlign(LEFT, BOTTOM);
+  fill(tc.complete ? [140, 200, 100] : [160, 140, 100]); textSize(10); textAlign(LEFT, BOTTOM);
   text(tc.complete ? 'REWARD ACTIVE: +10% damage' : 'Defeat all ' + tc.total + ' enemy types for +10% damage', cx + 4, cy + ch - 2);
 }
 
@@ -601,7 +606,7 @@ function drawNatRelicsTab(cx, cy, cw, ch) {
     _drawNatEntryWithDiscovery(ex, ey, colW, d.label, d.rarity, d.desc, countStr, !!rec, 'relics', k);
   }
   let tc = getNatTabCompletion(3);
-  fill(130, 110, 75); textSize(10); textAlign(LEFT, BOTTOM);
+  fill(160, 140, 100); textSize(10); textAlign(LEFT, BOTTOM);
   text('Dig treasures around the island to find relics. ' + tc.done + '/' + tc.total + ' found.', cx + 4, cy + ch - 2);
 }
 
@@ -623,7 +628,7 @@ function drawNatBuildingsTab(cx, cy, cw, ch) {
     text((isBuilt ? '' : '? ') + label, ex + 5, ey + entH / 2);
   }
   let tc = getNatTabCompletion(4);
-  fill(tc.complete ? [80, 140, 70] : [130, 110, 75]); textSize(10); textAlign(LEFT, BOTTOM);
+  fill(tc.complete ? [140, 200, 100] : [160, 140, 100]); textSize(10); textAlign(LEFT, BOTTOM);
   text(tc.complete ? 'REWARD ACTIVE: -20% build cost' : 'Build all types for -20% build cost. ' + tc.done + '/20 built.', cx + 4, cy + ch - 2);
 }
 
@@ -643,7 +648,7 @@ function drawNatLoreTab(cx, cy, cw, ch) {
     if (rec) { fill(100, 130, 80); textSize(9); text('Day ' + rec.firstDay, ex + colW - 28, ey + entH / 2); }
   }
   let tc = getNatTabCompletion(5);
-  fill(tc.complete ? [80, 140, 70] : [130, 110, 75]); textSize(10); textAlign(LEFT, BOTTOM);
+  fill(tc.complete ? [140, 200, 100] : [160, 140, 100]); textSize(10); textAlign(LEFT, BOTTOM);
   text(tc.complete ? 'REWARD ACTIVE: All lore unlocked — speak to Felix.' : 'Find all 20 lore tablets. ' + tc.done + '/20 found.', cx + 4, cy + ch - 2);
 }
 
@@ -653,7 +658,7 @@ function drawShopUI() {
   if (!ship.shopOpen || ship.state !== 'docked') return;
 
   let panW = 300;
-  let panH = 54 + ship.offers.length * 28 + 24;
+  let panH = 64 + ship.offers.length * 28 + 24;
   let panX = width / 2 - panW / 2;
   let panY = height / 2 - panH / 2;
 
@@ -666,23 +671,28 @@ function drawShopUI() {
   drawParchmentPanel(panX, panY, panW, panH);
 
   // Title with Roman flair
-  fill(200, 170, 90);
-  textSize(14);
+  textFont('Cinzel, Georgia, serif');
+  fill(210, 180, 80);
+  textSize(15);
   textAlign(CENTER, TOP);
-  text('MERCATOR', width / 2, panY + 12);
+  text('MERCATOR', width / 2, panY + 10);
   // Subtitle
-  fill(160, 140, 100);
+  fill(180, 160, 120);
   textSize(11);
-  text('Merchant Ship  —  Gold: ' + state.gold, width / 2, panY + 30);
+  text('Merchant Ship', width / 2, panY + 28);
+  textFont('monospace');
+  fill(210, 180, 80);
+  textSize(11);
+  text('Gold: ' + state.gold, width / 2, panY + 40);
   // Decorative line under title
   stroke(140, 110, 55, 100);
   strokeWeight(0.5);
-  line(panX + 20, panY + 42, panX + panW - 20, panY + 42);
+  line(panX + 20, panY + 52, panX + panW - 20, panY + 52);
   noStroke();
 
   textAlign(LEFT, TOP);
   ship.offers.forEach((offer, i) => {
-    let oy = panY + 54 + i * 28;
+    let oy = panY + 64 + i * 28;
     let canDo = offer.type === 'buy' ?
       state[offer.item] >= offer.qty :
       state.gold >= offer.price;
@@ -811,16 +821,14 @@ function drawUpgradeShopUI() {
   let px = width / 2 - panW / 2, py = height / 2 - panH / 2;
 
   // Parchment background
-  fill(40, 35, 25, 230);
-  stroke(120, 100, 60);
-  strokeWeight(2);
-  rect(px, py, panW, panH, 8);
-  noStroke();
+  drawParchmentPanel(px, py, panW, panH);
 
   // Title
-  fill(220, 200, 150); textSize(14); textAlign(CENTER);
-  text('EXPEDITION FORGE', px + panW / 2, py + 20);
-  fill(160, 140, 100); textSize(11);
+  textFont('Cinzel, Georgia, serif');
+  fill(210, 180, 80); textSize(15); textAlign(CENTER);
+  text('EXPEDITION FORGE', px + panW / 2, py + 18);
+  textFont('monospace');
+  fill(180, 160, 120); textSize(11);
   text('Upgrade your expeditions at the temple', px + panW / 2, py + 34);
 
   // Resource bar
@@ -1015,12 +1023,13 @@ function drawLegiaUI() {
   let px = width / 2 - pw / 2, py = height / 2 - ph / 2;
 
   // Dark panel background
-  fill(25, 18, 12, 235); stroke(160, 120, 60); strokeWeight(2);
-  rect(px, py, pw, ph, 8); noStroke();
+  drawParchmentPanel(px, py, pw, ph);
 
   // Title + banner
-  fill(200, 160, 80); textAlign(CENTER, TOP); textSize(13);
+  textFont('Cinzel, Georgia, serif');
+  fill(210, 180, 80); textAlign(CENTER, TOP); textSize(14);
   text('LEGIO NOSTRA', px + pw / 2, py + 10);
+  textFont('monospace');
   fill(140, 110, 70); textSize(9);
   text(castrumName + ' (Level ' + lg.castrumLevel + '/' + 5 + ')', px + pw / 2, py + 26);
 
@@ -1352,8 +1361,8 @@ function drawEmpireDashboard() {
   stroke(120, 95, 55, 80); strokeWeight(0.5); rect(px + 6, py + 6, pw - 12, ph - 12, 4); noStroke();
   fill(180, 145, 70, 140);
   rect(px+4,py+4,5,5); rect(px+pw-9,py+4,5,5); rect(px+4,py+ph-9,5,5); rect(px+pw-9,py+ph-9,5,5);
-  fill(212, 175, 80); textAlign(CENTER, TOP); textSize(14);
-  text('IMPERIUM ROMANUM', width/2, py+14);
+  textFont('Cinzel, Georgia, serif'); fill(212, 175, 80); textAlign(CENTER, TOP); textSize(15);
+  text('IMPERIUM ROMANUM', width/2, py+14); textFont('monospace');
   let rkT = state.islandLevel>=25?'IMPERATOR':state.islandLevel>=20?'CONSUL':state.islandLevel>=15?'SENATOR':state.islandLevel>=10?'GOVERNOR':'CITIZEN';
   let _iName = state.islandName ? '"' + state.islandName + '" — ' : '';
   fill(160,140,100); textSize(11); text(rkT+' \u2014 ' + _iName + 'Island Level '+state.islandLevel, width/2, py+32);
@@ -1397,7 +1406,7 @@ function drawInventoryScreen() {
   noStroke(); fill(0,0,0,190); rect(0,0,width,height);
   let pw=min(width-40,440),ph=min(height-40,380),px=(width-pw)/2,py=(height-ph)/2;
   fill(30,24,16,245);rect(px,py,pw,ph,6);stroke(180,145,70,220);strokeWeight(1.5);noFill();rect(px,py,pw,ph,6);stroke(120,95,55,80);strokeWeight(0.5);rect(px+5,py+5,pw-10,ph-10,4);noStroke();
-  fill(212,175,80);textAlign(CENTER,TOP);textSize(13);text('INVENTARIUM',width/2,py+12);
+  textFont('Cinzel, Georgia, serif');fill(210,180,80);textAlign(CENTER,TOP);textSize(14);text('INVENTARIUM',width/2,py+12);textFont('monospace');
   let gX=px+16,gY=py+36,cW=60,cH=36,cols=floor((pw-32)/cW);
   let _res=[{n:'Seeds',v:state.seeds,c:'#88cc44'},{n:'Harvest',v:state.harvest,c:'#ccaa44'},{n:'Wood',v:state.wood,c:'#8c6428'},{n:'Stone',v:state.stone,c:'#7a7268'},{n:'Crystals',v:state.crystals,c:'#44ffaa'},{n:'Gold',v:state.gold,c:'#ffbb22'},{n:'Fish',v:state.fish,c:'#64b4ff'},{n:'Iron',v:state.ironOre,c:'#aab8cc'},{n:'Hide',v:state.rareHide,c:'#c8a078'},{n:'Relics',v:state.ancientRelic,c:'#dc8cdc'},{n:'Bone',v:state.titanBone,c:'#f0dc8c'},{n:'Grape Sd',v:state.grapeSeeds,c:'#8c3ca0'},{n:'Olive Sd',v:state.oliveSeeds,c:'#6a8e30'}];
   _res.forEach((r,i)=>{let cx=gX+(i%cols)*cW,cy=gY+floor(i/cols)*cH;fill(r.v>0?color(40,35,25,200):color(25,20,14,150));rect(cx,cy,cW-4,cH-4,3);if(r.v>0){stroke(100,85,55,60);strokeWeight(0.5);noFill();rect(cx,cy,cW-4,cH-4,3);noStroke();}fill(r.v>0?color(r.c):color(60,50,40));textSize(10);textAlign(CENTER,TOP);text(r.v,cx+(cW-4)/2,cy+4);fill(r.v>0?color(160,140,100):color(70,60,45));textSize(9);text(r.n,cx+(cW-4)/2,cy+18);});
@@ -1429,29 +1438,59 @@ function drawHotbar() {
   if (_hotbarPrevSlot !== slot) { _hotbarBounce = 8; _hotbarPrevSlot = slot; }
   if (_hotbarBounce > 0) _hotbarBounce -= 0.5;
 
+  // Leather belt backing strip
+  fill(55, 38, 22, 200);
+  rect(bx - 6, by - 3, totalW + 12, slotH + 6, 6);
+  fill(70, 50, 30, 80);
+  rect(bx - 6, by - 3, totalW + 12, 2, 6, 6, 0, 0);
+  fill(35, 24, 14, 80);
+  rect(bx - 6, by + slotH + 1, totalW + 12, 2, 0, 0, 6, 6);
+  // Belt stitching lines
+  stroke(90, 70, 40, 60);
+  strokeWeight(0.5);
+  for (let si = 0; si < totalW + 8; si += 6) {
+    line(bx - 4 + si, by - 2, bx - 4 + si + 3, by - 2);
+    line(bx - 4 + si, by + slotH + 2, bx - 4 + si + 3, by + slotH + 2);
+  }
+  noStroke();
+
+  let _hbAc = (typeof getFactionData === 'function') ? getFactionData().accentColor : [212, 160, 64];
+
   for (let i = 0; i < HOTBAR_ITEMS.length; i++) {
     let sx = bx + i * (slotW + gap);
     let selected = i === slot;
     // Bounce offset for newly selected slot
     let _slotBounce = (selected && _hotbarBounce > 0) ? floor(sin(_hotbarBounce / 8 * PI) * -4) : 0;
 
-    // Slot background
-    fill(selected ? 45 : 20, selected ? 38 : 16, selected ? 28 : 12, 200);
-    rect(sx, by + _slotBounce, slotW, slotH);
-    // Faction-tinted border for selected
+    // Slot background — wood texture (brown gradient)
+    fill(selected ? 65 : 38, selected ? 48 : 28, selected ? 32 : 18, 220);
+    rect(sx, by + _slotBounce, slotW, slotH, 3);
+    // Wood grain lines
+    fill(selected ? 75 : 45, selected ? 55 : 32, selected ? 38 : 20, 40);
+    for (let gy = 0; gy < slotH; gy += 4) {
+      rect(sx + 1, by + _slotBounce + gy, slotW - 2, 1);
+    }
+    // Highlight top edge (wood sheen)
+    fill(120, 95, 60, selected ? 60 : 30);
+    rect(sx + 1, by + _slotBounce, slotW - 2, 1, 3, 3, 0, 0);
+    // Border
     if (selected) {
-      let _hbAc = (typeof getFactionData === 'function') ? getFactionData().accentColor : [212, 160, 64];
-      fill(_hbAc[0], _hbAc[1], _hbAc[2], 200);
-      rect(sx, by + _slotBounce, slotW, 2);
-      rect(sx, by + _slotBounce + slotH - 2, slotW, 2);
-      rect(sx, by + _slotBounce, 2, slotH);
-      rect(sx + slotW - 2, by + _slotBounce, 2, slotH);
+      // Golden glow border for selected
+      stroke(_hbAc[0], _hbAc[1], _hbAc[2], 220);
+      strokeWeight(1.5);
+      noFill();
+      rect(sx - 1, by + _slotBounce - 1, slotW + 2, slotH + 2, 4);
+      // Outer glow
+      stroke(_hbAc[0], _hbAc[1], _hbAc[2], 60);
+      strokeWeight(2);
+      rect(sx - 2, by + _slotBounce - 2, slotW + 4, slotH + 4, 5);
+      noStroke();
     } else {
-      fill(80, 70, 55, 100);
-      rect(sx, by, slotW, 1);
-      rect(sx, by + slotH - 1, slotW, 1);
-      rect(sx, by, 1, slotH);
-      rect(sx + slotW - 1, by, 1, slotH);
+      stroke(80, 60, 40, 100);
+      strokeWeight(0.6);
+      noFill();
+      rect(sx, by + _slotBounce, slotW, slotH, 3);
+      noStroke();
     }
 
     // Key number label (top-left of slot)
@@ -1715,11 +1754,13 @@ function drawHUD() {
   if (state.quarrier.unlocked) drawBarHUD(22, cookedY + 30, 100, 7, state.quarrier.energy / 100, '#8A8078', '#3A3530', 'QUARRY');
   let qOff = (state.quarrier && state.quarrier.unlocked) ? 14 : 0;
 
-  // Island level
-  fill(color(C.textDim));
+  // Island level — Cinzel for rank title
+  textFont('Cinzel, Georgia, serif');
+  fill(210, 180, 80);
   textSize(10);
   let rankTitle = state.islandLevel >= 25 ? 'IMPERATOR' : state.islandLevel >= 20 ? 'CONSUL' : state.islandLevel >= 15 ? 'SENATOR' : state.islandLevel >= 10 ? 'GOVERNOR' : 'CITIZEN';
   text(rankTitle + ' — LV.' + state.islandLevel, 22, cookedY + 30 + qOff);
+  textFont('monospace');
   // Skill points alert
   let _skillOff = 0;
   if ((state.player.skillPoints || 0) > 0) {
@@ -1821,8 +1862,9 @@ function drawHUD() {
 
   // Island name label (top center, subtle)
   if (state.islandName && !stormActive) {
-    fill(180, 160, 120, 140);
-    textSize(11);
+    textFont('Cinzel, Georgia, serif');
+    fill(200, 175, 120, 160);
+    textSize(12);
     textAlign(CENTER, TOP);
     let _dayLbl = state.islandName + ' \u2014 Day ' + state.day;
     if (typeof isMarketDay === 'function' && isMarketDay(state.day)) _dayLbl += '  [MARKET DAY]';
@@ -1834,6 +1876,7 @@ function drawHUD() {
       text('Better shop prices today!', width / 2, 20);
     }
     textAlign(LEFT, TOP);
+    textFont('monospace');
   }
 
   // Prestige UI hint (after winning)
@@ -2001,17 +2044,29 @@ function drawBuildUI() {
   let barX = width / 2 - barW / 2;
   let barY = height - barH - 16 + slideOff;
 
-  // Bar background
+  // Bar background — parchment scroll style
   noStroke();
-  fill(20, 15, 10, 200);
-  rect(barX - 3, barY - 3, barW + 6, barH + 6, 8);
-  fill(45, 35, 25, 240);
+  // Shadow
+  fill(0, 0, 0, 50);
+  rect(barX - 1, barY + 2, barW + 6, barH + 6, 8);
+  // Parchment base
+  fill(38, 30, 20, 240);
   rect(barX, barY, barW, barH, 6);
-  stroke(160, 130, 80, 150);
+  // Warm parchment overlay
+  fill(190, 170, 140, 12);
+  rect(barX, barY, barW, barH, 6);
+  // Scroll roll effect — darker top edge
+  fill(0, 0, 0, 35);
+  rect(barX, barY, barW, 4, 6, 6, 0, 0);
+  fill(80, 65, 40, 30);
+  rect(barX, barY + 4, barW, 2);
+  // Gold border
+  let _bmAc = (typeof getFactionData === 'function') ? getFactionData().accentColor : [180, 150, 80];
+  stroke(_bmAc[0], _bmAc[1], _bmAc[2], 160);
   strokeWeight(1.2);
   noFill();
   rect(barX, barY, barW, barH, 6);
-  stroke(120, 95, 55, 80);
+  stroke(140, 110, 60, 70);
   strokeWeight(0.5);
   rect(barX + 3, barY + 3, barW - 6, barH - 6, 4);
   // Divider between rows
@@ -2091,10 +2146,15 @@ function drawBuildUI() {
   baseTypes.forEach((t, i) => drawSlot(t, i, 0));
 
   // Title bar
-  fill(200, 170, 90, 220);
-  textSize(9);
+  textFont('Cinzel, Georgia, serif');
+  fill(210, 180, 80, 230);
+  textSize(11);
   textAlign(CENTER, BOTTOM);
-  text('AEDIFICIUM  [B to close]', width / 2, barY - 4);
+  text('AEDIFICIUM', width / 2, barY - 6);
+  textFont('monospace');
+  fill(160, 140, 100, 180);
+  textSize(8);
+  text('[B] close', width / 2, barY + 2);
 
   // Selected item tooltip with cost or lock message
   let bp = BLUEPRINTS[state.buildType];
@@ -2503,101 +2563,171 @@ function drawBuildIcon(type, selected) {
 
 function drawHUDPanel(x, y, w, h) {
   noStroke();
-  // Lighter, more elegant panel
-  fill(0, 0, 0, 25);
-  rect(x + 1, y + 1, w, h, 3);
-  // Semi-transparent dark background
-  fill(15, 12, 8, 230);
-  rect(x, y, w, h, 3);
-  // Single pixel faction-tinted border
-  if (typeof getFactionData === 'function') {
-    let ac = getFactionData().accentColor;
-    stroke(ac[0], ac[1], ac[2], 120);
-  } else {
-    stroke(180, 150, 80, 120);
+  // Drop shadow
+  fill(0, 0, 0, 40);
+  rect(x + 2, y + 2, w, h, 4);
+  // Parchment base — warm tan
+  fill(42, 34, 24, 230);
+  rect(x, y, w, h, 4);
+  // Subtle warm overlay (parchment feel)
+  fill(190, 170, 140, 18);
+  rect(x, y, w, h, 4);
+  // Sparse dither noise for parchment grain (low draw count)
+  fill(160, 140, 110, 10);
+  for (let dy = 0; dy < h; dy += 8) {
+    for (let dx = 0; dx < w; dx += 8) {
+      if (_b4[(dy & 3) * 4 + (dx & 3)] > 10) {
+        rect(x + dx, y + dy, 3, 3);
+      }
+    }
   }
-  strokeWeight(0.8);
+  // Darker edges (vignette on panel)
+  fill(0, 0, 0, 30);
+  rect(x, y, w, 3, 4, 4, 0, 0);
+  rect(x, y + h - 3, w, 3, 0, 0, 4, 4);
+  fill(0, 0, 0, 20);
+  rect(x, y, 3, h, 4, 0, 0, 4);
+  rect(x + w - 3, y, 3, h, 0, 4, 4, 0);
+  // Bronze/gold border
+  let ac = (typeof getFactionData === 'function') ? getFactionData().accentColor : [180, 150, 80];
+  stroke(ac[0], ac[1], ac[2], 140);
+  strokeWeight(1);
   noFill();
-  rect(x, y, w, h, 3);
+  rect(x, y, w, h, 4);
+  // Inner decorative line
+  stroke(180, 150, 80, 50);
+  strokeWeight(0.4);
+  rect(x + 2, y + 2, w - 4, h - 4, 3);
   noStroke();
 }
 
 function drawParchmentPanel(x, y, w, h) {
-  // Full parchment overlay panel for popups
   noStroke();
+  // Outer shadow
+  fill(0, 0, 0, 60);
+  rect(x + 3, y + 3, w, h, 6);
   // Dark backdrop
-  fill(20, 15, 10, 230);
+  fill(25, 20, 14, 240);
   rect(x, y, w, h, 5);
-  // Parchment inner
-  fill(45, 35, 25, 240);
+  // Parchment inner — warm tan
+  fill(52, 42, 30, 245);
   rect(x + 2, y + 2, w - 4, h - 4, 4);
+  // Warm parchment overlay
+  fill(190, 170, 140, 14);
+  rect(x + 2, y + 2, w - 4, h - 4, 4);
+  // Sparse dither grain texture
+  fill(150, 130, 100, 9);
+  for (let dy = 2; dy < h - 2; dy += 8) {
+    for (let dx = 2; dx < w - 2; dx += 8) {
+      if (_b4[(dy & 3) * 4 + (dx & 3)] > 9) {
+        rect(x + dx, y + dy, 3, 3);
+      }
+    }
+  }
+  // Vignette edges
+  fill(0, 0, 0, 25);
+  rect(x + 2, y + 2, w - 4, 4, 4, 4, 0, 0);
+  rect(x + 2, y + h - 6, w - 4, 4, 0, 0, 4, 4);
+  fill(0, 0, 0, 18);
+  rect(x + 2, y + 2, 4, h - 4, 4, 0, 0, 4);
+  rect(x + w - 6, y + 2, 4, h - 4, 0, 4, 4, 0);
   // Gold ornamental border
-  stroke(180, 145, 70);
+  let ac = (typeof getFactionData === 'function') ? getFactionData().accentColor : [180, 150, 80];
+  stroke(ac[0], ac[1], ac[2], 200);
   strokeWeight(1.5);
   noFill();
   rect(x + 1, y + 1, w - 2, h - 2, 5);
   // Inner decorative line
-  stroke(140, 110, 55, 120);
-  strokeWeight(0.6);
+  stroke(140, 110, 55, 100);
+  strokeWeight(0.5);
   rect(x + 5, y + 5, w - 10, h - 10, 3);
-  // Corner ornaments
+  // Corner ornaments — diamond shapes
   noStroke();
-  fill(180, 145, 70, 150);
-  let cs = 4;
+  fill(ac[0], ac[1], ac[2], 180);
+  let cs = 5;
   // top-left
-  rect(x + 3, y + 3, cs, cs);
+  push(); translate(x + 6, y + 6); rotate(PI / 4); rectMode(CENTER); rect(0, 0, cs, cs); rectMode(CORNER); pop();
   // top-right
-  rect(x + w - 3 - cs, y + 3, cs, cs);
+  push(); translate(x + w - 6, y + 6); rotate(PI / 4); rectMode(CENTER); rect(0, 0, cs, cs); rectMode(CORNER); pop();
   // bottom-left
-  rect(x + 3, y + h - 3 - cs, cs, cs);
+  push(); translate(x + 6, y + h - 6); rotate(PI / 4); rectMode(CENTER); rect(0, 0, cs, cs); rectMode(CORNER); pop();
   // bottom-right
-  rect(x + w - 3 - cs, y + h - 3 - cs, cs, cs);
+  push(); translate(x + w - 6, y + h - 6); rotate(PI / 4); rectMode(CENTER); rect(0, 0, cs, cs); rectMode(CORNER); pop();
   noStroke();
 }
 
 function drawBarHUD(x, y, w, h, frac, colFull, colEmpty, label) {
+  // Carved stone border
+  fill(60, 50, 35);
+  rect(x - 1, y - 1, w + 2, h + 2, 3);
+  stroke(90, 75, 50, 120);
+  strokeWeight(0.5);
+  noFill();
+  rect(x - 1, y - 1, w + 2, h + 2, 3);
+  noStroke();
+  // Empty trough
   fill(color(colEmpty));
   rect(x, y, w, h, 2);
-  fill(color(colFull));
+  // Filled bar with subtle gradient
+  let _cf = color(colFull);
+  fill(_cf);
   rect(x, y, w * frac, h, 2);
+  // Highlight stripe along top of filled area
+  fill(red(_cf), green(_cf), blue(_cf), 60);
+  rect(x, y, w * frac, max(1, floor(h / 3)), 2, 2, 0, 0);
   // Glow pulse on bar edge when filling
   if (frac > 0.01 && frac < 0.99) {
     let _glPulse = sin(frameCount * 0.12) * 0.4 + 0.6;
-    let _cf = color(colFull);
     fill(red(_cf), green(_cf), blue(_cf), 80 * _glPulse);
     rect(x + w * frac - 3, y, 6, h, 2);
   }
-  fill(color(C.textDim));
+  // Ornamental end caps
+  fill(90, 75, 50, 140);
+  rect(x - 2, y, 2, h);
+  rect(x + w, y, 2, h);
+  // Label in warmer color
+  fill(180, 160, 120);
   textSize(10);
   textAlign(LEFT, TOP);
-  text(label, x + w + 5, y + 1);
+  text(label, x + w + 8, y + 1);
 }
 
-// ─── CURSOR ───────────────────────────────────────────────────────────────
+// ─── CURSOR — faction-themed ──────────────────────────────────────────────
 function drawCursor() {
-  let mx = mouseX, my = mouseY;
-  noStroke();
+  let cx = mouseX, cy = mouseY;
+  let ac = (typeof getFactionData === 'function') ? getFactionData().accentColor : [180, 150, 80];
 
   if (state.buildMode) {
-    // Build cursor — golden crosshair
-    stroke(200, 170, 60, 180);
-    strokeWeight(1);
-    line(mx - 8, my, mx - 3, my);
-    line(mx + 3, my, mx + 8, my);
-    line(mx, my - 8, mx, my - 3);
-    line(mx, my + 3, mx, my + 8);
+    // Build cursor — golden crosshair with faction ring
     noStroke();
-    fill(255, 200, 60, 100);
-    ellipse(mx, my, 3, 3);
+    fill(ac[0], ac[1], ac[2], 100);
+    ellipse(cx, cy, 16, 16);
+    fill(255, 200, 60, 80);
+    ellipse(cx, cy, 8, 8);
+    stroke(255, 220, 100, 200);
+    strokeWeight(1);
+    line(cx - 10, cy, cx - 4, cy);
+    line(cx + 4, cy, cx + 10, cy);
+    line(cx, cy - 10, cx, cy - 4);
+    line(cx, cy + 4, cx, cy + 10);
+    noStroke();
+    fill(255, 255, 255, 220);
+    ellipse(cx, cy, 3, 3);
   } else {
-    // Simple warm pointer — small triangle + dot
-    fill(220, 190, 140, 200);
-    triangle(mx, my, mx + 3, my + 10, mx + 8, my + 5);
-    // Bright tip dot
-    fill(255, 230, 180, 220);
-    ellipse(mx + 1, my + 1, 2, 2);
+    // Faction-themed cursor — outer ring + inner dot + crosshair
+    noStroke();
+    fill(ac[0], ac[1], ac[2], 150);
+    ellipse(cx, cy, 12, 12);
+    fill(255, 255, 255, 200);
+    ellipse(cx, cy, 4, 4);
+    stroke(255, 255, 255, 100);
+    strokeWeight(1);
+    line(cx - 8, cy, cx - 4, cy);
+    line(cx + 4, cy, cx + 8, cy);
+    line(cx, cy - 8, cx, cy - 4);
+    line(cx, cy + 4, cx, cy + 8);
+    noStroke();
   }
-  noStroke();
 }
 
 
@@ -2981,11 +3111,11 @@ function drawTechTreeUI() {
   drawParchmentPanel(panX, panY, pw, ph);
 
   // Title
-  fill(200, 170, 90); textAlign(CENTER, TOP); textSize(14);
-  text('RESEARCH & TECHNOLOGY', width / 2, panY + 10);
+  textFont('Cinzel, Georgia, serif'); fill(210, 180, 80); textAlign(CENTER, TOP); textSize(15);
+  text('RESEARCH & TECHNOLOGY', width / 2, panY + 10); textFont('monospace');
   // Subtitle: current research
-  textSize(9); fill(160, 140, 100);
-  if (state.research.current) {
+  textSize(9); fill(180, 160, 120);
+  if (state.research && state.research.current) {
     let ct = TECH_TREE[state.research.current];
     let pct = floor((state.research.progress / ct.cost) * 100);
     text('Researching: ' + ct.name + ' (' + pct + '%)', width / 2, panY + 28);
@@ -2995,7 +3125,7 @@ function drawTechTreeUI() {
   // RP display
   textSize(9);
   fill(140, 180, 220);
-  text('RP/day: ' + getResearchRate() + '  |  Total RP: ' + (state.research.points || 0), width / 2, panY + 40);
+  text('RP/day: ' + getResearchRate() + '  |  Total RP: ' + ((state.research && state.research.points) || 0), width / 2, panY + 40);
 
   // Draw branches
   let branchY = panY + 58;
@@ -3033,7 +3163,7 @@ function drawTechTreeUI() {
       let ty = by + 8;
       let completed = hasTech(tech.id);
       let available = canResearch(tech.id);
-      let isCurrent = state.research.current === tech.id;
+      let isCurrent = state.research && state.research.current === tech.id;
       let isHovered = mouseX >= tx && mouseX <= tx + nodeW && mouseY >= ty && mouseY <= ty + nodeH;
 
       if (isHovered) _techTreeHover = tech.id;
@@ -3070,11 +3200,12 @@ function drawTechTreeUI() {
         text('COMPLETE', tx + nodeW / 2, ty + 15);
       } else if (isCurrent) {
         fill(120, 160, 220);
-        let pct = floor((state.research.progress / tech.cost) * 100);
+        let rprog = (state.research && state.research.progress) || 0;
+        let pct = floor((rprog / tech.cost) * 100);
         text(pct + '%', tx + nodeW / 2, ty + 15);
         // Progress bar
         fill(30, 35, 50); rect(tx + 4, ty + 25, nodeW - 8, 4, 1);
-        fill(100, 140, 220); rect(tx + 4, ty + 25, (nodeW - 8) * (state.research.progress / tech.cost), 4, 1);
+        fill(100, 140, 220); rect(tx + 4, ty + 25, (nodeW - 8) * (rprog / tech.cost), 4, 1);
       } else {
         fill(available ? color(180, 160, 120) : color(80, 70, 55));
         text(tech.cost + ' RP', tx + nodeW / 2, ty + 15);
@@ -3283,3 +3414,192 @@ function drawVictoryProgressHUD() {
   textAlign(LEFT, TOP);
 }
 
+// ─── COMPASS HUD BAR (Skyrim-style) ───────────────────────────────────────
+let worldMapOpen = false;
+
+function _getCompassIslands() {
+  let islands = [
+    { name: 'Home', x: WORLD.islandCX, y: WORLD.islandCY, col: '#88cc88', icon: '\u2302' },
+    { name: 'Arena', x: state.adventure.isleX, y: state.adventure.isleY, col: '#cc8888', icon: '\u2694' },
+    { name: state.conquest.colonized ? 'Colony' : 'Terra Nova', x: state.conquest.isleX, y: state.conquest.isleY, col: state.conquest.colonized ? '#88cc88' : '#88aacc', icon: '\u2694' },
+    { name: 'Wreck Beach', x: WRECK.cx, y: WRECK.cy, col: '#ccaa66', icon: '\u2693' },
+    { name: 'Vulcan', x: state.vulcan.isleX, y: state.vulcan.isleY, col: '#ff5533', icon: '\u2740' },
+    { name: 'Hyperborea', x: state.hyperborea.isleX, y: state.hyperborea.isleY, col: '#88ddff', icon: '\u2744' },
+    { name: 'Plenty', x: state.plenty.isleX, y: state.plenty.isleY, col: '#44cc44', icon: '\u2618' },
+    { name: 'Necropolis', x: state.necropolis.isleX, y: state.necropolis.isleY, col: '#9944cc', icon: '\u2620' },
+  ];
+  let _nKeys = Object.keys(state.nations || {});
+  for (let _nk of _nKeys) {
+    let _nv = state.nations[_nk];
+    if (_nv && !_nv.defeated) {
+      islands.push({ name: getNationName(_nk), x: _nv.isleX, y: _nv.isleY, col: getNationStanceColor(_nv), icon: '\u2694', nation: true });
+    }
+  }
+  return islands;
+}
+
+function drawCompassHUD() {
+  if (photoMode || screenshotMode) return;
+  if (!state.rowing || !state.rowing.active) return;
+  let r = state.rowing;
+  let px = r.x, py = r.y;
+  let facing = r.angle || 0;
+  let barW = min(width * 0.6, 500);
+  let barH = 24;
+  let barX = (width - barW) / 2;
+  let barY = 6;
+  push();
+  fill(15, 12, 8, 180); noStroke();
+  rect(barX, barY, barW, barH, 4);
+  stroke(120, 100, 70, 100); strokeWeight(0.5); noFill();
+  rect(barX, barY, barW, barH, 4); noStroke();
+  fill(255, 220, 140, 200);
+  triangle(barX + barW / 2 - 3, barY + barH, barX + barW / 2 + 3, barY + barH, barX + barW / 2, barY + barH - 4);
+  let dirs = [
+    { label: 'N', ang: -HALF_PI }, { label: 'NE', ang: -QUARTER_PI },
+    { label: 'E', ang: 0 }, { label: 'SE', ang: QUARTER_PI },
+    { label: 'S', ang: HALF_PI }, { label: 'SW', ang: HALF_PI + QUARTER_PI },
+    { label: 'W', ang: PI }, { label: 'NW', ang: -(HALF_PI + QUARTER_PI) },
+  ];
+  for (let dir of dirs) {
+    let diff = dir.ang - facing;
+    while (diff > PI) diff -= TWO_PI;
+    while (diff < -PI) diff += TWO_PI;
+    let xPos = barX + barW / 2 + (diff / PI) * (barW / 2);
+    if (xPos < barX + 4 || xPos > barX + barW - 4) continue;
+    let isMajor = dir.label.length === 1;
+    fill(isMajor ? color(255, 220, 140, 220) : color(180, 160, 120, 140));
+    textSize(isMajor ? 11 : 8); textAlign(CENTER, CENTER);
+    text(dir.label, xPos, barY + barH / 2);
+    if (isMajor) { fill(255, 220, 140, 60); rect(xPos - 0.5, barY + 2, 1, barH - 4); }
+  }
+  let islands = _getCompassIslands();
+  for (let isle of islands) {
+    let dx = isle.x - px, dy = isle.y - py;
+    let ang = atan2(dy, dx);
+    let diff = ang - facing;
+    while (diff > PI) diff -= TWO_PI;
+    while (diff < -PI) diff += TWO_PI;
+    let xPos = barX + barW / 2 + (diff / PI) * (barW / 2);
+    if (xPos < barX + 6 || xPos > barX + barW - 6) continue;
+    let d = sqrt(dx * dx + dy * dy);
+    let alpha = d < 400 ? 80 : 200;
+    let c = color(isle.col);
+    fill(red(c), green(c), blue(c), alpha);
+    textSize(10); textAlign(CENTER, CENTER);
+    text(isle.icon, xPos, barY + barH / 2 - 1);
+    fill(red(c), green(c), blue(c), alpha * 0.6);
+    rect(xPos - 1, barY + barH - 3, 2, 2);
+  }
+  textAlign(LEFT, TOP); pop();
+}
+
+// ─── WORLD MAP (press M) ──────────────────────────────────────────────────
+function drawWorldMap() {
+  if (!worldMapOpen) return;
+  let mapW = min(width - 40, 700), mapH = min(height - 40, 500);
+  let mapX = (width - mapW) / 2, mapY = (height - mapH) / 2;
+  push();
+  fill(0, 0, 0, 180); rect(0, 0, width, height);
+  fill(20, 18, 14, 240); stroke(140, 120, 80, 180); strokeWeight(2);
+  rect(mapX, mapY, mapW, mapH, 8); noStroke();
+  fill(220, 200, 160); textSize(16); textAlign(CENTER, TOP);
+  text('MARE NOSTRUM', width / 2, mapY + 10);
+  fill(160, 140, 110); textSize(10);
+  text('[M] Close', width / 2, mapY + 30);
+  let areaX = mapX + 20, areaY = mapY + 48, areaW = mapW - 40, areaH = mapH - 68;
+  drawingContext.save();
+  drawingContext.beginPath();
+  drawingContext.rect(areaX, areaY, areaW, areaH);
+  drawingContext.clip();
+  fill(25, 45, 70, 255); rect(areaX, areaY, areaW, areaH);
+  let allIslands = _getCompassIslands();
+  let minWX = WORLD.islandCX, maxWX = WORLD.islandCX, minWY = WORLD.islandCY, maxWY = WORLD.islandCY;
+  for (let isle of allIslands) {
+    minWX = min(minWX, isle.x); maxWX = max(maxWX, isle.x);
+    minWY = min(minWY, isle.y); maxWY = max(maxWY, isle.y);
+  }
+  let rangeX = max(maxWX - minWX, 2000), rangeY = max(maxWY - minWY, 2000);
+  let _mapScale = min(areaW / (rangeX * 1.3), areaH / (rangeY * 1.3));
+  let midWX = (minWX + maxWX) / 2, midWY = (minWY + maxWY) / 2;
+  function mapPX(wx) { return areaX + areaW / 2 + (wx - midWX) * _mapScale; }
+  function mapPY(wy) { return areaY + areaH / 2 + (wy - midWY) * _mapScale; }
+  stroke(40, 60, 85, 40); strokeWeight(0.5);
+  for (let gx = floor(minWX / 1000) * 1000; gx <= maxWX + 1000; gx += 1000) {
+    let sx = mapPX(gx);
+    if (sx > areaX && sx < areaX + areaW) line(sx, areaY, sx, areaY + areaH);
+  }
+  for (let gy = floor(minWY / 1000) * 1000; gy <= maxWY + 1000; gy += 1000) {
+    let sy = mapPY(gy);
+    if (sy > areaY && sy < areaY + areaH) line(areaX, sy, areaX + areaW, sy);
+  }
+  noStroke();
+  let _disc = _getDiscoveredIslandKeys();
+  if (state.tradeRoutes && state.tradeRoutes.length > 0) {
+    for (let route of state.tradeRoutes) {
+      if (!route.active) continue;
+      let fromX = mapPX(route.from ? route.from.x : WORLD.islandCX);
+      let fromY = mapPY(route.from ? route.from.y : WORLD.islandCY);
+      let toX = mapPX(route.to ? route.to.x : state.conquest.isleX);
+      let toY = mapPY(route.to ? route.to.y : state.conquest.isleY);
+      stroke(220, 200, 100, 100); strokeWeight(1.5);
+      drawingContext.setLineDash([4, 4]);
+      line(fromX, fromY, toX, toY);
+      drawingContext.setLineDash([]); noStroke();
+      let prog = (frameCount % 200) / 200;
+      fill(220, 200, 100, 200);
+      ellipse(lerp(fromX, toX, prog), lerp(fromY, toY, prog), 4, 4);
+    }
+  }
+  for (let isle of allIslands) {
+    let ix = mapPX(isle.x), iy = mapPY(isle.y);
+    let discovered = _disc.indexOf(isle.name) >= 0;
+    let c = color(isle.col);
+    if (!discovered) {
+      fill(60, 55, 50, 100); ellipse(ix, iy, 12, 8);
+      fill(120, 110, 90, 80); textSize(7); textAlign(CENTER, TOP);
+      text('???', ix, iy + 6); continue;
+    }
+    let isHome = isle.name === 'Home';
+    let sz = isHome ? 18 : 12;
+    fill(red(c), green(c), blue(c), 60); ellipse(ix, iy, sz + 6, (sz + 6) * 0.65);
+    fill(red(c), green(c), blue(c), 180); ellipse(ix, iy, sz, sz * 0.65);
+    fill(255, 255, 255, 200); textSize(isHome ? 11 : 9); textAlign(CENTER, CENTER);
+    text(isle.icon, ix, iy - 1);
+    fill(red(c), green(c), blue(c), 220); textSize(8); textAlign(CENTER, TOP);
+    text(isle.name, ix, iy + sz * 0.4 + 2);
+    if (isle.nation) { fill(red(c), green(c), blue(c), 200); ellipse(ix + sz * 0.5 + 4, iy - 2, 5, 5); }
+  }
+  if (state.rowing && state.rowing.active) {
+    let plX = mapPX(state.rowing.x), plY = mapPY(state.rowing.y);
+    let pulse = 3 + sin(frameCount * 0.08) * 1.5;
+    fill(255, 220, 80, 100); ellipse(plX, plY, pulse * 2, pulse * 2);
+    fill(255, 240, 140, 255); ellipse(plX, plY, 5, 5);
+    fill(255, 255, 200, 200); textSize(7); textAlign(CENTER, TOP);
+    text('YOU', plX, plY + 5);
+  } else {
+    let plX = mapPX(WORLD.islandCX), plY = mapPY(WORLD.islandCY);
+    let pulse = 2 + sin(frameCount * 0.08) * 1;
+    fill(255, 220, 80, 150); ellipse(plX, plY + 8, pulse * 2, pulse * 2);
+  }
+  drawingContext.restore();
+  fill(120, 110, 90, 160); textSize(8); textAlign(LEFT, TOP);
+  text('\u262E Friendly   \u2620 Dangerous   \u2694 Combat   --- Trade Route', mapX + 20, mapY + mapH - 16);
+  textAlign(LEFT, TOP); pop();
+}
+
+function _getDiscoveredIslandKeys() {
+  let keys = ['Home', 'Arena'];
+  if (state.conquest.phase !== 'unexplored' || state.conquest.colonized) keys.push(state.conquest.colonized ? 'Colony' : 'Terra Nova');
+  keys.push('Wreck Beach');
+  if (state.vulcan.phase !== 'unexplored') keys.push('Vulcan');
+  if (state.hyperborea.phase !== 'unexplored') keys.push('Hyperborea');
+  if (state.plenty.phase !== 'unexplored') keys.push('Plenty');
+  if (state.necropolis.phase !== 'unexplored') keys.push('Necropolis');
+  let _nKeys = Object.keys(state.nations || {});
+  for (let _nk of _nKeys) {
+    let _nv = state.nations[_nk];
+    if (_nv && !_nv.defeated) keys.push(getNationName(_nk));
+  }
+  return keys;
+}

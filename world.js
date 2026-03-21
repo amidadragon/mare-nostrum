@@ -803,6 +803,45 @@ function drawIsland() {
     rect(floor(rx3) - 2, floor(ry3), 4 + floor(wave * 3), 1);
   }
 
+  // Sandy bottom visible in shallow areas
+  if (dayMix > 0.3) {
+    let sandAlpha = (dayMix - 0.3) * 50;
+    // Pale sand patches showing through clear water
+    let sandSeeds = [
+      { a: 0.4, r: 0.48 }, { a: 1.2, r: 0.47 }, { a: 2.1, r: 0.49 },
+      { a: 3.0, r: 0.46 }, { a: 4.0, r: 0.48 }, { a: 5.2, r: 0.47 },
+    ];
+    sandSeeds.forEach(s => {
+      let sx2 = ix + cos(s.a) * iw * s.r;
+      let sy2 = (iy - 12) + sin(s.a) * ih * (s.r * 0.42);
+      fill(200, 185, 140, sandAlpha);
+      ellipse(sx2, sy2, 14 + sin(s.a * 3.7) * 4, 6);
+    });
+  }
+
+  // Small fish shadows in shallow water (occasional)
+  if (dayMix > 0.3) {
+    let fishPhase = frameCount * 0.008;
+    for (let fi = 0; fi < 4; fi++) {
+      let fa = (fi * 1.7 + fishPhase) % TWO_PI;
+      let fishDist = 0.47 + sin(fishPhase * 0.3 + fi * 2.1) * 0.015;
+      let fx2 = ix + cos(fa) * iw * fishDist;
+      let fy2 = (iy - 12) + sin(fa) * ih * (fishDist * 0.42);
+      let fishAlpha = 18 + sin(fishPhase * 2 + fi * 3) * 8;
+      // Only show occasionally (fish dart in and out)
+      if (sin(fishPhase * 0.5 + fi * 4.3) > 0.2) {
+        fill(20, 40, 50, fishAlpha * dayMix);
+        // Fish body — tiny elongated shadow
+        let fishDir = fa + sin(fishPhase + fi) * 0.3;
+        let fdx = cos(fishDir) * 3;
+        let fdy = sin(fishDir) * 1.2;
+        ellipse(fx2, fy2, 6, 2.5);
+        // Tail
+        rect(floor(fx2 - fdx * 1.5) - 1, floor(fy2 - fdy) - 1, 2, 2);
+      }
+    }
+  }
+
   // Sandy beach ring — warm golden sand (organic coastline)
   fill(210, 190, 145);
   drawCoastlineShape(ix, iy, iw * 0.465, ih * 0.195, -14);
@@ -1186,6 +1225,9 @@ function drawIsland() {
     rect(floor(gx) - 2 + sin(gi * 2.1) * 3, floor(gy) + 1, 2, 1);
   }
 
+  // Worn dirt paths between major buildings
+  drawDirtPaths(ix, iy, iw, ih);
+
   // District ground fills — paved stone under the city (Era 2+)
   drawDistrictGrounds(ix, iy);
 
@@ -1202,6 +1244,9 @@ function drawIsland() {
   drawPort();
   // Merchant port (Mercator — right side)
   drawMerchantPort();
+
+  // District props — scarecrow, training dummies, lamp posts, awnings, etc.
+  drawDistrictProps(ix, iy);
 
   // Grass tufts — individual blade clusters
   drawGrassTufts();
@@ -2535,6 +2580,229 @@ function drawGrassTufts() {
   });
 }
 
+// ─── DIRT PATHS — worn walking paths between major buildings ─────────────
+function drawDirtPaths(ix, iy, iw, ih) {
+  let lvl = state.islandLevel || 1;
+  if (lvl < 2) return;
+  let bright = getSkyBrightness();
+  let sg = getSeasonGrass();
+  noStroke();
+
+  // Path helper: draw a worn dirt strip between two screen points
+  function dirtPath(wx1, wy1, wx2, wy2, pathW) {
+    let sx1 = w2sX(wx1), sy1 = w2sY(wy1);
+    let sx2 = w2sX(wx2), sy2 = w2sY(wy2);
+    let steps = max(8, floor(dist(sx1, sy1, sx2, sy2) / 8));
+    for (let i = 0; i <= steps; i++) {
+      let t = i / steps;
+      let px = lerp(sx1, sx2, t);
+      let py = lerp(sy1, sy2, t) + sin(t * PI * 1.5) * 2;
+      let jx = sin(i * 2.3) * 1.5;
+      // Darker worn earth
+      fill(sg.r - 18, sg.g - 22, sg.b - 14, 40);
+      rect(floor(px + jx) - floor(pathW / 2), floor(py) - 1, pathW, 3);
+      // Lighter edges (dusty)
+      fill(sg.r + 5, sg.g - 5, sg.b - 8, 22);
+      rect(floor(px + jx) - floor(pathW / 2) - 1, floor(py), pathW + 2, 1);
+    }
+  }
+
+  let cx = WORLD.islandCX, cy = WORLD.islandCY;
+
+  // Path from campfire/center to farm area
+  dirtPath(cx, cy - 8, cx - 160, cy - 5, 6);
+  // Path from center to shrine/civic
+  if (lvl >= 3) dirtPath(cx + 20, cy - 8, cx + 160, cy - 110, 5);
+  // Path from center toward port
+  dirtPath(cx, cy, cx - 280, cy + 30, 5);
+  // Path from center to market area (east)
+  if (lvl >= 7) dirtPath(cx + 20, cy - 8, cx + 270, cy - 30, 5);
+  // Path toward military/castrum
+  if (lvl >= 8) dirtPath(cx + 200, cy - 8, cx + 260, cy + 90, 5);
+}
+
+// ─── DISTRICT PROPS — visual identity objects for each zone ─────────────
+function drawDistrictProps(ix, iy) {
+  let lvl = state.islandLevel || 1;
+  let bright = getSkyBrightness();
+  let dayMix = max(0.15, bright);
+  noStroke();
+
+  // ── FARM: Scarecrow ──
+  if (lvl >= 3) {
+    let scx = w2sX(WORLD.islandCX - 260);
+    let scy = w2sY(WORLD.islandCY - 30);
+    let windSway = sin(frameCount * 0.02) * 2;
+    // Post
+    fill(120, 90, 50);
+    rect(scx - 1, scy - 20, 3, 22);
+    // Crossbar
+    fill(110, 82, 45);
+    rect(scx - 8 + windSway, scy - 18, 16, 2);
+    // Head (burlap sack)
+    fill(180, 155, 100);
+    ellipse(scx, scy - 23, 8, 9);
+    // Hat
+    fill(100, 75, 40);
+    rect(scx - 6, scy - 28, 12, 3);
+    rect(scx - 3, scy - 32, 6, 4);
+    // Tattered cloth flaps
+    fill(140, 120, 75, 120);
+    rect(scx - 9 + windSway, scy - 16, 3, 8);
+    rect(scx + 6 + windSway, scy - 16, 3, 7);
+  }
+
+  // ── CIVIC: Lamp posts along road ──
+  if (lvl >= 10) {
+    let lampPositions = [
+      { wx: WORLD.islandCX + 80, wy: WORLD.islandCY - 18 },
+      { wx: WORLD.islandCX + 150, wy: WORLD.islandCY - 18 },
+    ];
+    lampPositions.forEach(lp => {
+      let lx = w2sX(lp.wx), ly = w2sY(lp.wy);
+      // Iron pole
+      fill(65, 60, 55);
+      rect(lx - 1, ly - 18, 2, 18);
+      // Cross arm
+      fill(60, 55, 50);
+      rect(lx - 4, ly - 18, 8, 2);
+      // Lantern box
+      fill(70, 65, 58);
+      rect(lx - 3, ly - 22, 6, 5);
+      // Glass glow (warm at night)
+      if (bright < 0.4) {
+        let glowA = map(bright, 0, 0.4, 60, 0);
+        fill(255, 190, 80, glowA);
+        ellipse(lx, ly - 20, 10, 8);
+      } else {
+        fill(200, 185, 140, 40);
+        rect(lx - 2, ly - 21, 4, 3);
+      }
+    });
+  }
+
+  // ── MILITARY: Training dummies and weapon racks ──
+  if (lvl >= 8) {
+    let mdx = w2sX(WORLD.islandCX + 230);
+    let mdy = w2sY(WORLD.islandCY + 60);
+    // Training dummy — wooden post with cross-arms and straw torso
+    fill(130, 100, 60);
+    rect(mdx - 1, mdy - 16, 3, 18);
+    // Cross arm
+    fill(120, 92, 55);
+    rect(mdx - 7, mdy - 14, 14, 2);
+    // Straw body
+    fill(185, 165, 110);
+    rect(mdx - 4, mdy - 12, 8, 10);
+    fill(170, 150, 95, 80);
+    rect(mdx - 3, mdy - 11, 6, 8);
+    // Target circle painted on straw
+    noFill();
+    stroke(160, 50, 40, 80);
+    strokeWeight(0.8);
+    ellipse(mdx, mdy - 7, 5, 5);
+    noStroke();
+
+    // Weapon rack — 2nd dummy further right
+    let wrx = w2sX(WORLD.islandCX + 250);
+    let wry = w2sY(WORLD.islandCY + 50);
+    // Rack frame (A-frame)
+    fill(110, 85, 48);
+    rect(wrx - 8, wry - 2, 2, 14);
+    rect(wrx + 6, wry - 2, 2, 14);
+    rect(wrx - 8, wry - 2, 16, 2);
+    // Spears leaning on rack
+    fill(90, 72, 42);
+    rect(wrx - 5, wry - 14, 1, 14);
+    rect(wrx - 2, wry - 12, 1, 12);
+    rect(wrx + 1, wry - 13, 1, 13);
+    rect(wrx + 4, wry - 11, 1, 11);
+    // Spear tips
+    fill(170, 165, 155);
+    rect(wrx - 5, wry - 16, 1, 3);
+    rect(wrx - 2, wry - 14, 1, 3);
+    rect(wrx + 1, wry - 15, 1, 3);
+    rect(wrx + 4, wry - 13, 1, 3);
+  }
+
+  // ── SACRED: Polished stone floor, flower offerings, incense wisps ──
+  if (lvl >= 9) {
+    let stx = w2sX(WORLD.islandCX + 0);
+    let sty = w2sY(WORLD.islandCY - 150);
+    // Polished stone platform
+    fill(180, 175, 165, 60);
+    rect(stx - 20, sty - 2, 40, 8, 1);
+    // Stone texture — lighter blocks
+    fill(195, 190, 180, 45);
+    for (let si = 0; si < 4; si++) {
+      rect(stx - 18 + si * 10, sty - 1, 8, 6);
+    }
+    // Flower offerings — small colored dots at base
+    let flowerOffs = [
+      { ox: -12, c: [225, 80, 90] }, { ox: -4, c: [255, 200, 60] },
+      { ox: 4, c: [200, 120, 180] }, { ox: 11, c: [255, 160, 80] },
+    ];
+    flowerOffs.forEach(f => {
+      fill(f.c[0], f.c[1], f.c[2], 130 * dayMix);
+      ellipse(stx + f.ox, sty + 8, 3, 2);
+    });
+    // Incense smoke wisps — thin rising particles
+    if (bright > 0.1) {
+      let smokePhase = frameCount * 0.015;
+      for (let wi = 0; wi < 3; wi++) {
+        let wx = stx + sin(smokePhase + wi * 2.5) * 4;
+        let wy = sty - 6 - wi * 6 - sin(smokePhase * 0.7 + wi) * 3;
+        let wa = (35 - wi * 10) * dayMix;
+        fill(165, 148, 175, wa);
+        ellipse(wx, wy, 3 + wi, 2);
+      }
+    }
+  }
+
+  // ── MARKET: Colored awning cloth pieces and crate stacks ──
+  if (lvl >= 7) {
+    let mkx = w2sX(WORLD.islandCX + 270);
+    let mky = w2sY(WORLD.islandCY - 35);
+    // Awning — striped colored cloth
+    let awningColors = [
+      [180, 45, 35], [45, 90, 150], [180, 140, 40],
+    ];
+    for (let ai = 0; ai < 3; ai++) {
+      let ac = awningColors[ai];
+      let ax = mkx - 14 + ai * 12;
+      fill(ac[0], ac[1], ac[2], 140);
+      rect(ax, mky - 10, 10, 3);
+      // Shadow under awning
+      fill(0, 0, 0, 15);
+      rect(ax, mky - 7, 10, 4);
+    }
+    // Support poles
+    fill(100, 80, 50);
+    rect(mkx - 14, mky - 10, 1, 12);
+    rect(mkx + 20, mky - 10, 1, 12);
+
+    // Crate stacks
+    let crx = mkx + 28;
+    let cry = mky - 2;
+    // Bottom crate
+    fill(140, 110, 65);
+    rect(crx, cry, 8, 7);
+    fill(155, 125, 75);
+    rect(crx + 1, cry + 1, 6, 5);
+    // Top crate (smaller, offset)
+    fill(130, 100, 58);
+    rect(crx + 1, cry - 6, 7, 6);
+    fill(145, 115, 68);
+    rect(crx + 2, cry - 5, 5, 4);
+    // Barrel next to crates
+    fill(120, 90, 50);
+    ellipse(crx - 6, cry + 3, 7, 8);
+    fill(95, 72, 40);
+    rect(crx - 9, cry + 1, 1, 5);
+    rect(crx - 3, cry + 1, 1, 5);
+  }
+}
+
 // ─── ISLAND BELLY ─────────────────────────────────────────────────────────
 function drawIslandBelly(cx, cy, w, h) {
   noStroke();
@@ -2701,6 +2969,7 @@ function initOceanWildlife() {
 }
 
 function drawOceanWildlife() {
+  if (typeof _fpsSmooth !== 'undefined' && _fpsSmooth < 30) return;
   if (!_oceanWildlife) initOceanWildlife();
   let bright = getSkyBrightness();
   let dayMix = max(0.15, bright);

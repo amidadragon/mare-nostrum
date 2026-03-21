@@ -1,3 +1,15 @@
+// ─── DISTANCE HELPER ──────────────────────────────────────────────────
+function _getIslandDist(ix, iy) {
+  let px, py;
+  if (state.rowing && state.rowing.active) { px = state.rowing.x; py = state.rowing.y; }
+  else { px = WORLD.islandCX; py = WORLD.islandCY; }
+  let d = sqrt((ix - px) * (ix - px) + (iy - py) * (iy - py));
+  if (d < 500) return 'Nearby';
+  if (d < 1200) return '~1 day sail';
+  if (d < 2500) return '~2 days sail';
+  return '~' + ceil(d / 1200) + ' days sail';
+}
+
 // ======================================================================
 // === ISLE OF VULCAN — Volcanic Island (Southeast) ====================
 // ======================================================================
@@ -96,6 +108,29 @@ function drawVulcanIsland() {
     if (i % 3 === 0) { fill(25, 20, 15, 100); rect(floor(rpx), floor(rpy), 6, 4); fill(35, 28, 22, 80); rect(floor(rpx + 1), floor(rpy), 4, 2); }
     else if (i % 3 === 1) { fill(60, 48, 35, 70); rect(floor(rpx), floor(rpy), 4, 3); }
     else { fill(20, 15, 12, 90); rect(floor(rpx), floor(rpy), 8, 2); }
+  }
+  // Dark sand beach ring at outer edge
+  for (let bb = 0; bb < 10; bb++) {
+    let ba = (bb / 10) * TWO_PI + 0.5;
+    let br = 0.92;
+    let bpx = ix + cos(ba) * v.isleRX * br;
+    let bpy = iy + sin(ba) * v.isleRY * br * 0.69;
+    fill(30, 25, 18, 80); rect(floor(bpx - 4), floor(bpy), 8, 3);
+    fill(38, 32, 22, 50); rect(floor(bpx - 2), floor(bpy + 1), 5, 2);
+  }
+  // Charred dead trees scattered around outer rim
+  let deadTreeSpots = [[-0.55, 0.3], [0.6, 0.2], [-0.4, -0.35], [0.5, -0.3], [-0.65, -0.1], [0.65, 0.35], [-0.3, 0.5]];
+  for (let dt of deadTreeSpots) {
+    let dtx = ix + dt[0] * v.isleRX * 0.75;
+    let dty = iy + dt[1] * v.isleRY * 0.55;
+    // Blackened trunk
+    fill(22, 18, 12); rect(floor(dtx - 1), floor(dty - 14), 3, 14);
+    // Charred branches
+    fill(28, 22, 15); rect(floor(dtx - 4), floor(dty - 12), 3, 1);
+    rect(floor(dtx + 2), floor(dty - 10), 4, 1);
+    // Ember glow at base
+    let eg = sin(vt * 3 + dt[0] * 5) * 0.3 + 0.4;
+    fill(200, 60, 10, 20 * eg); rect(floor(dtx - 2), floor(dty - 1), 5, 2);
   }
   // Central volcano cone — layered
   fill(48, 40, 32); ellipse(ix, iy - 8, 130, 90);
@@ -196,7 +231,24 @@ function drawVulcanDistantLabel() {
   if (state.vulcan.active) return; let v = state.vulcan, sx = w2sX(v.isleX), sy = w2sY(v.isleY);
   let minY = max(height * 0.06, height * 0.25 - horizonOffset) + 10; sy = max(sy, minY);
   if (sx < -400 || sx > width + 400 || sy < -400 || sy > height + 400) return;
-  push(); noStroke(); fill(255, 100, 60, 140 + sin(frameCount * 0.03) * 30); textSize(9); textAlign(CENTER); textStyle(ITALIC); text('Isle of Vulcan', sx, sy + v.isleRY + 18); textStyle(NORMAL); fill(200, 120, 80, 100); textSize(9); text('Volcanic Forge', sx, sy + v.isleRY + 28); pop();
+  let baseY = sy + v.isleRY + 12;
+  push(); noStroke(); textAlign(CENTER);
+  // Flame icon
+  fill(255, 120, 40, 180 + sin(frameCount * 0.05) * 40); textSize(14);
+  text('\u2740', sx, baseY - 2);
+  // Name
+  fill(255, 100, 60, 180); textSize(11); textStyle(ITALIC);
+  text('Isle of Vulcan', sx, baseY + 12); textStyle(NORMAL);
+  // Status + danger
+  let status = v.phase === 'unexplored' ? 'Unexplored' : v.phase === 'forged' ? 'Conquered' : 'Discovered';
+  let dangerIcon = '\u2620 '; // skull
+  fill(220, 80, 50, 160); textSize(9);
+  text(dangerIcon + status, sx, baseY + 24);
+  // Distance
+  let d = _getIslandDist(v.isleX, v.isleY);
+  fill(200, 170, 130, 120); textSize(8);
+  text(d, sx, baseY + 34);
+  pop();
 }
 function drawVulcanHUD() {
   if (!state.vulcan.active) return; push(); fill(20, 16, 12, 220); noStroke(); rect(8, 8, 160, 50, 4); fill(255, 100, 50); textSize(10); textAlign(LEFT); text('ISLE OF VULCAN', 16, 24); fill(200, 180, 150); textSize(11); text('HP: ' + state.player.hp + '/' + state.player.maxHp, 16, 38); fill(80, 60, 120); text('Obsidian: ' + state.obsidian, 16, 50); fill(180, 160, 120, 150); textSize(10); textAlign(CENTER); text('Walk south to dock', width / 2, height - 20); pop();
@@ -314,6 +366,31 @@ function drawHyperboreIsland() {
     fill(195, 215, 232); rect(floor(irx - 3), floor(iry - 3), 6, 4);
     fill(220, 235, 248, 80); rect(floor(irx - 2), floor(iry - 3), 3, 2);
   }
+  // Frozen lake — southeast of center
+  let lkx = ix + h.isleRX * 0.25, lky = iy + h.isleRY * 0.2;
+  fill(140, 185, 215, 100); ellipse(lkx, lky, 55, 30);
+  fill(170, 210, 235, 80); ellipse(lkx, lky, 40, 20);
+  // Ice surface shimmer
+  let iceShim = sin(ht * 3) * 0.3 + 0.7;
+  fill(220, 240, 255, 30 * iceShim); ellipse(lkx - 5, lky - 3, 20, 10);
+  fill(200, 225, 245, 20); rect(floor(lkx - 12), floor(lky - 1), 8, 1);
+  rect(floor(lkx + 4), floor(lky + 2), 6, 1);
+  // Snow-capped hill — northeast
+  fill(200, 218, 235); ellipse(ix + 30, iy - 6, 60, 40);
+  fill(220, 235, 248); ellipse(ix + 30, iy - 12, 40, 26);
+  fill(242, 248, 255); ellipse(ix + 30, iy - 16, 24, 16);
+  // Ice crystal formations — scattered spires
+  let crystalSpots = [[0.35, -0.3], [-0.45, 0.15], [0.55, 0.1], [-0.2, -0.5]];
+  for (let cs of crystalSpots) {
+    let cx = ix + cs[0] * h.isleRX * 0.6;
+    let cy = iy + cs[1] * h.isleRY * 0.45;
+    let cShim = sin(ht * 4 + cs[0] * 8) * 0.3 + 0.7;
+    fill(140, 210, 255, 120 * cShim);
+    triangle(cx, cy - 10, cx - 3, cy + 2, cx + 3, cy + 2);
+    fill(180, 230, 255, 80 * cShim);
+    triangle(cx + 3, cy - 7, cx + 1, cy + 1, cx + 5, cy + 1);
+    fill(100, 180, 240, 25 * cShim); ellipse(cx, cy, 14, 8);
+  }
   // Aurora borealis — improved with flowing curtains
   if (h.auroraBorealis > 0) {
     let a = h.auroraBorealis;
@@ -398,7 +475,24 @@ function drawHyperboreEntities() {
 function drawHyperboreDistantLabel() {
   if (state.hyperborea.active) return; let h = state.hyperborea, sx = w2sX(h.isleX), sy = w2sY(h.isleY); let minY = max(height * 0.06, height * 0.25 - horizonOffset) + 10; sy = max(sy, minY);
   if (sx < -400 || sx > width + 400 || sy < -400 || sy > height + 400) return;
-  push(); noStroke(); fill(140, 200, 240, 140 + sin(frameCount * 0.03) * 30); textSize(9); textAlign(CENTER); textStyle(ITALIC); text('Hyperborea', sx, sy + h.isleRY + 18); textStyle(NORMAL); fill(120, 180, 220, 100); textSize(9); text('Frozen Wastes', sx, sy + h.isleRY + 28); pop();
+  let baseY = sy + h.isleRY + 12;
+  push(); noStroke(); textAlign(CENTER);
+  // Snowflake icon
+  fill(160, 220, 255, 180 + sin(frameCount * 0.05) * 40); textSize(14);
+  text('\u2744', sx, baseY - 2);
+  // Name
+  fill(140, 200, 240, 180); textSize(11); textStyle(ITALIC);
+  text('Hyperborea', sx, baseY + 12); textStyle(NORMAL);
+  // Status + danger
+  let status = h.phase === 'unexplored' ? 'Unexplored' : h.phase === 'settled' ? 'Settled' : 'Discovered';
+  let dangerIcon = '\u2620 ';
+  fill(140, 180, 220, 160); textSize(9);
+  text(dangerIcon + status, sx, baseY + 24);
+  // Distance
+  let d = _getIslandDist(h.isleX, h.isleY);
+  fill(160, 200, 220, 120); textSize(8);
+  text(d, sx, baseY + 34);
+  pop();
 }
 function drawHyperboreHUD() {
   if (!state.hyperborea.active) return; push(); fill(20, 30, 45, 220); noStroke(); rect(8, 8, 160, 50, 4); fill(140, 200, 255); textSize(10); textAlign(LEFT); text('HYPERBOREA', 16, 24); fill(200, 220, 240); textSize(11); text('HP: ' + state.player.hp + '/' + state.player.maxHp, 16, 38); fill(120, 200, 255); text('Frost Crystals: ' + state.frostCrystal, 16, 50); fill(180, 210, 240, 150); textSize(10); textAlign(CENTER); text('Walk south to dock', width / 2, height - 20); pop();
@@ -526,6 +620,29 @@ function drawPlentyIsland() {
     let mAlpha = 20 + sin(pt * 6) * 8;
     fill(200, 225, 240, mAlpha); ellipse(wx, wy + wf.h - 2, 22, 10);
   }
+  // River/stream — winding from northwest hill to southeast shore
+  for (let seg = 0; seg < 12; seg++) {
+    let st = seg / 12;
+    let rx = ix - pl.isleRX * 0.35 + st * pl.isleRX * 0.65;
+    let ry = iy - pl.isleRY * 0.25 + st * pl.isleRY * 0.55;
+    let bend = sin(st * 4 + 1.5) * 12;
+    let shimmer = sin(pt * 8 + seg * 0.5) * 1;
+    fill(60, 160, 185, 110); rect(floor(rx + bend + shimmer), floor(ry), 6, 5);
+    fill(90, 190, 210, 70); rect(floor(rx + bend + shimmer + 1), floor(ry + 1), 4, 3);
+  }
+  // Tropical butterflies
+  for (let bf = 0; bf < 4; bf++) {
+    let bfa = (bf / 4) * TWO_PI + pt * 2;
+    let bfr = pl.isleRX * 0.3;
+    let bfx = ix + cos(bfa + bf) * bfr * 0.5;
+    let bfy = iy + sin(bfa * 0.7 + bf) * bfr * 0.3;
+    let wing = sin(frameCount * 0.15 + bf * 2) * 3;
+    let bfCols = [[255, 200, 50], [255, 100, 150], [100, 200, 255], [255, 150, 50]];
+    let bc = bfCols[bf];
+    fill(bc[0], bc[1], bc[2], 140);
+    rect(floor(bfx - abs(wing)), floor(bfy), max(1, floor(abs(wing))), 2);
+    rect(floor(bfx + 1), floor(bfy), max(1, floor(abs(wing))), 2);
+  }
   // Distant dock indicator
   if (!isActive) {
     noStroke();
@@ -548,7 +665,24 @@ function drawPlentyEntities() {
 function drawPlentyDistantLabel() {
   if (state.plenty.active) return; let pl = state.plenty, sx = w2sX(pl.isleX), sy = w2sY(pl.isleY); let minY = max(height * 0.06, height * 0.25 - horizonOffset) + 10; sy = max(sy, minY);
   if (sx < -400 || sx > width + 400 || sy < -400 || sy > height + 400) return;
-  push(); noStroke(); fill(60, 200, 80, 140 + sin(frameCount * 0.03) * 30); textSize(9); textAlign(CENTER); textStyle(ITALIC); text('Isle of Plenty', sx, sy + pl.isleRY + 18); textStyle(NORMAL); fill(80, 180, 60, 100); textSize(9); text('Tropical Paradise', sx, sy + pl.isleRY + 28); pop();
+  let baseY = sy + pl.isleRY + 12;
+  push(); noStroke(); textAlign(CENTER);
+  // Leaf icon
+  fill(80, 200, 80, 180 + sin(frameCount * 0.05) * 40); textSize(14);
+  text('\u2618', sx, baseY - 2);
+  // Name
+  fill(60, 200, 80, 180); textSize(11); textStyle(ITALIC);
+  text('Isle of Plenty', sx, baseY + 12); textStyle(NORMAL);
+  // Status + peace
+  let status = pl.phase === 'unexplored' ? 'Unexplored' : pl.phase === 'colonized' ? 'Colonized' : 'Discovered';
+  let dangerIcon = '\u262E '; // peace sign
+  fill(80, 180, 60, 160); textSize(9);
+  text(dangerIcon + status, sx, baseY + 24);
+  // Distance
+  let d = _getIslandDist(pl.isleX, pl.isleY);
+  fill(120, 180, 100, 120); textSize(8);
+  text(d, sx, baseY + 34);
+  pop();
 }
 function drawPlentyHUD() {
   if (!state.plenty.active) return; push(); fill(15, 30, 12, 220); noStroke(); rect(8, 8, 160, 50, 4); fill(80, 220, 80); textSize(10); textAlign(LEFT); text('ISLE OF PLENTY', 16, 24); fill(200, 230, 180); textSize(11); text('HP: ' + state.player.hp + '/' + state.player.maxHp, 16, 38); fill(200, 160, 60); text('Exotic Spices: ' + state.exoticSpices, 16, 50); fill(150, 200, 120, 150); textSize(10); textAlign(CENTER); text('Walk south to dock', width / 2, height - 20); pop();
@@ -663,6 +797,37 @@ function drawNecropolisIsland() {
     if (gs[0] > 0) { fill(78, 70, 85); rect(floor(gsx - 1), floor(gsy - 10), 2, 3); }
     else { fill(68, 60, 75); rect(floor(gsx - 2), floor(gsy - 9), 4, 2); }
   }
+  // Dead / twisted trees
+  let deadTreeSpots = [[-0.5, -0.2], [0.55, 0.1], [-0.35, 0.35], [0.4, -0.35], [-0.6, 0.15], [0.3, 0.4]];
+  for (let dt of deadTreeSpots) {
+    let dtx = ix + dt[0] * n.isleRX * 0.7;
+    let dty = iy + dt[1] * n.isleRY * 0.5;
+    // Gnarled trunk
+    fill(35, 28, 38); rect(floor(dtx - 1), floor(dty - 16), 3, 16);
+    // Twisted branches
+    fill(42, 35, 48);
+    rect(floor(dtx - 5), floor(dty - 14), 4, 1);
+    rect(floor(dtx - 6), floor(dty - 15), 2, 1);
+    rect(floor(dtx + 2), floor(dty - 12), 5, 1);
+    rect(floor(dtx + 5), floor(dty - 13), 2, 1);
+    rect(floor(dtx - 3), floor(dty - 16), 3, 1);
+    // Faint purple glow at roots
+    let tGlow = sin(nt * 2 + dt[0] * 4) * 0.3 + 0.4;
+    fill(100, 50, 150, 15 * tGlow); ellipse(dtx, dty, 10, 5);
+  }
+  // Ground fog / mist patches
+  for (let fg = 0; fg < 8; fg++) {
+    let fga = (fg / 8) * TWO_PI + nt * 0.3;
+    let fgr = n.isleRX * (0.2 + (fg % 3) * 0.15);
+    let fgx = ix + cos(fga) * fgr;
+    let fgy = iy + sin(fga) * fgr * 0.6;
+    let fogAlpha = 12 + sin(nt * 2 + fg * 1.5) * 6;
+    fill(80, 70, 100, fogAlpha);
+    ellipse(fgx, fgy, 35 + sin(nt + fg) * 8, 12 + sin(nt * 0.7 + fg) * 4);
+  }
+  // Edge fog crawl — creeping mist at island borders
+  fill(60, 50, 80, 10 + sin(nt * 1.5) * 5);
+  ellipse(ix, iy, n.isleRX * 2.05, n.isleRY * 2.05);
   // Central mausoleum — larger, more imposing
   fill(48, 42, 55); rect(floor(ix) - 28, floor(iy) - 18, 56, 32);
   fill(58, 52, 65); rect(floor(ix) - 24, floor(iy) - 26, 48, 12);
@@ -719,7 +884,24 @@ function drawNecropolisEntities() {
 function drawNecropolisDistantLabel() {
   if (state.necropolis.active) return; let n = state.necropolis, sx = w2sX(n.isleX), sy = w2sY(n.isleY); let minY = max(height * 0.06, height * 0.25 - horizonOffset) + 10; sy = max(sy, minY);
   if (sx < -400 || sx > width + 400 || sy < -400 || sy > height + 400) return;
-  push(); noStroke(); fill(160, 100, 200, 140 + sin(frameCount * 0.03) * 30); textSize(9); textAlign(CENTER); textStyle(ITALIC); text('Necropolis', sx, sy + n.isleRY + 18); textStyle(NORMAL); fill(130, 80, 170, 100); textSize(9); text('City of the Dead', sx, sy + n.isleRY + 28); pop();
+  let baseY = sy + n.isleRY + 12;
+  push(); noStroke(); textAlign(CENTER);
+  // Skull icon
+  fill(180, 100, 220, 180 + sin(frameCount * 0.05) * 40); textSize(14);
+  text('\u2620', sx, baseY - 2);
+  // Name
+  fill(160, 100, 200, 180); textSize(11); textStyle(ITALIC);
+  text('Necropolis', sx, baseY + 12); textStyle(NORMAL);
+  // Status + danger
+  let status = n.phase === 'unexplored' ? 'Unexplored' : n.phase === 'cleansed' ? 'Cleansed' : 'Discovered';
+  let dangerIcon = '\u2620 ';
+  fill(180, 80, 200, 160); textSize(9);
+  text(dangerIcon + status, sx, baseY + 24);
+  // Distance
+  let d = _getIslandDist(n.isleX, n.isleY);
+  fill(150, 120, 180, 120); textSize(8);
+  text(d, sx, baseY + 34);
+  pop();
 }
 function drawNecropolisHUD() {
   if (!state.necropolis.active) return; push(); fill(20, 12, 30, 220); noStroke(); rect(8, 8, 160, 60, 4); fill(180, 100, 240); textSize(10); textAlign(LEFT); text('NECROPOLIS', 16, 24); fill(200, 180, 210); textSize(11); text('HP: ' + state.player.hp + '/' + state.player.maxHp, 16, 38); fill(160, 100, 220); text('Soul Essence: ' + state.soulEssence, 16, 50); let alive = state.necropolis.skeletons.filter(s => s.hp > 0).length; fill(200, 80, 80); text('Skeletons: ' + alive, 16, 62); fill(160, 140, 180, 150); textSize(10); textAlign(CENTER); text('Walk south to dock', width / 2, height - 20); pop();

@@ -352,7 +352,14 @@ function getDailyWant(npcName) {
   // Each NPC gets a different offset so they don't all want the same type
   let npcOffset = { livia: 0, marcus: 3, vesta: 5, felix: 7 }[npcName] || 0;
   let idx = (daySeed + npcOffset) % pool.length;
-  return pool[idx];
+  let want = Object.assign({}, pool[idx]);
+  // Replace hardcoded Roman name with faction-appropriate name
+  if (typeof getNPCDisplayName === 'function' && want.label) {
+    let romeName = npcName.charAt(0).toUpperCase() + npcName.slice(1);
+    let facName = getNPCDisplayName(npcName);
+    if (facName !== romeName) want.label = want.label.replace(romeName, facName);
+  }
+  return want;
 }
 
 // ─── FELIX + LIVIA RELATIONSHIP SCENE ───
@@ -1079,7 +1086,7 @@ function drawQuestTracker() {
     let nqH = 16 + quest.objectives.length * 12;
     drawHUDPanel(rx, nqY, rw, nqH);
     fill(140, 180, 220); textSize(10);
-    text(npcName.charAt(0).toUpperCase() + npcName.slice(1) + ': ' + quest.title, rx + 8, nqY + 4);
+    text((typeof getNPCDisplayName === 'function' ? getNPCDisplayName(npcName) : npcName.charAt(0).toUpperCase() + npcName.slice(1)) + ': ' + quest.title, rx + 8, nqY + 4);
     let objY = nqY + 16;
     for (let obj of quest.objectives) {
       let done = false;
@@ -1121,7 +1128,7 @@ function drawNarrativeDialogue() {
   let nc = d.npc === 'livia' ? color(255, 150, 180, alpha) : d.npc === 'marcus' ? color(180, 200, 255, alpha) :
     d.npc === 'vesta' ? color(180, 140, 255, alpha) : color(140, 200, 140, alpha);
   fill(nc); textAlign(LEFT, TOP); textSize(9);
-  text(d.npc.charAt(0).toUpperCase() + d.npc.slice(1), px + 10, py + 8);
+  text((typeof getNPCDisplayName === 'function' ? getNPCDisplayName(d.npc) : d.npc.charAt(0).toUpperCase() + d.npc.slice(1)), px + 10, py + 8);
   fill(210, 200, 175, alpha); textSize(10);
   let words = d.line.split(' '), line = '', ly = py + 24, maxW = pw - 24;
   for (let w of words) {

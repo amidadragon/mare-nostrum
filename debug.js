@@ -2,6 +2,37 @@
 // Press ` (backtick) to toggle. Type commands and press Enter.
 // Loaded AFTER sketch.js so it can access all game globals.
 
+// Raw DOM listener — works in Electron, bypasses p5.js entirely
+document.addEventListener('keydown', function(e) {
+  if (typeof Debug === 'undefined') return;
+  // Toggle console
+  if (e.code === 'Backquote' || e.key === '`' || e.key === '~' || e.key === '§' || e.keyCode === 192) {
+    e.preventDefault();
+    e.stopPropagation();
+    Debug.toggle();
+    return;
+  }
+  // When console is open, handle ALL input here
+  if (Debug.open) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.key === 'Enter') {
+      if (Debug.input.trim()) {
+        Debug.addLog('> ' + Debug.input, '#888888');
+        Debug.exec(Debug.input);
+        Debug.input = '';
+      }
+    } else if (e.key === 'Backspace') {
+      Debug.input = Debug.input.slice(0, -1);
+    } else if (e.key === 'Escape') {
+      Debug.open = false;
+      Debug.input = '';
+    } else if (e.key.length === 1) {
+      Debug.input += e.key;
+    }
+  }
+});
+
 const Debug = {
   open: false,
   input: '',
@@ -545,7 +576,7 @@ const Debug = {
   },
 
   handleKey(key, keyCode) {
-    if (key === '`' || key === '§' || keyCode === 112) { // backtick, §, or F1
+    if (key === '`' || key === '§' || key === '~' || keyCode === 112 || keyCode === 192 || keyCode === 223) { // backtick, ~, §, F1, and common backtick keycodes
       this.toggle();
       return true;
     }

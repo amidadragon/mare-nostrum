@@ -16,7 +16,11 @@ function createWindow() {
     backgroundColor: '#0a0e1a',
   });
 
-  win.loadFile('index.html');
+  // Always clear cache on launch — never serve stale files
+  win.webContents.session.clearCache().then(() => {
+    win.webContents.session.clearStorageData({ storages: ['serviceworkers','cachestorage'] });
+    win.loadFile('index.html');
+  });
 
   // Open DevTools with F12
   win.webContents.on('before-input-event', (event, input) => {
