@@ -818,6 +818,10 @@ function getEraPalette() {
 let state;
 let cam = { x: 600, y: 400 };
 let camSmooth = { x: 600, y: 400 };
+let camZoom = 1.0;
+let camZoomTarget = 1.0;
+const CAM_ZOOM_MIN = 0.5;
+const CAM_ZOOM_MAX = 2.0;
 let particles = [];
 let lightningBolts = [];
 let stormTimer = 0;
@@ -2566,6 +2570,9 @@ function updateCamera() {
     camSmooth.x += sin(frameCount * 0.015) * 0.3;
     camSmooth.y += sin(frameCount * 0.011) * 0.2;
   }
+
+  // Smooth zoom interpolation
+  camZoom = lerp(camZoom, camZoomTarget, 0.1);
 }
 
 function w2sX(wx) {
@@ -2577,11 +2584,11 @@ function w2sY(wy) {
 }
 
 function s2wX(sx) {
-  return (sx - width / 2) + camSmooth.x;
+  return (sx - width / 2) / camZoom + camSmooth.x;
 }
 
 function s2wY(sy) {
-  return (sy - height / 2) + camSmooth.y;
+  return (sy - height / 2) / camZoom + camSmooth.y;
 }
 
 // Surface radii match the drawn grass ellipse
@@ -2723,7 +2730,7 @@ let _jumpingFish = [];
 
 function draw() {
   // Engine camera bounds for culling
-  if (typeof Engine !== 'undefined') Engine.updateCamBounds(camSmooth.x, camSmooth.y, width, height);
+  if (typeof Engine !== 'undefined') Engine.updateCamBounds(camSmooth.x, camSmooth.y, width / camZoom, height / camZoom);
   // Delta time
   let now = millis();
   _delta = constrain((now - _prevTime) / 1000, 0.001, 0.1);
@@ -2813,6 +2820,8 @@ function _dith(x, y, t) {
 
 
 function drawInner() {
+  // Clear canvas so zoomed-out edges don't show stale frames
+  if (camZoom < 0.99) background(10, 18, 35);
   floatOffset = sin(frameCount * 0.015) * 1.5;
   const dt = min(2, _delta * 60);
 
@@ -2872,6 +2881,11 @@ function drawInner() {
 
     horizonOffset = height * 0.19;
     push();
+    translate(width / 2, height / 2);
+    scale(camZoom);
+    translate(-width / 2, -height / 2);
+
+    push();
     translate(shakeX, shakeY);
     drawSky();
     drawOcean();
@@ -2892,6 +2906,8 @@ function drawInner() {
     drawFloatingText();
     pop();
 
+    pop(); // end zoom
+
     drawWreckHUD();
     drawTutorialHintUI();
     drawScreenFlash();
@@ -2910,6 +2926,7 @@ function drawInner() {
     updateShake(dt);
     updateCamera();
     horizonOffset = height * 0.19;
+    push(); translate(width/2,height/2); scale(camZoom); translate(-width/2,-height/2);
     push(); translate(shakeX, shakeY); drawSky(); drawOcean();
     if (typeof drawOceanWildlife === 'function') drawOceanWildlife();
     if (typeof drawAtmosphericHaze === 'function') drawAtmosphericHaze();
@@ -2918,6 +2935,7 @@ function drawInner() {
     drawVulcanIsland();
     drawVulcanEntities();
     drawParticles(); drawFloatingText(); pop();
+    pop(); // end zoom
     drawVulcanHUD();
     if (typeof drawSecretOverlays === 'function') drawSecretOverlays();
     drawGameVignette(); drawScreenFlash(); drawCursor(); drawSaveIndicator();
@@ -2932,6 +2950,7 @@ function drawInner() {
     updateShake(dt);
     updateCamera();
     horizonOffset = height * 0.19;
+    push(); translate(width/2,height/2); scale(camZoom); translate(-width/2,-height/2);
     push(); translate(shakeX, shakeY); drawSky(); drawOcean();
     if (typeof drawOceanWildlife === 'function') drawOceanWildlife();
     if (typeof drawAtmosphericHaze === 'function') drawAtmosphericHaze();
@@ -2940,6 +2959,7 @@ function drawInner() {
     drawHyperboreIsland();
     drawHyperboreEntities();
     drawParticles(); drawFloatingText(); pop();
+    pop(); // end zoom
     drawHyperboreHUD();
     if (typeof drawSecretOverlays === 'function') drawSecretOverlays();
     drawGameVignette(); drawScreenFlash(); drawCursor(); drawSaveIndicator();
@@ -2954,6 +2974,7 @@ function drawInner() {
     updateShake(dt);
     updateCamera();
     horizonOffset = height * 0.19;
+    push(); translate(width/2,height/2); scale(camZoom); translate(-width/2,-height/2);
     push(); translate(shakeX, shakeY); drawSky(); drawOcean();
     if (typeof drawOceanWildlife === 'function') drawOceanWildlife();
     if (typeof drawAtmosphericHaze === 'function') drawAtmosphericHaze();
@@ -2962,6 +2983,7 @@ function drawInner() {
     drawPlentyIsland();
     drawPlentyEntities();
     drawParticles(); drawFloatingText(); pop();
+    pop(); // end zoom
     drawPlentyHUD();
     if (typeof drawSecretOverlays === 'function') drawSecretOverlays();
     drawGameVignette(); drawScreenFlash(); drawCursor(); drawSaveIndicator();
@@ -2977,6 +2999,7 @@ function drawInner() {
     updateShake(dt);
     updateCamera();
     horizonOffset = height * 0.19;
+    push(); translate(width/2,height/2); scale(camZoom); translate(-width/2,-height/2);
     push(); translate(shakeX, shakeY); drawSky(); drawOcean();
     if (typeof drawOceanWildlife === 'function') drawOceanWildlife();
     if (typeof drawAtmosphericHaze === 'function') drawAtmosphericHaze();
@@ -2985,6 +3008,7 @@ function drawInner() {
     drawNecropolisIsland();
     drawNecropolisEntities();
     drawParticles(); drawFloatingText(); pop();
+    pop(); // end zoom
     drawNecropolisHUD();
     if (typeof drawSecretOverlays === 'function') drawSecretOverlays();
     drawGameVignette(); drawScreenFlash(); drawCursor(); drawSaveIndicator();
@@ -3000,6 +3024,7 @@ function drawInner() {
     updateShake(dt);
     updateCamera();
     horizonOffset = height * 0.19;
+    push(); translate(width/2,height/2); scale(camZoom); translate(-width/2,-height/2);
     push(); translate(shakeX, shakeY); drawSky(); drawOcean();
     if (typeof drawOceanWildlife === 'function') drawOceanWildlife();
     if (typeof drawAtmosphericHaze === 'function') drawAtmosphericHaze();
@@ -3008,6 +3033,7 @@ function drawInner() {
     drawNationIslandFull();
     drawNationIslandEntities();
     drawParticles(); drawFloatingText(); pop();
+    pop(); // end zoom
     drawNationIslandHUD();
     if (state.nationDiplomacyOpen) drawNationDiplomacyUI();
     drawGameVignette(); drawScreenFlash(); drawCursor(); drawSaveIndicator();
@@ -3030,6 +3056,7 @@ function drawInner() {
 
     // Sky + ocean — push horizon above island's visible water effects
     horizonOffset = height * 0.19;
+    push(); translate(width/2,height/2); scale(camZoom); translate(-width/2,-height/2);
     push();
     translate(shakeX, shakeY);
     drawSky();
@@ -3052,6 +3079,7 @@ function drawInner() {
     drawFloatingText();
     drawModifierAtmosphere();
     pop();
+    pop(); // end zoom
 
     drawConquestHUD();
     if (typeof drawFactionAbilityHUD === 'function') drawFactionAbilityHUD();
@@ -3072,6 +3100,7 @@ function drawInner() {
 
     // Sky + ocean — push horizon above island
     horizonOffset = height * 0.19;
+    push(); translate(width/2,height/2); scale(camZoom); translate(-width/2,-height/2);
     push();
     translate(shakeX, shakeY);
     drawSky();
@@ -3088,6 +3117,7 @@ function drawInner() {
     drawParticles();
     drawFloatingText();
     pop();
+    pop(); // end zoom
 
     drawAdventureHUD();
     if (typeof drawFactionAbilityHUD === 'function') drawFactionAbilityHUD();
@@ -3207,6 +3237,12 @@ function drawInner() {
       horizonY = max(horizonY, height * 0.05);
       horizonOffset = (height * 0.25) - horizonY;
     }
+    // ─── ZOOM TRANSFORM — scale world rendering around screen center ───
+    push();
+    translate(width / 2, height / 2);
+    scale(camZoom);
+    translate(-width / 2, -height / 2);
+
     push();
     translate(shakeX, shakeY);
     drawSky();
@@ -3492,6 +3528,8 @@ function drawInner() {
         pop();
       }
     }
+
+    pop(); // ─── END ZOOM TRANSFORM ───
 
     // Night darkness + golden hour color grading — atmospheric tint over the world
     if (!state.conquest.active && !state.adventure.active) {
@@ -18187,15 +18225,15 @@ function updateColonyIncome() {
 const NATION_BUILDING_TYPES = ['hut', 'hut', 'market', 'wall', 'barracks', 'tower', 'temple', 'harbor', 'forge', 'granary'];
 
 const NATION_DEFAULTS = {
-  carthage: { gold: 100, military: 3, population: 5, personality: 'aggressive',
+  carthage: { gold: 100, military: 3, population: 5, personality: 'trader',
               position: { angle: -0.785, dist: 2800 }, isleRX: 400, isleRY: 280 }, // NE
-  egypt:    { gold: 120, military: 2, population: 5, personality: 'trader',
+  egypt:    { gold: 120, military: 2, population: 5, personality: 'balanced',
               position: { angle: 1.571, dist: 2800 }, isleRX: 420, isleRY: 290 },  // S
   greece:   { gold: 80,  military: 4, population: 5, personality: 'balanced',
               position: { angle: 0, dist: 2800 }, isleRX: 390, isleRY: 270 },      // E
   rome:      { gold: 100, military: 3, population: 5, personality: 'balanced',
               position: { angle: 3.927, dist: 2800 }, isleRX: 400, isleRY: 280 },  // NW (fallback if not player)
-  seapeople: { gold: 60,  military: 5, population: 4, personality: 'aggressive',
+  seapeople: { gold: 60,  military: 5, population: 4, personality: 'raider',
               position: { angle: 2.356, dist: 3000 }, isleRX: 350, isleRY: 250 },  // SW
   persia:    { gold: 150, military: 3, population: 6, personality: 'trader',
               position: { angle: 0.785, dist: 3200 }, isleRX: 430, isleRY: 300 },  // NE far
@@ -18203,6 +18241,17 @@ const NATION_DEFAULTS = {
               position: { angle: -1.571, dist: 2800 }, isleRX: 380, isleRY: 260 }, // N
   gaul:      { gold: 70,  military: 4, population: 5, personality: 'aggressive',
               position: { angle: 3.14, dist: 3000 }, isleRX: 410, isleRY: 290 },   // W
+};
+
+const FACTION_RELATIONS = {
+  rome: { greece: 10, carthage: -15, gaul: -10 },
+  carthage: { phoenicia: 15, rome: -15, greece: -10 },
+  egypt: { persia: -10, phoenicia: 10 },
+  greece: { rome: 10, persia: -15 },
+  seapeople: { phoenicia: -10 },
+  persia: { greece: -15, egypt: -10, phoenicia: 5 },
+  phoenicia: { carthage: 15, egypt: 10, seapeople: -10 },
+  gaul: { rome: -15, seapeople: -5 },
 };
 
 const NATION_PERSONALITIES = {
@@ -18298,7 +18347,12 @@ function initNations() {
   let nationKeys = Object.keys(state.nations);
   for (let k of nationKeys) {
     for (let k2 of nationKeys) {
-      if (k !== k2) state.nations[k].relations[k2] = floor(random(-10, 10));
+      if (k !== k2) {
+        let base = floor(random(-10, 10));
+        let fRel = FACTION_RELATIONS[k];
+        if (fRel && fRel[k2]) base += fRel[k2];
+        state.nations[k].relations[k2] = constrain(base, -100, 100);
+      }
     }
   }
 }
@@ -18342,7 +18396,10 @@ function updateNationDaily(key) {
   let baseIncome = 5 + rv.population * 2;
   let tradeBonus = rv.tradeActive ? 10 : 0;
   let buildingIncome = floor(rv.buildings.length * 0.5);
-  rv.gold += floor((baseIncome + tradeBonus + buildingIncome) * pers.goldMult);
+  let facData = FACTIONS[key] || {};
+  let income = floor((baseIncome + tradeBonus + buildingIncome) * pers.goldMult);
+  income = floor(income * (facData.tradeIncomeMult || 1.0));
+  rv.gold += income;
 
   // Vassal tribute income
   let otherKeys = Object.keys(state.nations).filter(k2 => k2 !== key);
@@ -18405,8 +18462,10 @@ function updateNationDaily(key) {
       }
       // Skirmish
       if (random() < 0.15) {
-        let rvStr = rv.military + rv.level * 0.5;
-        let enStr = enemy.military + enemy.level * 0.5;
+        let rvFac = FACTIONS[key] || {};
+        let enFac = FACTIONS[warKey] || {};
+        let rvStr = (rv.military + rv.level * 0.5) * (rvFac.combatDamageMult || 1.0);
+        let enStr = (enemy.military + enemy.level * 0.5) * (enFac.combatDamageMult || 1.0);
         if (rvStr > enStr && random() < 0.6) {
           let loot = min(enemy.gold, floor(random(5, 15 + rv.level)));
           enemy.gold -= loot; rv.gold += loot;
@@ -18455,6 +18514,7 @@ function updateNationDaily(key) {
     let daysSinceRaid = state.day - rv.lastRaid;
     let raidChance = constrain(map(rv.reputation, pers.raidThreshold, -100, 0.05, 0.3), 0.05, 0.3);
     if (rv.personality === 'aggressive') raidChance *= 1.5;
+    if (rv.personality === 'raider') raidChance *= 2.0;
     if (rv.personality === 'trader') raidChance *= 0.4;
     if (daysSinceRaid >= 3 && random() < raidChance && rv.military >= 2) startNationRaid(key);
   }
@@ -18466,6 +18526,7 @@ function updateNationDaily(key) {
     let rel = rv.relations[k2] || 0;
     if (rv.personality === 'trader') rv.relations[k2] = min(100, rel + 0.3);
     else if (rv.personality === 'aggressive') rv.relations[k2] = max(-100, rel - 0.15);
+    else if (rv.personality === 'raider') rv.relations[k2] = max(-100, rel - 0.25);
     // Shared enemies bring nations closer
     if (rv.wars && other.wars) {
       for (let wk of rv.wars) {
@@ -18492,6 +18553,65 @@ function updateNationDaily(key) {
   if (random() < 0.1 && rv.population < popCap) rv.population++;
   if (atWar && random() < 0.05 && rv.population > 2) rv.population--;
 
+  // --- STRATEGIC GOALS (personality-driven) ---
+  if (rv.personality === 'aggressive') {
+    if (rv.gold >= 15 && random() < 0.15) { rv.military += 1; rv.gold -= 15; }
+    for (let k2 of otherKeys) {
+      let other = state.nations[k2];
+      if (!other || other.defeated || other.vassal) continue;
+      if (rv.military > other.military * 2 && !(rv.wars && rv.wars.includes(k2)) && random() < 0.04) {
+        if (!rv.wars) rv.wars = [];
+        rv.wars.push(k2);
+        if (!other.wars) other.wars = [];
+        if (!other.wars.includes(key)) other.wars.push(key);
+        rv.relations[k2] = -80; other.relations[key] = max(-80, (other.relations[key] || 0) - 40);
+        addNotification(name + ' attacks weakened ' + getNationName(k2) + '!', '#ff6644');
+      }
+    }
+  } else if (rv.personality === 'trader') {
+    for (let k2 of otherKeys) {
+      let other = state.nations[k2];
+      if (!other || other.defeated) continue;
+      if (other.gold > 100 && (rv.relations[k2] || 0) > -10 && random() < 0.06) {
+        rv.gold += 3; other.gold += 3;
+        rv.relations[k2] = min(100, (rv.relations[k2] || 0) + 0.5);
+      }
+      if (rv.wars && rv.wars.includes(k2) && random() < 0.08) {
+        rv.wars = rv.wars.filter(w => w !== k2);
+        other.wars = (other.wars || []).filter(w => w !== key);
+        rv.relations[k2] = 0; other.relations[key] = 0;
+        addNotification(name + ' offers peace to ' + getNationName(k2) + '.', '#88cc88');
+      }
+    }
+  } else if (rv.personality === 'raider') {
+    if (rv.raidParty.length === 0 && rv.military >= 2 && random() < 0.08) {
+      startNationRaid(key);
+    }
+    for (let k2 of otherKeys) {
+      let other = state.nations[k2];
+      if (other && other.vassal && other._vassalOf === key && random() < 0.1) {
+        other.vassal = false; other._vassalOf = null;
+      }
+    }
+    if (rv.gold >= 15 && random() < 0.12) { rv.military += 1; rv.gold -= 15; }
+  } else if (rv.personality === 'balanced') {
+    for (let k2 of otherKeys) {
+      let other = state.nations[k2];
+      if (!other || other.defeated || other.vassal) continue;
+      if (other.military > 8 && (rv.relations[k2] || 0) > 0 && random() < 0.03) {
+        rv.relations[k2] = min(100, (rv.relations[k2] || 0) + 2);
+      }
+      if (other.military < 3 && (!other.allies || other.allies.length === 0) && rv.military > 6 && !(rv.wars && rv.wars.includes(k2)) && random() < 0.02) {
+        if (!rv.wars) rv.wars = [];
+        rv.wars.push(k2);
+        if (!other.wars) other.wars = [];
+        if (!other.wars.includes(key)) other.wars.push(key);
+        rv.relations[k2] = -60; other.relations[key] = max(-80, (other.relations[key] || 0) - 30);
+        addNotification(name + ' moves against isolated ' + getNationName(k2) + '!', '#ff8844');
+      }
+    }
+  }
+
   // Spy intel expiry
   if (rv._intelRevealedDays > 0) rv._intelRevealedDays--;
   // Trade agreement expiry
@@ -18507,6 +18627,7 @@ function _pickNationBuilding(rv, key) {
   if (atWar && lowMilitary && random() < 0.6) return random() < 0.5 ? 'barracks' : 'wall';
   if (rv.personality === 'trader' && random() < 0.4) return random() < 0.5 ? 'market' : 'harbor';
   if (rv.personality === 'aggressive' && random() < 0.4) return random() < 0.5 ? 'barracks' : 'tower';
+  if (rv.personality === 'raider' && random() < 0.45) return random() < 0.6 ? 'barracks' : 'forge';
   if (rv.gold > 100 + rv.level * 20 && random() < 0.3) return 'temple';
   if (rv.population > rv.level * 4 && random() < 0.3) return 'granary';
   return NATION_BUILDING_TYPES[floor(random(NATION_BUILDING_TYPES.length))];
@@ -18545,10 +18666,15 @@ function startNationRaid(key) {
   rv.raidWarning = 300;
   let shoreX = WORLD.islandCX + getSurfaceRX() * 0.95;
   let shoreY = WORLD.islandCY;
+  let facRaid = FACTIONS[key] || {};
+  let baseHP = 30 + rv.level * 5;
   for (let i = 0; i < raidSize; i++) {
+    let rHP = baseHP;
+    if (facRaid.combatDamageMult && facRaid.combatDamageMult > 1.0) rHP = floor(rHP * 1.15);
     rv.raidParty.push({
       x: shoreX + random(20, 60), y: shoreY + random(-80, 80),
-      hp: 30 + rv.level * 5, maxHp: 30 + rv.level * 5,
+      hp: rHP, maxHp: rHP,
+      dmgMult: facRaid.combatDamageMult || 1.0,
       vx: 0, vy: 0, attackTimer: 0, facing: -1, flashTimer: 0, stealTimer: 0,
     });
   }
@@ -19288,6 +19414,18 @@ function drawSingleNationIsleDistant(key) {
   } else if (key === 'greece') {
     terrainCol = [lerp(155, 160, _bs), lerp(170, 175, _bs), lerp(130, 155, _bs)]; // green-white
     beachCol = [215, 210, 195]; treeCol = [55, 95, 40]; // olives
+  } else if (key === 'seapeople') {
+    terrainCol = [lerp(100, 120, _bs), lerp(105, 130, _bs), lerp(115, 145, _bs)]; // dark grey-blue rocky coast
+    beachCol = [150, 145, 140]; treeCol = [55, 70, 60]; // driftwood
+  } else if (key === 'persia') {
+    terrainCol = [lerp(195, 180, _bs), lerp(165, 165, _bs), lerp(95, 130, _bs)]; // golden amber
+    beachCol = [215, 195, 140]; treeCol = [60, 105, 35]; // cypress
+  } else if (key === 'phoenicia') {
+    terrainCol = [lerp(170, 160, _bs), lerp(130, 145, _bs), lerp(110, 140, _bs)]; // warm brown-purple
+    beachCol = [200, 180, 155]; treeCol = [50, 95, 45]; // cedar
+  } else if (key === 'gaul') {
+    terrainCol = [lerp(95, 120, _bs), lerp(135, 155, _bs), lerp(80, 125, _bs)]; // dark green forest
+    beachCol = [175, 170, 140]; treeCol = [35, 80, 30]; // dense oak
   } else { // rome
     terrainCol = [lerp(140, 150, _bs), lerp(130, 145, _bs), lerp(95, 130, _bs)]; // earthy
     beachCol = [195, 180, 145]; treeCol = [45, 90, 35];
@@ -19538,7 +19676,7 @@ function generateNationIslandContent(key) {
     // Don't overlap palace or dock
     if (abs(bx - palace.x) < 40 && abs(by - palace.y) < 30) continue;
     if (abs(by - dock.y) < 25 && abs(bx - dock.x) < 30) continue;
-    let bType = NATION_BUILDING_TYPES[floor(random(NATION_BUILDING_TYPES.length))];
+    let bType = _pickNationBuilding(rv, key);
     let bw = random(16, 28), bh = random(18, 32);
     buildings.push({ x: bx, y: by, w: bw, h: bh, type: bType });
   }
@@ -20134,6 +20272,32 @@ function generateWorldEvent(keys) {
   if (na.military >= 15 && random() < 0.1) {
     events.push({ type: 'parade', text: nameA + ' holds a grand military parade (' + na.military + ' troops)', factionA: a, factionB: null });
   }
+  // Faction-specific events
+  if (a === 'greece' && random() < 0.2) {
+    events.push({ type: 'olympic', text: nameA + ' holds the Olympic Games!', factionA: a, factionB: null });
+  }
+  if (a === 'egypt' && random() < 0.2) {
+    events.push({ type: 'monument', text: nameA + ' begins grand monument construction!', factionA: a, factionB: null });
+  }
+  if (a === 'carthage' && random() < 0.2) {
+    events.push({ type: 'expedition', text: nameA + ' launches a trade expedition!', factionA: a, factionB: null });
+  }
+  if (a === 'gaul' && random() < 0.2) {
+    events.push({ type: 'gathering', text: 'The tribes of ' + nameA + ' hold a great gathering!', factionA: a, factionB: null });
+  }
+  if (a === 'seapeople' && random() < 0.2) {
+    events.push({ type: 'great_raid', text: nameA + ' launch a great raid on coastal nations!', factionA: a, factionB: null });
+  }
+  if (a === 'persia' && random() < 0.2) {
+    events.push({ type: 'royal_road', text: nameA + ' expands the Royal Road!', factionA: a, factionB: null });
+  }
+  if (a === 'phoenicia' && random() < 0.2) {
+    events.push({ type: 'colony', text: nameA + ' founds a new colony!', factionA: a, factionB: null });
+  }
+  if (a === 'rome' && na.wars && na.wars.length > 0 && na.military > 8 && random() < 0.15) {
+    events.push({ type: 'triumph', text: nameA + ' celebrates a Triumph!', factionA: a, factionB: null });
+  }
+
   if (events.length === 0) return;
   let evt = events[floor(random(events.length))];
   evt.day = state.day;
@@ -20170,6 +20334,36 @@ function generateWorldEvent(keys) {
   } else if (evt.type === 'parade') {
     addNotification(evt.text, '#aaaadd');
     na.aggression = min(1.0, na.aggression + 0.05);
+  } else if (evt.type === 'olympic') {
+    na.population += 2;
+    for (let nk of keys) { if (state.nations[nk]) state.nations[nk].relations[a] = min(100, (state.nations[nk].relations[a] || 0) + 5); }
+    addNotification(evt.text, '#88bbdd');
+  } else if (evt.type === 'monument') {
+    if (na.level < 15) na.level++;
+    addNotification(evt.text, '#ddcc44');
+  } else if (evt.type === 'expedition') {
+    na.gold += 60;
+    addNotification(evt.text, '#ddaa44');
+  } else if (evt.type === 'gathering') {
+    na.military += 3;
+    addNotification(evt.text, '#cc8844');
+  } else if (evt.type === 'great_raid') {
+    for (let nk of keys) {
+      if (nk === a) continue;
+      let target = state.nations[nk];
+      if (target && !target.defeated) { let loot = min(target.gold, floor(random(5, 15))); target.gold -= loot; na.gold += loot; }
+    }
+    addNotification(evt.text, '#ff6644');
+  } else if (evt.type === 'royal_road') {
+    na.gold += 40 + floor(na.population * 0.5);
+    addNotification(evt.text, '#ddaa88');
+  } else if (evt.type === 'colony') {
+    na.population += 3;
+    addNotification(evt.text, '#88cc88');
+  } else if (evt.type === 'triumph') {
+    na.military += 2; na.aggression = min(1.0, na.aggression + 0.05);
+    for (let nk of keys) { if (state.nations[nk]) state.nations[nk].relations[a] = min(100, (state.nations[nk].relations[a] || 0) + 3); }
+    addNotification(evt.text, '#ddaa44');
   }
 }
 
@@ -22101,6 +22295,12 @@ function drawConquestBuildUI() {
 // ─── COLONY OVERLAY — draws colony buildings/farms on settled Terra Nova ──
 // ─── INPUT ────────────────────────────────────────────────────────────────
 function mouseWheel(event) {
+  // Zoom camera with scroll wheel during gameplay
+  if (gameScreen === 'game' && state && state.isInitialized) {
+    let delta = -event.delta * 0.001;
+    camZoomTarget = constrain(camZoomTarget + delta, CAM_ZOOM_MIN, CAM_ZOOM_MAX);
+    return false;
+  }
   let dir = event.delta > 0 ? 1 : -1;
   let p = state.player;
   p.hotbarSlot = ((p.hotbarSlot + dir) % HOTBAR_ITEMS.length + HOTBAR_ITEMS.length) % HOTBAR_ITEMS.length;
@@ -22667,6 +22867,9 @@ function keyPressed() {
   }
   if (state.introPhase !== 'done') { skipIntro(); return; }
   if (state.cutscene) { skipCutscene(); return; }
+
+  // Home key resets camera zoom
+  if (keyCode === 36) { camZoomTarget = 1.0; return; }
 
   // Victory screen dismiss
   if (state.victoryScreen && state.victoryScreen.timer > 120) {
