@@ -14492,9 +14492,18 @@ function drawArenaIsleDistant() {
   // Always pin to the horizon — looks like a distant island on the water
   let horizonY = max(height * 0.06, height * 0.25 - horizonOffset);
   let sy = horizonY + 5; // just below horizon line
+  // Distance-based scaling
+  let _dScale = null;
+  if (typeof _getDistantScale === 'function') {
+    _dScale = _getDistantScale(a.isleX, a.isleY, a.isleRX);
+    if (_dScale.dist > 4000) return;
+  }
   if (sx < -200 || sx > width + 200) return;
   push();
   noStroke();
+  if (_dScale && _dScale.scale < 0.98) {
+    translate(sx, sy); scale(_dScale.scale); translate(-sx, -sy);
+  }
   let fsx = floor(sx), fsy = floor(sy);
   // Atmospheric perspective — distant blue-grey haze
   let bright = getSkyBrightness();
@@ -17067,8 +17076,17 @@ function drawSingleNationIsleDistant(key) {
   let sx = w2sX(rv.isleX), sy = w2sY(rv.isleY);
   let _horizY = max(height * 0.06, height * 0.25 - horizonOffset) + 10;
   sy = max(sy, _horizY);
+  // Distance-based scaling when sailing
+  let _dScale = null;
+  if (typeof _getDistantScale === 'function') {
+    _dScale = _getDistantScale(rv.isleX, rv.isleY, rv.isleRX);
+    if (_dScale.dist > 4000) return;
+  }
   if (sx < -400 || sx > width + 400 || sy < -400 || sy > height + 400) return;
   push(); noStroke();
+  if (_dScale && _dScale.scale < 0.98) {
+    translate(sx, sy); scale(_dScale.scale); translate(-sx, -sy);
+  }
   let bright = (typeof getSkyBrightness === 'function') ? getSkyBrightness() : 0.7;
   let hazeA = lerp(60, 30, bright);
   let fsx = floor(sx), fsy = floor(sy);
@@ -17240,7 +17258,8 @@ function drawSingleNationIsleDistant(key) {
   }
 
   // Atmospheric distance haze overlay
-  fill(140 + 30 * bright, 165 + 20 * bright, 195 + 10 * bright, 20);
+  let _hazeAlpha = _dScale ? max(20, floor(_dScale.haze * 0.5)) : 20;
+  fill(140 + 30 * bright, 165 + 20 * bright, 195 + 10 * bright, _hazeAlpha);
   ellipse(fsx, fsy, rx * 2.2, ry * 2.2);
 
   // Water reflection below island
@@ -18914,9 +18933,18 @@ function drawConquestIsleDistant() {
   // Clamp to horizon — never float above water
   let _horizY = max(height * 0.06, height * 0.25 - horizonOffset) + 10;
   sy = max(sy, _horizY);
+  // Distance-based scaling
+  let _dScale = null;
+  if (typeof _getDistantScale === 'function') {
+    _dScale = _getDistantScale(c.isleX, c.isleY, c.isleRX);
+    if (_dScale.dist > 4000) return;
+  }
   if (sx < -350 || sx > width + 350 || sy < -350 || sy > height + 350) return;
   push();
   noStroke();
+  if (_dScale && _dScale.scale < 0.98) {
+    translate(sx, sy); scale(_dScale.scale); translate(-sx, -sy);
+  }
   let _cBright = getSkyBrightness();
 
   // Atmospheric perspective — blue-grey haze between viewer and island
@@ -19046,9 +19074,10 @@ function drawConquestIsleDistant() {
     fill(120, 90, 50);
     rect(floor(sx - 5), floor(sy + ry * 0.86), 10, 3);
   }
-  // Final atmospheric wash over entire island
+  // Final atmospheric wash over entire island — stronger with distance
   let _cRX = c.isleRX, _cRY = c.isleRY;
-  fill(160, 185, 210, 10 * _cBright);
+  let _cHazeA = _dScale ? max(10, floor(_dScale.haze * 0.5)) : floor(10 * _cBright);
+  fill(160, 185, 210, _cHazeA);
   ellipse(sx, sy, _cRX * 2.2, _cRY * 2.2);
   pop();
 }

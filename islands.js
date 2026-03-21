@@ -10,6 +10,23 @@ function _getIslandDist(ix, iy) {
   return '~' + ceil(d / 1200) + ' days sail';
 }
 
+// ─── DISTANT ISLAND SCALING ──────────────────────────────────────────
+// Returns { scale, haze, dist } for distance-based rendering when sailing
+// scale: 0.08 (far) to 1.0 (nearby), haze: 0-200 alpha for atmospheric fog
+function _getDistantScale(isleX, isleY, isleRX) {
+  let px, py;
+  if (state.rowing && state.rowing.active) { px = state.rowing.x; py = state.rowing.y; }
+  else { px = WORLD.islandCX; py = WORLD.islandCY; }
+  let d = sqrt((isleX - px) * (isleX - px) + (isleY - py) * (isleY - py));
+  // Full size when within ~1.5x island radius, shrinks to 0.08 at ~3500 units
+  let nearDist = isleRX * 2.5;  // fully visible range
+  let farDist = 3500;            // maximum viewing distance
+  let t = constrain((d - nearDist) / (farDist - nearDist), 0, 1);
+  let s = lerp(1.0, 0.08, t * t); // quadratic falloff — shrinks faster at distance
+  let haze = lerp(0, 180, t);     // atmospheric blue-grey haze alpha
+  return { scale: s, haze: haze, dist: d };
+}
+
 // ======================================================================
 // === ISLE OF VULCAN — Volcanic Island (Northwest) ====================
 // ======================================================================
@@ -54,13 +71,20 @@ function updateVulcanIsland(dt) {
 function drawVulcanIsland() {
   let v = state.vulcan, ix = w2sX(v.isleX), iy = w2sY(v.isleY);
   let isActive = v.active;
+  let _dScale = null;
   // Clamp to horizon when viewed from boat
   if (!isActive) {
     let horizMinY = max(height * 0.06, height * 0.25 - (typeof horizonOffset !== 'undefined' ? horizonOffset : 0)) + 10;
     iy = max(iy, horizMinY);
+    _dScale = _getDistantScale(v.isleX, v.isleY, v.isleRX);
+    if (_dScale.dist > 4000) return; // too far to see
   }
   if (ix < -500 || ix > width + 500 || iy < -500 || iy > height + 500) return;
   push(); noStroke();
+  // Apply distance-based scaling when sailing
+  if (_dScale && _dScale.scale < 0.98) {
+    translate(ix, iy); scale(_dScale.scale); translate(-ix, -iy);
+  }
   let vt = frameCount * 0.01;
   // Deep lava-lit ocean shadow
   fill(15, 5, 2, 55); ellipse(ix + 5, iy + 8, v.isleRX * 2.2, v.isleRY * 2.2);
@@ -194,6 +218,19 @@ function drawVulcanIsland() {
     fill(160, 140, 105);
     rect(ix - 5, iy + v.isleRY * 0.4, 10, 3); // pier top
   }
+  // Atmospheric haze overlay when distant
+  if (_dScale && _dScale.haze > 5) {
+    // Reset transform so haze covers the scaled island properly
+    resetMatrix();
+    let bright = (typeof getSkyBrightness === 'function') ? getSkyBrightness() : 0.7;
+    fill(140 + 30 * bright, 165 + 20 * bright, 195 + 10 * bright, floor(_dScale.haze * 0.6));
+    noStroke();
+    let hIx = w2sX(v.isleX), hIy = w2sY(v.isleY);
+    let horizMinY2 = max(height * 0.06, height * 0.25 - (typeof horizonOffset !== 'undefined' ? horizonOffset : 0)) + 10;
+    hIy = max(hIy, horizMinY2);
+    let hRad = max(v.isleRX, v.isleRY) * 2.5 * _dScale.scale;
+    ellipse(hIx, hIy, hRad, hRad * 0.7);
+  }
   pop();
 }
 function drawVulcanEntities() {
@@ -231,23 +268,26 @@ function drawVulcanDistantLabel() {
   if (state.vulcan.active) return; let v = state.vulcan, sx = w2sX(v.isleX), sy = w2sY(v.isleY);
   let minY = max(height * 0.06, height * 0.25 - horizonOffset) + 10; sy = max(sy, minY);
   if (sx < -400 || sx > width + 400 || sy < -400 || sy > height + 400) return;
-  let baseY = sy + v.isleRY + 12;
+  let _ds = _getDistantScale(v.isleX, v.isleY, v.isleRX);
+  if (_ds.dist > 4000) return;
+  let _labelFade = constrain(1 - _ds.haze / 200, 0.15, 1);
+  let baseY = sy + v.isleRY * _ds.scale + 12;
   push(); noStroke(); textAlign(CENTER);
   // Flame icon
-  fill(255, 120, 40, 180 + sin(frameCount * 0.05) * 40); textSize(14);
+  fill(255, 120, 40, floor((180 + sin(frameCount * 0.05) * 40) * _labelFade)); textSize(max(9, floor(14 * _ds.scale)));
   text('\u2740', sx, baseY - 2);
   // Name
-  fill(255, 100, 60, 180); textSize(11); textStyle(ITALIC);
-  text('Isle of Vulcan', sx, baseY + 12); textStyle(NORMAL);
+  fill(255, 100, 60, floor(180 * _labelFade)); textSize(max(8, floor(11 * _ds.scale))); textStyle(ITALIC);
+  text('Isle of Vulcan', sx, baseY + 12 * _ds.scale); textStyle(NORMAL);
   // Status + danger
   let status = v.phase === 'unexplored' ? 'Unexplored' : v.phase === 'forged' ? 'Conquered' : 'Discovered';
   let dangerIcon = '\u2620 '; // skull
-  fill(220, 80, 50, 160); textSize(9);
-  text(dangerIcon + status, sx, baseY + 24);
+  fill(220, 80, 50, floor(160 * _labelFade)); textSize(max(7, floor(9 * _ds.scale)));
+  text(dangerIcon + status, sx, baseY + 24 * _ds.scale);
   // Distance
   let d = _getIslandDist(v.isleX, v.isleY);
-  fill(200, 170, 130, 120); textSize(8);
-  text(d, sx, baseY + 34);
+  fill(200, 170, 130, floor(120 * _labelFade)); textSize(max(7, floor(8 * _ds.scale)));
+  text(d, sx, baseY + 34 * _ds.scale);
   pop();
 }
 function drawVulcanHUD() {
@@ -296,13 +336,19 @@ function updateHyperboreIsland(dt) {
 function drawHyperboreIsland() {
   let h = state.hyperborea, ix = w2sX(h.isleX), iy = w2sY(h.isleY);
   let isActive = h.active;
+  let _dScale = null;
   // Clamp to horizon when viewed from boat
   if (!isActive) {
     let horizMinY = max(height * 0.06, height * 0.25 - (typeof horizonOffset !== 'undefined' ? horizonOffset : 0)) + 10;
     iy = max(iy, horizMinY);
+    _dScale = _getDistantScale(h.isleX, h.isleY, h.isleRX);
+    if (_dScale.dist > 4000) return;
   }
   if (ix < -500 || ix > width + 500 || iy < -500 || iy > height + 500) return;
   push(); noStroke();
+  if (_dScale && _dScale.scale < 0.98) {
+    translate(ix, iy); scale(_dScale.scale); translate(-ix, -iy);
+  }
   let ht = frameCount * 0.01;
   // Icy water shadow
   fill(15, 30, 55, 50); ellipse(ix + 4, iy + 7, h.isleRX * 2.18, h.isleRY * 2.18);
@@ -417,6 +463,17 @@ function drawHyperboreIsland() {
     fill(160, 140, 105);
     rect(ix - 5, iy + h.isleRY * 0.4, 10, 3); // pier top
   }
+  if (_dScale && _dScale.haze > 5) {
+    resetMatrix();
+    let bright = (typeof getSkyBrightness === 'function') ? getSkyBrightness() : 0.7;
+    fill(140 + 30 * bright, 165 + 20 * bright, 195 + 10 * bright, floor(_dScale.haze * 0.6));
+    noStroke();
+    let hIx = w2sX(h.isleX), hIy = w2sY(h.isleY);
+    let horizMinY2 = max(height * 0.06, height * 0.25 - (typeof horizonOffset !== 'undefined' ? horizonOffset : 0)) + 10;
+    hIy = max(hIy, horizMinY2);
+    let hRad = max(h.isleRX, h.isleRY) * 2.5 * _dScale.scale;
+    ellipse(hIx, hIy, hRad, hRad * 0.7);
+  }
   pop();
 }
 function drawHyperboreEntities() {
@@ -475,23 +532,26 @@ function drawHyperboreEntities() {
 function drawHyperboreDistantLabel() {
   if (state.hyperborea.active) return; let h = state.hyperborea, sx = w2sX(h.isleX), sy = w2sY(h.isleY); let minY = max(height * 0.06, height * 0.25 - horizonOffset) + 10; sy = max(sy, minY);
   if (sx < -400 || sx > width + 400 || sy < -400 || sy > height + 400) return;
-  let baseY = sy + h.isleRY + 12;
+  let _ds = _getDistantScale(h.isleX, h.isleY, h.isleRX);
+  if (_ds.dist > 4000) return;
+  let _labelFade = constrain(1 - _ds.haze / 200, 0.15, 1);
+  let baseY = sy + h.isleRY * _ds.scale + 12;
   push(); noStroke(); textAlign(CENTER);
   // Snowflake icon
-  fill(160, 220, 255, 180 + sin(frameCount * 0.05) * 40); textSize(14);
+  fill(160, 220, 255, floor((180 + sin(frameCount * 0.05) * 40) * _labelFade)); textSize(max(9, floor(14 * _ds.scale)));
   text('\u2744', sx, baseY - 2);
   // Name
-  fill(140, 200, 240, 180); textSize(11); textStyle(ITALIC);
-  text('Hyperborea', sx, baseY + 12); textStyle(NORMAL);
+  fill(140, 200, 240, floor(180 * _labelFade)); textSize(max(8, floor(11 * _ds.scale))); textStyle(ITALIC);
+  text('Hyperborea', sx, baseY + 12 * _ds.scale); textStyle(NORMAL);
   // Status + danger
   let status = h.phase === 'unexplored' ? 'Unexplored' : h.phase === 'settled' ? 'Settled' : 'Discovered';
   let dangerIcon = '\u2620 ';
-  fill(140, 180, 220, 160); textSize(9);
-  text(dangerIcon + status, sx, baseY + 24);
+  fill(140, 180, 220, floor(160 * _labelFade)); textSize(max(7, floor(9 * _ds.scale)));
+  text(dangerIcon + status, sx, baseY + 24 * _ds.scale);
   // Distance
   let d = _getIslandDist(h.isleX, h.isleY);
-  fill(160, 200, 220, 120); textSize(8);
-  text(d, sx, baseY + 34);
+  fill(160, 200, 220, floor(120 * _labelFade)); textSize(max(7, floor(8 * _ds.scale)));
+  text(d, sx, baseY + 34 * _ds.scale);
   pop();
 }
 function drawHyperboreHUD() {
@@ -539,13 +599,19 @@ function updatePlentyIsland(dt) {
 function drawPlentyIsland() {
   let pl = state.plenty, ix = w2sX(pl.isleX), iy = w2sY(pl.isleY);
   let isActive = pl.active;
+  let _dScale = null;
   // Clamp to horizon when viewed from boat
   if (!isActive) {
     let horizMinY = max(height * 0.06, height * 0.25 - (typeof horizonOffset !== 'undefined' ? horizonOffset : 0)) + 10;
     iy = max(iy, horizMinY);
+    _dScale = _getDistantScale(pl.isleX, pl.isleY, pl.isleRX);
+    if (_dScale.dist > 4000) return;
   }
   if (ix < -500 || ix > width + 500 || iy < -500 || iy > height + 500) return;
   push(); noStroke();
+  if (_dScale && _dScale.scale < 0.98) {
+    translate(ix, iy); scale(_dScale.scale); translate(-ix, -iy);
+  }
   let pt = frameCount * 0.01;
   // Tropical lagoon shadow
   fill(8, 50, 35, 45); ellipse(ix + 4, iy + 7, pl.isleRX * 2.18, pl.isleRY * 2.18);
@@ -651,6 +717,17 @@ function drawPlentyIsland() {
     fill(160, 140, 105);
     rect(ix - 5, iy + pl.isleRY * 0.4, 10, 3); // pier top
   }
+  if (_dScale && _dScale.haze > 5) {
+    resetMatrix();
+    let bright = (typeof getSkyBrightness === 'function') ? getSkyBrightness() : 0.7;
+    fill(140 + 30 * bright, 165 + 20 * bright, 195 + 10 * bright, floor(_dScale.haze * 0.6));
+    noStroke();
+    let hIx = w2sX(pl.isleX), hIy = w2sY(pl.isleY);
+    let horizMinY2 = max(height * 0.06, height * 0.25 - (typeof horizonOffset !== 'undefined' ? horizonOffset : 0)) + 10;
+    hIy = max(hIy, horizMinY2);
+    let hRad = max(pl.isleRX, pl.isleRY) * 2.5 * _dScale.scale;
+    ellipse(hIx, hIy, hRad, hRad * 0.7);
+  }
   pop();
 }
 function drawPlentyEntities() {
@@ -665,23 +742,26 @@ function drawPlentyEntities() {
 function drawPlentyDistantLabel() {
   if (state.plenty.active) return; let pl = state.plenty, sx = w2sX(pl.isleX), sy = w2sY(pl.isleY); let minY = max(height * 0.06, height * 0.25 - horizonOffset) + 10; sy = max(sy, minY);
   if (sx < -400 || sx > width + 400 || sy < -400 || sy > height + 400) return;
-  let baseY = sy + pl.isleRY + 12;
+  let _ds = _getDistantScale(pl.isleX, pl.isleY, pl.isleRX);
+  if (_ds.dist > 4000) return;
+  let _labelFade = constrain(1 - _ds.haze / 200, 0.15, 1);
+  let baseY = sy + pl.isleRY * _ds.scale + 12;
   push(); noStroke(); textAlign(CENTER);
   // Leaf icon
-  fill(80, 200, 80, 180 + sin(frameCount * 0.05) * 40); textSize(14);
+  fill(80, 200, 80, floor((180 + sin(frameCount * 0.05) * 40) * _labelFade)); textSize(max(9, floor(14 * _ds.scale)));
   text('\u2618', sx, baseY - 2);
   // Name
-  fill(60, 200, 80, 180); textSize(11); textStyle(ITALIC);
-  text('Isle of Plenty', sx, baseY + 12); textStyle(NORMAL);
+  fill(60, 200, 80, floor(180 * _labelFade)); textSize(max(8, floor(11 * _ds.scale))); textStyle(ITALIC);
+  text('Isle of Plenty', sx, baseY + 12 * _ds.scale); textStyle(NORMAL);
   // Status + peace
   let status = pl.phase === 'unexplored' ? 'Unexplored' : pl.phase === 'colonized' ? 'Colonized' : 'Discovered';
   let dangerIcon = '\u262E '; // peace sign
-  fill(80, 180, 60, 160); textSize(9);
-  text(dangerIcon + status, sx, baseY + 24);
+  fill(80, 180, 60, floor(160 * _labelFade)); textSize(max(7, floor(9 * _ds.scale)));
+  text(dangerIcon + status, sx, baseY + 24 * _ds.scale);
   // Distance
   let d = _getIslandDist(pl.isleX, pl.isleY);
-  fill(120, 180, 100, 120); textSize(8);
-  text(d, sx, baseY + 34);
+  fill(120, 180, 100, floor(120 * _labelFade)); textSize(max(7, floor(8 * _ds.scale)));
+  text(d, sx, baseY + 34 * _ds.scale);
   pop();
 }
 function drawPlentyHUD() {
@@ -735,13 +815,19 @@ function updateNecropolisIsland(dt) {
 function drawNecropolisIsland() {
   let n = state.necropolis, ix = w2sX(n.isleX), iy = w2sY(n.isleY);
   let isActive = n.active;
+  let _dScale = null;
   // Clamp to horizon when viewed from boat
   if (!isActive) {
     let horizMinY = max(height * 0.06, height * 0.25 - (typeof horizonOffset !== 'undefined' ? horizonOffset : 0)) + 10;
     iy = max(iy, horizMinY);
+    _dScale = _getDistantScale(n.isleX, n.isleY, n.isleRX);
+    if (_dScale.dist > 4000) return;
   }
   if (ix < -500 || ix > width + 500 || iy < -500 || iy > height + 500) return;
   push(); noStroke();
+  if (_dScale && _dScale.scale < 0.98) {
+    translate(ix, iy); scale(_dScale.scale); translate(-ix, -iy);
+  }
   let nt = frameCount * 0.01;
   // Ghostly shadow — deeper, more ominous
   fill(8, 3, 18, 65); ellipse(ix + 5, iy + 8, n.isleRX * 2.22, n.isleRY * 2.22);
@@ -855,6 +941,17 @@ function drawNecropolisIsland() {
     fill(160, 140, 105);
     rect(ix - 5, iy + n.isleRY * 0.4, 10, 3); // pier top
   }
+  if (_dScale && _dScale.haze > 5) {
+    resetMatrix();
+    let bright = (typeof getSkyBrightness === 'function') ? getSkyBrightness() : 0.7;
+    fill(140 + 30 * bright, 165 + 20 * bright, 195 + 10 * bright, floor(_dScale.haze * 0.6));
+    noStroke();
+    let hIx = w2sX(n.isleX), hIy = w2sY(n.isleY);
+    let horizMinY2 = max(height * 0.06, height * 0.25 - (typeof horizonOffset !== 'undefined' ? horizonOffset : 0)) + 10;
+    hIy = max(hIy, horizMinY2);
+    let hRad = max(n.isleRX, n.isleRY) * 2.5 * _dScale.scale;
+    ellipse(hIx, hIy, hRad, hRad * 0.7);
+  }
   pop();
 }
 function drawNecropolisEntities() {
@@ -884,23 +981,26 @@ function drawNecropolisEntities() {
 function drawNecropolisDistantLabel() {
   if (state.necropolis.active) return; let n = state.necropolis, sx = w2sX(n.isleX), sy = w2sY(n.isleY); let minY = max(height * 0.06, height * 0.25 - horizonOffset) + 10; sy = max(sy, minY);
   if (sx < -400 || sx > width + 400 || sy < -400 || sy > height + 400) return;
-  let baseY = sy + n.isleRY + 12;
+  let _ds = _getDistantScale(n.isleX, n.isleY, n.isleRX);
+  if (_ds.dist > 4000) return;
+  let _labelFade = constrain(1 - _ds.haze / 200, 0.15, 1);
+  let baseY = sy + n.isleRY * _ds.scale + 12;
   push(); noStroke(); textAlign(CENTER);
   // Skull icon
-  fill(180, 100, 220, 180 + sin(frameCount * 0.05) * 40); textSize(14);
+  fill(180, 100, 220, floor((180 + sin(frameCount * 0.05) * 40) * _labelFade)); textSize(max(9, floor(14 * _ds.scale)));
   text('\u2620', sx, baseY - 2);
   // Name
-  fill(160, 100, 200, 180); textSize(11); textStyle(ITALIC);
-  text('Necropolis', sx, baseY + 12); textStyle(NORMAL);
+  fill(160, 100, 200, floor(180 * _labelFade)); textSize(max(8, floor(11 * _ds.scale))); textStyle(ITALIC);
+  text('Necropolis', sx, baseY + 12 * _ds.scale); textStyle(NORMAL);
   // Status + danger
   let status = n.phase === 'unexplored' ? 'Unexplored' : n.phase === 'cleansed' ? 'Cleansed' : 'Discovered';
   let dangerIcon = '\u2620 ';
-  fill(180, 80, 200, 160); textSize(9);
-  text(dangerIcon + status, sx, baseY + 24);
+  fill(180, 80, 200, floor(160 * _labelFade)); textSize(max(7, floor(9 * _ds.scale)));
+  text(dangerIcon + status, sx, baseY + 24 * _ds.scale);
   // Distance
   let d = _getIslandDist(n.isleX, n.isleY);
-  fill(150, 120, 180, 120); textSize(8);
-  text(d, sx, baseY + 34);
+  fill(150, 120, 180, floor(120 * _labelFade)); textSize(max(7, floor(8 * _ds.scale)));
+  text(d, sx, baseY + 34 * _ds.scale);
   pop();
 }
 function drawNecropolisHUD() {
