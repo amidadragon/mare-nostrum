@@ -14,7 +14,7 @@ const JS_FILES = [
   'fishing.js', 'farming.js', 'npc.js', 'events.js',
   'world.js', 'player.js', 'ui.js', 'sketch.js',
   'wreck.js', 'menu.js', 'islands.js', 'diving.js',
-  'combat.js', 'economy.js', 'debug.js', 'mobile.js',
+  'combat.js', 'economy.js', 'debug.js', 'multiplayer.js', 'mobile.js',
 ];
 
 // 1. Concatenate all JS files
@@ -50,7 +50,7 @@ unlinkSync(tmpFile);
 let html = readFileSync(join(__dirname, 'index.html'), 'utf8');
 
 // Remove all individual game script tags (keep p5 libs)
-html = html.replace(/\s*<script src="(engine|sound|narrative|cinematics|fishing|farming|npc|events|world|player|ui|sketch|wreck|menu|islands|diving|combat|economy|debug|mobile)\.js[^"]*"><\/script>/g, '');
+html = html.replace(/\s*<script src="(engine|sound|narrative|cinematics|fishing|farming|npc|events|world|player|ui|sketch|wreck|menu|islands|diving|combat|economy|debug|multiplayer|mobile)\.js[^"]*"><\/script>/g, '');
 
 // Insert single bundle before the inline scripts
 html = html.replace(

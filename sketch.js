@@ -94,7 +94,7 @@ const FACTIONS = {
     buildSpeedMult: 1.1,
     recruitBonus: 1,
     tradeIncomeMult: 1.0,
-    sailSpeedMult: 1.1,
+    sailSpeedMult: 1.0,
     combatDamageMult: 1.0,
     fishYieldMult: 1.0,
     npcFavorMult: 1.0,
@@ -209,6 +209,63 @@ function getFactionBuildingColors() {
 function getFactionData() {
   return FACTIONS[state.faction] || FACTIONS.rome;
 }
+
+function getFactionTreeTypes(factionKey) {
+  let f = factionKey || state.faction || 'rome';
+  let types = {
+    rome:     ['oak', 'pine', 'olive'],
+    carthage: ['palm', 'acacia', 'fig'],
+    egypt:    ['papyrus', 'datepalm', 'sycamore'],
+    greece:   ['olive', 'oak', 'laurel'],
+  };
+  return types[f] || types.rome;
+}
+
+const FACTION_FLORA = {
+  rome: [
+    { col: [140, 100, 180], w: 3, h: 3 },
+    { col: [80, 120, 50], w: 4, h: 2 },
+    { col: [160, 120, 200], w: 2, h: 2 },
+  ],
+  carthage: [
+    { col: [210, 100, 40], w: 3, h: 3 },
+    { col: [80, 130, 60], w: 3, h: 4 },
+    { col: [190, 80, 30], w: 2, h: 2 },
+  ],
+  egypt: [
+    { col: [60, 100, 180], w: 3, h: 2 },
+    { col: [200, 180, 80], w: 4, h: 3 },
+    { col: [50, 110, 170], w: 2, h: 2 },
+  ],
+  greece: [
+    { col: [230, 230, 220], w: 3, h: 3 },
+    { col: [70, 110, 50], w: 4, h: 2 },
+    { col: [220, 220, 210], w: 2, h: 2 },
+  ],
+};
+
+const FACTION_WILDLIFE = {
+  rome: [
+    { type: 'rabbit', speed: 0.4, size: 6 },
+    { type: 'songbird', speed: 0.6, size: 5 },
+    { type: 'fox', speed: 0.3, size: 8 },
+  ],
+  carthage: [
+    { type: 'camel', speed: 0.15, size: 12 },
+    { type: 'falcon', speed: 0.8, size: 7 },
+    { type: 'desertfox', speed: 0.35, size: 6 },
+  ],
+  egypt: [
+    { type: 'ibis', speed: 0.25, size: 8 },
+    { type: 'cat', speed: 0.3, size: 6 },
+    { type: 'scarab', speed: 0.2, size: 4 },
+  ],
+  greece: [
+    { type: 'goat', speed: 0.2, size: 10 },
+    { type: 'turtle', speed: 0.08, size: 5 },
+    { type: 'owl', speed: 0.5, size: 6 },
+  ],
+};
 
 // ─── WRECK ISLAND CONFIG ────────────────────────────────────────────────
 const WRECK = {
@@ -1565,6 +1622,32 @@ function buildIsland() {
     color: [random(180, 220), random(140, 170), random(100, 130)], // orange tabby
   });
 
+
+  // Faction wildlife — ambient creatures
+  state.factionWildlife = [];
+  let fWild = FACTION_WILDLIFE[state.faction || 'rome'] || FACTION_WILDLIFE.rome;
+  for (let wi = 0; wi < 5; wi++) {
+    let template = fWild[wi % fWild.length];
+    let wa = random(TWO_PI), wd = random(0.2, 0.55) * srx;
+    state.factionWildlife.push({
+      x: cx + cos(wa) * wd, y: cy + sin(wa) * wd * (sry / srx),
+      vx: 0, vy: 0, type: template.type, speed: template.speed, size: template.size,
+      timer: random(60, 300), phase: random(TWO_PI), facing: random() > 0.5 ? 1 : -1,
+    });
+  }
+
+  // Faction flora — ground cover positions (deterministic)
+  state.factionFlora = [];
+  let fFlora = FACTION_FLORA[state.faction || 'rome'] || FACTION_FLORA.rome;
+  randomSeed(99);
+  for (let fi = 0; fi < 20; fi++) {
+    let fa = random(TWO_PI), fd = random(0.15, 0.6) * srx;
+    let fx = cx + cos(fa) * fd, fy = cy + sin(fa) * fd * (sry / srx);
+    let template = fFlora[fi % fFlora.length];
+    state.factionFlora.push({ x: fx, y: fy, col: template.col, w: template.w, h: template.h, phase: random(TWO_PI) });
+  }
+  randomSeed(millis());
+
   // Trees — natural grove flanking the road, loosely organized
   state.trees = [];
   let texcl = getTempleExclusion();
@@ -1595,7 +1678,7 @@ function buildIsland() {
       x: tx, y: ty,
       health: 3, maxHealth: 3, alive: true, regrowTimer: 0,
       size: 0.75 + (idx * 7 % 11) * 0.04, swayPhase: idx * 1.3 + (idx % 3) * 0.7,
-      type: ['oak', 'pine', 'olive'][idx % 3],
+      type: getFactionTreeTypes()[idx % 3],
     });
   }
 
@@ -2190,7 +2273,7 @@ function draw() {
   }
 
   // ─── SCREEN ROUTER ───
-  if (gameScreen === 'menu' || gameScreen === 'settings' || gameScreen === 'credits') {
+  if (gameScreen === 'menu' || gameScreen === 'settings' || gameScreen === 'credits' || gameScreen === 'multiplayer') {
     menuFadeIn = min(menuFadeIn + _delta * 255, 255); // 1 sec fade-in
     if (menuFadeOut > 0) {
       menuFadeOut = min(menuFadeOut + _delta * 510, 255); // 0.5 sec fade-out
@@ -2471,6 +2554,8 @@ function drawInner() {
     drawConquestIsland();
     drawConquestEntities();
     if (typeof drawCombatOverlay === 'function') drawCombatOverlay();
+    if (typeof drawPlayerProjectiles === 'function') drawPlayerProjectiles();
+    if (typeof drawFactionAoEs === 'function') drawFactionAoEs();
     if (typeof drawEconomyWorldOverlay === 'function') drawEconomyWorldOverlay();
     drawFogOfWar();
     drawParticles();
@@ -2479,6 +2564,7 @@ function drawInner() {
     pop();
 
     drawConquestHUD();
+    if (typeof drawFactionAbilityHUD === 'function') drawFactionAbilityHUD();
     if (typeof drawEconomyUIOverlay === 'function') drawEconomyUIOverlay();
     drawModifierSelectUI();
     drawBountyBoard();
@@ -2514,6 +2600,7 @@ function drawInner() {
     pop();
 
     drawAdventureHUD();
+    if (typeof drawFactionAbilityHUD === 'function') drawFactionAbilityHUD();
     drawScreenFlash();
     drawSpeedLines();
     drawCursor();
@@ -2568,6 +2655,7 @@ function drawInner() {
     updateTrees(dt);
     updateFishing(dt);
     updateChickens(dt);
+    updateFactionWildlife(dt);
     { let _pg = state.progression;
       let _full = !_pg.gameStarted || _pg.villaCleared;
       if (_full || _pg.companionsAwakened.harvester) updateHarvester(dt);
@@ -2902,6 +2990,9 @@ function drawInner() {
       drawGameVignette();
     }
 
+    // Multiplayer sync + render
+    if (typeof MP !== 'undefined') { MP.update(); MP.drawRemotePlayer(); MP.drawHUD(); }
+
     if (!screenshotMode && !photoMode) {
       drawHUD();
       if (typeof drawQuestTracker === 'function') drawQuestTracker();
@@ -3202,6 +3293,8 @@ function updateTime(dt) {
     // Bath house bonus: 2x solar regen when nearby
     let nearBath = state.buildings.some(b => b.type === 'bath' && dist(state.player.x, state.player.y, b.x, b.y) < 60);
     if (nearBath) solarRate *= 2;
+    // Egypt passive: +30% crystal/solar recharge
+    if (typeof getFactionCrystalRechargeMult === 'function') solarRate *= getFactionCrystalRechargeMult();
     state.solar = min(state.maxSolar, state.solar + solarRate * dt);
     let _cRegenBonus = typeof getCompanionRegenBonus === 'function' ? getCompanionRegenBonus() : 0;
     state.companion.energy = min(100, state.companion.energy + (solarRate * 2.0 + _cRegenBonus) * dt);
@@ -7020,6 +7113,8 @@ function drawWorldObjectsSorted() {
   state.plots.forEach(p => ground.push({ y: p.y, draw: () => drawOnePlot(p) }));
   state.resources.forEach(r => { if (!inTemple(r.x, r.y)) ground.push({ y: r.y, draw: () => drawOneResource(r) }); });
   state.crystalNodes.forEach(c => ground.push({ y: c.y, draw: () => drawOneCrystal(c) }));
+  // Faction flora ground cover
+  if (state.factionFlora) state.factionFlora.forEach(fl => ground.push({ y: fl.y, draw: () => drawOneFlora(fl) }));
   ground.sort((a, b) => a.y - b.y);
   ground.forEach(i => i.draw());
 
@@ -7047,6 +7142,8 @@ function drawWorldObjectsSorted() {
   items.push({ y: WORLD.islandCY + 35, draw: drawFountain });
   // Chickens
   if (state.chickens) state.chickens.forEach((ch, i) => items.push({ y: ch.y, draw: () => drawOneChicken(ch) }));
+  // Faction wildlife
+  if (state.factionWildlife) state.factionWildlife.forEach(w => items.push({ y: w.y, draw: () => drawOneFactionCreature(w) }));
   // Harvester companion — only if awakened
   let prog = state.progression;
   let fullyUnlocked = !prog.gameStarted || prog.villaCleared; // old saves = fully unlocked
@@ -7111,6 +7208,7 @@ function drawOneBuilding(b) {
     let bw = b.w;
     let bh = b.h;
     let ep = getEraPalette();
+    let fc = getFactionBuildingColors();
 
     // Construction rise animation for newly placed buildings
     let _building = (b.buildProgress !== undefined && b.buildProgress < 1);
@@ -7161,7 +7259,7 @@ function drawOneBuilding(b) {
     switch (b.type) {
       case 'wall': {
         noStroke();
-        let _wfc = getFactionBuildingColors();
+        let _wfc = fc;
         let wallH = 24;
         fill(0, 0, 0, 30);
         rect(-bw / 2 + 1, -2, bw, 4, 1);
@@ -7219,17 +7317,18 @@ function drawOneBuilding(b) {
       }
 
       case 'floor':
-        // Roman mosaic tile floor — decorative pattern
+        // Mosaic tile floor — faction ground
         noStroke();
-        // Base tile — era-aware
-        fill(ep.floorBase[0], ep.floorBase[1], ep.floorBase[2]);
+        // Base tile — faction ground
+        fill(fc.ground[0] + 30, fc.ground[1] + 30, fc.ground[2] + 30);
         rect(-bw / 2, -bh / 2, bw, bh, 1);
-        // Mosaic tile grid — alternating colors
+        // Mosaic tile grid — faction ground alternating
+        let _fg = [fc.ground[0] + 30, fc.ground[1] + 30, fc.ground[2] + 30];
         let mTileColors = [
-          [ep.floorBase[0] + 10, ep.floorBase[1] + 10, ep.floorBase[2] + 10],
-          [ep.floorBase[0] - 10, ep.floorBase[1] - 10, ep.floorBase[2] - 10],
-          [ep.floorBase[0], ep.floorBase[1] - 8, ep.floorBase[2] - 17],
-          [ep.floorBase[0] - 15, ep.floorBase[1] - 15, ep.floorBase[2] - 15]
+          [_fg[0] + 10, _fg[1] + 10, _fg[2] + 10],
+          [_fg[0] - 10, _fg[1] - 10, _fg[2] - 10],
+          [_fg[0], _fg[1] - 8, _fg[2] - 17],
+          [_fg[0] - 15, _fg[1] - 15, _fg[2] - 15]
         ];
         for (let ty = -bh / 2 + 1; ty < bh / 2; ty += 4) {
           for (let tx = -bw / 2 + 1; tx < bw / 2; tx += 4) {
@@ -7265,7 +7364,7 @@ function drawOneBuilding(b) {
 
       case 'door': {
         noStroke();
-        let _dfc = getFactionBuildingColors();
+        let _dfc = fc;
         let doorH = 30;
         // Stone frame — faction trim
         fill(_dfc.trim[0], _dfc.trim[1], _dfc.trim[2]);
@@ -7367,51 +7466,50 @@ function drawOneBuilding(b) {
         // Shadow
         fill(0, 0, 0, 35);
         rect(-bw / 2 + 2, -bh / 2 + 3, bw, bh + 1, 2);
-        // Main deck — stone
-        fill(170, 162, 148);
+        // Main deck — stone — faction
+        fill(fc.trim[0], fc.trim[1], fc.trim[2]);
         rect(-bw / 2, -bh / 2, bw, bh, 2);
         // Stone block lines
-        stroke(150, 142, 128, 70);
+        stroke(fc.trim[0] - 20, fc.trim[1] - 20, fc.trim[2] - 20, 70);
         strokeWeight(0.5);
         for (let pl = -bh / 2 + 5; pl < bh / 2; pl += 7) {
           line(-bw / 2 + 1, pl, bw / 2 - 1, pl);
         }
         noStroke();
         // Side walls
-        fill(185, 178, 162);
+        fill(fc.trim[0] + 5, fc.trim[1] + 5, fc.trim[2] + 5);
         rect(-bw / 2, -bh / 2 - 6, bw, 6, 1);
         // Coping stones on top
-        fill(195, 188, 172);
+        fill(fc.column[0], fc.column[1], fc.column[2]);
         rect(-bw / 2, -bh / 2 - 8, bw, 3, 1);
         // Drain holes (decorative)
-        fill(100, 90, 78);
+        fill(fc.trim[0] - 85, fc.trim[1] - 88, fc.trim[2] - 87);
         circle(-bw / 4, -bh / 2 - 3, 3);
         circle(bw / 4, -bh / 2 - 3, 3);
         break;
 
       case 'fence':
-        // Roman balustrade — low marble fence with columns
+        // Balustrade — low fence with columns — faction
         noStroke();
         // Base rail
-        fill(185, 178, 165);
+        fill(fc.trim[0], fc.trim[1], fc.trim[2]);
         rect(-bw / 2, 0, bw, 4, 1);
         // Top rail
-        fill(195, 188, 175);
+        fill(fc.trim[0] + 10, fc.trim[1] + 10, fc.trim[2] + 10);
         rect(-bw / 2, -14, bw, 3, 1);
         // Mini columns (balusters)
-        fill(190, 183, 170);
+        fill(fc.column[0], fc.column[1], fc.column[2]);
         for (let i = 0; i < 4; i++) {
           let cx = -bw / 2 + 4 + i * (bw - 8) / 3;
           rect(cx - 1.5, -11, 3, 11);
-          // Bulge in middle — pixel
           rect(cx - 2, -7, 4, 4);
         }
         // End posts — taller with caps
-        fill(200, 193, 180);
+        fill(fc.column[0] + 10, fc.column[1] + 10, fc.column[2] + 10);
         rect(-bw / 2 - 1, -18, 5, 22, 1);
         rect(bw / 2 - 4, -18, 5, 22, 1);
         // Post caps
-        fill(210, 203, 190);
+        fill(fc.column[0] + 20, fc.column[1] + 20, fc.column[2] + 20);
         rect(-bw / 2 - 2, -20, 7, 3, 1);
         rect(bw / 2 - 5, -20, 7, 3, 1);
         break;
@@ -7585,13 +7683,13 @@ function drawOneBuilding(b) {
         break;
 
       case 'aqueduct':
-        // Roman aqueduct — proper arched stone construction
+        // Aqueduct — arched stone construction — faction
         noStroke();
         // Shadow
         fill(0, 0, 0, 25);
         rect(-15, 2, 30, 10, 1);
         // Pillars with slight taper
-        fill(185, 178, 165);
+        fill(fc.column[0], fc.column[1], fc.column[2]);
         beginShape();
         vertex(-14, 10); vertex(-12, -10); vertex(-8, -10); vertex(-10, 10);
         endShape(CLOSE);
@@ -7599,25 +7697,25 @@ function drawOneBuilding(b) {
         vertex(10, 10); vertex(8, -10); vertex(12, -10); vertex(14, 10);
         endShape(CLOSE);
         // Pillar highlight
-        fill(195, 188, 175, 80);
+        fill(fc.column[0] + 10, fc.column[1] + 5, fc.column[2] + 5, 80);
         rect(-13, -8, 2, 16);
         rect(9, -8, 2, 16);
         // Arch — semicircular
-        fill(190, 183, 170);
+        fill(fc.trim[0], fc.trim[1], fc.trim[2]);
         arc(0, 0, 20, 16, PI, TWO_PI, PIE);
         // Arch interior — dark
         fill(50, 62, 35);
         arc(0, 0, 16, 12, PI, TWO_PI, PIE);
         // Keystone
-        fill(200, 193, 178);
+        fill(fc.column[0] + 10, fc.column[1] + 10, fc.column[2] + 8);
         beginShape();
         vertex(-2, -8); vertex(2, -8); vertex(2.5, -5); vertex(-2.5, -5);
         endShape(CLOSE);
         // Water channel on top
-        fill(180, 173, 160);
+        fill(fc.trim[0] - 5, fc.trim[1] - 5, fc.trim[2] - 5);
         rect(-16, -12, 32, 4, 1);
         // Capstone
-        fill(195, 188, 175);
+        fill(fc.column[0] + 5, fc.column[1] + 5, fc.column[2] + 5);
         rect(-16, -14, 32, 2.5, 1);
         // Water flowing in channel
         let waterPhase = frameCount * 0.06 + b.x * 0.1;
@@ -7629,19 +7727,19 @@ function drawOneBuilding(b) {
         rect(4, -11.5, 8, 1.5, 1);
         break;
       case 'bath':
-        // Roman bath house (balneum) — grand heated pool with steam
+        // Bath house — grand heated pool with steam — faction
         noStroke();
         // Shadow
         fill(0, 0, 0, 30);
         rect(-bw / 2 + 3, bh / 2 - 3, bw, 7);
         // Foundation — lower step
-        fill(165, 155, 138);
+        fill(fc.trim[0] - 20, fc.trim[1] - 23, fc.trim[2] - 27);
         rect(-bw / 2 + 2, bh / 2 - 8, bw - 4, 8, 1);
         // Main building body
-        fill(190, 180, 162);
+        fill(fc.wall[0], fc.wall[1], fc.wall[2]);
         rect(-bw / 2, -bh / 2 + 12, bw, bh - 12, 1);
         // Stone course texture
-        stroke(172, 162, 145, 45);
+        stroke(fc.wall[0] - 18, fc.wall[1] - 18, fc.wall[2] - 17, 45);
         strokeWeight(0.5);
         for (let bly = -bh / 2 + 18; bly < bh / 2 - 10; bly += 6) {
           line(-bw / 2 + 1, bly, bw / 2 - 1, bly);
@@ -7659,22 +7757,22 @@ function drawOneBuilding(b) {
         // Pool ripple highlight
         fill(120, 185, 230, 25 + sin(bathPhase2 * 0.9) * 12);
         rect(-bw / 2 + 14, -bh / 2 + 28, bw - 30, 2);
-        // 4 entrance columns — proper spacing for wider building
-        fill(200, 192, 175);
+        // 4 entrance columns — faction
+        fill(fc.column[0], fc.column[1], fc.column[2]);
         let bathCols = [-bw/2 + 4, -bw/2 + 4 + (bw-8)/3, -bw/2 + 4 + 2*(bw-8)/3, bw/2 - 4];
         bathCols.forEach(bcx => {
           rect(bcx - 3, -bh / 2 + 2, 6, 22, 1);
-          fill(210, 202, 185);
+          fill(fc.column[0] + 10, fc.column[1] + 10, fc.column[2] + 10);
           rect(bcx - 4, -bh / 2 + 1, 8, 3, 1);  // capital
-          fill(200, 192, 175);
+          fill(fc.column[0], fc.column[1], fc.column[2]);
           rect(bcx - 3.5, -bh / 2 + 22, 7, 2, 1); // base
-          fill(200, 192, 175);
+          fill(fc.column[0], fc.column[1], fc.column[2]);
         });
         // Entablature
-        fill(180, 172, 155);
+        fill(fc.trim[0] - 5, fc.trim[1] - 6, fc.trim[2] - 10);
         rect(-bw / 2 + 2, -bh / 2 + 8, bw - 4, 6, 1);
         // Pediment
-        fill(168, 160, 145);
+        fill(fc.roof[0], fc.roof[1], fc.roof[2]);
         beginShape();
         vertex(-bw / 2 + 2, -bh / 2 + 8);
         vertex(0, -bh / 2 - 6);
@@ -7698,7 +7796,7 @@ function drawOneBuilding(b) {
           }
         }
         // Steps to entrance
-        fill(175, 168, 152);
+        fill(fc.trim[0] - 10, fc.trim[1] - 10, fc.trim[2] - 13);
         rect(-12, bh / 2 - 10, 24, 4, 1);
         rect(-10, bh / 2 - 6, 20, 3, 1);
         // Night: blue pool glow
@@ -7713,40 +7811,40 @@ function drawOneBuilding(b) {
         break;
 
       case 'granary':
-        // Roman granary — raised storage with tiled roof
+        // Granary — raised storage with tiled roof — faction
         noStroke();
         fill(0, 0, 0, 30);
         rect(-bw / 2 + 2, bh / 2 - 4, bw, 6);
         // Stilts
-        fill(165, 155, 138);
+        fill(fc.trim[0] - 20, fc.trim[1] - 23, fc.trim[2] - 27);
         for (let gi = 0; gi < 4; gi++) {
           let gpx = -bw / 2 + 5 + gi * (bw - 10) / 3;
           rect(gpx - 2, bh / 2 - 8, 4, 8, 1);
         }
         // Body
-        fill(185, 175, 158);
+        fill(fc.wall[0], fc.wall[1], fc.wall[2]);
         rect(-bw / 2, -bh / 2 + 6, bw, bh - 14, 2);
-        stroke(165, 155, 138, 60);
+        stroke(fc.wall[0] - 20, fc.wall[1] - 20, fc.wall[2] - 20, 60);
         strokeWeight(0.5);
         for (let gy = -bh / 2 + 12; gy < bh / 2 - 12; gy += 6) {
           line(-bw / 2 + 2, gy, bw / 2 - 2, gy);
         }
         noStroke();
         // Ventilation slots
-        fill(60, 45, 25, 160);
+        fill(fc.window[0], fc.window[1], fc.window[2], 160);
         for (let gv = 0; gv < 3; gv++) {
           let gvx = -bw / 2 + 10 + gv * (bw - 16) / 2;
           rect(gvx, -bh / 2 + 14, 6, 3);
           rect(gvx, -bh / 2 + 22, 6, 3);
         }
-        // Terracotta roof
-        fill(170, 95, 55);
+        // Roof — faction
+        fill(fc.roof[0], fc.roof[1], fc.roof[2]);
         beginShape();
         vertex(-bw / 2 - 2, -bh / 2 + 8);
         vertex(0, -bh / 2 - 4);
         vertex(bw / 2 + 2, -bh / 2 + 8);
         endShape(CLOSE);
-        stroke(145, 80, 42, 80);
+        stroke(fc.roof[0] - 25, fc.roof[1] - 15, fc.roof[2] - 13, 80);
         strokeWeight(0.7);
         for (let rt = 1; rt < 5; rt++) {
           let rty = -bh / 2 + 8 - rt * 2.5;
@@ -7754,10 +7852,10 @@ function drawOneBuilding(b) {
           line(-rw2, rty, rw2, rty);
         }
         noStroke();
-        fill(190, 110, 65);
+        fill(fc.roof[0] + 10, fc.roof[1] + 15, fc.roof[2] + 10);
         rect(-3, -bh / 2 - 5, 6, 3, 1);
         // Door with wheat symbol
-        fill(80, 58, 22);
+        fill(fc.door[0], fc.door[1], fc.door[2]);
         rect(-4, -bh / 2 + 28, 8, 10, 1);
         fill(190, 155, 55, 140);
         circle(-2, -bh / 2 + 28, 4);
@@ -7771,18 +7869,18 @@ function drawOneBuilding(b) {
         fill(0, 0, 0, 25);
         ellipse(0, bh / 2 - 2, bw * 0.9, 5);
         // Base ring
-        fill(175, 168, 155);
+        fill(fc.trim[0] - 10, fc.trim[1] - 10, fc.trim[2] - 10);
         ellipse(0, bh / 2 - 6, bw - 4, 8);
         // Shaft
-        fill(185, 178, 165);
+        fill(fc.wall[0] - 10, fc.wall[1] - 10, fc.wall[2] - 3);
         rect(-bw / 2 + 2, -bh / 4, bw - 4, bh * 0.75, 2);
-        stroke(155, 148, 135, 70);
+        stroke(fc.wall[0] - 40, fc.wall[1] - 40, fc.wall[2] - 30, 70);
         strokeWeight(0.6);
         for (let wl = -bh / 4 + 5; wl < bh / 2 - 6; wl += 5) {
           line(-bw / 2 + 3, wl, bw / 2 - 3, wl);
         }
         noStroke();
-        fill(195, 188, 175);
+        fill(fc.trim[0] + 10, fc.trim[1] + 10, fc.trim[2] + 10);
         rect(-bw / 2 + 1, -bh / 4 - 2, bw - 2, 4, 1);
         // Dark water
         fill(35, 65, 95, 200);
@@ -7809,7 +7907,7 @@ function drawOneBuilding(b) {
 
       case 'temple': {
         noStroke();
-        let _tfc = getFactionBuildingColors();
+        let _tfc = fc;
         // Foundation steps
         fill(_tfc.trim[0] - 30, _tfc.trim[1] - 27, _tfc.trim[2] - 22);
         rect(-bw / 2 + 2, bh / 2 - 8, bw - 4, 4, 1);
@@ -7898,10 +7996,10 @@ function drawOneBuilding(b) {
         noStroke();
         fill(0, 0, 0, 25);
         rect(-bw / 2 + 2, bh / 2 - 4, bw, 5);
-        // Counter — era-aware
-        fill(ep.wallBase[0], ep.wallBase[1], ep.wallBase[2]);
+        // Counter — faction
+        fill(fc.wall[0], fc.wall[1], fc.wall[2]);
         rect(-bw / 2, -bh / 2 + 10, bw, bh / 2, 1);
-        fill(ep.wallAccent[0], ep.wallAccent[1], ep.wallAccent[2]);
+        fill(fc.trim[0] - 15, fc.trim[1] - 18, fc.trim[2] - 20);
         rect(-bw / 2 + 3, -bh / 2 + 20, 3, bh / 2 - 2, 1);
         rect(bw / 2 - 6, -bh / 2 + 20, 3, bh / 2 - 2, 1);
         // Goods on counter
@@ -7915,9 +8013,9 @@ function drawOneBuilding(b) {
         fill(120, 90, 40);
         rect(-bw / 2 + 1, -bh / 2 - 10, 3, 22, 1);
         rect(bw / 2 - 4, -bh / 2 - 10, 3, 22, 1);
-        // Striped awning — era-aware
+        // Striped awning — faction
         for (let mai = 0; mai < 5; mai++) {
-          let maColor = mai % 2 === 0 ? [ep.roofBase[0], ep.roofBase[1], ep.roofBase[2]] : [ep.wallBase[0] + 20, ep.wallBase[1] + 20, ep.wallBase[2] + 20];
+          let maColor = mai % 2 === 0 ? [fc.roof[0], fc.roof[1], fc.roof[2]] : [fc.wall[0] + 20, fc.wall[1] + 20, fc.wall[2] + 20];
           fill(maColor[0], maColor[1], maColor[2], 220);
           let mawx = -bw / 2 + 2 + mai * (bw - 4) / 5;
           rect(mawx, -bh / 2 - 10, (bw - 4) / 5, 10, 1);
@@ -7957,12 +8055,12 @@ function drawOneBuilding(b) {
         break;
 
       case 'forum':
-        // Roman public forum — era-aware tiled plaza
+        // Public forum — tiled plaza — faction
         noStroke();
-        fill(ep.stoneBase[0], ep.stoneBase[1], ep.stoneBase[2]);
+        fill(fc.ground[0], fc.ground[1], fc.ground[2]);
         rect(-bw / 2, -bh / 2, bw, bh, 2);
         // Flagstone grid
-        stroke(ep.stoneBase[0] - 20, ep.stoneBase[1] - 20, ep.stoneBase[2] - 20, 50);
+        stroke(fc.ground[0] - 20, fc.ground[1] - 20, fc.ground[2] - 20, 50);
         strokeWeight(0.6);
         for (let ffy = -bh / 2 + 8; ffy < bh / 2; ffy += 8) {
           line(-bw / 2 + 2, ffy, bw / 2 - 2, ffy);
@@ -7971,8 +8069,8 @@ function drawOneBuilding(b) {
           line(ffx, -bh / 2 + 2, ffx, bh / 2 - 2);
         }
         noStroke();
-        // Border colonnade stubs — era-aware
-        fill(ep.wallBase[0], ep.wallBase[1], ep.wallBase[2]);
+        // Border colonnade stubs — faction
+        fill(fc.column[0], fc.column[1], fc.column[2]);
         for (let ffci = 0; ffci < 5; ffci++) {
           let ffcpx = -bw / 2 + 5 + ffci * (bw - 10) / 4;
           rect(ffcpx - 1.5, -bh / 2, 3, 6, 1);
@@ -7984,7 +8082,7 @@ function drawOneBuilding(b) {
           rect(bw / 2 - 6, ffcpy - 1.5, 6, 3, 1);
         }
         // Central fountain
-        fill(165, 158, 145);
+        fill(fc.trim[0] - 20, fc.trim[1] - 20, fc.trim[2] - 20);
         ellipse(0, 0, 20, 14);
         fill(50, 105, 160, 180);
         ellipse(0, 0, 16, 10);
@@ -7994,12 +8092,12 @@ function drawOneBuilding(b) {
         fill(80, 160, 210, 100 + sin(forumPhase * 1.3) * 40);
         ellipse(0, -4, 3, 5);
         // Rostra
-        fill(180, 172, 158);
+        fill(fc.trim[0] - 5, fc.trim[1] - 6, fc.trim[2] - 7);
         rect(-10, bh / 2 - 10, 20, 8, 1);
-        fill(188, 180, 165);
+        fill(fc.trim[0] + 3, fc.trim[1] + 2, fc.trim[2]);
         rect(-8, bh / 2 - 14, 16, 5, 1);
         // Statues
-        fill(192, 185, 170);
+        fill(fc.column[0] + 2, fc.column[1] + 2, fc.column[2]);
         rect(-bw / 2 + 12, -2, 3, 10, 1);
         rect(bw / 2 - 15, -2, 3, 10, 1);
         circle(-bw / 2 + 13, -3, 4);
@@ -8007,17 +8105,17 @@ function drawOneBuilding(b) {
         break;
 
       case 'watchtower':
-        // Roman defensive watchtower
+        // Defensive watchtower — faction
         noStroke();
         fill(0, 0, 0, 30);
         rect(-bw / 2 + 1, bh / 2 - 4, bw, 6);
         // Wide base
-        fill(165, 155, 140);
+        fill(fc.wall[0] - 30, fc.wall[1] - 30, fc.wall[2] - 28);
         rect(-bw / 2 - 3, bh / 2 - 10, bw + 6, 10, 1);
         // Shaft
-        fill(180, 172, 158);
+        fill(fc.wall[0] - 15, fc.wall[1] - 15, fc.wall[2] - 10);
         rect(-bw / 2, -bh / 2 + 8, bw, bh - 18, 1);
-        stroke(160, 152, 138, 65);
+        stroke(fc.wall[0] - 35, fc.wall[1] - 35, fc.wall[2] - 30, 65);
         strokeWeight(0.6);
         for (let wtl = -bh / 2 + 12; wtl < bh / 2 - 12; wtl += 6) {
           line(-bw / 2 + 1, wtl, bw / 2 - 1, wtl);
@@ -8033,10 +8131,10 @@ function drawOneBuilding(b) {
         rect(-1.5, -bh / 2 + 30, 3, 7, 1);
         rect(-1.5, -bh / 2 + 44, 3, 7, 1);
         // Battlement
-        fill(185, 177, 162);
+        fill(fc.trim[0], fc.trim[1], fc.trim[2]);
         rect(-bw / 2, -bh / 2 + 6, bw, 6, 1);
         // Merlons
-        fill(190, 182, 167);
+        fill(fc.trim[0] + 5, fc.trim[1] + 4, fc.trim[2] + 5);
         rect(-bw / 2, -bh / 2, 4, 8, 1);
         rect(-bw / 2 + 6, -bh / 2, 4, 8, 1);
         rect(bw / 2 - 10, -bh / 2, 4, 8, 1);
@@ -8062,40 +8160,40 @@ function drawOneBuilding(b) {
         break;
 
       case 'arch':
-        // Triumphal arch
+        // Triumphal arch — faction
         noStroke();
         // Base plinth
-        fill(170, 162, 148);
+        fill(fc.trim[0] - 15, fc.trim[1] - 20, fc.trim[2] - 17);
         rect(-bw / 2, bh / 2 - 8, bw, 8, 1);
         // Piers
-        fill(188, 180, 165);
+        fill(fc.wall[0], fc.wall[1], fc.wall[2]);
         rect(-bw / 2, -bh / 2 + 6, 14, bh - 14, 1);
         rect(bw / 2 - 14, -bh / 2 + 6, 14, bh - 14, 1);
         // Arch opening
         fill(38, 28, 16, 200);
         rect(-bw / 2 + 14, -bh / 2 + 12, bw - 28, bh - 20, 1);
-        fill(180, 172, 158);
+        fill(fc.trim[0], fc.trim[1], fc.trim[2]);
         arc(0, -bh / 2 + 12, bw - 28, bh - 14, PI, TWO_PI, PIE);
         fill(38, 28, 16, 200);
         arc(0, -bh / 2 + 12, bw - 32, bh - 20, PI, TWO_PI, PIE);
         // Attic inscription block
-        fill(192, 185, 170);
+        fill(fc.column[0] + 2, fc.column[1] + 2, fc.column[2]);
         rect(-bw / 2 + 2, -bh / 2, bw - 4, 14, 1);
-        stroke(165, 158, 143, 100);
+        stroke(fc.trim[0] - 20, fc.trim[1] - 20, fc.trim[2] - 22, 100);
         strokeWeight(0.5);
         line(-bw / 2 + 8, -bh / 2 + 4, bw / 2 - 8, -bh / 2 + 4);
         line(-bw / 2 + 8, -bh / 2 + 7, bw / 2 - 8, -bh / 2 + 7);
         line(-bw / 2 + 8, -bh / 2 + 10, bw / 2 - 8, -bh / 2 + 10);
         noStroke();
         // Engaged columns
-        fill(196, 188, 173);
+        fill(fc.column[0], fc.column[1], fc.column[2]);
         rect(-bw / 2 + 3, -bh / 2 + 8, 5, bh - 20, 1);
         rect(bw / 2 - 8, -bh / 2 + 8, 5, bh - 20, 1);
-        fill(200, 192, 177);
+        fill(fc.column[0] + 10, fc.column[1] + 9, fc.column[2] + 7);
         rect(-bw / 2 + 2, -bh / 2 + 6, 7, 3, 1);
         rect(bw / 2 - 9, -bh / 2 + 6, 7, 3, 1);
-        // Keystone — gold
-        fill(200, 160, 55);
+        // Keystone — accent
+        fill(fc.accent[0], fc.accent[1], fc.accent[2]);
         beginShape();
         vertex(-3, -bh / 2 + 10);
         vertex(3, -bh / 2 + 10);
@@ -8103,7 +8201,7 @@ function drawOneBuilding(b) {
         vertex(-4, -bh / 2 + 16);
         endShape(CLOSE);
         // Victory sculptures on top
-        fill(192, 185, 170);
+        fill(fc.column[0] + 2, fc.column[1] + 2, fc.column[2]);
         circle(-bw / 2 + 7, -bh / 2 - 3, 7);
         circle(bw / 2 - 7, -bh / 2 - 3, 7);
         // Prestige aura
@@ -8114,7 +8212,7 @@ function drawOneBuilding(b) {
 
       case 'villa': {
         noStroke();
-        let _vfc = getFactionBuildingColors();
+        let _vfc = fc;
         // Outer wall
         fill(_vfc.wall[0] - 20, _vfc.wall[1] - 15, _vfc.wall[2] - 15);
         rect(-bw / 2, -bh / 2, bw, bh, 2);
@@ -8168,25 +8266,25 @@ function drawOneBuilding(b) {
       }
 
       case 'shrine': {
-        // Small sacred shrine — raised platform, columns, flame bowl
+        // Small sacred shrine — raised platform, columns, flame bowl — faction
         noStroke();
-        fill(178, 170, 155);
+        fill(fc.trim[0] - 7, fc.trim[1] - 8, fc.trim[2] - 10);
         rect(-bw / 2, -bh / 2 + 10, bw, bh - 10, 1);
         for (let sry = -bh / 2 + 12; sry < bh / 2; sry += 4) {
           for (let srx = -bw / 2 + 2; srx < bw / 2 - 2; srx += 4) {
             if ((floor(srx / 4) + floor(sry / 4)) % 2 === 0) {
-              fill(168, 160, 145);
+              fill(fc.trim[0] - 17, fc.trim[1] - 18, fc.trim[2] - 20);
               rect(srx, sry, 4, 4);
             }
           }
         }
-        fill(200, 193, 178);
+        fill(fc.column[0] + 10, fc.column[1] + 10, fc.column[2] + 8);
         rect(-bw / 4 - 2, -bh / 2 + 2, 4, bh - 12, 1);
         rect(bw / 4 - 2, -bh / 2 + 2, 4, bh - 12, 1);
-        fill(210, 202, 186);
+        fill(fc.column[0] + 20, fc.column[1] + 19, fc.column[2] + 16);
         rect(-bw / 4 - 3, -bh / 2 + 1, 6, 3, 1);
         rect(bw / 4 - 3, -bh / 2 + 1, 6, 3, 1);
-        fill(190, 182, 166);
+        fill(fc.column[0], fc.column[1], fc.column[2]);
         rect(-bw / 4 - 3, bh / 2 - 4, 6, 2, 1);
         rect(bw / 4 - 3, bh / 2 - 4, 6, 2, 1);
         fill(120, 100, 65);
@@ -8213,7 +8311,7 @@ function drawOneBuilding(b) {
 
       case 'house': {
         noStroke();
-        let _fc = getFactionBuildingColors();
+        let _fc = fc;
         fill(0, 0, 0, 25);
         rect(-bw / 2 + 2, bh / 2 - 3, bw, 5);
         // Walls — faction color
@@ -8333,11 +8431,11 @@ function drawOneBuilding(b) {
         // Shadow
         fill(0, 0, 0, 28);
         rect(-bw / 2 + 3, bh / 2 - 3, bw, 6);
-        // Main body — warm marble
-        fill(205, 198, 180);
+        // Main body — faction wall
+        fill(fc.wall[0], fc.wall[1], fc.wall[2]);
         rect(-bw / 2, -bh / 2 + 10, bw, bh - 10, 1);
         // Stone course lines
-        stroke(185, 178, 162, 50);
+        stroke(fc.wall[0] - 20, fc.wall[1] - 20, fc.wall[2] - 18, 50);
         strokeWeight(0.5);
         for (let ly2 = -bh / 2 + 16; ly2 < bh / 2; ly2 += 6) {
           line(-bw / 2 + 1, ly2, bw / 2 - 1, ly2);
@@ -8360,29 +8458,29 @@ function drawOneBuilding(b) {
           rect(lnx, -bh / 2 + 17, 1.5, 7);
           rect(lnx + 5, -bh / 2 + 17, 1.5, 7);
         }
-        // 4 entrance columns — wider spacing on larger building
-        fill(215, 208, 192);
+        // 4 entrance columns — faction
+        fill(fc.column[0], fc.column[1], fc.column[2]);
         let libColPositions = [-bw/2 + 5, -bw/2 + 5 + (bw-10)/3, -bw/2 + 5 + 2*(bw-10)/3, bw/2 - 5];
         libColPositions.forEach(lcx => {
           rect(lcx - 3, -bh / 2 + 2, 6, bh / 2 + 10, 1);
           // Fluting
-          stroke(195, 188, 172, 60);
+          stroke(fc.column[0] - 20, fc.column[1] - 20, fc.column[2] - 18, 60);
           strokeWeight(0.4);
           line(lcx - 1, -bh / 2 + 4, lcx - 1, bh / 2 - 12);
           line(lcx + 1, -bh / 2 + 4, lcx + 1, bh / 2 - 12);
           noStroke();
           // Column capital
-          fill(225, 218, 202);
+          fill(fc.column[0] + 15, fc.column[1] + 15, fc.column[2] + 12);
           rect(lcx - 4, -bh / 2 + 1, 8, 3, 1);
           // Base
-          fill(210, 203, 188);
+          fill(fc.column[0] + 5, fc.column[1] + 5, fc.column[2] + 3);
           rect(lcx - 3.5, bh / 2 - 14, 7, 2, 1);
         });
         // Entablature
-        fill(190, 182, 165);
+        fill(fc.trim[0], fc.trim[1], fc.trim[2]);
         rect(-bw / 2 + 2, -bh / 2 + 8, bw - 4, 5, 1);
-        // Pediment — triangular
-        fill(178, 170, 155);
+        // Pediment — triangular — faction roof
+        fill(fc.roof[0], fc.roof[1], fc.roof[2]);
         beginShape();
         vertex(-bw / 2 + 2, -bh / 2 + 8);
         vertex(0, -bh / 2 - 10);
@@ -8402,8 +8500,8 @@ function drawOneBuilding(b) {
         circle(-bw / 2 + 4, -bh / 2 + 7, 4);
         circle(bw / 2 - 4, -bh / 2 + 7, 4);
         circle(0, -bh / 2 - 11, 4);
-        // Entrance doorway
-        fill(45, 33, 18);
+        // Entrance doorway — faction door
+        fill(fc.door[0], fc.door[1], fc.door[2]);
         rect(-8, -bh / 2 + 13, 16, 16, 1);
         arc(0, -bh / 2 + 13, 16, 10, PI, TWO_PI);
         // Night: warm lamp glow through entrance
@@ -8426,11 +8524,11 @@ function drawOneBuilding(b) {
         // Shadow ellipse
         fill(0, 0, 0, 35);
         ellipse(3, 6, bw, bh * 0.4);
-        // Outer wall — stone ellipse (largest, background)
-        fill(175, 162, 140);
+        // Outer wall — faction stone
+        fill(fc.wall[0] - 20, fc.wall[1] - 20, fc.wall[2] - 20);
         ellipse(0, 0, bw, bh);
         // Stone block texture on outer wall
-        stroke(155, 143, 122, 60);
+        stroke(fc.wall[0] - 40, fc.wall[1] - 40, fc.wall[2] - 38, 60);
         strokeWeight(0.6);
         for (let aRing = 0; aRing < 3; aRing++) {
           let aRx = (bw / 2 - 2) * (1 - aRing * 0.04);
@@ -8438,14 +8536,14 @@ function drawOneBuilding(b) {
           ellipse(0, 0, aRx * 2, aRy * 2);
         }
         noStroke();
-        // Seating tier 1 — outer (stone, lightest)
-        fill(185, 172, 150);
+        // Seating tier 1 — outer (faction, lightest)
+        fill(fc.wall[0] - 10, fc.wall[1] - 10, fc.wall[2] - 10);
         ellipse(0, 0, bw - 6, bh - 6);
         // Seating tier 2 — mid
-        fill(165, 152, 130);
+        fill(fc.wall[0] - 30, fc.wall[1] - 30, fc.wall[2] - 30);
         ellipse(0, 0, bw - 18, bh - 18);
         // Seating tier 3 — inner
-        fill(148, 135, 112);
+        fill(fc.wall[0] - 48, fc.wall[1] - 48, fc.wall[2] - 48);
         ellipse(0, 0, bw - 30, bh - 30);
         // Sand pit — arena floor
         fill(212, 195, 158);
@@ -8473,14 +8571,14 @@ function drawOneBuilding(b) {
           fill(cc[0], cc[1], cc[2], 140);
           circle(asx, asy, 2.5);
         }
-        // North gate (top)
-        fill(95, 82, 62);
+        // North gate (top) — faction door
+        fill(fc.door[0], fc.door[1], fc.door[2]);
         rect(-6, -bh / 2 + 4, 12, 14, 1);
-        fill(38, 28, 16, 220);
+        fill(fc.door[0] - 57, fc.door[1] - 30, fc.door[2] - 8, 220);
         rect(-4, -bh / 2 + 6, 8, 11);
         arc(0, -bh / 2 + 6, 8, 6, PI, TWO_PI);
         // South main gate (bottom)
-        fill(115, 100, 78);
+        fill(fc.door[0] + 20, fc.door[1] + 18, fc.door[2] + 16);
         rect(-8, bh / 2 - 16, 16, 16, 1);
         fill(38, 28, 16, 220);
         rect(-6, bh / 2 - 14, 12, 13);
@@ -8495,11 +8593,11 @@ function drawOneBuilding(b) {
         line(-bw / 2 + 5, -bh / 2 - 8, 0, -bh / 2 - 2);
         line(bw / 2 - 5, -bh / 2 - 8, 0, -bh / 2 - 2);
         noStroke();
-        // Red pennant banners on poles
-        fill(175, 28, 28);
+        // Faction pennant banners on poles
+        fill(fc.accent[0], fc.accent[1], fc.accent[2]);
         rect(-bw / 2 + 6, -bh / 2 - 8, 7, 9);
         rect(bw / 2 - 13, -bh / 2 - 8, 7, 9);
-        fill(145, 22, 22);
+        fill(fc.accent[0] - 30, fc.accent[1] - 6, fc.accent[2] - 6);
         rect(-bw / 2 + 6, -bh / 2 - 2, 7, 2);
         rect(bw / 2 - 13, -bh / 2 - 2, 7, 2);
         // Night: torchlight in seating tiers
@@ -8560,13 +8658,13 @@ function drawOneBuilding(b) {
       }
 
       case 'castrum':
-        // Roman military fortress — imposing stone walls with crenellations
+        // Military fortress — faction
         noStroke();
         // Ground shadow
         fill(0, 0, 0, 35);
         rect(-bw / 2 + 4, bh / 2 - 4, bw, 10);
-        // Outer stone wall (darker, fortress weight)
-        fill(125, 112, 92);
+        // Outer stone wall — faction
+        fill(fc.wall[0] - 60, fc.wall[1] - 60, fc.wall[2] - 60);
         rect(-bw / 2, -bh / 2, bw, bh, 3);
         // Stone block variation — ashlar courses
         stroke(108, 96, 78, 55);
@@ -8630,8 +8728,8 @@ function drawOneBuilding(b) {
           let my2 = -bh / 2 + 24 + mi * (bh - 48) / 6;
           rect(bw / 2 - 2, my2, 8, 7, 1);
         }
-        // Gate archway (south) — iron portcullis feel
-        fill(45, 35, 22);
+        // Gate archway (south) — faction door
+        fill(fc.door[0] - 50, fc.door[1] - 23, fc.door[2] - 2);
         rect(-14, bh / 2 - 20, 28, 20, 1);
         stroke(30, 24, 14, 200);
         strokeWeight(1.4);
@@ -8644,21 +8742,21 @@ function drawOneBuilding(b) {
         // Gate arch top
         fill(112, 100, 82);
         arc(0, bh / 2 - 20, 28, 14, PI, TWO_PI);
-        // Red legion banner — animated wave (taller pole)
+        // Faction legion banner — animated wave (taller pole)
         let castFlap = sin(frameCount * 0.04 + b.x * 0.01) * 2.5;
         fill(100, 75, 42);
         rect(-2, -bh / 2 - 22, 4, 26);   // pole
-        fill(185, 28, 28);
+        fill(fc.accent[0], fc.accent[1], fc.accent[2]);
         beginShape();
         vertex(0, -bh / 2 - 21);
         vertex(16 + castFlap, -bh / 2 - 17);
         vertex(15 + castFlap * 0.6, -bh / 2 - 10);
         vertex(0, -bh / 2 - 8);
         endShape(CLOSE);
-        // Eagle sigil on banner
+        // Faction sigil on banner
         fill(220, 195, 60, 200);
         circle(8 + castFlap * 0.4, -bh / 2 - 14, 5);
-        fill(185, 28, 28, 0);
+        fill(fc.accent[0], fc.accent[1], fc.accent[2], 0);
         // Military cooking smoke (darker, greyer than residential) — spread wider
         {
           let castSmokeAlpha = map(getSkyBrightness(), 0.0, 0.6, 65, 18);
@@ -8697,19 +8795,19 @@ function drawOneBuilding(b) {
 
       case 'altar': {
         noStroke();
-        fill(175, 168, 152);
+        fill(fc.trim[0] - 10, fc.trim[1] - 10, fc.trim[2] - 13);
         rect(-bw / 2, -bh / 2 + 8, bw, bh - 8, 1);
         for (let ay = -bh / 2 + 9; ay < bh / 2; ay += 3) {
           for (let ax = -bw / 2 + 1; ax < bw / 2 - 1; ax += 3) {
             if ((floor(ax / 3) + floor(ay / 3)) % 2 === 0) {
-              fill(165, 158, 142);
+              fill(fc.trim[0] - 20, fc.trim[1] - 20, fc.trim[2] - 23);
               rect(ax, ay, 3, 3);
             }
           }
         }
-        fill(192, 185, 170);
+        fill(fc.column[0] + 2, fc.column[1] + 2, fc.column[2]);
         rect(-8, -bh / 2 + 2, 16, 12, 1);
-        fill(200, 193, 178);
+        fill(fc.column[0] + 10, fc.column[1] + 10, fc.column[2] + 8);
         rect(-9, -bh / 2, 18, 4, 1);
         fill(145, 115, 55);
         ellipse(0, -bh / 2 + 2, 10, 5);
@@ -8751,7 +8849,7 @@ function drawOneBuilding(b) {
         noStroke();
         fill(0, 0, 0, 25);
         rect(-bw / 2 + 2, bh / 2 - 3, bw, 5);
-        let _bkfc = getFactionBuildingColors();
+        let _bkfc = fc;
         fill(_bkfc.wall[0], _bkfc.wall[1], _bkfc.wall[2]);
         rect(-bw / 2, -bh / 2 + 8, bw, bh - 8, 1);
         stroke(_bkfc.wall[0] - 20, _bkfc.wall[1] - 20, _bkfc.wall[2] - 20, 50);
@@ -8794,21 +8892,21 @@ function drawOneBuilding(b) {
         ellipse(-bw / 2 + 14, -bh / 2 + 19, 5, 3);
         fill(190, 150, 70);
         ellipse(-bw / 2 + 11, -bh / 2 + 25, 5, 3);
-        fill(185, 100, 58);
+        fill(fc.roof[0], fc.roof[1], fc.roof[2]);
         beginShape();
         vertex(-bw / 2 - 2, -bh / 2 + 8);
         vertex(0, -bh / 2 - 4);
         vertex(bw / 2 + 2, -bh / 2 + 8);
         endShape(CLOSE);
-        fill(195, 115, 68);
+        fill(fc.roof[0] + 10, fc.roof[1] + 15, fc.roof[2] + 10);
         beginShape();
         vertex(-bw / 2 + 2, -bh / 2 + 7);
         vertex(0, -bh / 2 - 2);
         vertex(bw / 2 - 2, -bh / 2 + 7);
         endShape(CLOSE);
-        fill(155, 145, 128);
+        fill(fc.trim[0] - 30, fc.trim[1] - 33, fc.trim[2] - 37);
         rect(bw / 4 - 3, -bh / 2 - 6, 6, 8);
-        fill(165, 155, 138);
+        fill(fc.trim[0] - 20, fc.trim[1] - 23, fc.trim[2] - 27);
         rect(bw / 4 - 4, -bh / 2 - 8, 8, 3, 1);
         {
           let bkSmoke = map(getSkyBrightness(), 0.2, 1.0, 50, 22);
@@ -8824,7 +8922,7 @@ function drawOneBuilding(b) {
             }
           }
         }
-        fill(75, 50, 22);
+        fill(fc.door[0], fc.door[1], fc.door[2]);
         rect(-3, -bh / 2 + 20, 6, 10, 1);
         if (getSkyBrightness() < 0.4) {
           let bkNight = map(getSkyBrightness(), 0, 0.4, 1, 0);
@@ -8840,9 +8938,9 @@ function drawOneBuilding(b) {
         noStroke();
         fill(0, 0, 0, 25);
         rect(-bw / 2 + 2, bh / 2 - 4, bw, 5);
-        fill(180, 172, 158);
+        fill(fc.wall[0] - 15, fc.wall[1] - 15, fc.wall[2] - 10);
         rect(-bw / 2, -bh / 2 + 12, bw, bh - 12, 1);
-        stroke(160, 152, 138, 50);
+        stroke(fc.wall[0] - 35, fc.wall[1] - 35, fc.wall[2] - 30, 50);
         strokeWeight(0.4);
         for (let mpy = -bh / 2 + 14; mpy < bh / 2; mpy += 6) {
           line(-bw / 2 + 1, mpy, bw / 2 - 1, mpy);
@@ -8968,11 +9066,11 @@ function drawOneBuilding(b) {
         noStroke();
         fill(0, 0, 0, 30);
         rect(-bw / 2 + 3, bh / 2 - 3, bw, 7);
-        fill(165, 155, 138);
+        fill(fc.trim[0] - 20, fc.trim[1] - 23, fc.trim[2] - 27);
         rect(-bw / 2 + 2, bh / 2 - 8, bw - 4, 8, 1);
-        fill(195, 185, 168);
+        fill(fc.wall[0], fc.wall[1], fc.wall[2]);
         rect(-bw / 2, -bh / 2 + 10, bw, bh - 18, 1);
-        stroke(175, 165, 148, 40);
+        stroke(fc.wall[0] - 20, fc.wall[1] - 20, fc.wall[2] - 20, 40);
         strokeWeight(0.5);
         for (let bhy = -bh / 2 + 16; bhy < bh / 2 - 10; bhy += 6) {
           line(-bw / 2 + 1, bhy, bw / 2 - 1, bhy);
@@ -8980,7 +9078,7 @@ function drawOneBuilding(b) {
         noStroke();
         fill(42, 105, 162, 195);
         rect(-bw / 2 + 10, -bh / 2 + 18, bw - 20, bh - 36, 3);
-        fill(185, 178, 162);
+        fill(fc.trim[0], fc.trim[1], fc.trim[2]);
         rect(-bw / 2 + 8, -bh / 2 + 16, bw - 16, 3);
         rect(-bw / 2 + 8, bh / 2 - 19, bw - 16, 3);
         rect(-bw / 2 + 8, -bh / 2 + 16, 3, bh - 32);
@@ -8992,17 +9090,17 @@ function drawOneBuilding(b) {
         rect(bw / 2 - 28, -bh / 2 + 26, 12, 3, 2);
         fill(120, 185, 230, 25 + sin(bhPhase * 0.9) * 12);
         rect(-bw / 2 + 12, bh / 2 - 26, bw - 26, 2);
-        fill(205, 198, 182);
+        fill(fc.column[0], fc.column[1], fc.column[2]);
         let bhCols = [-bw/2 + 4, -bw/2 + floor(bw/3), bw/2 - floor(bw/3), bw/2 - 4];
         bhCols.forEach(bcx => {
           rect(bcx - 2.5, -bh / 2 + 2, 5, 16, 1);
-          fill(215, 208, 192);
+          fill(fc.column[0] + 10, fc.column[1] + 10, fc.column[2] + 10);
           rect(bcx - 3.5, -bh / 2 + 1, 7, 3, 1);
-          fill(205, 198, 182);
+          fill(fc.column[0], fc.column[1], fc.column[2]);
         });
-        fill(185, 178, 162);
+        fill(fc.trim[0], fc.trim[1], fc.trim[2]);
         rect(-bw / 2 + 2, -bh / 2 + 6, bw - 4, 5, 1);
-        fill(175, 168, 152);
+        fill(fc.roof[0], fc.roof[1], fc.roof[2]);
         beginShape();
         vertex(-bw / 2 + 2, -bh / 2 + 6);
         vertex(0, -bh / 2 - 5);
@@ -9022,7 +9120,7 @@ function drawOneBuilding(b) {
             }
           }
         }
-        fill(175, 168, 152);
+        fill(fc.trim[0] - 10, fc.trim[1] - 10, fc.trim[2] - 13);
         rect(-10, bh / 2 - 10, 20, 4, 1);
         rect(-8, bh / 2 - 6, 16, 3, 1);
         if (getSkyBrightness() < 0.35) {
@@ -9040,9 +9138,9 @@ function drawOneBuilding(b) {
         noStroke();
         fill(0, 0, 0, 28);
         rect(-bw / 2 + 1, bh / 2 - 3, bw + 2, 5);
-        fill(160, 150, 135);
+        fill(fc.trim[0] - 25, fc.trim[1] - 28, fc.trim[2] - 30);
         rect(-bw / 2 - 2, bh / 2 - 10, bw + 4, 10, 1);
-        fill(115, 82, 38);
+        fill(fc.wall[0] - 70, fc.wall[1] - 80, fc.wall[2] - 90);
         rect(-bw / 2, -bh / 2 + 12, bw, bh - 22, 1);
         stroke(95, 65, 28, 80);
         strokeWeight(0.5);
@@ -9104,20 +9202,20 @@ function drawOneBuilding(b) {
         noStroke();
         fill(0, 0, 0, 30);
         rect(-bw / 2 + 2, bh / 2 - 4, bw + 2, 6);
-        fill(165, 155, 140);
+        fill(fc.trim[0] - 20, fc.trim[1] - 23, fc.trim[2] - 25);
         rect(-bw / 2, bh / 2 - 12, bw, 12, 1);
-        fill(175, 165, 148);
+        fill(fc.trim[0] - 10, fc.trim[1] - 13, fc.trim[2] - 17);
         rect(-bw / 2 + 1, bh / 2 - 14, bw - 2, 3, 1);
         let lhBotW = bw - 2;
         let lhTopW = bw * 0.6;
-        fill(185, 178, 162);
+        fill(fc.wall[0], fc.wall[1], fc.wall[2]);
         beginShape();
         vertex(-lhBotW / 2, bh / 2 - 14);
         vertex(-lhTopW / 2, -bh / 2 + 16);
         vertex(lhTopW / 2, -bh / 2 + 16);
         vertex(lhBotW / 2, bh / 2 - 14);
         endShape(CLOSE);
-        stroke(165, 158, 142, 55);
+        stroke(fc.wall[0] - 20, fc.wall[1] - 20, fc.wall[2] - 20, 55);
         strokeWeight(0.5);
         for (let lhy = -bh / 2 + 20; lhy < bh / 2 - 16; lhy += 6) {
           let frac = (lhy - (-bh / 2 + 16)) / (bh - 30);
@@ -9129,14 +9227,14 @@ function drawOneBuilding(b) {
         rect(-1.5, -bh / 2 + 22, 3, 5, 1);
         rect(-1.5, -bh / 2 + 34, 3, 5, 1);
         rect(-1.5, bh / 2 - 26, 3, 5, 1);
-        fill(175, 168, 152);
+        fill(fc.trim[0] - 10, fc.trim[1] - 10, fc.trim[2] - 13);
         rect(-lhTopW / 2 - 3, -bh / 2 + 12, lhTopW + 6, 5, 1);
-        fill(185, 178, 162);
+        fill(fc.trim[0], fc.trim[1], fc.trim[2]);
         rect(-lhTopW / 2 - 4, -bh / 2 + 10, lhTopW + 8, 3, 1);
-        fill(170, 162, 148);
+        fill(fc.trim[0] - 15, fc.trim[1] - 16, fc.trim[2] - 17);
         rect(-lhTopW / 2 - 3, -bh / 2 + 8, 2, 5);
         rect(lhTopW / 2 + 1, -bh / 2 + 8, 2, 5);
-        fill(195, 188, 172);
+        fill(fc.column[0] + 5, fc.column[1] + 5, fc.column[2] + 2);
         rect(-lhTopW / 4, -bh / 2 + 2, lhTopW / 2, 10, 1);
         fill(140, 110, 50);
         arc(0, -bh / 2 + 2, lhTopW / 2 + 2, 6, PI, TWO_PI, PIE);
@@ -9172,15 +9270,15 @@ function drawOneBuilding(b) {
         noStroke();
         fill(0, 0, 0, 25);
         rect(-bw / 2 + 2, bh / 2 - 3, bw, 5);
-        fill(200, 192, 175);
+        fill(fc.wall[0], fc.wall[1], fc.wall[2]);
         rect(-bw / 2, -bh / 2 + 8, bw, bh - 8, 1);
-        stroke(180, 172, 155, 45);
+        stroke(fc.wall[0] - 20, fc.wall[1] - 20, fc.wall[2] - 20, 45);
         strokeWeight(0.5);
         for (let scy = -bh / 2 + 14; scy < bh / 2; scy += 5) {
           line(-bw / 2 + 1, scy, bw / 2 - 1, scy);
         }
         noStroke();
-        fill(155, 145, 130);
+        fill(fc.trim[0] - 30, fc.trim[1] - 33, fc.trim[2] - 35);
         rect(-bw / 2 + 4, -bh / 2 + 14, bw - 8, bh - 22, 1);
         fill(225, 220, 210);
         rect(-bw / 2 + 6, bh / 2 - 14, 10, 8, 1);
@@ -9212,13 +9310,13 @@ function drawOneBuilding(b) {
         fill(218, 212, 202);
         rect(bw / 2 - 14, -bh / 2 + 24, 4, 6, 1);
         circle(bw / 2 - 12, -bh / 2 + 23, 3);
-        fill(185, 100, 58);
+        fill(fc.roof[0], fc.roof[1], fc.roof[2]);
         beginShape();
         vertex(-bw / 2 - 2, -bh / 2 + 8);
         vertex(0, -bh / 2 - 4);
         vertex(bw / 2 + 2, -bh / 2 + 8);
         endShape(CLOSE);
-        fill(195, 115, 68);
+        fill(fc.roof[0] + 10, fc.roof[1] + 15, fc.roof[2] + 10);
         beginShape();
         vertex(-bw / 2 + 2, -bh / 2 + 7);
         vertex(0, -bh / 2 - 2);
@@ -13198,7 +13296,7 @@ function drawOneTree(t) {
       fill(110, 75, 35, 100);
       rect(-8 * s, -28 * s, 2 * s, 3 * s);
       rect(6 * s, -27 * s, 2 * s, 3 * s);
-    }
+    } else if (t.type === 'palm') {      fill(110, 80, 45); rect(-2 * s, -30 * s, 4 * s, 34 * s);      fill(95, 68, 38, 100); for (let ri = 0; ri < 8; ri++) rect(-2 * s, (-28 + ri * 4) * s, 4 * s, 1 * s);      for (let f = 0; f < 7; f++) { let fa = (f / 7) * TWO_PI + sin(frameCount * 0.008 + t.swayPhase) * 0.15, fx = cos(fa) * 14 * s, fy = sin(fa) * 6 * s - 34 * s; fill(45, 110, 35); ellipse(floor(fx + sway * 0.5), floor(fy), 10 * s, 4 * s); fill(55, 125, 42, 160); ellipse(floor(fx * 0.7 + sway * 0.3), floor(fy + 1), 7 * s, 3 * s); }      fill(140, 80, 25, 120); rect(-3 * s + sway * 0.3, -32 * s, 2 * s, 3 * s); rect(2 * s + sway * 0.3, -33 * s, 2 * s, 3 * s);    } else if (t.type === 'acacia') {      fill(100, 72, 38); rect(-2 * s, -16 * s, 4 * s, 20 * s);      fill(90, 65, 32); rect(-1 * s, -14 * s, 3 * s, 16 * s);      fill(60, 95, 35); rect(-22 * s + sway, -26 * s, 44 * s, 6 * s);      fill(50, 82, 28); rect(-20 * s + sway, -24 * s, 40 * s, 4 * s);      fill(68, 108, 42, 180); rect(-18 * s + sway, -30 * s, 36 * s, 5 * s);      fill(45, 78, 25, 100); for (let li = 0; li < 4; li++) rect(floor((-14 + li * 9) * s + sway), floor(-28 * s), 3 * s, 3 * s);    } else if (t.type === 'fig') {      fill(85, 62, 35); rect(-3 * s, -14 * s, 6 * s, 18 * s);      fill(75, 55, 30); rect(-2 * s, -12 * s, 4 * s, 14 * s);      fill(55, 95, 38); ellipse(sway * 0.5, -24 * s, 28 * s, 18 * s);      fill(65, 108, 45, 180); ellipse(sway * 0.4, -26 * s, 22 * s, 14 * s);      fill(90, 50, 70, 120); rect(-4 * s + sway * 0.3, -16 * s, 2 * s, 2 * s); rect(3 * s + sway * 0.3, -18 * s, 2 * s, 2 * s);    } else if (t.type === 'papyrus') {      fill(90, 120, 55); rect(-1 * s, -28 * s, 2 * s, 32 * s);      fill(80, 110, 48); rect(-3 * s, -24 * s, 1.5 * s, 28 * s); rect(2 * s, -26 * s, 1.5 * s, 30 * s);      fill(100, 140, 65);      for (let f = 0; f < 6; f++) { let fa = (f / 6) * PI - HALF_PI + sin(frameCount * 0.01 + t.swayPhase) * 0.1, fx = cos(fa) * 8 * s, fy = sin(fa) * 5 * s - 30 * s; rect(floor(fx + sway * 0.5), floor(fy), 2 * s, 1 * s); rect(floor(fx * 0.6 + sway * 0.3), floor(fy - 2 * s), 3 * s, 2 * s); }      fill(110, 155, 72, 140); ellipse(sway * 0.3, -32 * s, 12 * s, 6 * s);    } else if (t.type === 'datepalm') {      fill(120, 88, 48); rect(-2 * s, -34 * s, 4 * s, 38 * s);      fill(105, 78, 42, 120); for (let ri = 0; ri < 9; ri++) rect(-2 * s, (-32 + ri * 4) * s, 4 * s, 1 * s);      for (let f = 0; f < 6; f++) { let fa = (f / 6) * TWO_PI + sin(frameCount * 0.009 + t.swayPhase) * 0.12; fill(48, 105, 38); ellipse(floor(cos(fa) * 12 * s + sway * 0.5), floor(sin(fa) * 5 * s - 38 * s), 9 * s, 3.5 * s); }      fill(160, 100, 30, 140); rect(-2 * s + sway * 0.3, -36 * s, 3 * s, 4 * s); rect(1 * s + sway * 0.3, -35 * s, 2 * s, 3 * s);    } else if (t.type === 'sycamore') {      fill(95, 70, 38); rect(-4 * s, -16 * s, 8 * s, 20 * s);      fill(85, 62, 32); rect(-3 * s, -14 * s, 6 * s, 16 * s);      fill(50, 88, 35); ellipse(sway * 0.4, -26 * s, 32 * s, 16 * s);      fill(60, 100, 42, 170); ellipse(sway * 0.3, -28 * s, 26 * s, 12 * s);      fill(42, 78, 28, 100); rect(-12 * s + sway * 0.5, -22 * s, 5 * s, 4 * s); rect(8 * s + sway * 0.5, -24 * s, 5 * s, 4 * s);    } else if (t.type === 'laurel') {      fill(82, 60, 32); rect(-2 * s, -16 * s, 4 * s, 20 * s);      fill(72, 52, 28); rect(-1.5 * s, -14 * s, 3 * s, 16 * s);      fill(45, 85, 30); ellipse(sway * 0.4, -28 * s, 20 * s, 20 * s);      fill(55, 100, 38, 180); ellipse(sway * 0.3, -30 * s, 16 * s, 16 * s);      fill(65, 115, 45, 120); ellipse(3 * s + sway * 0.3, -32 * s, 10 * s, 8 * s);      fill(30, 30, 50, 100); rect(-4 * s + sway * 0.3, -22 * s, 2 * s, 2 * s); rect(3 * s + sway * 0.3, -24 * s, 2 * s, 2 * s);    }
 
     // Health indicator when damaged
     if (t.health < t.maxHealth) {
@@ -13700,6 +13798,7 @@ function enterAdventure() {
   let a = state.adventure;
   let p = state.player;
   if (typeof _killCombo !== 'undefined') { _killCombo = 0; _killComboDisplay = 0; _killComboDisplayTimer = 0; }
+  if (typeof initFactionAbilities === 'function') initFactionAbilities();
   a.returnX = WORLD.islandCX;
   a.returnY = WORLD.islandCY;
   a.active = true;
@@ -13953,6 +14052,9 @@ function updateEnemyAI(e, dt, p, a) {
         if (typeof getFortifyReduction === 'function') {
           dmg = max(1, floor(dmg * (1 - getFortifyReduction())));
         }
+        if (typeof getFactionDamageReduction === 'function') {
+          dmg = max(1, floor(dmg * (1 - getFactionDamageReduction())));
+        }
         p.hp -= dmg;
         p.invincTimer = 45;
         addFloatingText(w2sX(p.x), w2sY(p.y) - 25, '-' + dmg, '#ff6644');
@@ -13991,6 +14093,9 @@ function updateEnemyAI(e, dt, p, a) {
           let eDmg = max(1, e.damage - armorReduce);
           if (typeof getFortifyReduction === 'function') {
             eDmg = max(1, floor(eDmg * (1 - getFortifyReduction())));
+          }
+          if (typeof getFactionDamageReduction === 'function') {
+            eDmg = max(1, floor(eDmg * (1 - getFactionDamageReduction())));
           }
           p.hp -= eDmg;
           p.invincTimer = 30;
@@ -14103,6 +14208,13 @@ function enemyDeath(e, a) {
       drops.push({ type: 'crystal', amount: 5 });
       spawnBossDefeated(e.x, e.y);
       break;
+  }
+  // Carthage passive: +30% gold drops
+  if (typeof getFactionGoldDropMult === 'function') {
+    let goldMult = getFactionGoldDropMult();
+    for (let d of drops) {
+      if (d.type === 'gold') d.amount = floor(d.amount * goldMult);
+    }
   }
   for (let d of drops) {
     a.loot.push({
@@ -15141,6 +15253,9 @@ function drawAdventureEntities() {
   drawLoot(a);
   // Archer projectiles
   if (typeof drawArenaProjectiles === 'function') drawArenaProjectiles();
+  // Faction projectiles & AoEs
+  if (typeof drawPlayerProjectiles === 'function') drawPlayerProjectiles();
+  if (typeof drawFactionAoEs === 'function') drawFactionAoEs();
   // Slash arc on top
   drawSlashArc();
 }
@@ -15714,6 +15829,7 @@ function enterConquest() {
   let c = state.conquest;
   let p = state.player;
   c.active = true;
+  if (typeof initFactionAbilities === 'function') initFactionAbilities();
   // Park ship at south shore dock
   let dockX = c.isleX;
   let dockY = c.isleY + c.isleRY * 0.92;
@@ -16907,14 +17023,30 @@ function generateNationIslandContent(key) {
   let trees = [];
   for (let i = 0; i < numTrees; i++) {
     let a = random(TWO_PI), d = random(0.4, 0.65) * rx;
-    trees.push({ x: cx + cos(a) * d, y: cy + sin(a) * d * (ry / rx), size: random(8, 16) });
+    let tTypes = getFactionTreeTypes(key); trees.push({ x: cx + cos(a) * d, y: cy + sin(a) * d * (ry / rx), size: random(8, 16), type: tTypes[i % tTypes.length] });
   }
 
   // Walls if level >= 3
   let hasWalls = lv >= 3;
   let hasTowers = lv >= 5;
 
-  return { dock, palace, buildings, npcs, trees, hasWalls, hasTowers, style, bannerCol };
+  // Nation wildlife
+  let wildConfig = FACTION_WILDLIFE[key] || FACTION_WILDLIFE.rome;
+  let wildlife = [];
+  for (let wi = 0; wi < 3; wi++) {
+    let wt = wildConfig[wi % wildConfig.length];
+    let wa = random(TWO_PI), wd = random(0.2, 0.5) * rx;
+    wildlife.push({ x: cx + cos(wa) * wd, y: cy + sin(wa) * wd * (ry / rx), vx: 0, vy: 0, type: wt.type, speed: wt.speed, size: wt.size, timer: random(60, 200), phase: random(TWO_PI), facing: random() > 0.5 ? 1 : -1 });
+  }
+  // Nation flora
+  let floraConfig = FACTION_FLORA[key] || FACTION_FLORA.rome;
+  let flora = [];
+  for (let fi = 0; fi < 10; fi++) {
+    let fa = random(TWO_PI), fd = random(0.15, 0.55) * rx;
+    let ft = floraConfig[fi % floraConfig.length];
+    flora.push({ x: cx + cos(fa) * fd, y: cy + sin(fa) * fd * (ry / rx), col: ft.col, w: ft.w, h: ft.h, phase: random(TWO_PI) });
+  }
+  return { dock, palace, buildings, npcs, trees, wildlife, flora, hasWalls, hasTowers, style, bannerCol };
 }
 
 function enterNationIsland(key) {
@@ -17007,6 +17139,17 @@ function updateNationIslandVisit(dt) {
       let nx = n.x + n.vx * dt, ny = n.y + n.vy * dt;
       if (isOnNationIsland(nx, ny)) { n.x = nx; n.y = ny; }
       else { n.vx = -n.vx; n.vy = -n.vy; }
+    }
+  }
+
+  // Update nation wildlife
+  if (ni.wildlife) {
+    let nrx = rv.isleRX * 0.7, nry = rv.isleRY * 0.7;
+    for (let w of ni.wildlife) {
+      w.timer -= dt;
+      if (w.timer <= 0) { w.vx = (random() - 0.5) * w.speed * 2; w.vy = (random() - 0.5) * w.speed * 2; w.facing = w.vx > 0 ? 1 : -1; w.timer = random(80, 250); }
+      let nx = w.x + w.vx * dt, ny = w.y + w.vy * dt;
+      if (isOnNationIsland(nx, ny)) { w.x = nx; w.y = ny; } else { w.vx = -w.vx; w.vy = -w.vy; }
     }
   }
 
@@ -17108,40 +17251,49 @@ function drawNationIslandFull() {
     }
   }
 
-  // Trees
+  // Trees — faction-specific types
   for (let t of ni.trees) {
     let tx = w2sX(t.x), ty = w2sY(t.y);
-    fill(pal.treeTrunk[0], pal.treeTrunk[1], pal.treeTrunk[2]);
-    rect(floor(tx) - 2, floor(ty) - t.size, 4, t.size);
-    if (key === 'carthage') {
-      // Palm tree
+    let sz = t.size * 0.08; // scale for drawOneTree compat (nation trees are 8-16px, need ~1.0 scale)
+    let nationSway = floor(sin(frameCount * 0.01 + t.x * 0.1) * 2);
+    push(); translate(floor(tx), floor(ty)); noStroke();
+    // Shadow
+    fill(0, 0, 0, 25); ellipse(0, 2, t.size, 3);
+    if (t.type === 'palm' || t.type === 'datepalm') {
+      fill(pal.treeTrunk[0], pal.treeTrunk[1], pal.treeTrunk[2]); rect(-1, -t.size, 2, t.size);
       fill(pal.treeLeaf[0], pal.treeLeaf[1], pal.treeLeaf[2]);
-      for (let f = 0; f < 5; f++) {
-        let fa = (f / 5) * TWO_PI + sin(frameCount * 0.01) * 0.1;
-        let fx = floor(tx) + cos(fa) * (t.size * 0.8);
-        let fy = floor(ty) - t.size + sin(fa) * (t.size * 0.4);
-        ellipse(fx, fy, t.size * 0.6, t.size * 0.3);
-      }
-    } else if (key === 'egypt') {
-      // Date palm
-      fill(50, 100, 35);
-      for (let f = 0; f < 6; f++) {
-        let fa = (f / 6) * TWO_PI;
-        let fx = floor(tx) + cos(fa) * (t.size * 0.7);
-        let fy = floor(ty) - t.size + sin(fa) * (t.size * 0.3) - 2;
-        ellipse(fx, fy, t.size * 0.5, t.size * 0.25);
-      }
-      fill(160, 100, 30);
-      ellipse(floor(tx), floor(ty) - t.size - 1, 4, 3);
-    } else if (key === 'greece') {
-      // Olive / cypress
-      fill(70, 110, 50, 180);
-      ellipse(floor(tx), floor(ty) - t.size - 3, t.size * 0.7, t.size * 1.1);
+      for (let f = 0; f < 6; f++) { let fa = (f / 6) * TWO_PI + sin(frameCount * 0.01) * 0.12; ellipse(floor(cos(fa) * t.size * 0.6 + nationSway * 0.3), floor(sin(fa) * t.size * 0.25 - t.size - 1), t.size * 0.45, t.size * 0.2); }
+      if (t.type === 'datepalm') { fill(160, 100, 30, 140); rect(-1, -t.size - 1, 2, 2); }
+    } else if (t.type === 'acacia') {
+      fill(pal.treeTrunk[0], pal.treeTrunk[1], pal.treeTrunk[2]); rect(-1, -t.size * 0.6, 2, t.size * 0.6);
+      fill(pal.treeLeaf[0], pal.treeLeaf[1], pal.treeLeaf[2]); rect(-t.size * 0.8 + nationSway, -t.size * 0.9, t.size * 1.6, t.size * 0.25);
+      fill(pal.treeLeaf[0] + 15, pal.treeLeaf[1] + 15, pal.treeLeaf[2] + 10, 160); rect(-t.size * 0.65 + nationSway, -t.size, t.size * 1.3, t.size * 0.2);
+    } else if (t.type === 'fig' || t.type === 'sycamore') {
+      fill(pal.treeTrunk[0], pal.treeTrunk[1], pal.treeTrunk[2]); rect(-2, -t.size * 0.5, 4, t.size * 0.5);
+      fill(pal.treeLeaf[0], pal.treeLeaf[1], pal.treeLeaf[2]); ellipse(nationSway * 0.3, -t.size * 0.8, t.size * 1.2, t.size * 0.8);
+    } else if (t.type === 'papyrus') {
+      fill(90, 120, 55); rect(-1, -t.size, 1, t.size); rect(0, -t.size * 0.85, 1, t.size * 0.85);
+      fill(100, 140, 65); ellipse(nationSway * 0.2, -t.size - 2, t.size * 0.5, t.size * 0.2);
+    } else if (t.type === 'olive') {
+      fill(pal.treeTrunk[0], pal.treeTrunk[1], pal.treeTrunk[2]); rect(-2, -t.size * 0.6, 4, t.size * 0.6);
+      fill(78, 98, 58); ellipse(nationSway * 0.3, -t.size * 0.8, t.size * 0.8, t.size * 0.6);
+      fill(120, 145, 95, 100); ellipse(nationSway * 0.2, -t.size * 0.9, t.size * 0.5, t.size * 0.35);
+    } else if (t.type === 'laurel') {
+      fill(pal.treeTrunk[0], pal.treeTrunk[1], pal.treeTrunk[2]); rect(-1, -t.size * 0.6, 2, t.size * 0.6);
+      fill(45, 85, 30); ellipse(nationSway * 0.3, -t.size * 0.85, t.size * 0.7, t.size * 0.7);
+      fill(55, 100, 38, 180); ellipse(nationSway * 0.2, -t.size * 0.9, t.size * 0.55, t.size * 0.55);
     } else {
-      // Roman pine
-      fill(50, 90, 40);
-      triangle(floor(tx), floor(ty) - t.size - 8, floor(tx) - t.size * 0.5, floor(ty) - 2, floor(tx) + t.size * 0.5, floor(ty) - 2);
+      // Default: oak/cypress/pine
+      fill(pal.treeTrunk[0], pal.treeTrunk[1], pal.treeTrunk[2]); rect(-1, -t.size * 0.7, 2, t.size * 0.7);
+      fill(pal.treeLeaf[0], pal.treeLeaf[1], pal.treeLeaf[2]);
+      if (t.type === 'oak') { // cypress shape
+        for (let li = 0; li < 4; li++) { let lw = (3 - abs(li - 1.5)) * t.size * 0.15; rect(floor(-lw + nationSway * (li / 4)), floor(-t.size * 0.7 - li * t.size * 0.22), floor(lw * 2), floor(t.size * 0.22)); }
+      } else { // pine umbrella
+        rect(-t.size * 0.6 + nationSway, -t.size - 2, t.size * 1.2, t.size * 0.25);
+        rect(-t.size * 0.45 + nationSway, -t.size - 4, t.size * 0.9, t.size * 0.2);
+      }
     }
+    pop();
   }
 
   // Faction-specific scenery
@@ -17278,6 +17430,9 @@ function drawNationIslandFull() {
   fill(bannerCol[0] + 40, bannerCol[1] + 40, bannerCol[2] + 40);
   rect(floor(px) + 2, floor(py) - floor(ph) - 21, 6, 4);
 
+  // Faction flora on nation island
+  if (ni.flora) { for (let fl of ni.flora) drawOneFlora(fl); }
+
   // Dock area (south)
   let dx = w2sX(ni.dock.x), dy = w2sY(ni.dock.y);
   fill(120, 90, 50);
@@ -17323,6 +17478,9 @@ function drawNationIslandEntities() {
     fill(50, 35, 25); arc(0, -13, 8, 5, PI, 0);
     pop();
   }
+
+  // Faction wildlife on nation island
+  if (ni.wildlife) { for (let w of ni.wildlife) drawOneFactionCreature(w); }
 
   // Draw player
   drawPlayer();
@@ -17965,6 +18123,9 @@ function updateConquestEnemy(e, dt, p, c) {
             if (typeof getFortifyReduction === 'function') {
               dmg = max(1, floor(dmg * (1 - getFortifyReduction())));
             }
+            if (typeof getFactionDamageReduction === 'function') {
+              dmg = max(1, floor(dmg * (1 - getFactionDamageReduction())));
+            }
             p.hp -= dmg;
             p.invincTimer = 30;
             addFloatingText(w2sX(p.x), w2sY(p.y) - 25, '-' + dmg, '#ff6644');
@@ -18373,6 +18534,12 @@ function drawConquestWorker(w) {
 }
 
 function conquestPlayerAttack() {
+  // Route through faction combat system
+  if (typeof factionPlayerAttack === 'function') {
+    factionPlayerAttack();
+    return;
+  }
+  // Fallback: original attack
   let p = state.player;
   let c = state.conquest;
   if (p.attackTimer > 0) return;
@@ -18383,16 +18550,10 @@ function conquestPlayerAttack() {
   let range = p.attackRange + (p.weapon === 1 ? 12 : 0);
   let dmg = floor(([15, 20, 25][p.weapon] || 15) * (typeof getNatBestiaryBonus === 'function' ? getNatBestiaryBonus() : 1));
   dmg = floor(dmg * (getFactionData().combatDamageMult || 1));
-
-  // Legia soldier combat bonus: +15% per deployed soldier
   let lg = state.legia;
   if (lg && lg.deployed > 0) dmg = floor(dmg * (1 + lg.deployed * 0.15));
-
-  // Check campfire morale bonus
   if (c.buildings.some(b => b.type === 'campfire')) dmg += 3;
-  // Tech: siege_weapons +30% raid damage
   if (typeof hasTech === 'function' && hasTech('siege_weapons')) dmg = floor(dmg * 1.3);
-
   for (let e of c.enemies) {
     if (e.state === 'dying' || e.state === 'dead') continue;
     let d = dist(p.x, p.y, e.x, e.y);
@@ -18402,13 +18563,9 @@ function conquestPlayerAttack() {
     while (diff > PI) diff -= TWO_PI;
     while (diff < -PI) diff += TWO_PI;
     if (abs(diff) > arcHalf) continue;
-    e.hp -= dmg;
-    e.flashTimer = 6;
-    e.state = 'stagger';
-    e.stateTimer = 8;
+    e.hp -= dmg; e.flashTimer = 6; e.state = 'stagger'; e.stateTimer = 8;
     let kba = atan2(e.y - p.y, e.x - p.x);
-    e.x += cos(kba) * 5;
-    e.y += sin(kba) * 5;
+    e.x += cos(kba) * 5; e.y += sin(kba) * 5;
     addFloatingText(w2sX(e.x), w2sY(e.y) - 20, '-' + dmg, '#ff4444');
     spawnParticles(e.x, e.y, 'combat', 4);
     triggerScreenShake(2, 4, cos(kba), sin(kba), 'directional');
@@ -19797,6 +19954,22 @@ function keyPressed() {
     if (keyCode === 27 && (gameScreen === 'settings' || gameScreen === 'credits')) {
       gameScreen = 'menu';
     }
+    if (keyCode === 27 && gameScreen === 'multiplayer') {
+      if (typeof _mpSubScreen !== 'undefined' && _mpSubScreen !== 'main') { _mpSubScreen = 'main'; }
+      else { gameScreen = 'menu'; if (state) state._mpMenuOpen = false; }
+      return;
+    }
+    // Multiplayer join input
+    if (gameScreen === 'multiplayer' && typeof _mpSubScreen !== 'undefined' && _mpSubScreen === 'join') {
+      if (keyCode === ENTER && typeof _mpJoinInput !== 'undefined' && _mpJoinInput.length > 0) {
+        MP.join(_mpJoinInput);
+        _mpSubScreen = 'host'; // reuse host screen to show waiting
+        return;
+      }
+      if (keyCode === BACKSPACE) { _mpJoinInput = (_mpJoinInput || '').slice(0, -1); return; }
+      if (key.length === 1 && (_mpJoinInput || '').length < 8) { _mpJoinInput = (_mpJoinInput || '') + key.toUpperCase(); return; }
+      return;
+    }
     // ESC on menu = back to game (if save exists / game in progress)
     if (keyCode === 27 && gameScreen === 'menu' && state && state.isInitialized) {
       gameScreen = 'game';
@@ -19805,7 +19978,7 @@ function keyPressed() {
     // Menu keyboard navigation
     if (gameScreen === 'menu') {
       let hasSave = !!localStorage.getItem('sunlitIsles_save');
-      let btnCount = hasSave ? 4 : 3;
+      let btnCount = hasSave ? 5 : 4;
       if (keyCode === DOWN_ARROW || keyCode === 83) { // down or S
         menuKeyIdx = (menuKeyIdx + 1) % btnCount;
         menuHover = menuKeyIdx;
@@ -19847,6 +20020,28 @@ function keyPressed() {
     let fNames = ['No Filter', 'Warm (Golden Hour)', 'Cool (Moonlit)', 'Sepia (Ancient)'];
     addFloatingText(width / 2, height * 0.1, fNames[screenshotFilter], '#ffffff');
     return;
+  }
+
+  // Multiplayer chat input
+  if (typeof MP !== 'undefined' && MP.connected) {
+    if (keyCode === ENTER) {
+      if (state._chatOpen) {
+        if (state._chatInput) MP.chat(state._chatInput);
+        state._chatOpen = false;
+        state._chatInput = '';
+        return;
+      } else {
+        state._chatOpen = true;
+        state._chatInput = '';
+        return;
+      }
+    }
+    if (state._chatOpen) {
+      if (keyCode === ESCAPE) { state._chatOpen = false; state._chatInput = ''; return; }
+      if (keyCode === BACKSPACE) { state._chatInput = (state._chatInput || '').slice(0, -1); return; }
+      if (key.length === 1) { state._chatInput = (state._chatInput || '') + key; return; }
+      return;
+    }
   }
 
   // Block all input during army battle
@@ -20009,7 +20204,10 @@ function keyPressed() {
       let dShip = dist(state.player.x, state.player.y, shipX, shipY);
       if (dShip < 60) { exitConquest(); return; }
     }
-    if (key === 'q' || key === 'Q') { usePotion(); return; }
+    // Faction abilities Q/R (take priority in combat)
+    if (!cq.buildMode && typeof handleFactionAbilityKey === 'function') {
+      if (handleFactionAbilityKey(key)) return;
+    }
     if (key === 'b' || key === 'B') {
       cq.buildMode = !cq.buildMode;
       if (cq.buildMode) addFloatingText(width / 2, height * 0.35, 'Build Mode — click to place', '#aaddff');
@@ -20049,8 +20247,10 @@ function keyPressed() {
       if (typeof showArenaSummary === 'function') showArenaSummary(state.adventure, true);
       exitAdventure(); return;
     }
-    // Potion
-    if (key === 'q' || key === 'Q') { usePotion(); return; }
+    // Faction abilities Q/R
+    if (typeof handleFactionAbilityKey === 'function') {
+      if (handleFactionAbilityKey(key)) return;
+    }
     // Dash works in arena too
     if (keyCode === SHIFT && state.player.dashCooldown <= 0 && state.solar >= 10) {
       state.player.dashTimer = 10;
@@ -21877,6 +22077,8 @@ function loadGame() {
     if (d.eventHistory) state.eventHistory = d.eventHistory;
     // Faction — default to 'rome' for existing saves
     state.faction = d.faction || 'rome';
+    // Regenerate faction wildlife/flora (not saved, always regenerated)
+    if (typeof initFactionNaturals === 'function') initFactionNaturals();
     // Wardrobe cosmetics
     state.wardrobe = d.wardrobe || { tunicColor: 0, headwear: 0 };
     // Research / Technology
@@ -22078,7 +22280,7 @@ function loadGame() {
           regrowTimer: saved.alive === false ? 600 : 0,
           size: 0.75 + (i * 7 % 11) * 0.04,
           swayPhase: i * 1.3 + (i % 3) * 0.7,
-          type: ['oak', 'pine', 'olive'][floor(random(3))],
+          type: saved.type || getFactionTreeTypes()[i % 3],
         };
       });
     }
@@ -22298,11 +22500,159 @@ function addClampedTree(x, y, cx, cy) {
     x: p.x, y: p.y,
     health: 3, maxHealth: 3, alive: true, regrowTimer: 0,
     size: random(0.8, 1.1), swayPhase: random(TWO_PI),
-    type: ['oak', 'pine', 'olive'][floor(random(3))],
+    type: getFactionTreeTypes()[floor(random(3))],
   });
 }
 
 // Farming system — see farming.js
+
+// Regenerate faction wildlife/flora (called on load since these aren't saved)
+function initFactionNaturals() {
+  let cx = WORLD.islandCX, cy = WORLD.islandCY;
+  let srx = getSurfaceRX(), sry = getSurfaceRY();
+  let fWild = FACTION_WILDLIFE[state.faction || 'rome'] || FACTION_WILDLIFE.rome;
+  state.factionWildlife = [];
+  for (let wi = 0; wi < 5; wi++) {
+    let template = fWild[wi % fWild.length];
+    let wa = random(TWO_PI), wd = random(0.2, 0.55) * srx;
+    state.factionWildlife.push({
+      x: cx + cos(wa) * wd, y: cy + sin(wa) * wd * (sry / srx),
+      vx: 0, vy: 0, type: template.type, speed: template.speed, size: template.size,
+      timer: random(60, 300), phase: random(TWO_PI), facing: random() > 0.5 ? 1 : -1,
+    });
+  }
+  let fFlora = FACTION_FLORA[state.faction || 'rome'] || FACTION_FLORA.rome;
+  state.factionFlora = [];
+  randomSeed(99);
+  for (let fi = 0; fi < 20; fi++) {
+    let fa = random(TWO_PI), fd = random(0.15, 0.6) * srx;
+    let fx = cx + cos(fa) * fd, fy = cy + sin(fa) * fd * (sry / srx);
+    let template = fFlora[fi % fFlora.length];
+    state.factionFlora.push({ x: fx, y: fy, col: template.col, w: template.w, h: template.h, phase: random(TWO_PI) });
+  }
+  randomSeed(millis());
+}
+
+// ─── FACTION WILDLIFE & FLORA ──────────────────────────────────────────
+
+function updateFactionWildlife(dt) {
+  if (!state.factionWildlife) return;
+  let cx = WORLD.islandCX, cy = WORLD.islandCY;
+  let srx = getSurfaceRX(), sry = getSurfaceRY();
+  for (let w of state.factionWildlife) {
+    w.timer -= dt;
+    if (w.timer <= 0) {
+      w.vx = (random() - 0.5) * w.speed * 2;
+      w.vy = (random() - 0.5) * w.speed * 2;
+      w.facing = w.vx > 0 ? 1 : -1;
+      w.timer = random(80, 300);
+    }
+    let nx = w.x + w.vx * dt, ny = w.y + w.vy * dt;
+    let ex = (nx - cx) / srx, ey = (ny - cy) / sry;
+    if (ex * ex + ey * ey < 0.55) { w.x = nx; w.y = ny; }
+    else { w.vx = -w.vx; w.vy = -w.vy; }
+    // Flee from player
+    let px = state.player.x, py = state.player.y;
+    let d2 = (w.x - px) * (w.x - px) + (w.y - py) * (w.y - py);
+    if (d2 < 40 * 40 && w.type !== 'camel' && w.type !== 'goat') {
+      let a = atan2(w.y - py, w.x - px);
+      w.vx = cos(a) * w.speed * 3;
+      w.vy = sin(a) * w.speed * 3;
+      w.timer = 30;
+    }
+  }
+}
+
+function drawOneFactionCreature(w) {
+  let sx = w2sX(w.x), sy = w2sY(w.y);
+  if (sx < -20 || sx > width + 20 || sy < -20 || sy > height + 20) return;
+  push(); translate(floor(sx), floor(sy)); scale(w.facing, 1); noStroke();
+  let sz = w.size;
+  if (w.type === 'rabbit') {
+    fill(160, 130, 90); rect(-3, -sz, 6, sz); // body
+    fill(170, 140, 100); rect(-2, -sz - 3, 2, 4); rect(1, -sz - 4, 2, 5); // ears
+    fill(40, 30, 20); rect(2, -sz + 1, 1, 1); // eye
+    fill(180, 150, 110); ellipse(0, 0, 4, 2); // shadow-ish tail
+  } else if (w.type === 'songbird') {
+    let bob = sin(frameCount * 0.15 + w.phase) * 2;
+    fill(180, 80, 50); rect(-2, -sz + bob, 4, 3); // body
+    fill(200, 100, 60); rect(-1, -sz - 1 + bob, 2, 2); // head
+    fill(60, 50, 40); rect(2, -sz + bob, 1, 1); // beak
+    fill(140, 60, 40); rect(-3, -sz + 1 + bob, 1, 2); rect(3, -sz + 2 + bob, 1, 2); // wings
+  } else if (w.type === 'fox') {
+    fill(200, 120, 50); rect(-4, -sz, 8, sz - 1); // body
+    fill(210, 130, 60); rect(-2, -sz - 3, 4, 4); // head
+    fill(220, 140, 70); rect(-3, -sz - 5, 2, 3); rect(2, -sz - 5, 2, 3); // ears
+    fill(240, 230, 210); rect(-1, -sz + 2, 3, 2); // belly
+    fill(40, 30, 20); rect(1, -sz - 2, 1, 1); // eye
+    fill(200, 110, 40); rect(4, -sz + 1, 4, 2); // tail
+  } else if (w.type === 'camel') {
+    fill(190, 160, 110); rect(-6, -sz, 12, sz - 2); // body
+    fill(180, 150, 100); rect(-2, -sz - 4, 3, 5); // neck
+    fill(175, 145, 95); rect(-1, -sz - 6, 3, 3); // head
+    fill(195, 165, 115); rect(-3, -sz + 2, 2, 3); rect(3, -sz + 2, 2, 3); // humps
+    fill(170, 140, 90); rect(-5, 0, 2, 3); rect(1, 0, 2, 3); rect(5, 0, 2, 3); // legs
+    fill(40, 30, 20); rect(0, -sz - 5, 1, 1); // eye
+  } else if (w.type === 'falcon') {
+    let fy = sin(frameCount * 0.04 + w.phase) * 8 - 40;
+    fill(100, 70, 40); rect(-3, fy, 6, 3); // body
+    fill(90, 60, 35); rect(-6, fy + 1, 3, 1); rect(4, fy + 1, 3, 1); // wings
+    fill(80, 55, 30, 100); rect(-8, fy + 1 + sin(frameCount * 0.06 + w.phase) * 1, 2, 1); rect(7, fy + 1 + sin(frameCount * 0.06 + w.phase) * 1, 2, 1); // wingtips
+  } else if (w.type === 'desertfox') {
+    fill(210, 180, 130); rect(-3, -sz, 6, sz - 1);
+    fill(220, 190, 140); rect(-2, -sz - 2, 3, 3);
+    fill(230, 200, 150); rect(-3, -sz - 4, 2, 3); rect(2, -sz - 4, 2, 3); // big ears
+    fill(40, 30, 20); rect(0, -sz - 1, 1, 1);
+  } else if (w.type === 'ibis') {
+    fill(240, 235, 225); rect(-2, -sz, 4, sz - 3); // body
+    fill(235, 230, 220); rect(-1, -sz - 3, 2, 4); // neck
+    fill(220, 210, 200); rect(-1, -sz - 4, 3, 2); // head
+    fill(40, 40, 40); rect(2, -sz - 3, 4, 1); // long beak
+    fill(200, 80, 60); rect(-1, -sz - 5, 2, 1); // red crown
+    fill(60, 60, 60); rect(-1, 0, 1, 4); rect(1, 0, 1, 4); // long legs
+  } else if (w.type === 'cat') {
+    fill(80, 70, 50); rect(-2, -sz, 4, sz - 1);
+    fill(90, 80, 60); rect(-2, -sz - 2, 3, 3);
+    fill(100, 90, 70); rect(-2, -sz - 3, 1, 2); rect(2, -sz - 3, 1, 2); // ears
+    fill(200, 180, 60); rect(0, -sz - 1, 1, 1); // eye
+    fill(70, 60, 40); rect(3, -sz + 2, 3, 1); // tail up
+  } else if (w.type === 'scarab') {
+    fill(30, 60, 40); rect(-2, -2, 4, 3);
+    fill(40, 80, 50); rect(-1, -3, 3, 2);
+    fill(80, 140, 60, 120); rect(-1, -2, 2, 2); // iridescent
+  } else if (w.type === 'goat') {
+    fill(220, 210, 195); rect(-4, -sz, 8, sz - 2);
+    fill(210, 200, 185); rect(-2, -sz - 3, 4, 4);
+    fill(160, 150, 130); rect(-2, -sz - 5, 1, 3); rect(2, -sz - 5, 1, 3); // horns
+    fill(40, 30, 20); rect(1, -sz - 2, 1, 1);
+    fill(200, 190, 170); rect(-3, 0, 2, 3); rect(2, 0, 2, 3); // legs
+  } else if (w.type === 'turtle') {
+    fill(80, 100, 60); rect(-3, -3, 6, 4); // shell
+    fill(70, 90, 50); rect(-2, -4, 4, 2); // top
+    fill(120, 110, 80); rect(3, -2, 2, 1); // head
+    fill(90, 80, 55); rect(-3, 1, 2, 1); rect(3, 1, 2, 1); // legs
+  } else if (w.type === 'owl') {
+    let bright = typeof getSkyBrightness === 'function' ? getSkyBrightness() : 0.5;
+    if (bright < 0.4) { // only visible at night/dusk
+      fill(140, 120, 90); rect(-3, -sz, 6, sz - 1);
+      fill(150, 130, 100); rect(-2, -sz - 2, 5, 3);
+      fill(200, 180, 80); rect(-1, -sz - 1, 1, 1); rect(2, -sz - 1, 1, 1); // eyes glow
+      fill(130, 110, 80); rect(-4, -sz + 1, 1, 2); rect(5, -sz + 1, 1, 2); // wings
+    }
+  }
+  pop();
+}
+
+function drawOneFlora(fl) {
+  let sx = w2sX(fl.x), sy = w2sY(fl.y);
+  if (sx < -10 || sx > width + 10 || sy < -10 || sy > height + 10) return;
+  noStroke();
+  let sway = sin(frameCount * 0.02 + fl.phase) * 0.5;
+  fill(fl.col[0], fl.col[1], fl.col[2], 160);
+  rect(floor(sx + sway) - 1, floor(sy) - 1, fl.w, fl.h);
+  fill(fl.col[0] + 20, fl.col[1] + 20, fl.col[2] + 20, 100);
+  rect(floor(sx + sway), floor(sy), max(1, fl.w - 1), max(1, fl.h - 1));
+}
 
 // ─── CHICKENS ──────────────────────────────────────────────────────────
 function updateChickens(dt) {

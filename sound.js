@@ -955,24 +955,53 @@ class SoundManager {
       }
       // --- Island-specific ---
       else if (island === 'home') {
+        let faction = (typeof state !== 'undefined' && state.faction) ? state.faction : 'rome';
         // Ocean: always present
         setAmb('ocean', ambVol * 0.8);
-        // Daytime: birds + forest
-        let birdVol = bright > 0.4 ? ambVol * 0.5 * bright : 0;
-        setAmb('birds', birdVol);
-        setAmb('forest', bright > 0.4 ? ambVol * 0.25 * bright : 0);
-        // Dawn/dusk transitions
-        if (hour >= 5 && hour < 7) setAmb('dawn', ambVol * 0.4);
-        if (hour >= 17 && hour < 19) setAmb('dusk', ambVol * 0.4);
-        // Night: crickets + night ambience
-        let nightVol = bright < 0.3 ? ambVol * 0.6 * (1 - bright) : 0;
-        setAmb('crickets', nightVol);
-        setAmb('night', nightVol * 0.7);
-        // Wind: always gentle
-        setAmb('wind', ambVol * 0.15);
+        // Faction-specific ambient layers
+        if (faction === 'carthage') {
+          // Desert wind prominent, less birds, market sounds
+          setAmb('wind', ambVol * 0.4);
+          setAmb('birds', bright > 0.5 ? ambVol * 0.2 * bright : 0);
+          setAmb('market', nearMarket ? ambVol * 0.6 : ambVol * 0.15);
+          let nightVol = bright < 0.3 ? ambVol * 0.4 * (1 - bright) : 0;
+          setAmb('crickets', nightVol);
+          setAmb('night', nightVol * 0.5);
+        } else if (faction === 'egypt') {
+          // Flowing water, less wind, cats and ibis (via birds), crickets at night
+          setAmb('ocean', ambVol * 0.9); // Nile water sounds
+          setAmb('birds', bright > 0.4 ? ambVol * 0.35 * bright : 0);
+          setAmb('wind', ambVol * 0.1);
+          setAmb('forest', bright > 0.4 ? ambVol * 0.15 * bright : 0);
+          let nightVol = bright < 0.3 ? ambVol * 0.5 * (1 - bright) : 0;
+          setAmb('crickets', nightVol);
+          setAmb('night', nightVol * 0.6);
+        } else if (faction === 'greece') {
+          // Seagulls (birds), wind, ocean prominent
+          setAmb('ocean', ambVol * 0.85);
+          setAmb('birds', bright > 0.3 ? ambVol * 0.45 * bright : 0);
+          setAmb('wind', ambVol * 0.25);
+          setAmb('forest', bright > 0.4 ? ambVol * 0.2 * bright : 0);
+          let nightVol = bright < 0.3 ? ambVol * 0.5 * (1 - bright) : 0;
+          setAmb('crickets', nightVol);
+          setAmb('night', nightVol * 0.6);
+          if (hour >= 5 && hour < 7) setAmb('dawn', ambVol * 0.45);
+          if (hour >= 17 && hour < 19) setAmb('dusk', ambVol * 0.45);
+        } else {
+          // Rome: standard Mediterranean — birds, crickets, forest
+          let birdVol = bright > 0.4 ? ambVol * 0.5 * bright : 0;
+          setAmb('birds', birdVol);
+          setAmb('forest', bright > 0.4 ? ambVol * 0.25 * bright : 0);
+          if (hour >= 5 && hour < 7) setAmb('dawn', ambVol * 0.4);
+          if (hour >= 17 && hour < 19) setAmb('dusk', ambVol * 0.4);
+          let nightVol = bright < 0.3 ? ambVol * 0.6 * (1 - bright) : 0;
+          setAmb('crickets', nightVol);
+          setAmb('night', nightVol * 0.7);
+          setAmb('wind', ambVol * 0.15);
+        }
         // Near market: market bustle
         setAmb('market', nearMarket ? ambVol * 0.5 : 0);
-        // Near tavern (reuse market proximity logic for simplicity)
+        // Near tavern
         let nearTavern = false;
         if (typeof state !== 'undefined' && state.buildings && state.player) {
           nearTavern = state.buildings.some(b => b.type === 'tavern' && dist(b.x, b.y, px, py) < 200);
@@ -999,12 +1028,29 @@ class SoundManager {
         setAmb('wind', ambVol * 0.25);
       }
       else if (island === 'nation') {
-        // Foreign nation island: ocean, market bustle, birds
+        let nationKey = (typeof state !== 'undefined' && state.visitingNation) ? state.visitingNation : 'rome';
         setAmb('ocean', ambVol * 0.6);
-        setAmb('market', ambVol * 0.4);
-        setAmb('birds', bright > 0.4 ? ambVol * 0.3 * bright : 0);
-        setAmb('wind', ambVol * 0.15);
-        setAmb('crickets', bright < 0.3 ? ambVol * 0.4 * (1 - bright) : 0);
+        if (nationKey === 'carthage') {
+          setAmb('wind', ambVol * 0.35);
+          setAmb('market', ambVol * 0.5);
+          setAmb('birds', bright > 0.5 ? ambVol * 0.15 * bright : 0);
+          setAmb('crickets', bright < 0.3 ? ambVol * 0.3 * (1 - bright) : 0);
+        } else if (nationKey === 'egypt') {
+          setAmb('ocean', ambVol * 0.8); // water sounds
+          setAmb('birds', bright > 0.4 ? ambVol * 0.3 * bright : 0);
+          setAmb('wind', ambVol * 0.1);
+          setAmb('crickets', bright < 0.3 ? ambVol * 0.35 * (1 - bright) : 0);
+        } else if (nationKey === 'greece') {
+          setAmb('ocean', ambVol * 0.7);
+          setAmb('birds', bright > 0.3 ? ambVol * 0.4 * bright : 0);
+          setAmb('wind', ambVol * 0.2);
+          setAmb('crickets', bright < 0.3 ? ambVol * 0.35 * (1 - bright) : 0);
+        } else {
+          setAmb('birds', bright > 0.4 ? ambVol * 0.3 * bright : 0);
+          setAmb('wind', ambVol * 0.15);
+          setAmb('crickets', bright < 0.3 ? ambVol * 0.4 * (1 - bright) : 0);
+          setAmb('market', ambVol * 0.3);
+        }
       }
 
       // Combat ambient layer

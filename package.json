@@ -10,7 +10,7 @@
     "electron-dev": "electron electron.js --dev",
     "build": "bash build.sh",
     "bundle": "node build.mjs",
-    "check": "node -c sketch.js && node -c ui.js && node -c player.js && node -c world.js && node -c events.js && node -c npc.js && node -c fishing.js && node -c farming.js && node -c wreck.js && node -c sound.js && node -c combat.js && node -c diving.js && node -c economy.js && node -c islands.js && node -c narrative.js && node -c progression.js && node -c engine.js && node -c debug.js && node -c cinematics.js && node -c menu.js && node -c mobile.js && echo 'All files OK'",
+    "check": "node -c sketch.js && node -c ui.js && node -c player.js && node -c world.js && node -c events.js && node -c npc.js && node -c fishing.js && node -c farming.js && node -c wreck.js && node -c sound.js && node -c combat.js && node -c diving.js && node -c economy.js && node -c islands.js && node -c narrative.js && node -c progression.js && node -c engine.js && node -c debug.js && node -c cinematics.js && node -c menu.js && node -c mobile.js && node -c multiplayer.js && echo 'All files OK'",
     "lint": "npx eslint *.js --no-error-on-unmatched-pattern",
     "test": "npx playwright test",
     "test:positions": "node test-positions.js",

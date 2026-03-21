@@ -29,6 +29,12 @@ function updatePlayer(dt) {
   // Storm slows movement
   if (stormActive || state.weather.type === 'storm') spd *= 0.7;
   if (state.prophecy && state.prophecy.type === 'speed') spd *= 1.25;
+  // Faction passive speed modifiers (Greece +15%, Testudo/Phalanx lock)
+  if (typeof getFactionMoveSpeedMult === 'function') {
+    let fSpd = getFactionMoveSpeedMult();
+    if (fSpd <= 0 && (state.conquest.active || state.adventure.active)) { spd = 0; }
+    else spd *= fSpd;
+  }
 
   if (p.dashTimer > 0) {
     spd *= 3.5;
@@ -614,10 +620,16 @@ function drawPlayer() {
     rect(armRx, armRy, 3, 7);
     pop();
 
-    // Weapon trail when attacking
+    // Weapon trail when attacking (faction-colored)
     if (p.slashPhase > 0) {
       let slashArc = map(p.slashPhase, 10, 0, -1, 1);
-      stroke(255, 220, 100, p.slashPhase * 20);
+      let _wf = state.faction || 'rome';
+      let _wtr = 255, _wtg = 220, _wtb = 100;
+      if (_wf === 'rome') { _wtr = 255; _wtg = 100; _wtb = 80; }
+      else if (_wf === 'carthage') { _wtr = 160; _wtg = 80; _wtb = 200; }
+      else if (_wf === 'egypt') { _wtr = 221; _wtg = 170; _wtb = 34; }
+      else if (_wf === 'greece') { _wtr = 200; _wtg = 220; _wtb = 255; }
+      stroke(_wtr, _wtg, _wtb, p.slashPhase * 20);
       strokeWeight(2);
       let sx1 = fDir * 10, sy1 = -5 + slashArc * 8;
       let sx2 = fDir * 18, sy2 = slashArc * 12;
@@ -1197,60 +1209,41 @@ function getFacingAngle() {
 }
 
 function playerAttack() {
+  // Route through faction combat system if available
+  if (typeof factionPlayerAttack === 'function') {
+    factionPlayerAttack();
+    return;
+  }
+  // Fallback: original attack (should not reach here with faction system loaded)
   let p = state.player;
   let a = state.adventure;
   if (p.attackTimer > 0) return;
-  // Auto-switch to weapon for combat
   if (p.hotbarSlot !== 4) { p.hotbarSlot = 4; addFloatingText(width / 2, height - 110, 'Switched to Weapon', '#aaddaa'); }
   p.attackTimer = p.attackCooldown;
   p.slashPhase = 10;
   triggerPlayerAlert();
-
   let fAngle = getFacingAngle();
   let arcHalf = PI * 0.3;
-  let range = p.attackRange + (p.weapon === 1 ? 12 : 0); // pilum extra range
-
+  let range = p.attackRange + (p.weapon === 1 ? 12 : 0);
   for (let e of a.enemies) {
     if (e.state === 'dying' || e.state === 'dead') continue;
     let d = dist(p.x, p.y, e.x, e.y);
     if (d > range + e.size) continue;
     let angle = atan2(e.y - p.y, e.x - p.x);
     let diff = angle - fAngle;
-    // Normalize angle diff to [-PI, PI]
     while (diff > PI) diff -= TWO_PI;
     while (diff < -PI) diff += TWO_PI;
     if (abs(diff) > arcHalf) continue;
-
-    // Hit! — weapon damage
     let dmg = floor(([15, 20, 25][p.weapon] || 15) * (typeof getNatBestiaryBonus === 'function' ? getNatBestiaryBonus() : 1));
-    // Secutor blocks frontal 50%
-    if (e.type === 'secutor' && random() < 0.5) {
-      addFloatingText(w2sX(e.x), w2sY(e.y) - 20, 'BLOCKED', '#aaaaaa');
-      e.flashTimer = 4;
-      if (typeof snd !== 'undefined' && snd) snd.playSFX('shield_bash');
-      continue;
-    }
-    // Shield Bearer blocks frontal attacks
-    if (e.type === 'shield_bearer' && random() < (e.blockChance || 0.5)) {
-      addFloatingText(w2sX(e.x), w2sY(e.y) - 20, 'BLOCKED', '#ccbb88');
-      e.flashTimer = 4;
-      if (typeof snd !== 'undefined' && snd) snd.playSFX('shield_bash');
-      continue;
-    }
-    e.hp -= dmg;
-    e.flashTimer = 6;
-    e.state = 'stagger';
-    e.stateTimer = 8;
-    // Freeze frame on killing blow (2 frames)
+    if (e.type === 'secutor' && random() < 0.5) { addFloatingText(w2sX(e.x), w2sY(e.y) - 20, 'BLOCKED', '#aaaaaa'); e.flashTimer = 4; if (snd) snd.playSFX('shield_bash'); continue; }
+    if (e.type === 'shield_bearer' && random() < (e.blockChance || 0.5)) { addFloatingText(w2sX(e.x), w2sY(e.y) - 20, 'BLOCKED', '#ccbb88'); e.flashTimer = 4; if (snd) snd.playSFX('shield_bash'); continue; }
+    e.hp -= dmg; e.flashTimer = 6; e.state = 'stagger'; e.stateTimer = 8;
     if (e.hp <= 0) { _juiceFreezeFrames = 2; _juiceCombatVignette = min(1, _juiceCombatVignette + 0.3); }
-    // Knockback
-    let kb = 5;
     let kbAngle = atan2(e.y - p.y, e.x - p.x);
-    e.x += cos(kbAngle) * kb;
-    e.y += sin(kbAngle) * kb;
+    e.x += cos(kbAngle) * 5; e.y += sin(kbAngle) * 5;
     addFloatingText(w2sX(e.x), w2sY(e.y) - 20, '-' + dmg, '#ff4444');
     spawnParticles(e.x, e.y, 'combat', 4);
-    { let _hta = atan2(e.y - p.y, e.x - p.x); triggerScreenShake(2, 4, cos(_hta), sin(_hta), 'directional'); }
+    triggerScreenShake(2, 4, cos(kbAngle), sin(kbAngle), 'directional');
     if (snd) snd.playSFX('hit');
   }
 }
@@ -1263,12 +1256,24 @@ function drawSlashArc() {
   let fAngle = getFacingAngle();
   let alpha = map(p.slashPhase, 0, 10, 0, 200);
   let r = p.attackRange + 5;
+  let f = state.faction || 'rome';
+
+  // Faction-specific slash colors
+  let trailR = 255, trailG = 240, trailB = 180; // default gold
+  let slashR = 255, slashG = 230, slashB = 140;
+  let innerR = 255, innerG = 255, innerB = 200;
+  if (f === 'rome') { trailR = 255; trailG = 100; trailB = 80; slashR = 255; slashG = 80; slashB = 60; }
+  else if (f === 'carthage') { trailR = 160; trailG = 80; trailB = 200; slashR = 180; slashG = 100; slashB = 220; }
+  else if (f === 'egypt') { trailR = 221; trailG = 170; trailB = 34; slashR = 255; slashG = 220; slashB = 80; }
+  else if (f === 'greece') { trailR = 200; trailG = 220; trailB = 255; slashR = 230; slashG = 240; slashB = 255; innerR = 255; innerG = 255; innerB = 255; }
+
+  // Greece: longer range visual
+  if (f === 'greece') r = p.attackRange + 28 + 5;
 
   push();
   translate(sx, sy);
 
-  // Sword tip trailing arc — 4 fading segments behind the sweep
-  // slashPhase goes 10→0; sweep progresses from -0.3 to +0.3 PI offset
+  // Sword tip trailing arc
   let sweepProgress = map(p.slashPhase, 10, 0, -0.3, 0.3);
   let tipX = cos(fAngle + sweepProgress * PI) * r;
   let tipY = sin(fAngle + sweepProgress * PI) * r;
@@ -1277,7 +1282,7 @@ function drawSlashArc() {
     let trailAlpha = map(i, 1, 4, 150, 0);
     let tx = cos(fAngle + trailOffset * PI) * (r - i * 2);
     let ty = sin(fAngle + trailOffset * PI) * (r - i * 2);
-    stroke(255, 240, 180, trailAlpha);
+    stroke(trailR, trailG, trailB, trailAlpha);
     strokeWeight(1.5);
     line(tipX, tipY, tx, ty);
     tipX = tx;
@@ -1285,15 +1290,13 @@ function drawSlashArc() {
   }
 
   noStroke();
-  // Pixel slash — scatter rects along arc
-  fill(255, 230, 140, alpha);
+  fill(slashR, slashG, slashB, alpha);
   for (let a = -0.3; a <= 0.3; a += 0.08) {
     let ax = floor(cos(fAngle + a * PI) * r);
     let ay = floor(sin(fAngle + a * PI) * r);
     rect(ax, ay, 3, 3);
   }
-  // Inner bright pixels
-  fill(255, 255, 200, alpha * 0.7);
+  fill(innerR, innerG, innerB, alpha * 0.7);
   for (let a = -0.25; a <= 0.25; a += 0.1) {
     let ax = floor(cos(fAngle + a * PI) * r * 0.8);
     let ay = floor(sin(fAngle + a * PI) * r * 0.8);

@@ -222,6 +222,14 @@ function tryDodgeRoll() {
   _dodgeState.dy = sin(angle) * 5;
   p.invincTimer = max(p.invincTimer, 20);
   _dodgeState.motionBlur = 1;
+  // Greece passive: dodge goes further
+  if (typeof getFactionDodgeDistMult === 'function') {
+    let mult = getFactionDodgeDistMult();
+    _dodgeState.dx *= mult;
+    _dodgeState.dy *= mult;
+  }
+  // Greece passive: enable dodge counter window
+  if (typeof onPlayerDodge === 'function') onPlayerDodge();
   spawnParticles(p.x, p.y, 'dash', 6);
   if (typeof snd !== 'undefined' && snd) snd.playSFX('dodge');
   return true;
@@ -315,6 +323,9 @@ function updateCombatSystem(dt) {
     dn.life -= dt;
     if (dn.life <= 0) _damageNumbers.splice(i, 1);
   }
+
+  // Faction combat update
+  if (typeof updateFactionCombat === 'function') updateFactionCombat(dt);
 
   // Enemy stun timers
   let enemies = state.conquest.active ? state.conquest.enemies : (state.adventure.enemies || []);
@@ -977,6 +988,10 @@ function updateArenaProjectiles(dt, p) {
       // Fortify damage reduction
       if (typeof getFortifyReduction === 'function') {
         dmg = max(1, floor(dmg * (1 - getFortifyReduction())));
+      }
+      // Faction damage reduction (Testudo)
+      if (typeof getFactionDamageReduction === 'function') {
+        dmg = max(1, floor(dmg * (1 - getFactionDamageReduction())));
       }
       p.hp -= dmg;
       p.invincTimer = 20;
@@ -1917,4 +1932,946 @@ function getGarrisonCount() {
 function getDeployedCount() {
   if (!state.legia || !state.legia.army) return 0;
   return state.legia.army.filter(u => !u.garrison).length;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ─── FACTION COMBAT SYSTEM — Unique fighting styles per faction ─────────
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Faction ability definitions (separate from skill tree)
+const FACTION_ABILITIES = {
+  rome: {
+    q: { name: 'Shield Bash', maxCD: 480, desc: 'Stun + knockback', color: '#cc4444' },
+    r: { name: 'Testudo', maxCD: 900, desc: '80% dmg reduction 3s', color: '#bb8833' },
+    passive: 'Disciplina',
+    passiveDesc: '+5% dmg per nearby soldier',
+  },
+  carthage: {
+    q: { name: 'Fire Pot', maxCD: 600, desc: 'AoE burn 3s', color: '#ff8800' },
+    r: { name: 'Mercenary Call', maxCD: 1800, desc: 'Summon 2 mercs 15s', color: '#aa44cc' },
+    passive: "Merchant's Cunning",
+    passiveDesc: '+30% enemy gold drops',
+  },
+  egypt: {
+    q: { name: 'Scarab Swarm', maxCD: 720, desc: 'AoE damage 4s', color: '#44bbaa' },
+    r: { name: 'Anubis Blessing', maxCD: 1500, desc: 'Full heal + 2s invincibility', color: '#ddaa22' },
+    passive: 'Divine Favor',
+    passiveDesc: '+30% crystal recharge',
+  },
+  greece: {
+    q: { name: 'Olympic Dash', maxCD: 360, desc: 'Dash through enemies', color: '#4488dd' },
+    r: { name: 'Phalanx Stance', maxCD: 720, desc: 'Next 3 attacks 2x dmg', color: '#ffffff' },
+    passive: 'Agility',
+    passiveDesc: '+15% move speed',
+  },
+};
+
+// Faction ability state
+var _factionAbilities = { q: { cooldown: 0 }, r: { cooldown: 0 } };
+
+// Faction-specific active state
+var _testudoTimer = 0;        // Rome R: damage reduction timer
+var _phalanxCharges = 0;      // Greece R: remaining 2x damage attacks
+var _phalanxTimer = 0;        // Greece R: can't move timer
+var _scarabSwarm = null;      // Egypt Q: { x, y, timer, tickTimer }
+var _firePots = [];            // Carthage Q: [{ x, y, timer, tickTimer, radius }]
+var _mercenaries = [];         // Carthage R: [{ x, y, hp, maxHp, timer, attackTimer, target }]
+var _playerProjectiles = [];   // Carthage javelins, Egypt solar beams
+var _factionCombo = { count: 0, timer: 0, triggered: false };
+var _egyptAttackCounter = 0;  // Egypt: track attacks for crystal cost
+var _greekDodgeCounter = false; // Greece: recently dodged, next hit = crit
+var _greekDodgeWindow = 0;     // frames remaining for dodge-counter crit
+
+// Initialize faction abilities (call on game start / load)
+function initFactionAbilities() {
+  _factionAbilities = { q: { cooldown: 0 }, r: { cooldown: 0 } };
+  _testudoTimer = 0;
+  _phalanxCharges = 0;
+  _phalanxTimer = 0;
+  _scarabSwarm = null;
+  _firePots = [];
+  _mercenaries = [];
+  _playerProjectiles = [];
+  _factionCombo = { count: 0, timer: 0, triggered: false };
+  _egyptAttackCounter = 0;
+  _greekDodgeCounter = false;
+  _greekDodgeWindow = 0;
+}
+
+// Get faction combat data
+function getFactionCombatData() {
+  let f = state.faction || 'rome';
+  return FACTION_ABILITIES[f] || FACTION_ABILITIES.rome;
+}
+
+// ─── FACTION Q ABILITY ──────────────────────────────────────────────────
+
+function activateFactionQ() {
+  if (!state.conquest.active && !state.adventure.active) return;
+  if (_factionAbilities.q.cooldown > 0) return;
+  let p = state.player;
+  let f = state.faction || 'rome';
+  let enemies = state.conquest.active ? state.conquest.enemies : (state.adventure.enemies || []);
+
+  switch (f) {
+    case 'rome': {
+      // SHIELD BASH — stun nearest enemy 1.5s, knockback
+      _factionAbilities.q.cooldown = FACTION_ABILITIES.rome.q.maxCD;
+      let nearest = null, nearD = Infinity;
+      for (let e of enemies) {
+        if (e.state === 'dying' || e.state === 'dead') continue;
+        let d = dist(p.x, p.y, e.x, e.y);
+        if (d < nearD) { nearD = d; nearest = e; }
+      }
+      if (nearest && nearD < 60) {
+        nearest.stunTimer = 90; // 1.5s
+        nearest.state = 'stagger';
+        nearest.stateTimer = 90;
+        nearest.flashTimer = 10;
+        let kba = atan2(nearest.y - p.y, nearest.x - p.x);
+        nearest.x += cos(kba) * 18;
+        nearest.y += sin(kba) * 18;
+        nearest.hp -= 10;
+        _spawnDamageNumber(nearest.x, nearest.y, 10, '#cc4444');
+        addFloatingText(w2sX(nearest.x), w2sY(nearest.y) - 30, 'SHIELD BASH!', '#cc4444');
+        spawnParticles(nearest.x, nearest.y, 'combat', 8);
+        triggerScreenShake(5, 10);
+        _cameraPush.timer = 5;
+        _cameraPush.dx = cos(kba) * 4;
+        _cameraPush.dy = sin(kba) * 4;
+        // Shield flash particles
+        for (let i = 0; i < 5; i++) {
+          particles.push({
+            x: p.x + cos(kba) * 12, y: p.y + sin(kba) * 12,
+            vx: cos(kba + random(-0.5, 0.5)) * random(1, 3),
+            vy: sin(kba + random(-0.5, 0.5)) * random(1, 3),
+            life: random(10, 20), maxLife: 20, type: 'burst', size: random(2, 4),
+            r: 220, g: 200, b: 120, world: true,
+          });
+        }
+      }
+      if (typeof snd !== 'undefined' && snd) snd.playSFX('shield_bash');
+      break;
+    }
+    case 'carthage': {
+      // FIRE POT — AoE incendiary at facing direction
+      _factionAbilities.q.cooldown = FACTION_ABILITIES.carthage.q.maxCD;
+      let fAngle = getFacingAngle();
+      let potX = p.x + cos(fAngle) * 80;
+      let potY = p.y + sin(fAngle) * 80;
+      _firePots.push({
+        x: potX, y: potY, timer: 180, tickTimer: 0, radius: 40,
+      });
+      addFloatingText(w2sX(potX), w2sY(potY) - 20, 'FIRE POT!', '#ff8800');
+      spawnParticles(potX, potY, 'combat', 10);
+      triggerScreenShake(3, 6);
+      if (typeof snd !== 'undefined' && snd) snd.playSFX('whirlwind');
+      break;
+    }
+    case 'egypt': {
+      // SCARAB SWARM — AoE damage cloud around cursor direction
+      _factionAbilities.q.cooldown = FACTION_ABILITIES.egypt.q.maxCD;
+      let fAngle2 = getFacingAngle();
+      let swarmX = p.x + cos(fAngle2) * 60;
+      let swarmY = p.y + sin(fAngle2) * 60;
+      _scarabSwarm = { x: swarmX, y: swarmY, timer: 240, tickTimer: 0, radius: 45 };
+      addFloatingText(w2sX(swarmX), w2sY(swarmY) - 20, 'SCARAB SWARM!', '#44bbaa');
+      if (typeof snd !== 'undefined' && snd) snd.playSFX('whirlwind');
+      break;
+    }
+    case 'greece': {
+      // OLYMPIC DASH — dash through enemies dealing damage, i-frames
+      _factionAbilities.q.cooldown = FACTION_ABILITIES.greece.q.maxCD;
+      let dashAngle = getFacingAngle();
+      let dashDist = 100;
+      let oldX = p.x, oldY = p.y;
+      p.x += cos(dashAngle) * dashDist;
+      p.y += sin(dashAngle) * dashDist;
+      p.invincTimer = max(p.invincTimer, 18);
+      // Damage enemies along dash path
+      for (let e of enemies) {
+        if (e.state === 'dying' || e.state === 'dead') continue;
+        // Check if enemy is near the dash line
+        let ex = e.x - oldX, ey = e.y - oldY;
+        let dx = p.x - oldX, dy = p.y - oldY;
+        let t = max(0, min(1, (ex * dx + ey * dy) / (dx * dx + dy * dy)));
+        let closestX = oldX + t * dx, closestY = oldY + t * dy;
+        let d = dist(closestX, closestY, e.x, e.y);
+        if (d < 30 + (e.size || 10)) {
+          let dmg = 20;
+          e.hp -= dmg;
+          e.flashTimer = 8;
+          e.state = 'stagger';
+          e.stateTimer = 12;
+          _spawnDamageNumber(e.x, e.y, dmg, '#4488dd');
+          _registerComboHit();
+        }
+      }
+      // Blue dash trail
+      for (let i = 0; i < 8; i++) {
+        let t = i / 8;
+        let tx = lerp(oldX, p.x, t);
+        let ty = lerp(oldY, p.y, t);
+        particles.push({
+          x: tx + random(-4, 4), y: ty + random(-4, 4),
+          vx: random(-0.5, 0.5), vy: random(-0.5, 0.5),
+          life: random(15, 25), maxLife: 25, type: 'burst', size: random(2, 4),
+          r: 68, g: 136, b: 221, world: true,
+        });
+      }
+      spawnParticles(p.x, p.y, 'dash', 8);
+      triggerScreenShake(4, 8);
+      addFloatingText(w2sX(p.x), w2sY(p.y) - 30, 'OLYMPIC DASH!', '#4488dd');
+      if (typeof snd !== 'undefined' && snd) snd.playSFX('dodge');
+      break;
+    }
+  }
+}
+
+// ─── FACTION R ABILITY ──────────────────────────────────────────────────
+
+function activateFactionR() {
+  if (!state.conquest.active && !state.adventure.active) return;
+  if (_factionAbilities.r.cooldown > 0) return;
+  let p = state.player;
+  let f = state.faction || 'rome';
+
+  switch (f) {
+    case 'rome': {
+      // TESTUDO — 80% damage reduction, can't move, 3s
+      _factionAbilities.r.cooldown = FACTION_ABILITIES.rome.r.maxCD;
+      _testudoTimer = 180; // 3s at 60fps
+      addFloatingText(w2sX(p.x), w2sY(p.y) - 35, 'TESTUDO!', '#bb8833');
+      spawnParticles(p.x, p.y, 'divine', 10);
+      triggerScreenShake(2, 4);
+      if (typeof snd !== 'undefined' && snd) snd.playSFX('shield_bash');
+      break;
+    }
+    case 'carthage': {
+      // MERCENARY CALL — summon 2 temporary fighters
+      _factionAbilities.r.cooldown = FACTION_ABILITIES.carthage.r.maxCD;
+      for (let i = 0; i < 2; i++) {
+        let a = getFacingAngle() + (i === 0 ? -0.5 : 0.5);
+        _mercenaries.push({
+          x: p.x + cos(a) * 30,
+          y: p.y + sin(a) * 30,
+          hp: 40, maxHp: 40,
+          timer: 900, // 15s
+          attackTimer: 0,
+          target: null,
+          facing: p.facing,
+        });
+      }
+      addFloatingText(w2sX(p.x), w2sY(p.y) - 35, 'MERCENARIES!', '#aa44cc');
+      spawnParticles(p.x, p.y, 'divine', 8);
+      triggerScreenShake(3, 6);
+      if (typeof snd !== 'undefined' && snd) snd.playSFX('skill_unlock');
+      break;
+    }
+    case 'egypt': {
+      // ANUBIS BLESSING — full heal + 2s invincibility
+      _factionAbilities.r.cooldown = FACTION_ABILITIES.egypt.r.maxCD;
+      let healed = p.maxHp - p.hp;
+      p.hp = p.maxHp;
+      p.invincTimer = max(p.invincTimer, 120); // 2s
+      addFloatingText(w2sX(p.x), w2sY(p.y) - 35, 'ANUBIS BLESSING!', '#ddaa22');
+      if (healed > 0) addFloatingText(w2sX(p.x), w2sY(p.y) - 50, '+' + healed + ' HP', '#44ff66');
+      spawnParticles(p.x, p.y, 'divine', 15);
+      triggerScreenShake(4, 8);
+      // Ankh particles
+      for (let i = 0; i < 6; i++) {
+        let a = random(0, TWO_PI);
+        particles.push({
+          x: p.x + cos(a) * random(5, 20), y: p.y + sin(a) * random(5, 20),
+          vx: cos(a) * 0.5, vy: -random(0.8, 1.5),
+          life: random(30, 50), maxLife: 50, type: 'burst', size: random(3, 5),
+          r: 221, g: 170, b: 34, world: true,
+        });
+      }
+      if (typeof snd !== 'undefined' && snd) snd.playSFX('heart');
+      break;
+    }
+    case 'greece': {
+      // PHALANX STANCE — next 3 attacks deal 2x damage + longer range, can't move 2s
+      _factionAbilities.r.cooldown = FACTION_ABILITIES.greece.r.maxCD;
+      _phalanxCharges = 3;
+      _phalanxTimer = 120; // 2s can't move
+      addFloatingText(w2sX(p.x), w2sY(p.y) - 35, 'PHALANX STANCE!', '#ffffff');
+      spawnParticles(p.x, p.y, 'combat', 8);
+      triggerScreenShake(3, 6);
+      // White spear glow particles
+      for (let i = 0; i < 4; i++) {
+        particles.push({
+          x: p.x + random(-8, 8), y: p.y + random(-15, -5),
+          vx: random(-0.3, 0.3), vy: -random(0.5, 1),
+          life: random(20, 35), maxLife: 35, type: 'burst', size: random(2, 4),
+          r: 240, g: 240, b: 255, world: true,
+        });
+      }
+      if (typeof snd !== 'undefined' && snd) snd.playSFX('shield_bash');
+      break;
+    }
+  }
+}
+
+// ─── FACTION ABILITY KEY HANDLER ────────────────────────────────────────
+
+function handleFactionAbilityKey(k) {
+  if (!state.conquest.active && !state.adventure.active) return false;
+  if (state.conquest.buildMode) return false;
+  if (k === 'q' || k === 'Q') {
+    activateFactionQ();
+    return true;
+  }
+  if (k === 'r' || k === 'R') {
+    activateFactionR();
+    return true;
+  }
+  return false;
+}
+
+// ─── PLAYER PROJECTILE SYSTEM ───────────────────────────────────────────
+
+function spawnPlayerProjectile(x, y, angle, type) {
+  let speed, damage, life, pierce;
+  if (type === 'javelin') {
+    speed = 5; damage = 18; life = 30; pierce = true; // 150px range at 5px/frame
+  } else if (type === 'solar_beam') {
+    speed = 4; damage = 12; life = 25; pierce = false; // 100px range
+  }
+  _playerProjectiles.push({
+    x: x, y: y,
+    vx: cos(angle) * speed, vy: sin(angle) * speed,
+    damage: damage, type: type, life: life,
+    pierce: pierce, hitList: [],
+  });
+}
+
+function updatePlayerProjectiles(dt, enemies) {
+  for (let i = _playerProjectiles.length - 1; i >= 0; i--) {
+    let pr = _playerProjectiles[i];
+    pr.x += pr.vx * dt;
+    pr.y += pr.vy * dt;
+    pr.life -= dt;
+    if (pr.life <= 0) { _playerProjectiles.splice(i, 1); continue; }
+    // Collision with enemies
+    for (let e of enemies) {
+      if (e.state === 'dying' || e.state === 'dead') continue;
+      if (pr.hitList.includes(e)) continue;
+      let d = dist(pr.x, pr.y, e.x, e.y);
+      if (d < 15 + (e.size || 10)) {
+        let dmg = pr.damage;
+        // Phalanx bonus for Greece
+        if (_phalanxCharges > 0 && (state.faction || 'rome') === 'greece') {
+          dmg = floor(dmg * 2);
+          _phalanxCharges--;
+          if (_phalanxCharges <= 0) {
+            addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 25, 'Phalanx ended', '#aaaaaa');
+          }
+        }
+        e.hp -= dmg;
+        e.flashTimer = 6;
+        e.state = 'stagger';
+        e.stateTimer = 8;
+        _spawnDamageNumber(e.x, e.y, dmg, pr.type === 'javelin' ? '#aa44cc' : '#ddaa22');
+        spawnParticles(e.x, e.y, 'combat', 3);
+        _registerComboHit();
+        pr.hitList.push(e);
+        if (!pr.pierce) { _playerProjectiles.splice(i, 1); break; }
+      }
+    }
+  }
+}
+
+function drawPlayerProjectiles() {
+  for (let pr of _playerProjectiles) {
+    let sx = w2sX(pr.x);
+    let sy = w2sY(pr.y);
+    push();
+    translate(sx, sy);
+    let angle = atan2(pr.vy, pr.vx);
+    rotate(angle);
+    noStroke();
+    if (pr.type === 'javelin') {
+      // Purple-tinted javelin
+      fill(160, 80, 200);
+      rect(-8, -1, 16, 2);
+      fill(200, 120, 240);
+      triangle(8, -2, 8, 2, 12, 0);
+      // Trail
+      fill(160, 80, 200, 100);
+      rect(-14, -1, 6, 2);
+    } else if (pr.type === 'solar_beam') {
+      // Golden beam
+      fill(221, 170, 34, 200);
+      ellipse(0, 0, 10, 6);
+      fill(255, 220, 80, 150);
+      ellipse(0, 0, 6, 4);
+      // Glow
+      fill(255, 255, 200, 60);
+      ellipse(0, 0, 16, 10);
+    }
+    pop();
+  }
+}
+
+// ─── FACTION AoE UPDATES ────────────────────────────────────────────────
+
+function updateFactionAoEs(dt, enemies) {
+  // Fire pots (Carthage Q)
+  for (let i = _firePots.length - 1; i >= 0; i--) {
+    let fp = _firePots[i];
+    fp.timer -= dt;
+    fp.tickTimer -= dt;
+    if (fp.timer <= 0) { _firePots.splice(i, 1); continue; }
+    // Damage tick every 30 frames (0.5s)
+    if (fp.tickTimer <= 0) {
+      fp.tickTimer = 30;
+      for (let e of enemies) {
+        if (e.state === 'dying' || e.state === 'dead') continue;
+        if (dist(fp.x, fp.y, e.x, e.y) < fp.radius + (e.size || 10)) {
+          let dmg = 8;
+          e.hp -= dmg;
+          e.flashTimer = 4;
+          _spawnDamageNumber(e.x, e.y, dmg, '#ff8800');
+        }
+      }
+    }
+    // Fire particles
+    if (frameCount % 4 === 0) {
+      particles.push({
+        x: fp.x + random(-fp.radius * 0.6, fp.radius * 0.6),
+        y: fp.y + random(-fp.radius * 0.6, fp.radius * 0.6),
+        vx: random(-0.3, 0.3), vy: random(-1.5, -0.5),
+        life: random(12, 22), maxLife: 22, type: 'burst', size: random(2, 5),
+        r: 255, g: floor(random(100, 200)), b: 30, world: true,
+      });
+    }
+  }
+
+  // Scarab swarm (Egypt Q)
+  if (_scarabSwarm) {
+    _scarabSwarm.timer -= dt;
+    _scarabSwarm.tickTimer -= dt;
+    if (_scarabSwarm.timer <= 0) { _scarabSwarm = null; }
+    else {
+      // Damage tick every 20 frames
+      if (_scarabSwarm.tickTimer <= 0) {
+        _scarabSwarm.tickTimer = 20;
+        for (let e of enemies) {
+          if (e.state === 'dying' || e.state === 'dead') continue;
+          if (dist(_scarabSwarm.x, _scarabSwarm.y, e.x, e.y) < _scarabSwarm.radius + (e.size || 10)) {
+            let dmg = 6;
+            e.hp -= dmg;
+            e.flashTimer = 4;
+            _spawnDamageNumber(e.x, e.y, dmg, '#44bbaa');
+          }
+        }
+      }
+      // Scarab particles — turquoise dots orbiting
+      if (frameCount % 3 === 0) {
+        let a = random(0, TWO_PI);
+        let r = random(5, _scarabSwarm.radius);
+        particles.push({
+          x: _scarabSwarm.x + cos(a) * r,
+          y: _scarabSwarm.y + sin(a) * r,
+          vx: cos(a + HALF_PI) * random(0.5, 1.5),
+          vy: sin(a + HALF_PI) * random(0.5, 1.5),
+          life: random(10, 18), maxLife: 18, type: 'burst', size: random(1, 3),
+          r: 68, g: 187, b: 170, world: true,
+        });
+      }
+    }
+  }
+
+  // Mercenaries (Carthage R)
+  for (let i = _mercenaries.length - 1; i >= 0; i--) {
+    let m = _mercenaries[i];
+    m.timer -= dt;
+    if (m.timer <= 0 || m.hp <= 0) {
+      spawnParticles(m.x, m.y, 'combat', 4);
+      _mercenaries.splice(i, 1);
+      continue;
+    }
+    // Find nearest enemy
+    let nearest = null, nearD = Infinity;
+    for (let e of enemies) {
+      if (e.state === 'dying' || e.state === 'dead') continue;
+      let d = dist(m.x, m.y, e.x, e.y);
+      if (d < nearD) { nearD = d; nearest = e; }
+    }
+    if (nearest) {
+      // Move toward enemy
+      if (nearD > 25) {
+        let a = atan2(nearest.y - m.y, nearest.x - m.x);
+        m.x += cos(a) * 1.5 * dt;
+        m.y += sin(a) * 1.5 * dt;
+        m.facing = cos(a) > 0 ? 'right' : 'left';
+      }
+      // Attack
+      m.attackTimer -= dt;
+      if (nearD < 30 && m.attackTimer <= 0) {
+        m.attackTimer = 30;
+        let dmg = 12;
+        nearest.hp -= dmg;
+        nearest.flashTimer = 6;
+        nearest.state = 'stagger';
+        nearest.stateTimer = 6;
+        _spawnDamageNumber(nearest.x, nearest.y, dmg, '#aa44cc');
+        spawnParticles(nearest.x, nearest.y, 'combat', 2);
+      }
+    } else {
+      // Follow player
+      let pd = dist(m.x, m.y, state.player.x, state.player.y);
+      if (pd > 50) {
+        let a = atan2(state.player.y - m.y, state.player.x - m.x);
+        m.x += cos(a) * 1.2 * dt;
+        m.y += sin(a) * 1.2 * dt;
+      }
+    }
+  }
+}
+
+function drawFactionAoEs() {
+  // Fire pot AoE circles
+  for (let fp of _firePots) {
+    let sx = w2sX(fp.x), sy = w2sY(fp.y);
+    let alpha = min(180, fp.timer * 2);
+    // Orange AoE circle
+    noFill();
+    stroke(255, 140, 30, alpha * 0.5);
+    strokeWeight(2);
+    ellipse(sx, sy, fp.radius * 2, fp.radius * 1.4);
+    // Inner glow
+    fill(255, 100, 20, alpha * 0.15);
+    noStroke();
+    ellipse(sx, sy, fp.radius * 2, fp.radius * 1.4);
+  }
+
+  // Scarab swarm AoE
+  if (_scarabSwarm) {
+    let sx = w2sX(_scarabSwarm.x), sy = w2sY(_scarabSwarm.y);
+    let alpha = min(180, _scarabSwarm.timer * 2);
+    noFill();
+    stroke(68, 187, 170, alpha * 0.5);
+    strokeWeight(1.5);
+    let r = _scarabSwarm.radius + sin(frameCount * 0.1) * 4;
+    ellipse(sx, sy, r * 2, r * 1.4);
+    noStroke();
+    fill(68, 187, 170, alpha * 0.1);
+    ellipse(sx, sy, r * 2, r * 1.4);
+  }
+
+  // Mercenaries
+  for (let m of _mercenaries) {
+    let sx = w2sX(m.x), sy = w2sY(m.y);
+    push();
+    translate(floor(sx), floor(sy));
+    noStroke();
+    // Shadow
+    fill(0, 0, 0, 30);
+    ellipse(0, 8, 12, 4);
+    // Body (purple-tinted mercenary)
+    let fDir = m.facing === 'left' ? -1 : 1;
+    fill(120, 50, 160);
+    rect(-4, -5, 8, 10);
+    // Head
+    fill(195, 165, 130);
+    rect(-3, -10, 6, 5);
+    // Eyes
+    fill(50);
+    rect(fDir > 0 ? 1 : -2, -8, 1, 1);
+    // Sword
+    fill(180, 180, 190);
+    rect(fDir * 5, -6, fDir * 6, 2);
+    // HP indicator
+    let hpFrac = m.hp / m.maxHp;
+    fill(30, 10, 10, 150);
+    rect(-8, -14, 16, 2);
+    fill(lerp(200, 60, hpFrac), lerp(40, 200, hpFrac), 30);
+    rect(-8, -14, 16 * hpFrac, 2);
+    // Timer indicator (fading)
+    if (m.timer < 180) {
+      fill(255, 255, 255, map(m.timer, 0, 180, 0, 100));
+      textSize(7); textAlign(CENTER);
+      text(ceil(m.timer / 60) + 's', 0, -17);
+    }
+    pop();
+  }
+
+  // Testudo visual (Rome R)
+  if (_testudoTimer > 0) {
+    let p = state.player;
+    let psx = w2sX(p.x), psy = w2sY(p.y);
+    let alpha = min(1, _testudoTimer / 30);
+    // Large shield dome
+    noFill();
+    stroke(187, 136, 51, 150 * alpha);
+    strokeWeight(3);
+    let shieldR = 26 + sin(frameCount * 0.06) * 2;
+    arc(psx, psy - 4, shieldR * 2, shieldR * 1.6, PI, TWO_PI);
+    // Shield panels
+    stroke(187, 136, 51, 80 * alpha);
+    strokeWeight(1);
+    for (let i = -2; i <= 2; i++) {
+      let sx2 = psx + i * 10;
+      line(sx2, psy - 4 - shieldR * 0.6, sx2, psy - 4);
+    }
+    noStroke();
+    fill(187, 136, 51, 120 * alpha);
+    textSize(11); textAlign(CENTER, CENTER);
+    text('TESTUDO', psx, psy - 32);
+  }
+
+  // Phalanx charges indicator (Greece R)
+  if (_phalanxCharges > 0) {
+    let p = state.player;
+    let psx = w2sX(p.x), psy = w2sY(p.y);
+    fill(240, 240, 255, 200);
+    noStroke();
+    textSize(10); textAlign(CENTER, CENTER);
+    text('PHALANX x' + _phalanxCharges, psx, psy - 28);
+    // White glow around player
+    noFill();
+    stroke(240, 240, 255, 60 + sin(frameCount * 0.1) * 30);
+    strokeWeight(1.5);
+    ellipse(psx, psy - 4, 28, 22);
+    noStroke();
+  }
+}
+
+// ─── FACTION COMBAT UPDATE (called from updateCombatSystem) ─────────────
+
+function updateFactionCombat(dt) {
+  if (!state.conquest.active && !state.adventure.active) return;
+  let enemies = state.conquest.active ? state.conquest.enemies : (state.adventure.enemies || []);
+
+  // Ability cooldowns
+  if (_factionAbilities.q.cooldown > 0) _factionAbilities.q.cooldown -= dt;
+  if (_factionAbilities.r.cooldown > 0) _factionAbilities.r.cooldown -= dt;
+
+  // Testudo timer (Rome R)
+  if (_testudoTimer > 0) _testudoTimer -= dt;
+
+  // Phalanx timer (Greece R — movement lock)
+  if (_phalanxTimer > 0) _phalanxTimer -= dt;
+
+  // Greek dodge counter window
+  if (_greekDodgeWindow > 0) _greekDodgeWindow -= dt;
+
+  // Update projectiles
+  updatePlayerProjectiles(dt, enemies);
+
+  // Update AoEs, mercs
+  updateFactionAoEs(dt, enemies);
+
+  // Faction combo system
+  if (_factionCombo.timer > 0) {
+    _factionCombo.timer -= dt;
+    if (_factionCombo.timer <= 0) {
+      _factionCombo.count = 0;
+      _factionCombo.triggered = false;
+    }
+  }
+}
+
+// ─── FACTION-SPECIFIC ATTACK OVERRIDE ───────────────────────────────────
+
+function factionPlayerAttack() {
+  let p = state.player;
+  let f = state.faction || 'rome';
+  if (p.attackTimer > 0) return;
+
+  // Auto-switch to weapon
+  if (p.hotbarSlot !== 4) { p.hotbarSlot = 4; addFloatingText(width / 2, height - 110, 'Switched to Weapon', '#aaddaa'); }
+  triggerPlayerAlert();
+
+  let enemies = state.conquest.active ? state.conquest.enemies : (state.adventure.enemies || []);
+
+  switch (f) {
+    case 'rome': {
+      // Standard sword slash — same as original but with combo tracking
+      p.attackTimer = p.attackCooldown;
+      p.slashPhase = 10;
+      let fAngle = getFacingAngle();
+      let arcHalf = PI * 0.3;
+      let range = p.attackRange + (p.weapon === 1 ? 12 : 0);
+      let baseDmg = floor(([15, 20, 25][p.weapon] || 15) * (typeof getNatBestiaryBonus === 'function' ? getNatBestiaryBonus() : 1));
+      baseDmg = floor(baseDmg * (getFactionData().combatDamageMult || 1));
+      // DISCIPLINA passive: +5% per nearby friendly soldier
+      let nearbyAllies = 0;
+      if (state.legia && state.legia.army) {
+        for (let s of state.legia.army) {
+          if (!s.garrison && dist(p.x, p.y, s.x || 0, s.y || 0) < 120) nearbyAllies++;
+        }
+      }
+      for (let m of _mercenaries) {
+        if (dist(p.x, p.y, m.x, m.y) < 120) nearbyAllies++;
+      }
+      baseDmg = floor(baseDmg * (1 + nearbyAllies * 0.05));
+      // Legia soldier bonus
+      let lg = state.legia;
+      if (lg && lg.deployed > 0) baseDmg = floor(baseDmg * (1 + lg.deployed * 0.15));
+      // Campfire bonus
+      if (state.conquest.active && state.conquest.buildings && state.conquest.buildings.some(b => b.type === 'campfire')) baseDmg += 3;
+      // Tech bonus
+      if (typeof hasTech === 'function' && hasTech('siege_weapons')) baseDmg = floor(baseDmg * 1.3);
+
+      let hitCount = 0;
+      for (let e of enemies) {
+        if (e.state === 'dying' || e.state === 'dead') continue;
+        let d = dist(p.x, p.y, e.x, e.y);
+        if (d > range + (e.size || 10)) continue;
+        let angle = atan2(e.y - p.y, e.x - p.x);
+        let diff = angle - fAngle;
+        while (diff > PI) diff -= TWO_PI;
+        while (diff < -PI) diff += TWO_PI;
+        if (abs(diff) > arcHalf) continue;
+        if (e.type === 'secutor' && random() < 0.5) { addFloatingText(w2sX(e.x), w2sY(e.y) - 20, 'BLOCKED', '#aaaaaa'); e.flashTimer = 4; if (snd) snd.playSFX('shield_bash'); continue; }
+        if (e.type === 'shield_bearer' && random() < (e.blockChance || 0.5)) { addFloatingText(w2sX(e.x), w2sY(e.y) - 20, 'BLOCKED', '#ccbb88'); e.flashTimer = 4; if (snd) snd.playSFX('shield_bash'); continue; }
+        let dmg = baseDmg;
+        // Rome combo: 3 hits = heavy strike 1.5x
+        _factionCombo.count++;
+        _factionCombo.timer = 90; // 1.5s window
+        if (_factionCombo.count >= 3 && !_factionCombo.triggered) {
+          dmg = floor(dmg * 1.5);
+          _factionCombo.triggered = true;
+          _factionCombo.count = 0;
+          triggerScreenShake(6, 12);
+          addFloatingText(w2sX(e.x), w2sY(e.y) - 35, 'HEAVY STRIKE!', '#ff4444');
+          _slowMoFrames = max(typeof _slowMoFrames !== 'undefined' ? _slowMoFrames : 0, 4);
+        }
+        e.hp -= dmg;
+        e.flashTimer = 6;
+        e.state = 'stagger'; e.stateTimer = 8;
+        if (e.hp <= 0) { _juiceFreezeFrames = 2; _juiceCombatVignette = min(1, _juiceCombatVignette + 0.3); }
+        let kba = atan2(e.y - p.y, e.x - p.x);
+        e.x += cos(kba) * 5; e.y += sin(kba) * 5;
+        addFloatingText(w2sX(e.x), w2sY(e.y) - 20, '-' + dmg, '#ff4444');
+        spawnParticles(e.x, e.y, 'combat', 4);
+        triggerScreenShake(2, 4, cos(kba), sin(kba), 'directional');
+        if (snd) snd.playSFX('hit');
+        hitCount++;
+        _registerComboHit();
+      }
+      break;
+    }
+    case 'carthage': {
+      // JAVELIN THROW — ranged projectile, pierces first enemy
+      p.attackTimer = p.attackCooldown + 5; // slightly slower
+      p.slashPhase = 8;
+      let fAngle = getFacingAngle();
+      spawnPlayerProjectile(p.x, p.y, fAngle, 'javelin');
+      // Combo: track unique enemies hit in 2s window
+      _factionCombo.timer = 120;
+      spawnParticles(p.x, p.y, 'combat', 2);
+      if (snd) snd.playSFX('dodge');
+      break;
+    }
+    case 'egypt': {
+      // SOLAR BEAM — medium range energy bolt
+      p.attackTimer = p.attackCooldown + 3;
+      p.slashPhase = 8;
+      let fAngle = getFacingAngle();
+      spawnPlayerProjectile(p.x, p.y, fAngle, 'solar_beam');
+      _egyptAttackCounter++;
+      // Every 5 attacks costs 1 crystal
+      if (_egyptAttackCounter >= 5) {
+        _egyptAttackCounter = 0;
+        if (state.crystals > 0) state.crystals--;
+      }
+      // Combo: 5 consecutive hits without damage = solar explosion
+      _factionCombo.timer = 180;
+      if (snd) snd.playSFX('hit');
+      break;
+    }
+    case 'greece': {
+      // SPEAR THRUST — longer range, faster
+      p.attackTimer = floor(p.attackCooldown * 0.8); // faster
+      p.slashPhase = 10;
+      let fAngle = getFacingAngle();
+      let arcHalf = PI * 0.25; // narrower arc
+      let range = p.attackRange + 28; // 70px vs 42px base
+      let baseDmg = floor(([15, 20, 25][p.weapon] || 15) * (typeof getNatBestiaryBonus === 'function' ? getNatBestiaryBonus() : 1));
+      baseDmg = floor(baseDmg * (getFactionData().combatDamageMult || 1));
+      // Phalanx 2x damage
+      let isPhalanx = _phalanxCharges > 0;
+      if (isPhalanx) {
+        baseDmg = floor(baseDmg * 2);
+        range += 15; // longer range during phalanx
+      }
+      // Dodge counter crit
+      if (_greekDodgeWindow > 0) {
+        baseDmg = floor(baseDmg * 2.5);
+        _greekDodgeWindow = 0;
+        addFloatingText(w2sX(p.x), w2sY(p.y) - 40, 'COUNTER CRIT!', '#ffffff');
+        triggerScreenShake(5, 10);
+        // Laurel particles
+        for (let i = 0; i < 4; i++) {
+          particles.push({
+            x: p.x + random(-10, 10), y: p.y + random(-15, -5),
+            vx: random(-0.5, 0.5), vy: -random(0.8, 1.5),
+            life: random(20, 35), maxLife: 35, type: 'burst', size: random(2, 4),
+            r: 80, g: 160, b: 60, world: true,
+          });
+        }
+      }
+
+      for (let e of enemies) {
+        if (e.state === 'dying' || e.state === 'dead') continue;
+        let d = dist(p.x, p.y, e.x, e.y);
+        if (d > range + (e.size || 10)) continue;
+        let angle = atan2(e.y - p.y, e.x - p.x);
+        let diff = angle - fAngle;
+        while (diff > PI) diff -= TWO_PI;
+        while (diff < -PI) diff += TWO_PI;
+        if (abs(diff) > arcHalf) continue;
+        if (e.type === 'secutor' && random() < 0.5) { addFloatingText(w2sX(e.x), w2sY(e.y) - 20, 'BLOCKED', '#aaaaaa'); e.flashTimer = 4; if (snd) snd.playSFX('shield_bash'); continue; }
+        if (e.type === 'shield_bearer' && random() < (e.blockChance || 0.5)) { addFloatingText(w2sX(e.x), w2sY(e.y) - 20, 'BLOCKED', '#ccbb88'); e.flashTimer = 4; if (snd) snd.playSFX('shield_bash'); continue; }
+        let dmg = baseDmg;
+        e.hp -= dmg;
+        e.flashTimer = 6;
+        e.state = 'stagger'; e.stateTimer = 8;
+        if (e.hp <= 0) { _juiceFreezeFrames = 2; _juiceCombatVignette = min(1, _juiceCombatVignette + 0.3); }
+        let kba = atan2(e.y - p.y, e.x - p.x);
+        e.x += cos(kba) * 5; e.y += sin(kba) * 5;
+        let dmgCol = isPhalanx ? '#ffffff' : '#4488dd';
+        addFloatingText(w2sX(e.x), w2sY(e.y) - 20, '-' + dmg, dmgCol);
+        spawnParticles(e.x, e.y, 'combat', 4);
+        triggerScreenShake(2, 4, cos(kba), sin(kba), 'directional');
+        if (snd) snd.playSFX('hit');
+        _registerComboHit();
+      }
+      if (isPhalanx) {
+        _phalanxCharges--;
+        if (_phalanxCharges <= 0) {
+          addFloatingText(w2sX(p.x), w2sY(p.y) - 25, 'Phalanx ended', '#aaaaaa');
+        }
+      }
+      break;
+    }
+  }
+}
+
+// ─── FACTION PASSIVE EFFECTS ────────────────────────────────────────────
+
+function getFactionDamageReduction() {
+  // Testudo: 80% reduction
+  if (_testudoTimer > 0) return 0.8;
+  return 0;
+}
+
+function getFactionMoveSpeedMult() {
+  let f = state.faction || 'rome';
+  // Greece passive: +15% move speed
+  if (f === 'greece') return 1.15;
+  // Testudo: can't move
+  if (_testudoTimer > 0) return 0;
+  // Phalanx: can't move during setup
+  if (_phalanxTimer > 0) return 0;
+  return 1;
+}
+
+function getFactionGoldDropMult() {
+  // Carthage passive: +30% gold drops
+  if ((state.faction || 'rome') === 'carthage') return 1.3;
+  return 1;
+}
+
+function getFactionCrystalRechargeMult() {
+  // Egypt passive: +30% crystal recharge
+  if ((state.faction || 'rome') === 'egypt') return 1.3;
+  return 1;
+}
+
+function getFactionDodgeDistMult() {
+  // Greece passive: dodge goes further
+  if ((state.faction || 'rome') === 'greece') return 1.3;
+  return 1;
+}
+
+// Called when player successfully dodges an attack (from dodge roll system)
+function onPlayerDodge() {
+  if ((state.faction || 'rome') === 'greece') {
+    _greekDodgeWindow = 45; // 0.75s window for counter crit
+  }
+}
+
+// ─── FACTION COMBAT HUD ────────────────────────────────────────────────
+
+function drawFactionAbilityHUD() {
+  if (!state.conquest.active && !state.adventure.active) return;
+  let f = state.faction || 'rome';
+  let fData = FACTION_ABILITIES[f];
+  if (!fData) return;
+
+  push();
+  let hudX = width - 140;
+  let hudY = height - 55;
+
+  // Q ability
+  let qReady = _factionAbilities.q.cooldown <= 0;
+  let qMaxCD = fData.q.maxCD;
+  let qFrac = qReady ? 1 : 1 - (_factionAbilities.q.cooldown / qMaxCD);
+  _drawAbilityIcon(hudX, hudY, 'Q', fData.q.name, fData.q.color, qFrac, qReady);
+
+  // R ability
+  let rReady = _factionAbilities.r.cooldown <= 0;
+  let rMaxCD = fData.r.maxCD;
+  let rFrac = rReady ? 1 : 1 - (_factionAbilities.r.cooldown / rMaxCD);
+  _drawAbilityIcon(hudX + 65, hudY, 'R', fData.r.name, fData.r.color, rFrac, rReady);
+
+  // Passive indicator
+  fill(180, 165, 135, 160);
+  noStroke();
+  textSize(8); textAlign(CENTER, TOP);
+  text(fData.passive, hudX + 32, hudY + 34);
+
+  // Faction combo indicator
+  if (_factionCombo.count > 0 && _factionCombo.timer > 0) {
+    fill(255, 220, 80, min(255, _factionCombo.timer * 4));
+    textSize(14); textAlign(CENTER, CENTER);
+    text('x' + _factionCombo.count, hudX + 32, hudY - 15);
+  }
+
+  pop();
+}
+
+function _drawAbilityIcon(x, y, key, name, col, frac, ready) {
+  noStroke();
+  // Background
+  fill(ready ? 40 : 25, ready ? 35 : 20, ready ? 25 : 15, 200);
+  rect(x, y, 56, 30, 4);
+
+  // Cooldown sweep
+  if (!ready) {
+    fill(0, 0, 0, 100);
+    rect(x, y, 56 * (1 - frac), 30, frac < 0.05 ? 4 : 0);
+  }
+
+  // Border
+  let c = color(col);
+  stroke(red(c), green(c), blue(c), ready ? 200 : 80);
+  strokeWeight(ready ? 1.5 : 0.8);
+  noFill();
+  rect(x, y, 56, 30, 4);
+  noStroke();
+
+  // Key label
+  fill(ready ? 255 : 120);
+  textSize(12); textAlign(LEFT, TOP);
+  text('[' + key + ']', x + 3, y + 3);
+
+  // Ability name (truncated)
+  fill(red(c), green(c), blue(c), ready ? 220 : 100);
+  textSize(8); textAlign(LEFT, TOP);
+  let shortName = name.length > 10 ? name.substring(0, 9) + '.' : name;
+  text(shortName, x + 3, y + 18);
+
+  // Cooldown seconds
+  if (!ready) {
+    fill(255, 100, 80);
+    textSize(10); textAlign(RIGHT, TOP);
+    text(ceil(_factionAbilities[key.toLowerCase()].cooldown / 60) + 's', x + 53, y + 3);
+  }
 }

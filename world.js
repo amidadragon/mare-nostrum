@@ -2160,10 +2160,10 @@ function drawDistrictGrounds(ix, iy) {
   drawingContext.ellipse(ix, iy - 18, _clipRX, _clipRY, 0, 0, Math.PI * 2);
   drawingContext.clip();
 
-  // Faction ground tint overlay
+  // Faction ground tint overlay — stronger to show faction identity
   let _fgt = (typeof getFactionBuildingColors === 'function') ? getFactionBuildingColors().groundTint : null;
   if (_fgt) {
-    fill(_fgt[0], _fgt[1], _fgt[2], 35);
+    fill(_fgt[0], _fgt[1], _fgt[2], 65);
     ellipse(ix, iy - 18, _clipRX * 2, _clipRY * 2);
   }
 
@@ -2181,16 +2181,19 @@ function drawDistrictGrounds(ix, iy) {
   let coreAlpha = ep.era >= 3 ? 210 : 190;
   let streetW = 4; // side street width
 
-  // ── DECUMANUS CORRIDOR — wide E-W paved strip ──
+  // ── DECUMANUS CORRIDOR — wide E-W paved strip — faction tinted ──
   let decY = iy - 18;
   let decH = ih * 0.03;
-  fill(ep.roadBase[0], ep.roadBase[1], ep.roadBase[2], 130);
+  let _roadR = _fgt ? lerp(ep.roadBase[0], _fgt[0], 0.3) : ep.roadBase[0];
+  let _roadG = _fgt ? lerp(ep.roadBase[1], _fgt[1], 0.3) : ep.roadBase[1];
+  let _roadB = _fgt ? lerp(ep.roadBase[2], _fgt[2], 0.3) : ep.roadBase[2];
+  fill(_roadR, _roadG, _roadB, 130);
   rect(ix - iw * 0.35, decY - decH / 2, iw * 0.70, decH);
 
-  // ── CARDO CORRIDOR — N-S paved strip ──
+  // ── CARDO CORRIDOR — N-S paved strip — faction tinted ──
   let cardoX = ix + iw * 0.02;
   let cardoW = iw * 0.024;
-  fill(ep.roadBase[0], ep.roadBase[1], ep.roadBase[2], 110);
+  fill(_roadR, _roadG, _roadB, 110);
   rect(cardoX - cardoW / 2, iy - 18 - ih * 0.12, cardoW, ih * 0.22);
 
   // ── CIVIC CORE (NE of cardo/decumanus intersection) ──

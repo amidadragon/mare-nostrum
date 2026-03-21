@@ -459,6 +459,26 @@ const Debug = {
           this.addLog('Skipped all intros — Lv5 with resources', '#ffdd44');
           break;
 
+        case '/host':
+          if (typeof MP !== 'undefined') { MP.host(); this.addLog('Hosting game...', '#88ddff'); }
+          else this.addLog('MP not loaded', '#ff8888');
+          break;
+
+        case '/join':
+          if (typeof MP !== 'undefined' && args[0]) { MP.join(args[0]); this.addLog('Joining ' + args[0] + '...', '#88ddff'); }
+          else this.addLog('Usage: /join CODE', '#ff8888');
+          break;
+
+        case '/chat':
+          if (typeof MP !== 'undefined' && MP.connected) { MP.chat(args.join(' ')); this.addLog('Sent: ' + args.join(' '), '#aaddff'); }
+          else this.addLog('Not connected', '#ff8888');
+          break;
+
+        case '/attack':
+          if (typeof MP !== 'undefined' && MP.connected) { MP.attackRemote(parseInt(args[0]) || 5); this.addLog('Attacking with ' + (parseInt(args[0]) || 5) + ' troops', '#ff8844'); }
+          else this.addLog('Not connected', '#ff8888');
+          break;
+
         default:
           // Try eval for advanced debugging
           try {

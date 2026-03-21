@@ -18,6 +18,7 @@ const ASSETS = [
   'combat.js',
   'economy.js',
   'debug.js',
+  'multiplayer.js',
   'world.js',
   'player.js',
   'farming.js',

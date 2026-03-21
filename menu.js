@@ -76,6 +76,7 @@ function drawMenuScreen() {
   if (gameScreen === 'settings') { drawSettingsPanel(1); return; }
   if (gameScreen === 'credits') { drawCreditsPanel(1); return; }
   if (gameScreen === 'howtoplay') { drawHowToPlayPanel(1); return; }
+  if (gameScreen === 'multiplayer') { drawMultiplayerPanel(1); return; }
 
   // ═══════════════════════════════════════════════════════════════════════
   // ─── ANIMATED SCENE OVERLAY — brings the background art to life ───
@@ -463,6 +464,7 @@ function drawMenuScreen() {
   let items = [];
   if (hasSave) items.push('CONTINUE VOYAGE');
   items.push('NEW VOYAGE');
+  items.push('MULTIPLAYER');
   items.push('HOW TO PLAY');
   items.push('SETTINGS', 'CREDITS');
   let itemCount = items.length;
@@ -1158,16 +1160,200 @@ function handleMenuClick() {
     }
     return;
   }
+  if (gameScreen === 'multiplayer') {
+    handleMultiplayerClick();
+    return;
+  }
   if (menuHover < 0 || menuFadeOut > 0) return;
   let hasSave = !!localStorage.getItem('sunlitIsles_save');
   let btns = [];
   if (hasSave) btns.push('load');
-  btns.push('new', 'howtoplay', 'settings', 'credits');
+  btns.push('new', 'multiplayer', 'howtoplay', 'settings', 'credits');
   let action = btns[menuHover];
+  if (action === 'multiplayer') { gameScreen = 'multiplayer'; state._mpMenuOpen = true; return; }
   if (action === 'howtoplay') { gameScreen = 'howtoplay'; return; }
   if (action === 'settings') { gameScreen = 'settings'; return; }
   if (action === 'credits') { gameScreen = 'credits'; return; }
   // Fade to black, then execute action
   menuFadeOut = 1;
   menuFadeAction = action === 'new' ? startNewGame : startLoadGame;
+}
+
+// ─── MULTIPLAYER PANEL ──────────────────────────────────────────────────
+let _mpJoinInput = '';
+let _mpSubScreen = 'main'; // 'main' | 'host' | 'join'
+
+function drawMultiplayerPanel(fadeA) {
+  let w = width, h = height;
+  let panW = 320, panH = 280;
+  let px = floor(w / 2 - panW / 2), py = floor(h / 2 - panH / 2);
+
+  _drawPanelFrame(px, py, panW, panH);
+
+  push();
+  textAlign(CENTER, CENTER);
+  noStroke();
+
+  fill(244, 213, 141); textSize(14);
+  text('MULTIPLAYER', w / 2, py + 22);
+  _drawSectionDivider(w / 2, py + 38, panW - 40);
+
+  if (typeof MP === 'undefined') {
+    fill(180, 100, 100); textSize(11);
+    text('PeerJS not loaded', w / 2, py + 80);
+    _drawBackButton(w, py, panH);
+    pop(); return;
+  }
+
+  if (MP.connected) {
+    fill(100, 255, 140); textSize(12);
+    text('CONNECTED', w / 2, py + 60);
+    fill(200, 190, 160); textSize(10);
+    text('Room: ' + MP.roomCode, w / 2, py + 80);
+    text('Player 2: ' + MP.remotePlayer.name, w / 2, py + 96);
+
+    // Start game button
+    let btnY = py + 130;
+    let hoverStart = mouseX > w/2 - 60 && mouseX < w/2 + 60 && mouseY > btnY - 12 && mouseY < btnY + 12;
+    fill(hoverStart ? color(60, 140, 60) : color(40, 100, 40));
+    rect(w/2 - 60, btnY - 12, 120, 24, 4);
+    fill(255); textSize(11);
+    text('START GAME', w / 2, btnY);
+
+    // Disconnect button
+    let dcY = py + 170;
+    let hoverDC = mouseX > w/2 - 50 && mouseX < w/2 + 50 && mouseY > dcY - 10 && mouseY < dcY + 10;
+    fill(hoverDC ? color(160, 60, 60) : color(120, 40, 40));
+    rect(w/2 - 50, dcY - 10, 100, 20, 4);
+    fill(200); textSize(10);
+    text('DISCONNECT', w / 2, dcY);
+
+  } else if (_mpSubScreen === 'host') {
+    fill(200, 190, 160); textSize(11);
+    text('Waiting for player to join...', w / 2, py + 65);
+    fill(244, 213, 141); textSize(16);
+    text(MP.roomCode || '...', w / 2, py + 100);
+    fill(160, 150, 120); textSize(9);
+    text('Share this code with your friend', w / 2, py + 125);
+
+    let cancelY = py + 160;
+    let hoverCancel = mouseX > w/2 - 40 && mouseX < w/2 + 40 && mouseY > cancelY - 10 && mouseY < cancelY + 10;
+    fill(hoverCancel ? color(160, 60, 60) : color(120, 40, 40));
+    rect(w/2 - 40, cancelY - 10, 80, 20, 4);
+    fill(200); textSize(10);
+    text('CANCEL', w / 2, cancelY);
+
+  } else if (_mpSubScreen === 'join') {
+    fill(200, 190, 160); textSize(11);
+    text('Enter room code:', w / 2, py + 65);
+
+    // Input box
+    fill(20, 18, 15);
+    rect(w/2 - 60, py + 85, 120, 28, 4);
+    stroke(120, 100, 60); strokeWeight(1);
+    rect(w/2 - 60, py + 85, 120, 28, 4);
+    noStroke();
+    fill(244, 213, 141); textSize(14);
+    text(_mpJoinInput + (frameCount % 40 < 20 ? '_' : ''), w / 2, py + 99);
+
+    fill(160, 150, 120); textSize(9);
+    text('Type code and press ENTER', w / 2, py + 125);
+
+    let cancelY = py + 155;
+    let hoverCancel = mouseX > w/2 - 40 && mouseX < w/2 + 40 && mouseY > cancelY - 10 && mouseY < cancelY + 10;
+    fill(hoverCancel ? color(160, 60, 60) : color(120, 40, 40));
+    rect(w/2 - 40, cancelY - 10, 80, 20, 4);
+    fill(200); textSize(10);
+    text('CANCEL', w / 2, cancelY);
+
+  } else {
+    // Main multiplayer menu
+    let hostY = py + 80;
+    let joinY = py + 130;
+
+    let hoverHost = mouseX > w/2 - 80 && mouseX < w/2 + 80 && mouseY > hostY - 14 && mouseY < hostY + 14;
+    fill(hoverHost ? color(60, 80, 120) : color(35, 50, 80));
+    rect(w/2 - 80, hostY - 14, 160, 28, 4);
+    fill(hoverHost ? color(255, 230, 160) : color(200, 190, 160)); textSize(12);
+    text('HOST GAME', w / 2, hostY);
+
+    let hoverJoin = mouseX > w/2 - 80 && mouseX < w/2 + 80 && mouseY > joinY - 14 && mouseY < joinY + 14;
+    fill(hoverJoin ? color(60, 80, 120) : color(35, 50, 80));
+    rect(w/2 - 80, joinY - 14, 160, 28, 4);
+    fill(hoverJoin ? color(255, 230, 160) : color(200, 190, 160)); textSize(12);
+    text('JOIN GAME', w / 2, joinY);
+  }
+
+  _drawBackButton(w, py, panH);
+  pop();
+}
+
+function _drawBackButton(w, py, panH) {
+  let backY = py + panH - 22;
+  let hoverBack = mouseX > w/2 - 40 && mouseX < w/2 + 40 && mouseY > backY - 8 && mouseY < backY + 10;
+  fill(hoverBack ? color(200, 180, 120) : color(130, 115, 85));
+  textSize(10);
+  text('BACK', w / 2, backY);
+}
+
+function handleMultiplayerClick() {
+  let w = width, h = height;
+  let panW = 320, panH = 280;
+  let px = floor(w / 2 - panW / 2), py = floor(h / 2 - panH / 2);
+
+  // Back button (always present)
+  let backY = py + panH - 22;
+  if (mouseX > w/2 - 40 && mouseX < w/2 + 40 && mouseY > backY - 8 && mouseY < backY + 10) {
+    if (_mpSubScreen !== 'main') { _mpSubScreen = 'main'; }
+    else { gameScreen = 'menu'; state._mpMenuOpen = false; }
+    return;
+  }
+
+  if (typeof MP === 'undefined') return;
+
+  if (MP.connected) {
+    // Start game
+    let btnY = py + 130;
+    if (mouseX > w/2 - 60 && mouseX < w/2 + 60 && mouseY > btnY - 12 && mouseY < btnY + 12) {
+      state._mpMenuOpen = false;
+      menuFadeOut = 1;
+      let hasSave = !!localStorage.getItem('sunlitIsles_save');
+      menuFadeAction = hasSave ? startLoadGame : startNewGame;
+      return;
+    }
+    // Disconnect
+    let dcY = py + 170;
+    if (mouseX > w/2 - 50 && mouseX < w/2 + 50 && mouseY > dcY - 10 && mouseY < dcY + 10) {
+      MP.disconnect();
+      _mpSubScreen = 'main';
+      return;
+    }
+  } else if (_mpSubScreen === 'host') {
+    let cancelY = py + 160;
+    if (mouseX > w/2 - 40 && mouseX < w/2 + 40 && mouseY > cancelY - 10 && mouseY < cancelY + 10) {
+      MP.disconnect();
+      _mpSubScreen = 'main';
+      return;
+    }
+  } else if (_mpSubScreen === 'join') {
+    let cancelY = py + 155;
+    if (mouseX > w/2 - 40 && mouseX < w/2 + 40 && mouseY > cancelY - 10 && mouseY < cancelY + 10) {
+      _mpSubScreen = 'main';
+      return;
+    }
+  } else {
+    // Main MP menu
+    let hostY = py + 80;
+    let joinY = py + 130;
+    if (mouseX > w/2 - 80 && mouseX < w/2 + 80 && mouseY > hostY - 14 && mouseY < hostY + 14) {
+      MP.host();
+      _mpSubScreen = 'host';
+      return;
+    }
+    if (mouseX > w/2 - 80 && mouseX < w/2 + 80 && mouseY > joinY - 14 && mouseY < joinY + 14) {
+      _mpSubScreen = 'join';
+      _mpJoinInput = '';
+      return;
+    }
+  }
 }

@@ -884,6 +884,14 @@ function getCitizenColors(variant, lvl, citizen) {
   }
   let skin = [195, 165, 130];
 
+  // Faction-aware fallback tunic colors
+  let fd = (typeof getFactionData === 'function') ? getFactionData() : null;
+  if (fd && fd.player) {
+    let facTunic = fd.player.tunic;
+    if (variant === 'soldier')  return { skin, tunic: facTunic, hair: [80, 60, 40] };
+    if (variant === 'priest')   return { skin, tunic: [facTunic[0] + 40, facTunic[1] + 40, facTunic[2] + 40], hair: [50, 40, 30] };
+  }
+
   if (lvl <= 8) {
     if (variant === 'farmer')   return { skin, tunic: [140, 120, 80],  hair: [80, 60, 40] };
     if (variant === 'merchant') return { skin, tunic: [160, 130, 70],  hair: [70, 50, 35] };
@@ -1811,6 +1819,42 @@ const CITIZEN_TUNIC_HUES = [
   [140, 80, 70],    // terracotta
 ];
 
+// Faction-specific tunic palettes for citizens
+const FACTION_CITIZEN_TUNICS = {
+  rome: [
+    [175, 58, 44],    // red tunic
+    [140, 70, 50],    // brown leather
+    [155, 35, 30],    // deep red
+    [130, 95, 60],    // leather brown
+    [160, 100, 55],   // warm brown
+    [120, 80, 60],    // dark leather
+  ],
+  carthage: [
+    [240, 230, 210],  // white robe
+    [225, 218, 200],  // ivory
+    [200, 180, 160],  // cream
+    [180, 140, 200],  // purple accent
+    [210, 200, 180],  // light linen
+    [160, 100, 170],  // tyrian purple
+  ],
+  egypt: [
+    [245, 240, 224],  // white kilt
+    [235, 225, 200],  // off-white
+    [220, 210, 185],  // pale linen
+    [200, 170, 40],   // gold collar
+    [230, 220, 195],  // bleached linen
+    [64, 176, 160],   // turquoise accent
+  ],
+  greece: [
+    [240, 238, 230],  // white chiton
+    [230, 225, 215],  // off-white
+    [80, 144, 192],   // blue himation
+    [100, 140, 180],  // lighter blue
+    [220, 215, 205],  // cream chiton
+    [60, 120, 170],   // deep blue
+  ],
+};
+
 const CITIZEN_HAIR_COLORS = [
   [80, 60, 40],     // brown
   [50, 35, 25],     // dark brown
@@ -1834,8 +1878,18 @@ function spawnVariedCitizen() {
   for (let i = 0; i < weights.length; i++) { acc += weights[i]; if (roll < acc) { vi = i; break; } }
 
   let skinIdx = floor(random(CITIZEN_SKIN_TONES.length));
-  let tunicIdx = floor(random(CITIZEN_TUNIC_HUES.length));
   let hairIdx = floor(random(CITIZEN_HAIR_COLORS.length));
+
+  // Faction-aware tunic colors — 70% faction palette, 30% generic variety
+  let fac = (typeof getFactionData === 'function') ? getFactionData() : null;
+  let facKey = fac ? (state.faction || 'rome') : 'rome';
+  let facTunics = FACTION_CITIZEN_TUNICS[facKey] || CITIZEN_TUNIC_HUES;
+  let tunicColor;
+  if (random() < 0.7 && facTunics.length > 0) {
+    tunicColor = facTunics[floor(random(facTunics.length))];
+  } else {
+    tunicColor = CITIZEN_TUNIC_HUES[floor(random(CITIZEN_TUNIC_HUES.length))];
+  }
 
   state.citizens.push({
     x: x, y: y, vx: 0, vy: 0,
@@ -1846,7 +1900,7 @@ function spawnVariedCitizen() {
     speed: 0.3 + random(0.4),
     targetX: x, targetY: y,
     skinTone: CITIZEN_SKIN_TONES[skinIdx],
-    tunicColor: CITIZEN_TUNIC_HUES[tunicIdx],
+    tunicColor: tunicColor,
     hairColor: CITIZEN_HAIR_COLORS[hairIdx],
     idleAnim: floor(random(3)), // 0=stand, 1=look around, 2=arms crossed
     walkBobPhase: random(TWO_PI),
