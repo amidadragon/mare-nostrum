@@ -15,7 +15,9 @@ function getCoastlineVerts() {
   for (let i = 0; i < numVerts; i++) {
     let angle = (i / numVerts) * TWO_PI;
     let noiseVal = noise(cos(angle) * 2 + noiseSeed, sin(angle) * 2 + noiseSeed);
-    let offset = (noiseVal - 0.5) * 0.06;
+    // Second octave at half frequency for larger-scale coastal irregularity
+    let noiseVal2 = noise(cos(angle) * 0.9 + noiseSeed + 100, sin(angle) * 0.9 + noiseSeed + 100);
+    let offset = (noiseVal - 0.5) * 0.09 + (noiseVal2 - 0.5) * 0.05;
     _coastlineVerts.push({ angle: angle, offset: offset });
   }
   _coastlineLastRX = rx;
@@ -2249,7 +2251,7 @@ function drawDistrictGrounds(ix, iy) {
   fill(_roadR, _roadG, _roadB, 110);
   rect(cardoX - cardoW / 2, iy - 18 - ih * 0.12, cardoW, ih * 0.22);
 
-  // ── CIVIC CORE (NE of cardo/decumanus intersection) ──
+  // ── CIVIC CORE (NE of cardo/decumanus intersection) — pale stone ──
   // Two insulae blocks separated by a N-S side street
   let coreX = cardoX + cardoW / 2 + 2;
   let coreY = decY - decH / 2 - ih * 0.09;
@@ -2257,10 +2259,10 @@ function drawDistrictGrounds(ix, iy) {
   let coreW2 = iw * 0.08;
   let coreH = ih * 0.08;
   _drawInsula(coreX, coreY, coreW1, coreH,
-    ep.stoneBase[0] - 5, ep.stoneBase[1] - 5, ep.stoneBase[2] - 8, coreAlpha);
+    ep.stoneBase[0] + 8, ep.stoneBase[1] + 5, ep.stoneBase[2] - 2, coreAlpha);
   _drawSideStreet(coreX + coreW1, coreY, streetW, coreH, ep);
   _drawInsula(coreX + coreW1 + streetW, coreY, coreW2, coreH,
-    ep.stoneBase[0], ep.stoneBase[1] - 2, ep.stoneBase[2] - 5, coreAlpha - 10);
+    ep.stoneBase[0] + 10, ep.stoneBase[1] + 6, ep.stoneBase[2], coreAlpha - 10);
 
   // ── CIVIC CORE SOUTH (SE of intersection) — forum ground ──
   let forumX = cardoX + cardoW / 2 + 2;
@@ -2268,55 +2270,92 @@ function drawDistrictGrounds(ix, iy) {
   let forumW = iw * 0.14;
   let forumH = ih * 0.06;
   _drawInsula(forumX, forumY, forumW, forumH,
-    ep.stoneBase[0] - 2, ep.stoneBase[1] - 3, ep.stoneBase[2] - 6, coreAlpha - 5);
+    ep.stoneBase[0] + 5, ep.stoneBase[1] + 2, ep.stoneBase[2] - 4, coreAlpha - 5);
+
+  // ── TEMPLE COURT — distinct open gathering plaza ──
+  {
+    let tcX = forumX + 4, tcY = forumY + 2;
+    let tcW = forumW - 8, tcH = forumH - 4;
+    // Cream/sandstone floor
+    fill(lerp(200, 225, dayMix), lerp(185, 215, dayMix), lerp(155, 185, dayMix), coreAlpha + 20);
+    rect(tcX, tcY, tcW, tcH);
+    // Subtle inner border (worn stone edge)
+    stroke(ep.stoneBase[0] - 15, ep.stoneBase[1] - 18, ep.stoneBase[2] - 20, 60);
+    strokeWeight(1);
+    noFill();
+    rect(tcX + 2, tcY + 2, tcW - 4, tcH - 4);
+    noStroke();
+    // Column markers at corners (small grey stone pillars)
+    let colC = [ep.stoneBase[0] - 20, ep.stoneBase[1] - 22, ep.stoneBase[2] - 18];
+    fill(colC[0], colC[1], colC[2], 180);
+    rect(tcX + 2, tcY + 1, 4, 5);
+    rect(tcX + tcW - 6, tcY + 1, 4, 5);
+    rect(tcX + 2, tcY + tcH - 6, 4, 5);
+    rect(tcX + tcW - 6, tcY + tcH - 6, 4, 5);
+    // Decorative urns at mid-edges
+    fill(160, 110, 70, 140);
+    ellipse(tcX + tcW / 2, tcY + 1, 5, 4);
+    ellipse(tcX + tcW / 2, tcY + tcH - 1, 5, 4);
+  }
 
   // E-W side street below forum
   _drawSideStreet(forumX, forumY + forumH, forumW, streetW, ep);
 
-  // ── MARKET EAST — two blocks stacked vertically ──
+  // ── MARKET EAST — darker paving, two blocks stacked vertically ──
   let mktX = coreX + coreW1 + streetW + coreW2 + streetW;
   let mktY = coreY + 2;
   let mktW = iw * 0.09;
   let mktH1 = ih * 0.05;
   let mktH2 = ih * 0.04;
   _drawInsula(mktX, mktY, mktW, mktH1,
-    ep.roadBase[0] - 8, ep.roadBase[1] - 10, ep.roadBase[2] - 15, 170);
+    ep.roadBase[0] - 15, ep.roadBase[1] - 18, ep.roadBase[2] - 22, 180);
   _drawSideStreet(mktX, mktY + mktH1, mktW, streetW, ep);
   _drawInsula(mktX, mktY + mktH1 + streetW, mktW, mktH2,
-    ep.roadBase[0] - 5, ep.roadBase[1] - 8, ep.roadBase[2] - 12, 155);
+    ep.roadBase[0] - 12, ep.roadBase[1] - 15, ep.roadBase[2] - 18, 165);
 
   // N-S side street connecting market to decumanus
   _drawSideStreet(mktX - streetW, decY - decH / 2 - ih * 0.09, streetW, ih * 0.09, ep);
 
-  // ── RESIDENTIAL NW — two blocks west of cardo ──
+  // ── RESIDENTIAL NW — warm tan, two blocks west of cardo ──
   let resX = cardoX - cardoW / 2 - 2 - iw * 0.12;
   let resY = decY - decH / 2 - ih * 0.08;
   let resW1 = iw * 0.06;
   let resW2 = iw * 0.05;
   let resH = ih * 0.07;
   _drawInsula(resX, resY, resW1, resH,
-    ep.floorBase[0] - 12, ep.floorBase[1] - 15, ep.floorBase[2] - 18, 140);
+    ep.floorBase[0] - 5, ep.floorBase[1] - 8, ep.floorBase[2] - 18, 150);
   _drawSideStreet(resX + resW1, resY, streetW, resH, ep);
   _drawInsula(resX + resW1 + streetW, resY, resW2, resH,
-    ep.floorBase[0] - 8, ep.floorBase[1] - 10, ep.floorBase[2] - 14, 135);
+    ep.floorBase[0], ep.floorBase[1] - 4, ep.floorBase[2] - 14, 145);
 
   // E-W side street connecting residential to cardo
   _drawSideStreet(resX, resY + resH, iw * 0.12, streetW, ep);
 
-  // ── MILITARY SE — two blocks south of decumanus, east side ──
+  // ── MILITARY SE — grey stone, two blocks south of decumanus, east side ──
   let milX = cardoX + cardoW / 2 + iw * 0.08;
   let milY = decY + decH / 2 + ih * 0.04;
   let milW1 = iw * 0.08;
   let milW2 = iw * 0.06;
   let milH = ih * 0.055;
   _drawInsula(milX, milY, milW1, milH,
-    ep.roadBase[0] - 2, ep.roadBase[1] - 5, ep.roadBase[2] - 2, 150);
+    ep.roadBase[0] - 8, ep.roadBase[1] - 8, ep.roadBase[2] - 4, 160);
   _drawSideStreet(milX + milW1, milY, streetW, milH, ep);
   _drawInsula(milX + milW1 + streetW, milY, milW2, milH,
-    ep.roadBase[0], ep.roadBase[1] - 3, ep.roadBase[2], 140);
+    ep.roadBase[0] - 5, ep.roadBase[1] - 5, ep.roadBase[2] - 2, 150);
 
   // N-S side street from military to decumanus
   _drawSideStreet(milX + milW1 / 2 - streetW / 2, decY + decH / 2, streetW, milY - decY - decH / 2, ep);
+
+  // ── DISTRICT BORDER LINES — thin paths separating zones ──
+  stroke(ep.roadLine[0] - 5, ep.roadLine[1] - 5, ep.roadLine[2] - 3, 55);
+  strokeWeight(2);
+  // Civic/residential border (N-S line west of cardo)
+  line(resX + resW1 + streetW + resW2 + 2, resY - 2, resX + resW1 + streetW + resW2 + 2, resY + resH + streetW + 2);
+  // Civic/market border (N-S line east of civic)
+  line(mktX - 2, mktY - 2, mktX - 2, mktY + mktH1 + streetW + mktH2 + 2);
+  // Civic/military border (E-W line south of decumanus)
+  line(milX - 2, milY - 2, milX + milW1 + streetW + milW2 + 2, milY - 2);
+  noStroke();
 
   // ── CITY BOUNDARY / POMERIUM (Era 2+) ──
   // Low stone wall — rectangles around the built area
@@ -2368,7 +2407,7 @@ function drawRomanRoad(ix, iy) {
   let ep = getEraPalette();
   let roadY = WORLD.islandCY - 8; // consistent centerline
   let shrineSX = w2sX(WORLD.islandCX - 440);
-  let farmSX = w2sX(WORLD.islandCX - 220);
+  let farmSX = w2sX(WORLD.islandCX - 340);
   let templeSX = w2sX(WORLD.islandCX);
   let groveSX = w2sX(WORLD.islandCX + 200);
   let roadSY = w2sY(roadY); // one Y for the whole road

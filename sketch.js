@@ -827,132 +827,167 @@ let starPositions = null;
 // Island center: (600, 400). Walkable area ~500x320.
 // Districts: Farm(W), Residential(NW), Center(C), Civic(NE), Market(E), Military(SE), Sacred(N)
 const CITY_SLOTS = [
+  // ===============================================================
   // ERA 1: VILLAGE (Lv 2-8)
-  // --- Farm district (west, x:220-400) ---
-  { id: 'fence_farm_e1',   x: 260, y: 365, w: 32, h:  8, type: 'fence',       level: 2,  district: 'farm' },
-  { id: 'fence_farm_e2',   x: 260, y: 395, w: 32, h:  8, type: 'fence',       level: 2,  district: 'farm' },
-  { id: 'granary',         x: 260, y: 340, w: 58, h: 44, type: 'granary',     level: 5,  district: 'farm' },
-  { id: 'torch_gran_l',    x: 250, y: 354, w:  8, h: 16, type: 'torch',       level: 5,  district: 'farm' },
-  { id: 'fence_nw1',       x: 320, y: 318, w: 32, h:  8, type: 'fence',       level: 4,  district: 'farm' },
-  // --- Center (x:560-660, y:400-470) ---
-  { id: 'torch_center',    x: 600, y: 415, w:  8, h: 16, type: 'torch',       level: 2,  district: 'center' },
-  { id: 'well_center',     x: 660, y: 440, w: 24, h: 24, type: 'well',        level: 4,  district: 'center' },
-  { id: 'well_sw',         x: 540, y: 470, w: 24, h: 24, type: 'well',        level: 5,  district: 'center' },
-  // --- Residential (NW, x:420-540, y:290-380) ---
-  { id: 'house_res1',      x: 430, y: 330, w: 44, h: 34, type: 'house',       level: 6,  district: 'residential' },
-  { id: 'house_res2',      x: 490, y: 330, w: 44, h: 34, type: 'house',       level: 6,  district: 'residential' },
-  { id: 'torch_res1',      x: 460, y: 355, w:  8, h: 16, type: 'torch',       level: 6,  district: 'residential' },
-  // --- Civic (NE, x:720-870, y:280-360) ---
-  { id: 'shrine_civic',    x: 760, y: 290, w: 32, h: 28, type: 'shrine',      level: 3,  district: 'civic' },
-  { id: 'floor_sacra',     x: 760, y: 320, w: 32, h: 22, type: 'floor',       level: 3,  district: 'civic' },
-  // --- Market (E, x:850-960, y:350-420) ---
+  // ===============================================================
+
+  // --- FARM DISTRICT (left, x:150-380) ---
+  { id: 'fence_farm_e1',   x: 200, y: 375, w: 32, h:  8, type: 'fence',       level: 2,  district: 'farm' },
+  { id: 'fence_farm_e2',   x: 200, y: 405, w: 32, h:  8, type: 'fence',       level: 2,  district: 'farm' },
+  { id: 'fence_nw1',       x: 310, y: 360, w: 32, h:  8, type: 'fence',       level: 4,  district: 'farm' },
+  { id: 'crystal_coll',    x: 180, y: 370, w: 40, h: 30, type: 'crystal_collector', level: 5, district: 'farm' },
+  { id: 'granary',         x: 330, y: 380, w: 58, h: 44, type: 'granary',     level: 5,  district: 'farm' },
+  { id: 'torch_gran_l',    x: 295, y: 384, w:  8, h: 16, type: 'torch',       level: 5,  district: 'farm' },
+
+  // --- CIVIC / PLAZA (center, x:560-700) ---
+  { id: 'torch_center',    x: 620, y: 415, w:  8, h: 16, type: 'torch',       level: 2,  district: 'center' },
+  { id: 'shrine_civic',    x: 660, y: 340, w: 32, h: 28, type: 'shrine',      level: 3,  district: 'center' },
+  { id: 'floor_sacra',     x: 660, y: 370, w: 32, h: 22, type: 'floor',       level: 3,  district: 'center' },
+  { id: 'well_center',     x: 630, y: 440, w: 24, h: 24, type: 'well',        level: 4,  district: 'center' },
+  { id: 'well_sw',         x: 570, y: 450, w: 24, h: 24, type: 'well',        level: 5,  district: 'center' },
+
+  // --- RESIDENTIAL (center-left, x:400-550) ---
+  { id: 'house_res1',      x: 420, y: 360, w: 44, h: 34, type: 'house',       level: 6,  district: 'residential' },
+  { id: 'house_res2',      x: 480, y: 360, w: 44, h: 34, type: 'house',       level: 6,  district: 'residential' },
+  { id: 'torch_res1',      x: 450, y: 385, w:  8, h: 16, type: 'torch',       level: 6,  district: 'residential' },
+
+  // --- MARKET (right, x:850-980) ---
   { id: 'market_1',        x: 870, y: 370, w: 44, h: 34, type: 'market',      level: 7,  district: 'market' },
   { id: 'torch_mkt1a',     x: 844, y: 362, w:  8, h: 16, type: 'torch',       level: 7,  district: 'market' },
-  { id: 'torch_mkt1b',     x: 896, y: 362, w:  8, h: 16, type: 'torch',       level: 7,  district: 'market' },
-  // --- Bath (SW, x:440-520, y:450-510) ---
-  { id: 'bath_1',          x: 480, y: 480, w: 70, h: 52, type: 'bath',        level: 8,  district: 'bath' },
-  // --- Military (SE, x:800-920, y:440-530) ---
-  { id: 'castrum',         x: 860, y: 490, w: 130, h: 100, type: 'castrum',     level: 8,  district: 'military' },
-  { id: 'wall_cast_l',     x: 818, y: 490, w:  8, h: 50, type: 'wall',        level: 8,  district: 'military' },
-  { id: 'wall_cast_r',     x: 902, y: 490, w:  8, h: 50, type: 'wall',        level: 8,  district: 'military' },
-  { id: 'wall_cast_top',   x: 860, y: 458, w: 80, h:  8, type: 'wall',        level: 8,  district: 'military' },
-  { id: 'watchtower_cast', x: 908, y: 458, w: 24, h: 56, type: 'watchtower',  level: 8,  district: 'military' },
-  { id: 'torch_cast_l',    x: 840, y: 510, w:  8, h: 16, type: 'torch',       level: 8,  district: 'military' },
-  { id: 'torch_cast_r',    x: 880, y: 510, w:  8, h: 16, type: 'torch',       level: 8,  district: 'military' },
+  { id: 'torch_mkt1b',     x: 920, y: 362, w:  8, h: 16, type: 'torch',       level: 7,  district: 'market' },
 
+  // --- BATH (residential south, x:440-520) ---
+  { id: 'bath_1',          x: 480, y: 430, w: 70, h: 52, type: 'bath',        level: 8,  district: 'residential' },
+
+  // --- MILITARY (far right, x:870-980) ---
+  { id: 'castrum',         x: 920, y: 440, w: 130, h: 100, type: 'castrum',    level: 8,  district: 'military' },
+  { id: 'wall_cast_l',     x: 878, y: 440, w:  8, h: 50, type: 'wall',        level: 8,  district: 'military' },
+  { id: 'wall_cast_r',     x: 962, y: 440, w:  8, h: 50, type: 'wall',        level: 8,  district: 'military' },
+  { id: 'wall_cast_top',   x: 920, y: 408, w: 80, h:  8, type: 'wall',        level: 8,  district: 'military' },
+  { id: 'watchtower_cast', x: 968, y: 408, w: 24, h: 56, type: 'watchtower',  level: 8,  district: 'military' },
+  { id: 'torch_cast_l',    x: 900, y: 460, w:  8, h: 16, type: 'torch',       level: 8,  district: 'military' },
+  { id: 'torch_cast_r',    x: 940, y: 460, w:  8, h: 16, type: 'torch',       level: 8,  district: 'military' },
+
+  // ===============================================================
   // ERA 2: CITY (Lv 9-17)
-  // --- Sacred (N, x:400-780, y:180-280) ---
-  { id: 'aqueduct_1',      x: 480, y: 260, w: 20, h: 40, type: 'aqueduct',    level: 9,  district: 'sacred' },
-  { id: 'aqueduct_2',      x: 560, y: 260, w: 20, h: 40, type: 'aqueduct',    level: 9,  district: 'sacred' },
-  { id: 'aqueduct_3',      x: 640, y: 260, w: 20, h: 40, type: 'aqueduct',    level: 9,  district: 'sacred' },
-  { id: 'bridge_north',    x: 600, y: 300, w: 32, h: 32, type: 'bridge',      level: 9,  district: 'sacred' },
-  // --- Civic temple (NE, moved to avoid shrine overlap) ---
-  { id: 'temple_main',     x: 840, y: 310, w: 70, h: 50, type: 'temple',      level: 10, district: 'civic' },
-  { id: 'torch_temp_l',    x: 800, y: 320, w:  8, h: 16, type: 'torch',       level: 10, district: 'civic' },
-  { id: 'torch_temp_r',    x: 880, y: 320, w:  8, h: 16, type: 'torch',       level: 10, district: 'civic' },
-  { id: 'floor_temp',      x: 840, y: 345, w: 32, h: 22, type: 'floor',       level: 10, district: 'civic' },
-  // --- Market 2 (further east) ---
-  { id: 'market_2',        x: 930, y: 370, w: 44, h: 34, type: 'market',      level: 10, district: 'market' },
-  // --- Center plaza (single large floor, not 6 tiles) ---
-  { id: 'plaza_floor',     x: 600, y: 420, w: 64, h: 48, type: 'floor',       level: 10, district: 'center' },
-  { id: 'lantern_civ_n',   x: 700, y: 370, w: 10, h: 20, type: 'lantern',     level: 10, district: 'civic' },
-  // --- Residential expansion ---
-  { id: 'house_res3',      x: 540, y: 330, w: 44, h: 34, type: 'house',       level: 12, district: 'residential' },
-  { id: 'house_res4',      x: 430, y: 290, w: 44, h: 34, type: 'house',       level: 12, district: 'residential' },
-  { id: 'well_sw2',        x: 400, y: 420, w: 24, h: 24, type: 'well',        level: 12, district: 'residential' },
-  // --- Military walls (between civic and military, y:435 line) ---
-  { id: 'wall_mil1',       x: 780, y: 445, w: 32, h:  8, type: 'wall',        level: 13, district: 'military' },
-  { id: 'wall_mil2',       x: 812, y: 445, w: 32, h:  8, type: 'wall',        level: 13, district: 'military' },
-  { id: 'watchtower_e',    x: 960, y: 390, w: 20, h: 44, type: 'watchtower',  level: 13, district: 'market' },
-  { id: 'watchtower_sw',   x: 380, y: 450, w: 20, h: 44, type: 'watchtower',  level: 13, district: 'farm' },
-  // --- Market 3 (south of market row, no overlap with bath_2) ---
-  { id: 'market_3',        x: 870, y: 420, w: 44, h: 34, type: 'market',      level: 13, district: 'market' },
-  // --- Bath 2 (civic, moved away from market_3) ---
-  { id: 'bath_2',          x: 700, y: 440, w: 70, h: 52, type: 'bath',        level: 14, district: 'civic' },
-  { id: 'aqueduct_4',      x: 440, y: 260, w: 20, h: 40, type: 'aqueduct',    level: 14, district: 'sacred' },
-  { id: 'aqueduct_5',      x: 720, y: 260, w: 20, h: 40, type: 'aqueduct',    level: 14, district: 'sacred' },
-  { id: 'bridge_mkt',      x: 660, y: 400, w: 32, h: 32, type: 'bridge',      level: 14, district: 'center' },
-  // --- Forum (center south) ---
-  { id: 'forum_main',      x: 600, y: 480, w: 80, h: 60, type: 'forum',       level: 15, district: 'center' },
-  { id: 'lantern_f_nw',    x: 555, y: 475, w: 10, h: 20, type: 'lantern',     level: 15, district: 'center' },
-  { id: 'lantern_f_ne',    x: 645, y: 475, w: 10, h: 20, type: 'lantern',     level: 15, district: 'center' },
-  { id: 'mosaic_forum',    x: 600, y: 520, w: 48, h: 22, type: 'mosaic',      level: 15, district: 'center' },
-  // --- Granary 2 (military supply) ---
-  { id: 'granary_2',       x: 780, y: 500, w: 58, h: 44, type: 'granary',     level: 15, district: 'military' },
-  { id: 'arch_east',       x: 960, y: 420, w: 48, h: 52, type: 'arch',        level: 15, district: 'market' },
-  // --- Residential row (NW block, spaced 55px apart) ---
-  { id: 'house_row1',      x: 420, y: 370, w: 44, h: 34, type: 'house',       level: 16, district: 'residential' },
-  { id: 'house_row2',      x: 475, y: 370, w: 44, h: 34, type: 'house',       level: 16, district: 'residential' },
-  { id: 'house_row3',      x: 530, y: 370, w: 44, h: 34, type: 'house',       level: 16, district: 'residential' },
-  { id: 'torch_row1',      x: 448, y: 390, w:  8, h: 16, type: 'torch',       level: 16, district: 'residential' },
-  { id: 'torch_row2',      x: 503, y: 390, w:  8, h: 16, type: 'torch',       level: 16, district: 'residential' },
-  { id: 'fence_res_back',  x: 475, y: 308, w:160, h:  6, type: 'fence',       level: 16, district: 'residential' },
-  // --- Library (civic, moved north to avoid shrine overlap) ---
-  { id: 'library',         x: 720, y: 310, w: 72, h: 52, type: 'library',     level: 17, district: 'civic' },
-  { id: 'lantern_lib_l',   x: 682, y: 320, w: 10, h: 20, type: 'lantern',     level: 17, district: 'civic' },
+  // ===============================================================
 
+  // --- SACRED (north, x:500-780) ---
+  { id: 'aqueduct_1',      x: 500, y: 270, w: 20, h: 40, type: 'aqueduct',    level: 9,  district: 'sacred' },
+  { id: 'aqueduct_2',      x: 580, y: 270, w: 20, h: 40, type: 'aqueduct',    level: 9,  district: 'sacred' },
+  { id: 'aqueduct_3',      x: 660, y: 270, w: 20, h: 40, type: 'aqueduct',    level: 9,  district: 'sacred' },
+  { id: 'bridge_north',    x: 620, y: 310, w: 32, h: 32, type: 'bridge',      level: 9,  district: 'sacred' },
+
+  // --- CIVIC/SACRED temple (x:720-840) ---
+  { id: 'temple_main',     x: 760, y: 330, w: 70, h: 50, type: 'temple',      level: 10, district: 'civic' },
+  { id: 'torch_temp_l',    x: 720, y: 340, w:  8, h: 16, type: 'torch',       level: 10, district: 'civic' },
+  { id: 'torch_temp_r',    x: 800, y: 340, w:  8, h: 16, type: 'torch',       level: 10, district: 'civic' },
+  { id: 'floor_temp',      x: 760, y: 370, w: 32, h: 22, type: 'floor',       level: 10, district: 'civic' },
+
+  // --- MARKET expansion (x:850-960) ---
+  { id: 'market_2',        x: 870, y: 420, w: 44, h: 34, type: 'market',      level: 10, district: 'market' },
+
+  // --- PLAZA floor (center, x:580-660) ---
+  { id: 'plaza_floor',     x: 620, y: 410, w: 64, h: 48, type: 'floor',       level: 10, district: 'center' },
+  { id: 'lantern_civ_n',   x: 700, y: 370, w: 10, h: 20, type: 'lantern',     level: 10, district: 'civic' },
+
+  // --- RESIDENTIAL expansion (x:400-540) ---
+  { id: 'house_res3',      x: 540, y: 360, w: 44, h: 34, type: 'house',       level: 12, district: 'residential' },
+  { id: 'house_res4',      x: 420, y: 320, w: 44, h: 34, type: 'house',       level: 12, district: 'residential' },
+  { id: 'well_sw2',        x: 540, y: 400, w: 24, h: 24, type: 'well',        level: 12, district: 'residential' },
+
+  // --- MILITARY walls (x:850-960) ---
+  { id: 'wall_mil1',       x: 860, y: 395, w: 32, h:  8, type: 'wall',        level: 13, district: 'military' },
+  { id: 'wall_mil2',       x: 892, y: 395, w: 32, h:  8, type: 'wall',        level: 13, district: 'military' },
+  { id: 'watchtower_e',    x: 960, y: 370, w: 20, h: 44, type: 'watchtower',  level: 13, district: 'market' },
+  { id: 'watchtower_sw',   x: 370, y: 420, w: 20, h: 44, type: 'watchtower',  level: 13, district: 'farm' },
+
+  // --- MARKET 3 (x:920-960) ---
+  { id: 'market_3',        x: 930, y: 370, w: 44, h: 34, type: 'market',      level: 13, district: 'market' },
+
+  // --- BATH 2 (civic area, x:650-720) ---
+  { id: 'bath_2',          x: 680, y: 440, w: 70, h: 52, type: 'bath',        level: 14, district: 'civic' },
+  { id: 'aqueduct_4',      x: 460, y: 270, w: 20, h: 40, type: 'aqueduct',    level: 14, district: 'sacred' },
+  { id: 'aqueduct_5',      x: 740, y: 270, w: 20, h: 40, type: 'aqueduct',    level: 14, district: 'sacred' },
+  { id: 'bridge_mkt',      x: 660, y: 400, w: 32, h: 32, type: 'bridge',      level: 14, district: 'center' },
+
+  // --- FORUM (center south, x:580-660) ---
+  { id: 'forum_main',      x: 620, y: 480, w: 80, h: 60, type: 'forum',       level: 15, district: 'center' },
+  { id: 'lantern_f_nw',    x: 575, y: 475, w: 10, h: 20, type: 'lantern',     level: 15, district: 'center' },
+  { id: 'lantern_f_ne',    x: 665, y: 475, w: 10, h: 20, type: 'lantern',     level: 15, district: 'center' },
+  { id: 'mosaic_forum',    x: 620, y: 520, w: 48, h: 22, type: 'mosaic',      level: 15, district: 'center' },
+
+  // --- GRANARY 2 (farm district supply, x:340-380) ---
+  { id: 'granary_2',       x: 350, y: 430, w: 58, h: 44, type: 'granary',     level: 15, district: 'farm' },
+  { id: 'arch_east',       x: 960, y: 420, w: 48, h: 52, type: 'arch',        level: 15, district: 'market' },
+
+  // --- RESIDENTIAL row (x:420-540, y:400 row) ---
+  { id: 'house_row1',      x: 420, y: 410, w: 44, h: 34, type: 'house',       level: 16, district: 'residential' },
+  { id: 'house_row2',      x: 475, y: 410, w: 44, h: 34, type: 'house',       level: 16, district: 'residential' },
+  { id: 'house_row3',      x: 530, y: 410, w: 44, h: 34, type: 'house',       level: 16, district: 'residential' },
+  { id: 'torch_row1',      x: 448, y: 432, w:  8, h: 16, type: 'torch',       level: 16, district: 'residential' },
+  { id: 'torch_row2',      x: 503, y: 432, w:  8, h: 16, type: 'torch',       level: 16, district: 'residential' },
+  { id: 'fence_res_back',  x: 475, y: 340, w:160, h:  6, type: 'fence',       level: 16, district: 'residential' },
+
+  // --- LIBRARY (civic/sacred, x:720-790) ---
+  { id: 'library',         x: 760, y: 400, w: 72, h: 52, type: 'library',     level: 17, district: 'civic' },
+  { id: 'lantern_lib_l',   x: 720, y: 410, w: 10, h: 20, type: 'lantern',     level: 17, district: 'civic' },
+
+  // ===============================================================
   // ERA 3: ATLANTIS (Lv 18-25)
-  // --- Arena (SE, below castrum with proper spacing) ---
-  { id: 'arena',           x: 780, y: 530, w: 84, h: 64, type: 'arena',       level: 18, district: 'military' },
-  { id: 'torch_arena_l',   x: 735, y: 545, w:  8, h: 16, type: 'torch',       level: 18, district: 'military' },
-  { id: 'torch_arena_r',   x: 825, y: 545, w:  8, h: 16, type: 'torch',       level: 18, district: 'military' },
-  { id: 'mosaic_arena',    x: 780, y: 570, w: 48, h: 22, type: 'mosaic',      level: 19, district: 'military' },
-  // --- Military houses (between center and military) ---
-  { id: 'house_mil1',      x: 740, y: 480, w: 44, h: 34, type: 'house',       level: 19, district: 'military' },
-  { id: 'house_mil2',      x: 680, y: 500, w: 44, h: 34, type: 'house',       level: 19, district: 'military' },
-  // --- Villa NW ---
-  { id: 'villa_nw',        x: 460, y: 268, w: 72, h: 52, type: 'villa',       level: 20, district: 'residential' },
-  { id: 'flower_vnw_l',    x: 415, y: 268, w: 20, h: 16, type: 'flower',      level: 20, district: 'residential' },
-  { id: 'flower_vnw_r',    x: 505, y: 268, w: 20, h: 16, type: 'flower',      level: 20, district: 'residential' },
-  { id: 'lantern_vnw',     x: 505, y: 300, w: 10, h: 20, type: 'lantern',     level: 20, district: 'residential' },
-  // --- Senate forum (south center, below main forum) ---
-  { id: 'senate_forum',    x: 520, y: 510, w: 64, h: 48, type: 'forum',       level: 21, district: 'center' },
-  { id: 'torch_sen_l',     x: 484, y: 520, w:  8, h: 16, type: 'torch',       level: 21, district: 'center' },
-  { id: 'torch_sen_r',     x: 556, y: 520, w:  8, h: 16, type: 'torch',       level: 21, district: 'center' },
-  // --- Harbor arch (far east) ---
-  { id: 'arch_harbor',     x: 980, y: 430, w: 48, h: 52, type: 'arch',        level: 22, district: 'market' },
-  { id: 'lantern_h1',      x: 930, y: 430, w: 10, h: 20, type: 'lantern',     level: 22, district: 'market' },
-  // --- Grand aqueduct expansion ---
-  { id: 'aqueduct_ga1',    x: 400, y: 240, w: 20, h: 40, type: 'aqueduct',    level: 23, district: 'sacred' },
-  { id: 'aqueduct_ga2',    x: 780, y: 240, w: 20, h: 40, type: 'aqueduct',    level: 23, district: 'sacred' },
-  { id: 'bridge_grand_l',  x: 450, y: 260, w: 32, h: 32, type: 'bridge',      level: 23, district: 'sacred' },
-  { id: 'bridge_grand_r',  x: 720, y: 260, w: 32, h: 32, type: 'bridge',      level: 23, district: 'sacred' },
-  // --- Palace (sacred center) ---
-  { id: 'palace',          x: 600, y: 242, w: 60, h: 44, type: 'villa',       level: 24, district: 'sacred' },
-  { id: 'flower_pal_l',    x: 555, y: 252, w: 20, h: 16, type: 'flower',      level: 24, district: 'sacred' },
-  { id: 'flower_pal_r',    x: 645, y: 252, w: 20, h: 16, type: 'flower',      level: 24, district: 'sacred' },
-  { id: 'lantern_pal_l',   x: 565, y: 290, w: 10, h: 20, type: 'lantern',     level: 24, district: 'sacred' },
-  { id: 'lantern_pal_r',   x: 635, y: 290, w: 10, h: 20, type: 'lantern',     level: 24, district: 'sacred' },
-  // --- Grand temple (top of sacred hill) ---
-  { id: 'grand_temple',    x: 600, y: 183, w: 56, h: 40, type: 'temple',      level: 25, district: 'sacred' },
-  // --- Arch south (military gate, below wall line — no castrum overlap) ---
-  { id: 'arch_south',      x: 860, y: 545, w: 48, h: 52, type: 'arch',        level: 25, district: 'military' },
-  // --- Villa SW ---
-  { id: 'villa_sw',        x: 380, y: 480, w: 60, h: 44, type: 'villa',       level: 25, district: 'residential' },
-  // --- Sacred procession mosaics ---
-  { id: 'mosaic_proc',     x: 600, y: 340, w: 48, h: 22, type: 'mosaic',      level: 25, district: 'sacred' },
-  { id: 'lantern_proc_l',  x: 555, y: 340, w: 10, h: 20, type: 'lantern',     level: 25, district: 'sacred' },
-  { id: 'lantern_proc_r',  x: 645, y: 340, w: 10, h: 20, type: 'lantern',     level: 25, district: 'sacred' },
+  // ===============================================================
+
+  // --- ARENA (military zone, x:870-960) ---
+  { id: 'arena',           x: 910, y: 510, w: 84, h: 64, type: 'arena',       level: 18, district: 'military' },
+  { id: 'torch_arena_l',   x: 865, y: 525, w:  8, h: 16, type: 'torch',       level: 18, district: 'military' },
+  { id: 'torch_arena_r',   x: 955, y: 525, w:  8, h: 16, type: 'torch',       level: 18, district: 'military' },
+  { id: 'mosaic_arena',    x: 910, y: 550, w: 48, h: 22, type: 'mosaic',      level: 19, district: 'military' },
+
+  // --- MILITARY houses (x:820-870) ---
+  { id: 'house_mil1',      x: 830, y: 430, w: 44, h: 34, type: 'house',       level: 19, district: 'military' },
+  { id: 'house_mil2',      x: 830, y: 475, w: 44, h: 34, type: 'house',       level: 19, district: 'military' },
+
+  // --- VILLA NW (residential, x:420-500) ---
+  { id: 'villa_nw',        x: 460, y: 290, w: 72, h: 52, type: 'villa',       level: 20, district: 'residential' },
+  { id: 'flower_vnw_l',    x: 415, y: 290, w: 20, h: 16, type: 'flower',      level: 20, district: 'residential' },
+  { id: 'flower_vnw_r',    x: 505, y: 290, w: 20, h: 16, type: 'flower',      level: 20, district: 'residential' },
+  { id: 'lantern_vnw',     x: 505, y: 320, w: 10, h: 20, type: 'lantern',     level: 20, district: 'residential' },
+
+  // --- SENATE FORUM (center south, x:560-620) ---
+  { id: 'senate_forum',    x: 560, y: 500, w: 64, h: 48, type: 'forum',       level: 21, district: 'center' },
+  { id: 'torch_sen_l',     x: 524, y: 510, w:  8, h: 16, type: 'torch',       level: 21, district: 'center' },
+  { id: 'torch_sen_r',     x: 596, y: 510, w:  8, h: 16, type: 'torch',       level: 21, district: 'center' },
+
+  // --- HARBOR ARCH (far east, x:950-990) ---
+  { id: 'arch_harbor',     x: 970, y: 430, w: 48, h: 52, type: 'arch',        level: 22, district: 'market' },
+  { id: 'lantern_h1',      x: 940, y: 430, w: 10, h: 20, type: 'lantern',     level: 22, district: 'market' },
+
+  // --- GRAND AQUEDUCT (sacred, x:420-780) ---
+  { id: 'aqueduct_ga1',    x: 420, y: 250, w: 20, h: 40, type: 'aqueduct',    level: 23, district: 'sacred' },
+  { id: 'aqueduct_ga2',    x: 780, y: 250, w: 20, h: 40, type: 'aqueduct',    level: 23, district: 'sacred' },
+  { id: 'bridge_grand_l',  x: 470, y: 270, w: 32, h: 32, type: 'bridge',      level: 23, district: 'sacred' },
+  { id: 'bridge_grand_r',  x: 730, y: 270, w: 32, h: 32, type: 'bridge',      level: 23, district: 'sacred' },
+
+  // --- PALACE (sacred center, x:580-660) ---
+  { id: 'palace',          x: 620, y: 250, w: 60, h: 44, type: 'villa',       level: 24, district: 'sacred' },
+  { id: 'flower_pal_l',    x: 575, y: 260, w: 20, h: 16, type: 'flower',      level: 24, district: 'sacred' },
+  { id: 'flower_pal_r',    x: 665, y: 260, w: 20, h: 16, type: 'flower',      level: 24, district: 'sacred' },
+  { id: 'lantern_pal_l',   x: 585, y: 290, w: 10, h: 20, type: 'lantern',     level: 24, district: 'sacred' },
+  { id: 'lantern_pal_r',   x: 655, y: 290, w: 10, h: 20, type: 'lantern',     level: 24, district: 'sacred' },
+
+  // --- GRAND TEMPLE (top of sacred hill) ---
+  { id: 'grand_temple',    x: 620, y: 195, w: 56, h: 40, type: 'temple',      level: 25, district: 'sacred' },
+
+  // --- ARCH SOUTH (military gate) ---
+  { id: 'arch_south',      x: 920, y: 520, w: 48, h: 52, type: 'arch',        level: 25, district: 'military' },
+
+  // --- VILLA SW (residential, x:400-440) ---
+  { id: 'villa_sw',        x: 420, y: 460, w: 60, h: 44, type: 'villa',       level: 25, district: 'residential' },
+
+  // --- SACRED PROCESSION (center, x:580-660) ---
+  { id: 'mosaic_proc',     x: 620, y: 350, w: 48, h: 22, type: 'mosaic',      level: 25, district: 'sacred' },
+  { id: 'lantern_proc_l',  x: 575, y: 350, w: 10, h: 20, type: 'lantern',     level: 25, district: 'sacred' },
+  { id: 'lantern_proc_r',  x: 665, y: 350, w: 10, h: 20, type: 'lantern',     level: 25, district: 'sacred' },
 ];
 
 // Blueprint types — cost wood, stone, crystals
@@ -998,6 +1033,7 @@ const BLUEPRINTS = {
   guardtower: { name: 'Specula',    w: 22, h: 52, cost: { gold: 70, stone: 25 },                     key: '', blocks: true,  minLevel: 7 },
   lighthouse: { name: 'Pharos',     w: 26, h: 60, cost: { gold: 100, stone: 30 },                    key: '', blocks: true,  minLevel: 8 },
   sculptor:   { name: 'Sculptor',   w: 50, h: 40, cost: { gold: 120, stone: 40, ironOre: 10 },       key: '', blocks: true,  minLevel: 9 },
+  crystal_collector: { name: 'Crystal Collector', w: 40, h: 30, cost: { stone: 15, gold: 30 }, key: '', blocks: true, minLevel: 5, desc: 'Automatically harvests nearby crystal nodes' },
 };
 
 // ─── TECH TREE ──────────────────────────────────────────────────────────────
@@ -1534,6 +1570,12 @@ function initState() {
     // Island visitors (random events)
     visitor: null, // { type, x, y, timer, interacted, dialogTimer, currentLine }
 
+    // Temple court — social hub for diplomats, spies, foreign merchants
+    templeCourt: {
+      visitors: [],  // { type, nationKey, name, color, x, y, timer, traded, offer, greeting, trade }
+      lastSpawn: 0,
+    },
+
     // Villa Codex (completionist tracking)
     codex: {
       fishCaught: {}, // { sardine: true, tuna: true, ... }
@@ -1945,7 +1987,7 @@ function buildIsland() {
 
   // Chickens near farm
   state.chickens = [];
-  let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
+  let farmCX = WORLD.islandCX - 340, farmCY = WORLD.islandCY - 5;
   for (let i = 0; i < 3; i++) {
     state.chickens.push({
       x: farmCX + random(-60, 60), y: farmCY + random(-30, 30),
@@ -2454,11 +2496,11 @@ function s2wY(sy) {
 
 // Surface radii match the drawn grass ellipse
 function getSurfaceRX() { return state.islandRX * 0.90; }
-function getSurfaceRY() { return state.islandRY * 0.55; }
+function getSurfaceRY() { return state.islandRY * 0.62; }
 
 // Dynamic farm center — scales with island size so farm doesn't crowd temple
-function getFarmCenterX() { return WORLD.islandCX - getSurfaceRX() * 0.45; }
-function getFarmCenterY() { return WORLD.islandCY - getSurfaceRY() * 0.04; }
+function getFarmCenterX() { return WORLD.islandCX - 340; }
+function getFarmCenterY() { return WORLD.islandCY - 5; }
 
 // Check if world point is on the walkable grass surface
 function isOnIsland(wx, wy) {
@@ -2557,7 +2599,7 @@ function spawnClear(margin, minDist) {
     let pdx = pt.x - cx, pdy = pt.y - cy;
     if (pdx * pdx + pdy * pdy < 150 * 150) { continue; }
     // Farm zone exclusion (left side arc)
-    let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
+    let farmCX = WORLD.islandCX - 340, farmCY = WORLD.islandCY - 5;
     let fdx = pt.x - farmCX, fdy = pt.y - farmCY;
     if (fdx * fdx / (110 * 110) + fdy * fdy / (50 * 50) < 1) { continue; }
     // Check against all placed objects
@@ -3037,6 +3079,7 @@ function drawInner() {
     updateFestival(dt);
     updateActiveEvent(dt);
     updateVisitor(dt);
+    updateTempleCourt(dt);
     updateDiscoveryEvents(dt);
     updateBridgeConstruction(dt);
     updateLegia(dt);
@@ -3663,6 +3706,10 @@ function updateTime(dt) {
     if (state.day > 5 && !state.visitor && random() < 0.2) {
       spawnVisitor();
     }
+    // Temple court visitors (daily spawn attempt)
+    if (state.day > 5 && state.templeCourt) {
+      spawnTempleCourtVisitors();
+    }
     // Bottle washes ashore every 3-5 days (random)
     if (state.day > 2 && random() < 0.3 && state.bottles.filter(b => !b.collected).length < 2) {
       spawnBottle();
@@ -3714,6 +3761,9 @@ function updateTime(dt) {
       }
     }
   });
+
+  // Crystal Collector auto-harvest
+  updateCrystalCollector(dt);
 
   state.plots.forEach(p => {
     if (p.planted && !p.ripe) {
@@ -4800,6 +4850,263 @@ function drawVisitor() {
 
 // Farming system — see farming.js
 
+// ─── TEMPLE COURT SYSTEM ─────────────────────────────────────────────────
+// Temple court area — open space in front of main temple (x:840, y:310)
+const TEMPLE_COURT = { x: 780, y: 360, w: 120, h: 80 };
+
+const COURT_VISITOR_TYPES = {
+  foreign_merchant: {
+    name: 'Foreign Merchant', minLevel: 8, dailyChance: 0.15, unique: false,
+    nations: {
+      carthage: { greeting: 'Carthaginian wares, finest in the sea!', offer: 'Bulk resources: 20 wood + 20 stone for 15 gold', trade: { give: { gold: 15 }, take: { wood: 20, stone: 20 } } },
+      egypt:    { greeting: 'From the banks of the Nile, I bring wonders.', offer: '3 crystals for just 8 gold', trade: { give: { gold: 8 }, take: { crystals: 3 } } },
+      greece:   { greeting: 'Athenian crafts, touched by Athena herself.', offer: 'Fine oil and seeds for 10 gold', trade: { give: { gold: 10 }, take: { oliveSeeds: 5, oil: 2 } } },
+      persia:   { greeting: 'Persian luxuries from the eastern roads.', offer: 'Exotic spices for 12 gold', trade: { give: { gold: 12 }, take: { exoticSpices: 2 } } },
+      phoenicia:{ greeting: 'Phoenician dyes and cedar — the best!', offer: '15 wood + rare hide for 10 gold', trade: { give: { gold: 10 }, take: { wood: 15, rareHide: 1 } } },
+      gaul:     { greeting: 'Gallic iron, forged by mountain clans.', offer: 'Iron ore for 8 gold', trade: { give: { gold: 8 }, take: { ironOre: 3 } } },
+      seapeople:{ greeting: 'From hidden shores, treasures of the deep.', offer: 'Fish and pearls for 6 gold', trade: { give: { gold: 6 }, take: { fish: 8 } } },
+    },
+    color: '#ffaa44',
+  },
+  diplomat: {
+    name: 'Diplomat', minLevel: 12, dailyChance: 0.05, unique: true,
+    color: '#88aaff',
+  },
+  spy: {
+    name: 'Spy', minLevel: 15, dailyChance: 0.05, unique: true,
+    color: '#8866aa',
+  },
+};
+
+function spawnTempleCourtVisitors() {
+  let tc = state.templeCourt;
+  let lvl = state.islandLevel || 1;
+  let nationKeys = Object.keys(state.nations || {});
+  if (nationKeys.length === 0) return;
+
+  for (let typeKey in COURT_VISITOR_TYPES) {
+    let vt = COURT_VISITOR_TYPES[typeKey];
+    if (lvl < vt.minLevel) continue;
+    if (random() > vt.dailyChance) continue;
+    // Unique check — only one diplomat / spy at a time
+    if (vt.unique && tc.visitors.some(v => v.type === typeKey)) continue;
+    // Max 4 court visitors at once
+    if (tc.visitors.length >= 4) break;
+
+    let nationKey = nationKeys[floor(random(nationKeys.length))];
+    let vx = TEMPLE_COURT.x + random(-TEMPLE_COURT.w / 3, TEMPLE_COURT.w / 3);
+    let vy = TEMPLE_COURT.y + random(-TEMPLE_COURT.h / 3, TEMPLE_COURT.h / 3);
+
+    let visitor = {
+      type: typeKey, nationKey: nationKey, x: vx, y: vy,
+      timer: 2400, // ~40 seconds
+      traded: false, dialogTimer: 0,
+      walking: null, // { tx, ty } target for walk-away
+    };
+
+    if (typeKey === 'foreign_merchant') {
+      let nationTrades = vt.nations[nationKey] || vt.nations.carthage;
+      visitor.name = getNationName(nationKey) + ' Merchant';
+      visitor.greeting = nationTrades.greeting;
+      visitor.offer = nationTrades.offer;
+      visitor.trade = nationTrades.trade;
+      visitor.color = vt.color;
+    } else if (typeKey === 'diplomat') {
+      let offers = [];
+      let nation = state.nations[nationKey];
+      if (nation && nation.reputation < -30) {
+        offers.push({ label: 'Peace Treaty (100g)', cost: 100, effect: 'peace' });
+      }
+      offers.push({ label: 'Alliance Proposal (50g, +30 rep)', cost: 50, effect: 'alliance' });
+      offers.push({ label: 'Trade Agreement (+10% trade, 10 days)', cost: 25, effect: 'trade_agreement' });
+      let pick = offers[floor(random(offers.length))];
+      visitor.name = getNationName(nationKey) + ' Diplomat';
+      visitor.greeting = 'I speak for ' + getNationName(nationKey) + '.';
+      visitor.offer = pick.label;
+      visitor.trade = { diplomatEffect: pick.effect, cost: pick.cost };
+      visitor.color = vt.color;
+    } else if (typeKey === 'spy') {
+      visitor.name = 'Hooded Stranger';
+      visitor.greeting = 'I have... information, for a price.';
+      visitor.offer = 'Intel on ' + getNationName(nationKey) + ' — 30 gold';
+      visitor.trade = { spyTarget: nationKey, cost: 30 };
+      visitor.color = vt.color;
+      visitor.nationKey = null; // hidden affiliation
+      visitor._spyTarget = nationKey;
+    }
+
+    tc.visitors.push(visitor);
+    addFloatingText(width / 2, height * 0.25, visitor.name + ' arrives at the temple court!', visitor.color);
+  }
+}
+
+function updateTempleCourt(dt) {
+  let tc = state.templeCourt;
+  if (!tc) return;
+  for (let i = tc.visitors.length - 1; i >= 0; i--) {
+    let v = tc.visitors[i];
+    v.timer -= dt;
+    if (v.dialogTimer > 0) v.dialogTimer -= dt;
+
+    // Walk away after trade or timeout
+    if (v.walking) {
+      let dx = v.walking.tx - v.x, dy = v.walking.ty - v.y;
+      let d = sqrt(dx * dx + dy * dy);
+      if (d < 5) { tc.visitors.splice(i, 1); continue; }
+      let spd = 0.5;
+      v.x += (dx / d) * spd * dt;
+      v.y += (dy / d) * spd * dt;
+    } else if (v.timer <= 0) {
+      // Start walking to port
+      let port = getPortPosition();
+      v.walking = { tx: port.x, ty: port.y };
+    }
+  }
+}
+
+function tradeWithCourtVisitor(v) {
+  if (!v || v.traded) return;
+  let tc = state.templeCourt;
+
+  if (v.type === 'foreign_merchant') {
+    // Check can afford
+    for (let [res, amt] of Object.entries(v.trade.give)) {
+      if ((state[res] || 0) < amt) {
+        addFloatingText(width / 2, height * 0.35, 'Not enough ' + res + '!', '#ff6666');
+        return;
+      }
+    }
+    for (let [res, amt] of Object.entries(v.trade.give)) { state[res] -= amt; }
+    for (let [res, val] of Object.entries(v.trade.take)) { state[res] = (state[res] || 0) + val; addFloatingText(width / 2, height * 0.3, '+' + val + ' ' + res, '#ffcc44'); }
+  } else if (v.type === 'diplomat') {
+    let cost = v.trade.cost;
+    if ((state.gold || 0) < cost) {
+      addFloatingText(width / 2, height * 0.35, 'Not enough gold!', '#ff6666');
+      return;
+    }
+    state.gold -= cost;
+    let effect = v.trade.diplomatEffect;
+    let nation = state.nations[v.nationKey];
+    if (effect === 'peace' && nation) {
+      nation.reputation = max(nation.reputation, -10);
+      if (nation.wars) nation.wars = nation.wars.filter(w => w !== (state.faction || 'rome'));
+      addFloatingText(width / 2, height * 0.25, 'Peace with ' + getNationName(v.nationKey) + '!', '#88cc88');
+    } else if (effect === 'alliance' && nation) {
+      nation.reputation = min(100, (nation.reputation || 0) + 30);
+      addFloatingText(width / 2, height * 0.25, '+30 reputation with ' + getNationName(v.nationKey), '#88aaff');
+    } else if (effect === 'trade_agreement' && nation) {
+      nation._tradeBonus = (nation._tradeBonus || 0) + 10;
+      nation._tradeBonusDays = 10;
+      addFloatingText(width / 2, height * 0.25, '+10% trade income with ' + getNationName(v.nationKey) + ' for 10 days', '#ffcc44');
+    }
+  } else if (v.type === 'spy') {
+    if ((state.gold || 0) < v.trade.cost) {
+      addFloatingText(width / 2, height * 0.35, 'Not enough gold!', '#ff6666');
+      return;
+    }
+    state.gold -= v.trade.cost;
+    let target = v._spyTarget || v.trade.spyTarget;
+    let nation = state.nations[target];
+    if (nation) {
+      nation._intelRevealedDays = 5;
+      addFloatingText(width / 2, height * 0.25, getNationName(target) + ' intel revealed for 5 days!', '#cc88ff');
+      addFloatingText(width / 2, height * 0.33, 'Military: ' + (nation.military || 0) + '  Gold: ' + (nation.gold || 0) + '  Aggro: ' + (nation.aggression || 0), '#aaaacc');
+    }
+  }
+
+  v.traded = true;
+  v.dialogTimer = 120;
+  state.codex.visitorsTraded++;
+  if (typeof checkDailyQuestProgress === 'function') checkDailyQuestProgress('trade', 1);
+  spawnParticles(v.x, v.y, 'harvest', 10);
+  if (snd) snd.playSFX('coin');
+  // Start walking away
+  let port = getPortPosition();
+  v.walking = { tx: port.x, ty: port.y };
+}
+
+function drawTempleCourtVisitors_single(v) {
+  let sx = w2sX(v.x), sy = w2sY(v.y);
+  push();
+  translate(sx, sy);
+  noStroke();
+
+  // Shadow
+  fill(0, 0, 0, 30);
+  rect(-9, 2, 18, 3);
+
+  if (v.type === 'diplomat') {
+    let nc = FACTIONS[v.nationKey] ? FACTIONS[v.nationKey].bannerColor : [100, 100, 180];
+    fill(220, 215, 200);
+    rect(-5, -10, 10, 14);
+    fill(nc[0], nc[1], nc[2]);
+    rect(-2, -8, 3, 12);
+    fill(210, 185, 150);
+    rect(-4, -18, 8, 8);
+    fill(80, 140, 60);
+    rect(-5, -19, 10, 3);
+    fill(40);
+    rect(-3, -15, 2, 2);
+    rect(1, -15, 2, 2);
+    fill(230, 220, 180);
+    rect(7, -8, 3, 8);
+    stroke(180, 160, 120);
+    strokeWeight(0.5);
+    line(7, -8, 10, -8);
+    line(7, 0, 10, 0);
+    noStroke();
+  } else if (v.type === 'spy') {
+    fill(50, 40, 60);
+    rect(-6, -12, 12, 16);
+    fill(40, 30, 50);
+    rect(-6, -20, 12, 10);
+    rect(-5, -22, 10, 4);
+    fill(30, 25, 35);
+    rect(-4, -18, 8, 6);
+    fill(180, 160, 200);
+    rect(-2, -15, 2, 1);
+    rect(1, -15, 2, 1);
+  } else {
+    let nc = FACTIONS[v.nationKey] ? FACTIONS[v.nationKey].bannerColor : [200, 150, 50];
+    fill(nc[0], nc[1], nc[2]);
+    rect(-5, -10, 10, 14);
+    fill(min(255, nc[0] + 40), min(255, nc[1] + 40), min(255, nc[2] + 40));
+    rect(-3, -8, 6, 10);
+    fill(210, 185, 150);
+    rect(-4, -18, 8, 8);
+    fill(nc[0], nc[1], nc[2]);
+    rect(-5, -20, 10, 4);
+    fill(40);
+    rect(-3, -15, 2, 2);
+    rect(1, -15, 2, 2);
+    fill(140, 100, 50);
+    rect(-8, -6, 4, 6);
+  }
+  pop();
+
+  // Dialog bubble when player is near
+  let pd = dist(state.player.x, state.player.y, v.x, v.y);
+  if (pd < 60) {
+    let msg = v.traded ? 'Farewell!' : v.greeting;
+    if (!v.traded && v.dialogTimer <= 0) msg = v.offer;
+    fill(0, 0, 0, 160);
+    rectMode(CENTER);
+    let tw = textWidth(msg) + 20;
+    rect(sx, sy - 32, min(tw, 220), 20, 6);
+    fill(255);
+    textAlign(CENTER, CENTER);
+    textSize(11);
+    text(msg, sx, sy - 32);
+    rectMode(CORNER);
+
+    if (!v.traded) {
+      fill(255, 200, 100);
+      textSize(9);
+      text('[E] Trade', sx, sy - 18);
+    }
+  }
+}
+
 // ─── COOKING SYSTEM ───────────────────────────────────────────────────────
 const RECIPES = [
   { name: 'Meal',       item: 'meals', needs: { harvest: 2, fish: 1 }, hearts: 1, desc: '2 Harvest + 1 Fish → Meal' },
@@ -5816,7 +6123,7 @@ function updateAmbientWildlife(dt) {
 
   // ── Farm butterflies ──
   if (!_wildlifeFarmButterflies) {
-    let fCX = WORLD.islandCX - 220, fCY = WORLD.islandCY - 5;
+    let fCX = WORLD.islandCX - 340, fCY = WORLD.islandCY - 5;
     _wildlifeFarmButterflies = [];
     let wc = [[220,140,60],[200,80,120],[180,120,200]];
     for (let i = 0; i < 3; i++) {
@@ -7793,6 +8100,12 @@ function drawWorldObjectsSorted() {
   }
   // Visitor
   if (state.visitor) _sortItems.push({ y: state.visitor.y, draw: drawVisitor });
+  // Temple court visitors
+  if (state.templeCourt && state.templeCourt.visitors.length > 0) {
+    state.templeCourt.visitors.forEach(v => {
+      _sortItems.push({ y: v.y, draw: () => drawTempleCourtVisitors_single(v) });
+    });
+  }
   _sortItems.push({ y: state.player.y, draw: drawPlayer });
   // Sort by Y (back to front)
   _sortItems.sort((a, b) => a.y - b.y);
@@ -9935,6 +10248,32 @@ function drawOneBuilding(b) {
         }
         break;
       }
+      case 'crystal_collector': {
+        noStroke();
+        let ccPulse = sin(frameCount * 0.04) * 0.2 + 0.8;
+        // Stone base platform
+        fill(160, 155, 145);
+        rect(-18, 0, 36, 12);
+        fill(170, 165, 155);
+        rect(-16, -2, 32, 10);
+        // Two stone pillars
+        fill(145, 140, 130);
+        rect(-14, -14, 6, 14);
+        rect(8, -14, 6, 14);
+        // Crystal in center (glowing)
+        let ccg = color(C.crystalGlow);
+        fill(red(ccg) * ccPulse, green(ccg) * ccPulse, blue(ccg) * ccPulse, 200);
+        rect(-4, -12, 8, 10);
+        // Small crystal facets
+        fill(red(ccg), green(ccg), blue(ccg), 120);
+        rect(-2, -16, 4, 4);
+        rect(-6, -8, 4, 4);
+        rect(2, -8, 4, 4);
+        // Glow aura
+        fill(red(ccg), green(ccg), blue(ccg), 30 * ccPulse);
+        ellipse(0, -6, 30, 20);
+        break;
+      }
     }
     if (_building) drawingContext.globalAlpha = 1;
     pop();
@@ -10212,6 +10551,40 @@ function drawCrystalShape(x, y, size) {
   // Bottom
   rect(cx - s * 0.7, cy + s * 0.6, s * 1.4, 2);
   rect(cx - s * 0.3, cy + s * 0.8, s * 0.6, 2);
+}
+
+// ─── CRYSTAL COLLECTOR ────────────────────────────────────────────────────
+// Crystal Collector auto-harvest timer tracked on the building itself
+function updateCrystalCollector(dt) {
+  let collectors = state.buildings.filter(b => b.type === 'crystal_collector');
+  if (collectors.length === 0) return;
+  collectors.forEach(col => {
+    if (!col._harvestTimer) col._harvestTimer = 0;
+    col._harvestTimer += dt;
+    if (col._harvestTimer >= 600) { // ~10 seconds at 60fps
+      col._harvestTimer = 0;
+      // Find nearest charged crystal node within 150px
+      let best = null, bestDist = 150;
+      state.crystalNodes.forEach(c => {
+        if (c.charge <= 0) return;
+        let d = dist(col.x, col.y, c.x, c.y);
+        if (d < bestDist) { bestDist = d; best = c; }
+      });
+      if (best) {
+        let amt = 1;
+        amt = floor(amt * (getFactionData().crystalIncomeMult || 1));
+        if (amt < 1) amt = 1;
+        state.crystals += amt;
+        best.charge = 0;
+        best.respawnTimer = state.tools.steelPick ? 400 : 800;
+        // Sparkle effect at collector
+        spawnParticles(col.x, col.y, 'build', 6);
+        let sx = w2sX(col.x), sy = w2sY(col.y);
+        addFloatingText(sx, sy - 20, '+' + amt + ' Crystal', C.crystalGlow);
+        if (snd) snd.playSFX('crystal');
+      }
+    }
+  });
 }
 
 // ─── FARM PLOTS ───────────────────────────────────────────────────────────
@@ -12708,7 +13081,7 @@ function updateParticles(dt) {
     for (let i = 0; i < particles.length && _bflyCount < 4; i++) { if (particles[i].type === 'butterfly') _bflyCount++; }
   }
   if (_bflyCount < 3 && bright > 0.4 && frameCount % 60 === 0) {
-    let bx = WORLD.islandCX - 220 + random(-100, 100);
+    let bx = WORLD.islandCX - 340 + random(-100, 100);
     let by = WORLD.islandCY + random(-40, 30);
     particles.push({
       x: bx, y: by,
@@ -17367,6 +17740,13 @@ function updateNationDaily(key) {
     if (rv.personality === 'trader') rv.relations[k2] = min(100, (rv.relations[k2] || 0) + 0.3);
     if (rv.personality === 'aggressive') rv.relations[k2] = max(-100, (rv.relations[k2] || 0) - 0.1);
   }
+  // Spy intel expiry
+  if (rv._intelRevealedDays > 0) rv._intelRevealedDays--;
+  // Trade agreement expiry
+  if (rv._tradeBonusDays > 0) {
+    rv._tradeBonusDays--;
+    if (rv._tradeBonusDays <= 0) rv._tradeBonus = 0;
+  }
 }
 
 function startNationRaid(key) {
@@ -21971,6 +22351,11 @@ function keyPressed() {
     if (state.visitor && !state.visitor.interacted && dist(state.player.x, state.player.y, state.visitor.x, state.visitor.y) < 70) {
       tradeWithVisitor(); return;
     }
+    // Temple court visitor trade
+    if (state.templeCourt && state.templeCourt.visitors.length > 0) {
+      let nearCourt = state.templeCourt.visitors.find(v => !v.traded && !v.walking && dist(state.player.x, state.player.y, v.x, v.y) < 60);
+      if (nearCourt) { tradeWithCourtVisitor(nearCourt); return; }
+    }
     // Treasure dig
     if (state.activeTreasure && !state.activeTreasure.found) {
       if (digTreasure()) return;
@@ -23480,6 +23865,8 @@ function loadGame() {
       if (state.codex.bestCombo === undefined) state.codex.bestCombo = 0;
     }
     if (Array.isArray(d.journal)) state.journal = d.journal;
+    // Temple court migration
+    if (!state.templeCourt) state.templeCourt = { visitors: [], lastSpawn: 0 };
     // Expedition resources
     state.ironOre = d.ironOre || 0;
     state.rareHide = d.rareHide || 0;
@@ -23947,7 +24334,7 @@ function loadGame() {
     }
     // Rebuild chickens if not present
     if (!state.chickens || state.chickens.length === 0) {
-      let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
+      let farmCX = WORLD.islandCX - 340, farmCY = WORLD.islandCY - 5;
       state.chickens = [];
       for (let i = 0; i < 3; i++) {
         state.chickens.push({
@@ -24271,7 +24658,7 @@ function drawOneFlora(fl) {
 // ─── CHICKENS ──────────────────────────────────────────────────────────
 function updateChickens(dt) {
   if (!state.chickens) return;
-  let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
+  let farmCX = WORLD.islandCX - 340, farmCY = WORLD.islandCY - 5;
   state.chickens.forEach(ch => {
     ch.timer -= dt;
     if (ch.pecking) {
@@ -25049,10 +25436,21 @@ function getExpandCostString() {
 }
 
 function canPlaceBuilding(x, y, w, h) {
-  return !state.buildings.some(b => {
+  // Check against existing buildings
+  let buildingOverlap = state.buildings.some(b => {
     return Math.abs(b.x - x) < (b.w + w) / 2 + 4 &&
            Math.abs(b.y - y) < (b.h + h) / 2 + 4;
   });
+  if (buildingOverlap) return false;
+  // Check against farm plots
+  if (state.plots) {
+    let plotOverlap = state.plots.some(p => {
+      return Math.abs(p.x - x) < (p.w + w) / 2 + 6 &&
+             Math.abs(p.y - y) < (p.h + h) / 2 + 6;
+    });
+    if (plotOverlap) return false;
+  }
+  return true;
 }
 
 function placeBuildingChecked(bld) {
@@ -25131,9 +25529,8 @@ function placeEraBuildings(lvl) {
   let ry = getSurfaceRY();
   let cx = WORLD.islandCX;
   let cy = WORLD.islandCY;
-  // Push farm further left at higher levels to avoid temple/building overlap
-  let farmOffset = lvl >= 10 ? 320 : lvl >= 6 ? 270 : 220;
-  let farmCX = WORLD.islandCX - farmOffset, farmCY = WORLD.islandCY - 5;
+  // Farm is always in the far left zone
+  let farmCX = WORLD.islandCX - 340, farmCY = WORLD.islandCY - 5;
 
   // Place all CITY_SLOTS for this level (absolute coordinates, no drift)
   CITY_SLOTS.forEach(slot => {
@@ -25451,7 +25848,7 @@ function expandIsland() {
     checkImperatorVictory();
   }
 
-  let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
+  let farmCX = WORLD.islandCX - 340, farmCY = WORLD.islandCY - 5;
   let lvl = state.islandLevel;
 
   // Push existing trees away from temple (it grew)

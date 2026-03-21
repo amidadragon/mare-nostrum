@@ -236,7 +236,7 @@ function checkCropMutation(plot) {
 
 // ─── FARM ZONE BACKGROUND & FENCE ────────────────────────────────────────
 function drawFarmZoneBG() {
-  let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
+  let farmCX = WORLD.islandCX - 340, farmCY = WORLD.islandCY - 5;
   let lvl = state.islandLevel;
   let pw = 38, ph = 28;
   // Calculate grid bounds
@@ -853,7 +853,7 @@ function spawnHarvestBurst(wx, wy, cropType) {
 
 // ─── FARM BOUNDS & GRID ──────────────────────────────────────────────────
 function getFarmBounds() {
-  let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
+  let farmCX = WORLD.islandCX - 340, farmCY = WORLD.islandCY - 5;
   // Grid grows: base 3x3 (38x28 spacing), expands per level
   let cols = 3 + (state.islandLevel >= 2 ? 1 : 0) + (state.islandLevel >= 4 ? 1 : 0);
   let rows = 3 + (state.islandLevel >= 3 ? 1 : 0) + (state.islandLevel >= 5 ? 1 : 0);
@@ -869,7 +869,7 @@ function isInFarmZone(x, y) {
 
 // Rebuild the entire farm grid for a given level, preserving planted state
 function rebuildFarmGrid(lvl) {
-  let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
+  let farmCX = WORLD.islandCX - 340, farmCY = WORLD.islandCY - 5;
   let pw = 38, ph = 28;
   // Grid dimensions per level
   let cols, rows, colStart, rowStart;
@@ -942,7 +942,7 @@ function updateHarvester(dt) {
       // Wander near farm
       h.timer -= dt;
       if (h.timer <= 0) {
-        let farmCX = WORLD.islandCX - 220, farmCY = WORLD.islandCY - 5;
+        let farmCX = WORLD.islandCX - 340, farmCY = WORLD.islandCY - 5;
         h.vx = random(-0.5, 0.5);
         h.vy = random(-0.3, 0.3);
         h.timer = random(60, 120);
