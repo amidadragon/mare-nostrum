@@ -888,6 +888,7 @@ class SoundManager {
       else if (state.hyperborea && state.hyperborea.active) island = 'hyperborea';
       else if (state.plenty && state.plenty.active) island = 'plenty';
       else if (state.necropolis && state.necropolis.active) island = 'necropolis';
+      else if (state.visitingNation) island = 'nation';
     }
     this._islandAmbient = island;
 
@@ -996,6 +997,14 @@ class SoundManager {
       else if (island === 'necropolis') {
         setAmb('spooky', ambVol * 0.7);
         setAmb('wind', ambVol * 0.25);
+      }
+      else if (island === 'nation') {
+        // Foreign nation island: ocean, market bustle, birds
+        setAmb('ocean', ambVol * 0.6);
+        setAmb('market', ambVol * 0.4);
+        setAmb('birds', bright > 0.4 ? ambVol * 0.3 * bright : 0);
+        setAmb('wind', ambVol * 0.15);
+        setAmb('crickets', bright < 0.3 ? ambVol * 0.4 * (1 - bright) : 0);
       }
 
       // Combat ambient layer
@@ -1116,6 +1125,7 @@ class SoundManager {
       else if (state.festival) target = 'music_festival';
       else if (state.rowing && state.rowing.active) target = 'music_sailing';
       else if (state.necropolis && state.necropolis.active) target = 'music_sad';
+      else if (state.visitingNation) target = 'music_temple';
       else if (state.time >= 1200 || state.time < 300) target = 'music_night';
       // Near temple?
       if (typeof state.buildings !== 'undefined' && state.player) {
@@ -1970,7 +1980,8 @@ class SoundManager {
       festival_start: 'fanfare', visitor_arrive: 'notification',
       dialogue_open: 'click', gift_accepted: 'notification', favor_up: 'notification',
       rain_drop: 'rain_drop', cricket_single: 'cricket_single',
-      tree_fall: 'tree_fall', dash: 'wind_gust'
+      tree_fall: 'tree_fall', dash: 'wind_gust',
+      war_horn: 'battle_cry'
     };
     if (sampleMap[id] && this._playSample(sampleMap[id])) return;
 
@@ -2413,6 +2424,17 @@ class SoundManager {
         this._playTone({ freq: 880, freqEnd: 1320, volume: 0.10, duration: 0.35, attack: 0.025, decay: 0.1 });
         this._playTone({ freq: 885, freqEnd: 1325, volume: 0.07, duration: 0.35, attack: 0.03, decay: 0.1 });
         this._playNoise({ type: 'white', filterType: 'highpass', freq: 6000, freqEnd: 10000, Q: 1, volume: 0.025, duration: 0.3, attack: 0.02, decay: 0.1 });
+        break;
+
+      // ═══ Raid / Defense ═══
+      case 'war_horn':
+        // Deep horn blast: triangle wave swell + noise breath
+        this._playTone({ type: 'triangle', freq: 146.8, freqEnd: 165, volume: 0.16, duration: 0.6, attack: 0.08, decay: 0.2 });
+        this._playTone({ type: 'triangle', freq: 220, freqEnd: 247, volume: 0.10, duration: 0.5, attack: 0.10, decay: 0.15, delay: 0.05 });
+        this._playNoise({ type: 'brown', filterType: 'bandpass', freq: 250, Q: 2, volume: 0.06, duration: 0.5, attack: 0.06, decay: 0.2 });
+        // Second blast
+        this._playTone({ type: 'triangle', freq: 165, freqEnd: 146.8, volume: 0.14, duration: 0.5, attack: 0.06, decay: 0.15, delay: 0.65 });
+        this._playNoise({ type: 'brown', filterType: 'bandpass', freq: 200, Q: 2, volume: 0.05, duration: 0.4, attack: 0.05, decay: 0.15, delay: 0.65 });
         break;
 
       // ═══ Legion / March ═══

@@ -1445,6 +1445,8 @@ function initState() {
     // ─── NATIONS (AI rivals — all factions except player's) ─────────────
     nations: {}, // populated by initNations() after faction selection
     nationDiplomacyOpen: null, // which nation's diplomacy panel is open (key or null)
+    visitingNation: null, // key of nation island currently visiting (or null)
+    nationIsland: null,   // { npcs, buildings, dock, palace, walls, trees } — generated on enter
     worldEvents: [],      // { text, factionA, factionB, day, type }
     victoryAchieved: null, // null | 'domination' | 'diplomatic' | 'economic' | 'research'
 
@@ -2416,6 +2418,29 @@ function drawInner() {
     return;
   }
 
+  // === VISITING NATION ISLAND ===
+  if (state.visitingNation) {
+    updatePlayerAnim(dt);
+    updateNationIslandVisit(dt);
+    updateParticles(dt);
+    updateFloatingText(dt);
+    updateShake(dt);
+    updateCamera();
+    horizonOffset = height * 0.19;
+    push(); translate(shakeX, shakeY); drawSky(); drawOcean();
+    if (typeof drawOceanWildlife === 'function') drawOceanWildlife();
+    if (typeof drawAtmosphericHaze === 'function') drawAtmosphericHaze();
+    pop();
+    push(); translate(shakeX, shakeY);
+    drawNationIslandFull();
+    drawNationIslandEntities();
+    drawParticles(); drawFloatingText(); pop();
+    drawNationIslandHUD();
+    if (state.nationDiplomacyOpen) drawNationDiplomacyUI();
+    drawGameVignette(); drawScreenFlash(); drawCursor(); drawSaveIndicator();
+    return;
+  }
+
   if (state.conquest.active) {
     // === CONQUEST MODE ===
     updatePlayerCombat(dt);
@@ -2805,7 +2830,7 @@ function drawInner() {
                   state.rowing.nearIsle === 'hyperborea' ? '[E] Dock at Hyperborea' :
                   state.rowing.nearIsle === 'plenty' ? '[E] Dock at Isle of Plenty' :
                   state.rowing.nearIsle === 'necropolis' ? '[E] Dock at Necropolis' :
-                  (state.nations && state.nations[state.rowing.nearIsle]) ? '[E] Approach ' + getNationName(state.rowing.nearIsle) :
+                  (state.nations && state.nations[state.rowing.nearIsle]) ? '[E] Dock at ' + getNationName(state.rowing.nearIsle) :
                   isColonized ? '[E] Visit Colony' : '[E] Dock at Terra Nova';
       fill(255, 255, 220, 200 + sin(frameCount * 0.08) * 40);
       noStroke(); textAlign(CENTER); textSize(13);
@@ -5338,6 +5363,7 @@ function drawTempleInterior(dt) {
   // Exit if player walks to bottom
   if (tpy > height * 0.9) {
     state.insideTemple = false;
+    if (snd) snd.playSFX('door_close');
     return;
   }
 
@@ -16354,7 +16380,8 @@ function startNationRaid(key) {
   }
   addFloatingText(width / 2, height * 0.2, name.toUpperCase() + ' RAID INCOMING!', '#ff4444');
   addNotification(name + ' sends ' + raidSize + ' raiders to your shores!', '#ff4444');
-  if (snd) snd.playSFX('war_horn');
+  if (snd) { snd.playSFX('war_horn'); setTimeout(function() { if (snd) snd.playSFX('ding'); }, 500); }
+  rv._raidKills = 0;
 }
 
 function updateNationRaids(dt) {
@@ -16417,17 +16444,35 @@ function updateSingleNationRaid(key, dt) {
         if (random() < 0.05) addFloatingText(w2sX(r.x), w2sY(r.y) - 20, getNationName(ak) + ' ally strikes!', '#88ccff');
       }
     }
+    // Watchtower auto-fire: towers shoot nearby raiders
+    if (state.buildings && frameCount % 40 === 0) {
+      for (let b of state.buildings) {
+        if (b.type === 'watchtower' && dist(b.x, b.y, r.x, r.y) < 200) {
+          let tDmg = floor(5 + random(3));
+          r.hp -= tDmg; r.flashTimer = 6;
+          addFloatingText(w2sX(r.x), w2sY(r.y) - 18, '-' + tDmg, '#ccaa44');
+          spawnParticles(r.x, r.y, 'hit', 2);
+          break; // one tower per tick
+        }
+      }
+    }
     if (r.hp <= 0) {
       rv.raidParty.splice(i, 1);
       spawnParticles(r.x, r.y, 'death', 5);
       if (typeof grantXP === 'function') grantXP(15 + rv.level * 3);
       addFloatingText(w2sX(r.x), w2sY(r.y) - 20, '+' + (15 + rv.level * 3) + ' XP', '#ffdd44');
+      if (!rv._raidKills) rv._raidKills = 0;
+      rv._raidKills++;
     }
   }
   if (rv.raidParty.length === 0) {
-    addFloatingText(width / 2, height * 0.25, 'Raiders defeated!', '#88ff88');
-    addNotification(name + ' raiders repelled!', '#88ff88');
+    // Casualties report
+    let killed = rv._raidKills || 0;
+    let goldStolen = 0; // tracked during steal
+    addFloatingText(width / 2, height * 0.2, 'RAID REPELLED!', '#88ff88');
+    addNotification(name + ' raiders defeated! ' + killed + ' enemies slain.', '#88ff88');
     rv.reputation = max(-100, rv.reputation - 5);
+    rv._raidKills = 0;
   }
 }
 
@@ -16775,6 +16820,579 @@ function drawSingleNationIsleDistant(key) {
   else { fill(180, 170, 130, 100); textSize(9); text('Lv.' + lv, sx, sy + floor(baseH * 0.5) + 22); }
   textAlign(LEFT, TOP);
   pop();
+}
+
+// ─── VISITABLE NATION ISLANDS ──────────────────────────────────────────────
+
+function getNationIslandPalette(key) {
+  let palettes = {
+    carthage: {
+      terrain: [210, 185, 130], terrainDark: [180, 155, 100], terrainRim: [195, 170, 115],
+      path: [190, 165, 110], sand: [225, 205, 155], water: [40, 90, 140],
+      treeLeaf: [60, 120, 50], treeTrunk: [130, 95, 55],
+      special1: [160, 80, 40], special2: [200, 170, 100], // columns, market
+    },
+    egypt: {
+      terrain: [220, 195, 120], terrainDark: [195, 170, 95], terrainRim: [210, 185, 110],
+      path: [210, 185, 110], sand: [235, 215, 140], water: [30, 80, 120],
+      treeLeaf: [50, 100, 40], treeTrunk: [120, 85, 45],
+      special1: [200, 170, 40], special2: [64, 176, 160], // gold, teal
+    },
+    greece: {
+      terrain: [195, 195, 185], terrainDark: [170, 170, 160], terrainRim: [185, 185, 175],
+      path: [220, 218, 210], sand: [205, 200, 190], water: [50, 110, 180],
+      treeLeaf: [70, 110, 50], treeTrunk: [100, 80, 50],
+      special1: [240, 240, 248], special2: [80, 144, 192], // marble, blue
+    },
+    rome: {
+      terrain: [160, 140, 110], terrainDark: [130, 115, 85], terrainRim: [150, 130, 100],
+      path: [175, 160, 130], sand: [195, 175, 140], water: [35, 85, 130],
+      treeLeaf: [55, 110, 45], treeTrunk: [115, 80, 45],
+      special1: [175, 28, 28], special2: [180, 120, 50], // red, gold
+    },
+  };
+  return palettes[key] || palettes.rome;
+}
+
+function generateNationIslandContent(key) {
+  let rv = state.nations[key];
+  if (!rv) return null;
+  let fac = FACTIONS[key];
+  let style = fac ? fac.style : FACTIONS.rome.style;
+  let lv = rv.level;
+  let rx = rv.isleRX * 0.7, ry = rv.isleRY * 0.7;
+  let cx = rv.isleX, cy = rv.isleY;
+
+  // Dock at bottom of island
+  let dock = { x: cx, y: cy + ry * 0.85 };
+
+  // Palace at center-north
+  let palace = { x: cx, y: cy - ry * 0.3, w: 50 + lv * 4, h: 35 + lv * 3 };
+
+  // Generate buildings based on level (3-8 buildings)
+  let numBuildings = min(3 + lv, 8);
+  let buildings = [];
+  for (let i = 0; i < numBuildings; i++) {
+    let angle = (i / numBuildings) * TWO_PI + random(-0.3, 0.3);
+    let dist = random(0.2, 0.55) * rx;
+    let bx = cx + cos(angle) * dist;
+    let by = cy + sin(angle) * dist * (ry / rx);
+    // Don't overlap palace or dock
+    if (abs(bx - palace.x) < 40 && abs(by - palace.y) < 30) continue;
+    if (abs(by - dock.y) < 25 && abs(bx - dock.x) < 30) continue;
+    let bType = NATION_BUILDING_TYPES[floor(random(NATION_BUILDING_TYPES.length))];
+    let bw = random(16, 28), bh = random(18, 32);
+    buildings.push({ x: bx, y: by, w: bw, h: bh, type: bType });
+  }
+
+  // Ambient NPCs (3-6)
+  let numNPCs = min(3 + floor(lv / 2), 6);
+  let npcs = [];
+  let bannerCol = fac ? fac.bannerColor : [150, 100, 60];
+  for (let i = 0; i < numNPCs; i++) {
+    let a = random(TWO_PI), d = random(0.15, 0.5) * rx;
+    npcs.push({
+      x: cx + cos(a) * d,
+      y: cy + sin(a) * d * (ry / rx),
+      vx: 0, vy: 0,
+      facing: random() > 0.5 ? 1 : -1,
+      moveTimer: random(60, 200),
+      idleTimer: 0,
+      col: bannerCol,
+    });
+  }
+
+  // Trees/scenery (faction-specific)
+  let numTrees = 4 + floor(random(4));
+  let trees = [];
+  for (let i = 0; i < numTrees; i++) {
+    let a = random(TWO_PI), d = random(0.4, 0.65) * rx;
+    trees.push({ x: cx + cos(a) * d, y: cy + sin(a) * d * (ry / rx), size: random(8, 16) });
+  }
+
+  // Walls if level >= 3
+  let hasWalls = lv >= 3;
+  let hasTowers = lv >= 5;
+
+  return { dock, palace, buildings, npcs, trees, hasWalls, hasTowers, style, bannerCol };
+}
+
+function enterNationIsland(key) {
+  let rv = state.nations[key];
+  if (!rv || rv.defeated) return;
+  state.visitingNation = key;
+  state.nationIsland = generateNationIslandContent(key);
+  state.rowing.active = false;
+  let ni = state.nationIsland;
+  let p = state.player;
+  p.x = ni.dock.x;
+  p.y = ni.dock.y - 15;
+  p.vx = 0; p.vy = 0;
+  if (p.invincTimer !== undefined) p.invincTimer = 60;
+  cam.x = p.x; cam.y = p.y;
+  camSmooth.x = p.x; camSmooth.y = p.y;
+  addFloatingText(width / 2, height * 0.25, getNationName(key).toUpperCase(), FACTIONS[key] ? FACTIONS[key].accentColorHex : '#ddaa44');
+  addFloatingText(width / 2, height * 0.3, 'E near Palace for diplomacy  |  E near dock to sail home', '#ccbb88');
+  trackMilestone('visit_nation_' + key);
+}
+
+function exitNationIsland() {
+  let key = state.visitingNation;
+  if (!key) return;
+  let rv = state.nations[key];
+  state.visitingNation = null;
+  state.nationIsland = null;
+  state.nationDiplomacyOpen = null;
+  let p = state.player;
+  // Put player back in boat near the island
+  state.rowing.active = true;
+  state.rowing.x = rv.isleX;
+  state.rowing.y = rv.isleY + rv.isleRY * 1.1;
+  state.rowing.speed = 0;
+  state.rowing.angle = HALF_PI;
+  state.rowing.wakeTrail = [];
+  p.x = state.rowing.x; p.y = state.rowing.y;
+  p.vx = 0; p.vy = 0;
+  cam.x = p.x; cam.y = p.y;
+  camSmooth.x = p.x; camSmooth.y = p.y;
+  addFloatingText(width / 2, height * 0.35, 'Departing ' + getNationName(key), '#ccbb88');
+}
+
+function isOnNationIsland(wx, wy) {
+  let key = state.visitingNation;
+  if (!key) return false;
+  let rv = state.nations[key];
+  if (!rv) return false;
+  let rx = rv.isleRX * 0.7, ry = rv.isleRY * 0.7;
+  let ex = (wx - rv.isleX) / rx, ey = (wy - rv.isleY) / ry;
+  return ex * ex + ey * ey < 1;
+}
+
+function updateNationIslandVisit(dt) {
+  let key = state.visitingNation;
+  if (!key) return;
+  let rv = state.nations[key];
+  let ni = state.nationIsland;
+  if (!rv || !ni) return;
+  let p = state.player;
+
+  // Player movement (reuse standard WASD)
+  let dx = 0, dy = 0;
+  if (keyIsDown(65) || keyIsDown(LEFT_ARROW)) dx -= 1;
+  if (keyIsDown(68) || keyIsDown(RIGHT_ARROW)) dx += 1;
+  if (keyIsDown(87) || keyIsDown(UP_ARROW)) dy -= 1;
+  if (keyIsDown(83) || keyIsDown(DOWN_ARROW)) dy += 1;
+  if (dx || dy) {
+    let m = sqrt(dx * dx + dy * dy);
+    p.vx = (dx / m) * p.speed * dt;
+    p.vy = (dy / m) * p.speed * dt;
+    p.moving = true;
+    if (abs(dx) > abs(dy)) p.facing = dx > 0 ? 'right' : 'left';
+    else p.facing = dy > 0 ? 'down' : 'up';
+  } else { p.vx = 0; p.vy = 0; p.moving = false; }
+  p.x += p.vx; p.y += p.vy;
+  if (!isOnNationIsland(p.x, p.y)) { p.x -= p.vx; p.y -= p.vy; }
+
+  // Update NPC wandering
+  for (let n of ni.npcs) {
+    n.moveTimer -= dt;
+    if (n.moveTimer <= 0) {
+      n.vx = random(-0.3, 0.3); n.vy = random(-0.3, 0.3);
+      n.facing = n.vx > 0 ? 1 : -1;
+      n.moveTimer = random(80, 250);
+      n.idleTimer = random(60, 120);
+    }
+    if (n.idleTimer > 0) { n.idleTimer -= dt; n.vx = 0; n.vy = 0; }
+    else {
+      let nx = n.x + n.vx * dt, ny = n.y + n.vy * dt;
+      if (isOnNationIsland(nx, ny)) { n.x = nx; n.y = ny; }
+      else { n.vx = -n.vx; n.vy = -n.vy; }
+    }
+  }
+
+  // Walk off south edge = exit
+  let ry = rv.isleRY * 0.7;
+  if (p.y > rv.isleY + ry * 0.95) exitNationIsland();
+}
+
+function drawNationIslandFull() {
+  let key = state.visitingNation;
+  if (!key) return;
+  let rv = state.nations[key];
+  let ni = state.nationIsland;
+  if (!rv || !ni) return;
+  let pal = getNationIslandPalette(key);
+  let cx = rv.isleX, cy = rv.isleY;
+  let rx = rv.isleRX * 0.7, ry = rv.isleRY * 0.7;
+  let ix = w2sX(cx), iy = w2sY(cy);
+  let lv = rv.level;
+
+  push(); noStroke();
+
+  // Shallow water ring
+  fill(pal.water[0], pal.water[1], pal.water[2], 60);
+  ellipse(ix, iy, (rx + 30) * 2, (ry + 20) * 2);
+
+  // Island base
+  fill(pal.terrainDark[0], pal.terrainDark[1], pal.terrainDark[2]);
+  ellipse(ix, iy + 4, rx * 2 + 6, ry * 2 + 4);
+  fill(pal.terrain[0], pal.terrain[1], pal.terrain[2]);
+  ellipse(ix, iy, rx * 2, ry * 2);
+
+  // Rim highlight
+  fill(pal.terrainRim[0], pal.terrainRim[1], pal.terrainRim[2], 100);
+  ellipse(ix, iy - ry * 0.15, rx * 1.7, ry * 1.2);
+
+  // Beach sand along southern edge
+  fill(pal.sand[0], pal.sand[1], pal.sand[2], 150);
+  arc(ix, iy, rx * 1.8, ry * 1.6, 0.3, PI - 0.3);
+
+  // Faction-specific terrain details
+  if (key === 'carthage') {
+    // Desert texture — scattered sand patches (deterministic positions)
+    for (let i = 0; i < 8; i++) {
+      let sx = ix + sin(i * 2.7 + 0.5) * rx * 0.45, sy = iy + cos(i * 1.9 + 1.2) * ry * 0.25;
+      fill(225, 205, 155, 40); ellipse(sx, sy, 25 + (i % 3) * 10, 12 + (i % 2) * 8);
+    }
+  } else if (key === 'egypt') {
+    // Golden shimmer patches (use sin for subtle animation, deterministic base)
+    for (let i = 0; i < 6; i++) {
+      let sx = ix + sin(i * 3.1 + 0.8) * rx * 0.35, sy = iy + cos(i * 2.3 + 0.4) * ry * 0.25;
+      fill(255, 220, 80, 20 + sin(frameCount * 0.02 + i) * 10); ellipse(sx, sy, 30 + (i % 3) * 6, 18 + (i % 2) * 5);
+    }
+    // Papyrus reeds along water edge (south)
+    for (let i = 0; i < 5; i++) {
+      let rpx = floor(ix - rx * 0.3 + i * rx * 0.15), rpy = floor(iy + ry * 0.75);
+      fill(80, 130, 50); rect(rpx, rpy, 2, -12 - (i % 3) * 2);
+      fill(100, 150, 60); ellipse(rpx + 1, rpy - 14, 6, 4);
+    }
+  } else if (key === 'greece') {
+    // White marble paths
+    fill(230, 228, 220, 80);
+    rect(ix - 3, iy - ry * 0.5, 6, ry * 0.8); // north-south path
+    rect(ix - rx * 0.3, iy - 3, rx * 0.6, 6); // east-west path
+    // Olive groves (small clusters)
+    for (let i = 0; i < 4; i++) {
+      let gx = ix + (i % 2 === 0 ? -1 : 1) * rx * (0.25 + random(0.1));
+      let gy = iy + (i < 2 ? -1 : 1) * ry * (0.15 + random(0.1));
+      fill(90, 120, 60, 100); ellipse(gx, gy, 20, 14);
+      fill(70, 100, 45, 120); ellipse(gx - 3, gy - 2, 14, 10);
+    }
+  }
+
+  // Walls (level >= 3)
+  if (ni.hasWalls) {
+    let bannerCol = ni.bannerCol;
+    stroke(bannerCol[0] * 0.5, bannerCol[1] * 0.5, bannerCol[2] * 0.5, 140);
+    strokeWeight(2); noFill();
+    ellipse(ix, iy - ry * 0.05, rx * 1.3, ry * 1.1);
+    noStroke();
+    // Towers at corners (level >= 5)
+    if (ni.hasTowers) {
+      let towerPositions = [
+        { x: ix - rx * 0.6, y: iy - ry * 0.2 },
+        { x: ix + rx * 0.6, y: iy - ry * 0.2 },
+        { x: ix - rx * 0.5, y: iy + ry * 0.35 },
+        { x: ix + rx * 0.5, y: iy + ry * 0.35 },
+      ];
+      for (let tp of towerPositions) {
+        fill(bannerCol[0] * 0.4 + 80, bannerCol[1] * 0.4 + 60, bannerCol[2] * 0.4 + 40);
+        rect(floor(tp.x) - 6, floor(tp.y) - 18, 12, 18, 1);
+        fill(bannerCol[0] * 0.6, bannerCol[1] * 0.6, bannerCol[2] * 0.6);
+        rect(floor(tp.x) - 7, floor(tp.y) - 20, 14, 4);
+        // Crenellations
+        for (let c = 0; c < 4; c++) {
+          rect(floor(tp.x) - 7 + c * 4, floor(tp.y) - 23, 2, 3);
+        }
+      }
+    }
+  }
+
+  // Trees
+  for (let t of ni.trees) {
+    let tx = w2sX(t.x), ty = w2sY(t.y);
+    fill(pal.treeTrunk[0], pal.treeTrunk[1], pal.treeTrunk[2]);
+    rect(floor(tx) - 2, floor(ty) - t.size, 4, t.size);
+    if (key === 'carthage') {
+      // Palm tree
+      fill(pal.treeLeaf[0], pal.treeLeaf[1], pal.treeLeaf[2]);
+      for (let f = 0; f < 5; f++) {
+        let fa = (f / 5) * TWO_PI + sin(frameCount * 0.01) * 0.1;
+        let fx = floor(tx) + cos(fa) * (t.size * 0.8);
+        let fy = floor(ty) - t.size + sin(fa) * (t.size * 0.4);
+        ellipse(fx, fy, t.size * 0.6, t.size * 0.3);
+      }
+    } else if (key === 'egypt') {
+      // Date palm
+      fill(50, 100, 35);
+      for (let f = 0; f < 6; f++) {
+        let fa = (f / 6) * TWO_PI;
+        let fx = floor(tx) + cos(fa) * (t.size * 0.7);
+        let fy = floor(ty) - t.size + sin(fa) * (t.size * 0.3) - 2;
+        ellipse(fx, fy, t.size * 0.5, t.size * 0.25);
+      }
+      fill(160, 100, 30);
+      ellipse(floor(tx), floor(ty) - t.size - 1, 4, 3);
+    } else if (key === 'greece') {
+      // Olive / cypress
+      fill(70, 110, 50, 180);
+      ellipse(floor(tx), floor(ty) - t.size - 3, t.size * 0.7, t.size * 1.1);
+    } else {
+      // Roman pine
+      fill(50, 90, 40);
+      triangle(floor(tx), floor(ty) - t.size - 8, floor(tx) - t.size * 0.5, floor(ty) - 2, floor(tx) + t.size * 0.5, floor(ty) - 2);
+    }
+  }
+
+  // Faction-specific scenery
+  if (key === 'carthage') {
+    // Market stalls
+    for (let i = 0; i < 3; i++) {
+      let mx = ix + (i - 1) * 35, my = iy + ry * 0.15;
+      fill(180, 130, 70); rect(floor(mx) - 10, floor(my) - 12, 20, 12, 1);
+      fill(pal.special1[0], pal.special1[1], pal.special1[2], 180);
+      rect(floor(mx) - 12, floor(my) - 14, 24, 3); // awning
+      fill(140, 100, 50, 100);
+      for (let g = 0; g < 3; g++) rect(floor(mx) - 6 + g * 5, floor(my) - 8, 3, 4);
+    }
+    // Punic columns
+    fill(pal.special2[0], pal.special2[1], pal.special2[2], 150);
+    rect(floor(ix) - rx * 0.2 - 3, floor(iy) - ry * 0.4, 6, 25);
+    rect(floor(ix) + rx * 0.2 - 3, floor(iy) - ry * 0.4, 6, 25);
+    fill(pal.special2[0], pal.special2[1], pal.special2[2], 100);
+    rect(floor(ix) - rx * 0.2 - 5, floor(iy) - ry * 0.4 - 3, 10, 3);
+    rect(floor(ix) + rx * 0.2 - 5, floor(iy) - ry * 0.4 - 3, 10, 3);
+    // Harbor ships
+    for (let i = 0; i < min(3, floor(lv / 2) + 1); i++) {
+      let hx = ix + (i - 1) * 30 + 5, hy = iy + ry * 0.75;
+      fill(120, 80, 40); rect(floor(hx) - 8, floor(hy), 16, 4, 2);
+      fill(160, 120, 60); rect(floor(hx), floor(hy) - 10, 2, 10);
+      fill(240, 230, 210, 120); triangle(floor(hx) + 2, floor(hy) - 9, floor(hx) + 10, floor(hy) - 5, floor(hx) + 2, floor(hy) - 2);
+    }
+  } else if (key === 'egypt') {
+    // Obelisks
+    for (let i = 0; i < 2; i++) {
+      let ox = ix + (i === 0 ? -1 : 1) * rx * 0.25, oy = iy - ry * 0.15;
+      fill(pal.special1[0], pal.special1[1], pal.special1[2]);
+      rect(floor(ox) - 3, floor(oy) - 28, 6, 28);
+      fill(255, 230, 100); triangle(floor(ox), floor(oy) - 32, floor(ox) - 4, floor(oy) - 28, floor(ox) + 4, floor(oy) - 28);
+    }
+    // Sphinx
+    fill(200, 175, 110);
+    let spx = ix + rx * 0.3, spy = iy + ry * 0.2;
+    rect(floor(spx) - 12, floor(spy) - 6, 24, 10, 2);
+    fill(190, 165, 100);
+    rect(floor(spx) - 4, floor(spy) - 14, 8, 10, 2);
+    fill(60, 50, 40);
+    ellipse(floor(spx) - 1, floor(spy) - 10, 2, 2);
+    ellipse(floor(spx) + 3, floor(spy) - 10, 2, 2);
+    // Pyramidal structure
+    fill(220, 195, 120, 160);
+    let prx = ix - rx * 0.35, pry = iy - ry * 0.1;
+    triangle(floor(prx), floor(pry) - 30, floor(prx) - 22, floor(pry) + 8, floor(prx) + 22, floor(pry) + 8);
+    fill(210, 185, 110, 100);
+    triangle(floor(prx), floor(pry) - 30, floor(prx), floor(pry) + 8, floor(prx) + 22, floor(pry) + 8);
+  } else if (key === 'greece') {
+    // Amphitheater (semi-circle steps)
+    let ax = ix + rx * 0.3, ay = iy + ry * 0.1;
+    for (let s = 3; s >= 0; s--) {
+      fill(220 - s * 10, 218 - s * 10, 210 - s * 10, 150);
+      arc(floor(ax), floor(ay), (20 + s * 12), (12 + s * 8), PI, TWO_PI);
+    }
+    // Ionic columns flanking palace approach
+    for (let i = 0; i < 4; i++) {
+      let colX = ix - 25 + i * 17, colY = iy - ry * 0.15;
+      fill(pal.special1[0], pal.special1[1], pal.special1[2], 200);
+      rect(floor(colX) - 2, floor(colY) - 20, 4, 20);
+      // Ionic capital — scroll
+      fill(pal.special1[0], pal.special1[1], pal.special1[2], 240);
+      rect(floor(colX) - 4, floor(colY) - 22, 8, 3);
+      ellipse(floor(colX) - 3, floor(colY) - 22, 4, 4);
+      ellipse(floor(colX) + 3, floor(colY) - 22, 4, 4);
+    }
+  }
+
+  // Buildings
+  for (let b of ni.buildings) {
+    let bx = w2sX(b.x), by = w2sY(b.y);
+    let s = ni.style;
+    // Shadow
+    fill(0, 0, 0, 25); ellipse(floor(bx), floor(by) + 3, b.w + 4, 6);
+    // Wall
+    fill(s.wall[0], s.wall[1], s.wall[2]);
+    rect(floor(bx) - floor(b.w / 2), floor(by) - floor(b.h), b.w, b.h, 1);
+    // Roof
+    fill(s.roof[0], s.roof[1], s.roof[2]);
+    if (s.roofType === 'pediment') {
+      triangle(floor(bx), floor(by) - floor(b.h) - 8, floor(bx) - floor(b.w / 2) - 2, floor(by) - floor(b.h), floor(bx) + floor(b.w / 2) + 2, floor(by) - floor(b.h));
+    } else if (s.roofType === 'flat') {
+      rect(floor(bx) - floor(b.w / 2) - 1, floor(by) - floor(b.h) - 3, b.w + 2, 3);
+    } else {
+      rect(floor(bx) - floor(b.w / 2) - 2, floor(by) - floor(b.h) - 4, b.w + 4, 4);
+      triangle(floor(bx) - floor(b.w / 2) - 2, floor(by) - floor(b.h) - 4, floor(bx) + floor(b.w / 2) + 2, floor(by) - floor(b.h) - 4, floor(bx), floor(by) - floor(b.h) - 10);
+    }
+    // Door
+    fill(s.door[0], s.door[1], s.door[2]);
+    rect(floor(bx) - 3, floor(by) - 8, 6, 8, 1);
+    // Window
+    fill(s.window[0], s.window[1], s.window[2], 160);
+    rect(floor(bx) - floor(b.w / 4) - 2, floor(by) - floor(b.h * 0.6), 4, 4, 1);
+    rect(floor(bx) + floor(b.w / 4) - 2, floor(by) - floor(b.h * 0.6), 4, 4, 1);
+  }
+
+  // Palace (center building, larger)
+  let px = w2sX(ni.palace.x), py = w2sY(ni.palace.y);
+  let pw = ni.palace.w, ph = ni.palace.h;
+  let s = ni.style;
+  let bannerCol = ni.bannerCol;
+  // Palace shadow
+  fill(0, 0, 0, 30); ellipse(floor(px), floor(py) + 4, pw + 10, 8);
+  // Palace base
+  fill(s.wall[0] + 10, s.wall[1] + 10, s.wall[2] + 10);
+  rect(floor(px) - floor(pw / 2), floor(py) - floor(ph), pw, ph, 2);
+  // Palace columns
+  fill(s.column[0], s.column[1], s.column[2]);
+  let numCols = 4 + floor(lv / 2);
+  for (let c = 0; c < numCols; c++) {
+    let colX = floor(px) - floor(pw / 2) + 4 + c * floor((pw - 8) / max(1, numCols - 1));
+    rect(colX - 1, floor(py) - floor(ph) + 3, 3, ph - 3);
+  }
+  // Palace roof
+  fill(s.roof[0], s.roof[1], s.roof[2]);
+  if (s.roofType === 'pediment') {
+    triangle(floor(px), floor(py) - floor(ph) - 14, floor(px) - floor(pw / 2) - 4, floor(py) - floor(ph), floor(px) + floor(pw / 2) + 4, floor(py) - floor(ph));
+    fill(s.accent[0], s.accent[1], s.accent[2], 120);
+    triangle(floor(px), floor(py) - floor(ph) - 11, floor(px) - floor(pw / 2) + 5, floor(py) - floor(ph) + 1, floor(px) + floor(pw / 2) - 5, floor(py) - floor(ph) + 1);
+  } else {
+    rect(floor(px) - floor(pw / 2) - 2, floor(py) - floor(ph) - 5, pw + 4, 5);
+  }
+  // Palace door
+  fill(s.door[0], s.door[1], s.door[2]);
+  rect(floor(px) - 5, floor(py) - 14, 10, 14, 2);
+  fill(bannerCol[0], bannerCol[1], bannerCol[2], 160);
+  rect(floor(px) - 4, floor(py) - 12, 8, 2);
+  // Banner on palace
+  fill(bannerCol[0], bannerCol[1], bannerCol[2]);
+  rect(floor(px) - 1, floor(py) - floor(ph) - 22, 2, 18);
+  rect(floor(px) + 1, floor(py) - floor(ph) - 22, 8, 6);
+  fill(bannerCol[0] + 40, bannerCol[1] + 40, bannerCol[2] + 40);
+  rect(floor(px) + 2, floor(py) - floor(ph) - 21, 6, 4);
+
+  // Dock area (south)
+  let dx = w2sX(ni.dock.x), dy = w2sY(ni.dock.y);
+  fill(120, 90, 50);
+  rect(floor(dx) - 25, floor(dy), 50, 8, 1);
+  rect(floor(dx) - 3, floor(dy) + 6, 6, 10);
+  rect(floor(dx) - 20, floor(dy) + 6, 4, 8);
+  rect(floor(dx) + 16, floor(dy) + 6, 4, 8);
+  // Moored boat
+  fill(140, 100, 55);
+  rect(floor(dx) + 22, floor(dy) + 10, 14, 4, 2);
+  fill(180, 160, 120);
+  rect(floor(dx) + 28, floor(dy) + 2, 2, 8);
+
+  pop();
+}
+
+function drawNationIslandEntities() {
+  let key = state.visitingNation;
+  if (!key) return;
+  let ni = state.nationIsland;
+  if (!ni) return;
+
+  push(); noStroke();
+  // NPCs
+  for (let n of ni.npcs) {
+    let sx = w2sX(n.x), sy = w2sY(n.y);
+    if (sx < -20 || sx > width + 20 || sy < -20 || sy > height + 20) continue;
+    push(); translate(floor(sx), floor(sy)); scale(n.facing, 1);
+    // Shadow
+    fill(0, 0, 0, 25); ellipse(0, 2, 12, 4);
+    // Legs
+    fill(60, 50, 40); rect(-3, 0, 2, 5); rect(1, 0, 2, 5);
+    // Body (tunic in faction color)
+    fill(n.col[0] * 0.6 + 100, n.col[1] * 0.6 + 100, n.col[2] * 0.6 + 100);
+    rect(-4, -8, 8, 10, 1);
+    // Sash
+    fill(n.col[0], n.col[1], n.col[2]); rect(-4, -3, 8, 2);
+    // Arms
+    fill(160, 125, 90); rect(-6, -6, 2, 6); rect(4, -6, 2, 6);
+    // Head
+    fill(155, 120, 85); ellipse(0, -11, 7, 7);
+    // Hair (dark)
+    fill(50, 35, 25); arc(0, -13, 8, 5, PI, 0);
+    pop();
+  }
+
+  // Draw player
+  drawPlayer();
+  pop();
+}
+
+function drawNationIslandHUD() {
+  let key = state.visitingNation;
+  if (!key) return;
+  let rv = state.nations[key];
+  let ni = state.nationIsland;
+  if (!rv || !ni) return;
+  let name = getNationName(key);
+  let bannerCol = ni.bannerCol;
+
+  push();
+  // Top banner bar
+  fill(bannerCol[0], bannerCol[1], bannerCol[2], 50);
+  noStroke(); rect(0, 0, width, 28);
+  fill(bannerCol[0], bannerCol[1], bannerCol[2], 200);
+  textSize(13); textAlign(CENTER, TOP);
+  text(name + '  —  Level ' + rv.level, width / 2, 6);
+  fill(220, 210, 180, 160); textSize(9);
+  text(getNationStanceLabel(rv).toUpperCase() + '  |  Rep: ' + rv.reputation + '  |  Military: ' + rv.military, width / 2, 20);
+
+  // Proximity prompts
+  let p = state.player;
+  let dPalace = dist(p.x, p.y, ni.palace.x, ni.palace.y);
+  let dDock = dist(p.x, p.y, ni.dock.x, ni.dock.y);
+
+  if (dPalace < 50) {
+    fill(255, 255, 220, 200 + sin(frameCount * 0.08) * 40);
+    textSize(12); textAlign(CENTER);
+    text('[E] Enter Palace — Diplomacy', width / 2, height * 0.35);
+  }
+  if (dDock < 45) {
+    fill(255, 255, 220, 200 + sin(frameCount * 0.08) * 40);
+    textSize(12); textAlign(CENTER);
+    text('[E] Board Ship — Sail Home', width / 2, height * 0.38);
+  }
+
+  // Simple health/gold display
+  textAlign(LEFT, TOP);
+  fill(220, 200, 160); textSize(10);
+  text('HP: ' + p.hp + '/' + p.maxHp + '  Gold: ' + state.gold, 8, 32);
+
+  pop();
+}
+
+function handleNationIslandInteract() {
+  if (!state.visitingNation) return false;
+  let ni = state.nationIsland;
+  if (!ni) return false;
+  let p = state.player;
+
+  // If diplomacy panel is open, don't handle island interactions
+  if (state.nationDiplomacyOpen) return false;
+
+  let dPalace = dist(p.x, p.y, ni.palace.x, ni.palace.y);
+  let dDock = dist(p.x, p.y, ni.dock.x, ni.dock.y);
+
+  if (dPalace < 50) {
+    openNationDiplomacy(state.visitingNation);
+    return true;
+  }
+  if (dDock < 45) {
+    exitNationIsland();
+    return true;
+  }
+  return false;
 }
 
 // ─── WORLD EVENTS — inter-nation drama ────────────────────────────────────
@@ -19236,6 +19854,8 @@ function keyPressed() {
 
   // ESC — close overlays first, then menu as last resort
   if (keyCode === 27) {
+    if (state.nationDiplomacyOpen) { closeNationDiplomacy(); return; }
+    if (state.visitingNation) { exitNationIsland(); return; }
     if (state.buildMode) { state.buildMode = false; return; }
     if (state.insideTemple) { state.insideTemple = false; return; }
     if (wardrobeOpen) { wardrobeOpen = false; return; }
@@ -19283,6 +19903,15 @@ function keyPressed() {
   }
   if (state.necropolis.active) {
     if (key === 'e' || key === 'E') handleNecropolisInteract();
+    return;
+  }
+  if (state.visitingNation) {
+    if (state.nationDiplomacyOpen) {
+      handleNationDiplomacyKey(key, keyCode);
+      return;
+    }
+    if (key === 'e' || key === 'E') handleNationIslandInteract();
+    if (keyCode === 27) exitNationIsland();
     return;
   }
 
@@ -19586,7 +20215,7 @@ function keyPressed() {
       if (r.nearIsle === 'hyperborea') { enterHyperborea(); return; }
       if (r.nearIsle === 'plenty') { enterPlenty(); return; }
       if (r.nearIsle === 'necropolis') { enterNecropolis(); return; }
-      if (state.nations && state.nations[r.nearIsle]) { openNationDiplomacy(r.nearIsle); return; }
+      if (state.nations && state.nations[r.nearIsle]) { enterNationIsland(r.nearIsle); return; }
       // Otherwise disembark — snap player back to pier
       let port = getPortPosition();
       state.rowing.active = false;
@@ -19677,7 +20306,7 @@ function keyPressed() {
       state.insideTemple = true;
       state.templePlayerX = width / 2;
       state.templePlayerY = height * 0.75;
-      if (snd) snd.playSFX('build');
+      if (snd) snd.playSFX('door_creak');
       addFloatingText(width / 2, height * 0.3, 'Entering the Temple of Sol Invictus', '#ffd080');
       return;
     }
@@ -19900,6 +20529,7 @@ function keyPressed() {
       empireDashOpen = !empireDashOpen;
       if (empireDashOpen) inventoryOpen = false;
     }
+    if (snd) snd.playSFX('page_turn');
     return false; // prevent browser tab switching
   }
 
@@ -19915,6 +20545,7 @@ function keyPressed() {
   if (key === 'i' || key === 'I') {
     inventoryOpen = !inventoryOpen;
     if (inventoryOpen) empireDashOpen = false;
+    if (snd) snd.playSFX('page_turn');
     return;
   }
 
@@ -19976,6 +20607,7 @@ function keyPressed() {
   // Tech tree toggle (Y key)
   if (key === 'y' || key === 'Y') {
     state.techTreeOpen = !state.techTreeOpen;
+    if (snd) snd.playSFX('page_turn');
     return;
   }
 
@@ -19983,6 +20615,7 @@ function keyPressed() {
   if (key === 'c' || key === 'C') {
     state.codexOpen = !state.codexOpen;
     state.journalOpen = false;
+    if (snd) snd.playSFX('page_turn');
     return;
   }
 
@@ -21188,6 +21821,8 @@ function loadGame() {
     state.worldEvents = d.worldEvents || [];
     state.victoryAchieved = d.victoryAchieved || null;
     state.nationDiplomacyOpen = null;
+    state.visitingNation = null;
+    state.nationIsland = null;
     // Island exploration phases — prevents re-generating content on revisit
     if (d.vulcanPhase) state.vulcan.phase = d.vulcanPhase;
     if (d.hyperboreaPhase) state.hyperborea.phase = d.hyperboreaPhase;

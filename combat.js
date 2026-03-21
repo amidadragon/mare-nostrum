@@ -1371,10 +1371,18 @@ function drawArmyBattle() {
   if (!b) return;
 
   push();
-  // Full screen overlay
-  fill(15, 10, 8, 230);
   noStroke();
-  rect(0, 0, width, height);
+
+  // Nation island battle background — show faction-themed terrain
+  let nKey = b.context.nationKey;
+  let isNationBattle = nKey && (b.context.type === 'raid' || b.context.type === 'invade');
+  if (isNationBattle) {
+    _drawNationBattleBackground(nKey, b);
+  } else {
+    // Default dark overlay
+    fill(15, 10, 8, 230);
+    rect(0, 0, width, height);
+  }
 
   // Title
   fill(220, 185, 80); textAlign(CENTER, TOP); textSize(14);
@@ -1389,11 +1397,20 @@ function drawArmyBattle() {
     text('Deploying forces...', width / 2, height / 2);
   }
 
-  // Draw ground
-  fill(60, 50, 35); noStroke();
-  rect(0, height - 40, width, 40);
-  fill(70, 60, 40);
-  rect(0, height - 42, width, 4);
+  // Draw ground — faction-tinted if nation battle
+  if (isNationBattle) {
+    let fac = typeof FACTIONS !== 'undefined' ? FACTIONS[nKey] : null;
+    let groundCol = fac ? fac.style.ground : [60, 50, 35];
+    fill(groundCol[0], groundCol[1], groundCol[2]); noStroke();
+    rect(0, height - 40, width, 40);
+    fill(groundCol[0] + 10, groundCol[1] + 10, groundCol[2] + 10);
+    rect(0, height - 42, width, 4);
+  } else {
+    fill(60, 50, 35); noStroke();
+    rect(0, height - 40, width, 40);
+    fill(70, 60, 40);
+    rect(0, height - 42, width, 4);
+  }
 
   // Draw units
   _drawBattleUnits(b.attackers, '#cc4444', 1);
@@ -1440,6 +1457,95 @@ function drawArmyBattle() {
   }
 
   pop();
+}
+
+function _drawNationBattleBackground(nKey, battle) {
+  let fac = typeof FACTIONS !== 'undefined' ? FACTIONS[nKey] : null;
+  let bannerCol = fac ? fac.bannerColor : [150, 100, 60];
+  let style = fac ? fac.style : { wall: [200, 180, 150], roof: [160, 100, 50], ground: [130, 110, 80] };
+  let groundH = height - 40;
+
+  // Sky gradient — faction tinted
+  for (let y = 0; y < groundH; y++) {
+    let t = y / groundH;
+    let r = lerp(30 + bannerCol[0] * 0.1, 60 + bannerCol[0] * 0.15, t);
+    let g = lerp(40 + bannerCol[1] * 0.08, 70 + bannerCol[1] * 0.1, t);
+    let b2 = lerp(60 + bannerCol[2] * 0.06, 50 + bannerCol[2] * 0.08, t);
+    stroke(r, g, b2, 200); line(0, y, width, y);
+  }
+  noStroke();
+
+  // Distant hills/terrain
+  fill(style.ground[0] * 0.5, style.ground[1] * 0.5, style.ground[2] * 0.5, 120);
+  beginShape();
+  vertex(0, groundH);
+  for (let x = 0; x <= width; x += 20) {
+    vertex(x, groundH - 60 - sin(x * 0.01 + 1.5) * 25 - cos(x * 0.007) * 15);
+  }
+  vertex(width, groundH);
+  endShape(CLOSE);
+
+  // Buildings in the background — get damaged as battle progresses
+  let numB = 5;
+  let battleProgress = battle.phase === 'result' ? 1 : min(1, battle.timer / 600);
+  let isInvasion = battle.context.type === 'invade';
+  for (let i = 0; i < numB; i++) {
+    let bx = width * 0.3 + i * (width * 0.1);
+    let bw = 22 + (i * 7 % 10), bh = 30 + (i * 11 % 15);
+    let by = groundH - bh;
+    // Damage: buildings crack/crumble during invasion
+    let damage = isInvasion ? battleProgress * (0.3 + (i * 0.13 % 0.5)) : 0;
+    // Wall
+    fill(style.wall[0] * (1 - damage * 0.3), style.wall[1] * (1 - damage * 0.3), style.wall[2] * (1 - damage * 0.3));
+    rect(bx, by + damage * 5, bw, bh - damage * 5, 1);
+    // Roof
+    fill(style.roof[0] * (1 - damage * 0.4), style.roof[1] * (1 - damage * 0.4), style.roof[2] * (1 - damage * 0.4));
+    rect(bx - 2, by - 4 + damage * 5, bw + 4, 4);
+    // Damage cracks
+    if (damage > 0.3) {
+      stroke(40, 30, 20, damage * 200); strokeWeight(1);
+      line(bx + bw * 0.3, by + bh * 0.2, bx + bw * 0.5, by + bh * 0.6);
+      line(bx + bw * 0.6, by + bh * 0.1, bx + bw * 0.4, by + bh * 0.4);
+      noStroke();
+    }
+    // Fire on heavily damaged buildings (invasion)
+    if (damage > 0.5 && isInvasion) {
+      let firePulse = sin(frameCount * 0.15 + i * 2);
+      fill(255, 120 + firePulse * 30, 30, 120 + firePulse * 40);
+      ellipse(bx + bw * 0.5, by + 5, 12 + firePulse * 4, 18 + firePulse * 6);
+      fill(255, 200, 60, 80);
+      ellipse(bx + bw * 0.5, by, 8, 10);
+    }
+  }
+
+  // Nation banner — replaced with player banner if invasion victory
+  let flagX = width * 0.7, flagY = groundH - 70;
+  fill(bannerCol[0] * 0.5, bannerCol[1] * 0.5, bannerCol[2] * 0.5);
+  rect(flagX, flagY, 3, 50);
+  if (battle.result === 'victory' && isInvasion) {
+    // Player's faction flag
+    let pFac = typeof state !== 'undefined' && state.faction ? FACTIONS[state.faction] : null;
+    let pCol = pFac ? pFac.bannerColor : [175, 28, 28];
+    fill(pCol[0], pCol[1], pCol[2]);
+    rect(flagX + 3, flagY + 2, 16, 10);
+    fill(pCol[0] + 40, pCol[1] + 40, pCol[2] + 40);
+    rect(flagX + 5, flagY + 4, 12, 6);
+  } else {
+    fill(bannerCol[0], bannerCol[1], bannerCol[2]);
+    rect(flagX + 3, flagY + 2, 16, 10);
+    fill(bannerCol[0] + 30, bannerCol[1] + 30, bannerCol[2] + 30);
+    rect(flagX + 5, flagY + 4, 12, 6);
+  }
+
+  // Dock on left (attacker spawn point)
+  fill(100, 75, 45);
+  rect(20, groundH - 8, 60, 8, 1);
+  rect(30, groundH - 4, 4, 12);
+  rect(70, groundH - 4, 4, 12);
+
+  // Smoke/atmosphere
+  fill(80, 70, 60, 20 + sin(frameCount * 0.02) * 10);
+  rect(0, 0, width, groundH * 0.3);
 }
 
 function _drawBattleUnits(units, teamCol, facing) {
