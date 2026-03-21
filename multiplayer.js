@@ -7,7 +7,8 @@ const MP = {
   isHost: false,
   connected: false,
   roomCode: '',
-  remotePlayer: { x: 600, y: 400, facing: 'down', moving: false, faction: 'rome', name: 'Player 2' },
+  remotePlayer: { x: 600, y: 400, facing: 'down', moving: false, faction: 'rome', name: 'Player 2', anim: 'idle', hp: 0, tool: null },
+  remoteScreen: 'game',
   remoteBuildings: [],
   remoteIslandLevel: 1,
   remoteMilitary: 0,
@@ -82,12 +83,16 @@ const MP = {
         this.remotePlayer.y = msg.data.y;
         this.remotePlayer.facing = msg.data.f;
         this.remotePlayer.moving = msg.data.m;
+        this.remotePlayer.anim = msg.data.anim || 'idle';
         break;
       case 'sync':
         this.remoteIslandLevel = msg.data.level;
         this.remoteBuildings = msg.data.buildings || [];
         this.remoteMilitary = msg.data.military;
         this.remoteGold = msg.data.gold;
+        this.remoteScreen = msg.data.screen || 'game';
+        this.remotePlayer.hp = msg.data.hp || 0;
+        this.remotePlayer.tool = msg.data.tool || null;
         break;
       case 'chat':
         this.chatMessages.push({ from: this.remotePlayer.name, text: msg.data.text, time: Date.now() });
@@ -128,9 +133,12 @@ const MP = {
     let now = Date.now();
 
     if (now - this._lastPos > 100) {
+      let p = state.player;
+      let anim = p.dashTimer > 0 ? 'rolling' : (p.toolSwing > 0 ? 'attacking' : (p.moving ? 'walking' : 'idle'));
       this.send('pos', {
-        x: state.player.x, y: state.player.y,
-        f: state.player.facing, m: state.player.moving
+        x: p.x, y: p.y,
+        f: p.facing, m: p.moving,
+        anim: anim
       });
       this._lastPos = now;
     }
@@ -140,50 +148,58 @@ const MP = {
         level: state.islandLevel,
         buildings: (state.buildings || []).map(b => ({ x: b.x, y: b.y, type: b.type })),
         military: (state.legia && state.legia.army) ? state.legia.army.length : 0,
-        gold: state.gold
+        gold: state.gold,
+        screen: (typeof gameScreen !== 'undefined') ? gameScreen : 'game',
+        hp: state.player.hp || 0,
+        tool: state.equippedTool || null
       });
       this._lastSync = now;
     }
   },
 
-  drawRemotePlayer() {
+  // Draw rival island on the horizon (visible from your island)
+  drawRivalIsland() {
     if (!this.connected) return;
     let rp = this.remotePlayer;
-    let shX = (typeof shakeX !== 'undefined') ? shakeX : 0;
-    let shY = (typeof shakeY !== 'undefined') ? shakeY : 0;
-    let fOff = (typeof floatOffset !== 'undefined') ? floatOffset : 0;
-    let sx = w2sX(rp.x) + shX, sy = w2sY(rp.y) + shY + fOff;
-    if (sx < -50 || sx > width + 50) return;
+    let fm = (typeof FACTION_MILITARY !== 'undefined' && FACTION_MILITARY[rp.faction]) ?
+      FACTION_MILITARY[rp.faction] : { tunic: [160,50,40], cape: [145,28,22] };
+
+    // Position: northeast horizon
+    let baseX = width * 0.82;
+    let baseY = height * 0.12 + sin(frameCount * 0.015) * 3; // gentle bob
 
     push();
-    let fc = { rome: [180,50,50], carthage: [140,80,180], egypt: [200,170,50], greece: [60,120,200] };
-    let c = fc[rp.faction] || fc.rome;
-
-    // Glow outline to distinguish remote player
-    let glowAlpha = (typeof frameCount !== 'undefined') ? (sin(frameCount * 0.08) * 30 + 60) : 60;
-    noFill();
-    stroke(c[0], c[1], c[2], glowAlpha);
-    strokeWeight(2);
-    ellipse(sx, sy - 5, 20, 28);
     noStroke();
 
-    // Shadow
-    fill(0, 0, 0, 40);
-    ellipse(sx, sy + 8, 14, 6);
+    // Island silhouette
+    fill(80, 90, 70, 180);
+    ellipse(baseX, baseY + 8, 70, 18);
+    fill(90, 105, 80, 200);
+    ellipse(baseX, baseY + 5, 60, 14);
 
-    // Body
-    fill(c[0], c[1], c[2]);
-    rect(sx - 5, sy - 12, 10, 14, 2);
+    // Buildings silhouette
+    fill(fm.tunic[0], fm.tunic[1], fm.tunic[2], 140);
+    rect(baseX - 15, baseY - 12, 8, 14, 1); // tower
+    rect(baseX - 5, baseY - 8, 12, 10, 1);  // main building
+    rect(baseX + 10, baseY - 6, 7, 8, 1);   // small building
 
-    // Head
-    fill(220, 190, 160);
-    rect(sx - 4, sy - 18, 8, 7, 2);
+    // Flag with faction color
+    fill(fm.cape[0], fm.cape[1], fm.cape[2], 180);
+    rect(baseX - 15, baseY - 18, 1, 8);     // pole
+    let flagWave = sin(frameCount * 0.1) * 2;
+    rect(baseX - 14, baseY - 18, 8 + flagWave, 4, 1); // flag
 
     // Name label
-    fill(255, 255, 255, 200);
+    fill(255, 220, 120, 180);
     textAlign(CENTER, BOTTOM);
-    textSize(9);
-    text(rp.name, sx, sy - 22);
+    textSize(8);
+    text(rp.name + "'s Isle", baseX, baseY - 20);
+
+    // Level indicator
+    fill(200, 200, 200, 150);
+    textSize(7);
+    text('Lv.' + this.remoteIslandLevel, baseX, baseY - 12);
+
     textAlign(LEFT, TOP);
     pop();
   },
@@ -193,12 +209,66 @@ const MP = {
 
     push();
     noStroke();
-    fill(this.connected ? '#00ff88' : '#ff4444');
-    ellipse(width - 20, 20, 8, 8);
-    fill(255);
-    textSize(9);
-    textAlign(RIGHT, TOP);
-    text(this.connected ? 'P2: ' + this.remotePlayer.name : 'OFFLINE', width - 28, 14);
+    // Rival panel (top-right)
+    if (this.connected) {
+      let rp = this.remotePlayer;
+      let fm = (typeof FACTION_MILITARY !== 'undefined' && FACTION_MILITARY[rp.faction]) ?
+        FACTION_MILITARY[rp.faction] : { tunic: [160,50,40] };
+      let pw = 150, ph = 62;
+      let px = width - pw - 10, py = 8;
+
+      // Panel background
+      fill(20, 15, 8, 200);
+      stroke(fm.tunic[0], fm.tunic[1], fm.tunic[2], 150);
+      strokeWeight(1);
+      rect(px, py, pw, ph, 4);
+      noStroke();
+
+      // Connection dot
+      fill(0, 255, 120);
+      ellipse(px + 10, py + 10, 6, 6);
+
+      // Name + faction
+      fill(255, 220, 120);
+      textSize(10);
+      textAlign(LEFT, TOP);
+      text(rp.name, px + 18, py + 5);
+      fill(180, 180, 180);
+      textSize(8);
+      let facName = (typeof FACTIONS !== 'undefined' && FACTIONS[rp.faction]) ? FACTIONS[rp.faction].name : rp.faction;
+      text(facName + ' | Lv.' + this.remoteIslandLevel, px + 18, py + 18);
+
+      // Stats row
+      fill(255, 210, 80);
+      textSize(8);
+      text('Gold: ' + this.remoteGold, px + 8, py + 32);
+      fill(200, 200, 200);
+      text('Army: ' + this.remoteMilitary, px + 80, py + 32);
+
+      // Action buttons
+      let btnW = 65, btnH = 14, btnY2 = py + 44;
+      // Trade button
+      fill(60, 100, 50);
+      rect(px + 6, btnY2, btnW, btnH, 2);
+      fill(255);
+      textSize(7);
+      textAlign(CENTER, CENTER);
+      text('TRADE', px + 6 + btnW/2, btnY2 + btnH/2);
+      // Attack button
+      fill(120, 40, 40);
+      rect(px + 78, btnY2, btnW, btnH, 2);
+      fill(255);
+      text('ATTACK', px + 78 + btnW/2, btnY2 + btnH/2);
+
+      textAlign(LEFT, TOP);
+    } else {
+      fill('#ff4444');
+      ellipse(width - 20, 20, 8, 8);
+      fill(255);
+      textSize(9);
+      textAlign(RIGHT, TOP);
+      text('OFFLINE', width - 28, 14);
+    }
 
     if (this.chatMessages.length > 0) {
       let cy = height - 80;
@@ -322,6 +392,37 @@ const MP = {
 
     if (mx > px && mx < px + pw && my > py && my < py + ph) return true;
     return false;
+  },
+
+  handleRivalPanelClick(mx, my) {
+    if (!this.connected) return false;
+    let pw = 150, ph = 62;
+    let px = width - pw - 10, py = 8;
+    if (mx < px || mx > px + pw || my < py || my > py + ph) return false;
+
+    let btnW = 65, btnH = 14, btnY2 = py + 44;
+    // Trade button
+    if (mx > px + 6 && mx < px + 6 + btnW && my > btnY2 && my < btnY2 + btnH) {
+      // Quick trade: offer 20 gold for 20 wood
+      let offerGold = Math.min(20, state.gold);
+      this.offerTrade(offerGold, 0, 0, 20);
+      addNotification('Offered ' + offerGold + ' gold for 20 wood.', '#ffdd44');
+      return true;
+    }
+    // Attack button
+    if (mx > px + 78 && mx < px + 78 + btnW && my > btnY2 && my < btnY2 + btnH) {
+      let deployed = 0;
+      if (state.legia && state.legia.army) {
+        deployed = state.legia.army.filter(s => !s.garrison).length;
+      }
+      if (deployed < 3) {
+        addNotification('Need at least 3 deployed soldiers to attack!', '#ff4444');
+      } else {
+        this.attackRemote(deployed);
+      }
+      return true;
+    }
+    return true; // consumed click (on panel)
   },
 
   chat(text) {

@@ -3539,8 +3539,8 @@ function drawInner() {
       drawGameVignette();
     }
 
-    // Multiplayer sync + render
-    if (typeof MP !== 'undefined') { MP.update(); MP.drawRemotePlayer(); MP.drawHUD(); }
+    // Multiplayer sync + HUD + rival island on horizon
+    if (typeof MP !== 'undefined') { MP.update(); if (MP.connected) MP.drawRivalIsland(); MP.drawHUD(); }
 
     if (!screenshotMode && !photoMode) {
       drawHUD();
@@ -8310,6 +8310,7 @@ function drawWorldObjectsSorted() {
     });
   }
   _sortItems.push({ y: state.player.y, draw: drawPlayer });
+  // Multiplayer: separate islands — remote player shown on world map + HUD panel, not on your island
   // Sort by Y (back to front)
   _sortItems.sort((a, b) => a.y - b.y);
   for (let i = 0; i < _sortItems.length; i++) _sortItems[i].draw();
@@ -22321,9 +22322,10 @@ function mousePressed() {
     return;
   }
   if (state.cutscene) { skipCutscene(); return; }
-  // Multiplayer trade offer click
-  if (typeof MP !== 'undefined' && MP.connected && state._mpTradeOffer) {
-    if (MP.handleTradeOfferClick(mouseX, mouseY)) return;
+  // Multiplayer clicks (rival panel + trade offer)
+  if (typeof MP !== 'undefined' && MP.connected) {
+    if (state._mpTradeOffer && MP.handleTradeOfferClick(mouseX, mouseY)) return;
+    if (MP.handleRivalPanelClick(mouseX, mouseY)) return;
   }
   // Army battle — allow clicks during deploy for formation picker
   if (typeof _armyBattle !== 'undefined' && _armyBattle) {
