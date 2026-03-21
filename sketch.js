@@ -1259,6 +1259,11 @@ function initState() {
 
     faction: null, // 'rome' | 'carthage' | 'egypt' | 'greece' | 'seapeople' | 'persia' | 'phoenicia' | 'gaul'
 
+    // Sea People raid system
+    seaPeopleRaidCooldown: 0,
+    seaPeopleRaidActive: false,
+    seaPeopleShips: [],
+
     // God system — faction deity
     god: { faction: null, prayerCooldown: 0, ultimateCharge: 0, blessingActive: null, blessingTimer: 0 },
 
@@ -3038,6 +3043,7 @@ function drawInner() {
     updateLegionAmbient(dt);
     if (typeof updateDiving === 'function') updateDiving(dt);
     updateRivalRaid(dt);
+    updateSeaPeopleRaid(dt);
     updateNotifications(dt);
     // Narrative engine updates
     if (typeof updateMainQuest === 'function') { updateMainQuest(); updateNPCQuests(); updateNarrativeDialogue(); checkLoreTabletPickup(); }
@@ -3076,6 +3082,7 @@ function drawInner() {
     if (typeof drawOceanWildlife === 'function') drawOceanWildlife();
     if (typeof drawAtmosphericHaze === 'function') drawAtmosphericHaze();
     drawAmbientShips();
+    drawSeaPeopleShips();
     pop();
 
     // Full island rendering (visible from boat/home) — no floatOffset for distant islands
@@ -3183,12 +3190,21 @@ function drawInner() {
     if (!state.rowing || !state.rowing.active || _homeDist < 300) {
       drawLegionPatrol();
       drawRivalRaiders();
+      drawSeaPeopleRaiders();
       // Build mode ghost — drawn inside island float/shake context so it matches placed buildings
       if (state.buildMode) {
         drawBuildGhost();
       }
     }
     pop();
+
+    // Sea People raid warning border flash
+    if (state.seaPeopleRaidActive && state._seaPeopleWarning > 0) {
+      let flashAlpha = (sin(frameCount * 0.12) * 0.5 + 0.5) * 120;
+      noFill(); stroke(180, 30, 20, flashAlpha); strokeWeight(4);
+      rect(2, 2, width - 4, height - 4);
+      noStroke();
+    }
 
     // Lightning drawn outside island transform — fixed to sky, not bobbing with island
     drawLightning();
@@ -3596,6 +3612,8 @@ function updateTime(dt) {
     checkAllVictoryConditions();
     // Nations AI daily tick
     if (state.nations && Object.keys(state.nations).length > 0) updateNationsDaily();
+    // Sea People raid check (daily)
+    checkSeaPeopleRaid();
     // Random event roll — 20% chance per day
     checkRandomEvent();
     // Daily island resource refresh — nodes respawn each day for revisit incentive
@@ -17474,6 +17492,330 @@ function updateSingleNationRaid(key, dt) {
   }
 }
 
+// ─── SEA PEOPLE RAID SYSTEM ─────────────────────────────────────────────
+
+function checkSeaPeopleRaid() {
+  if (state.faction === 'seapeople') return;
+  if (state.player.level < 3) return;
+  if (state.seaPeopleRaidCooldown > 0) { state.seaPeopleRaidCooldown--; return; }
+  if (state.seaPeopleRaidActive) return;
+  let chance = min(0.30, 0.08 + state.player.level * 0.02);
+  if (random() >= chance) return;
+  let tier = min(4, floor(state.player.level / 5) + 1);
+  startSeaPeopleRaid(tier);
+}
+
+function startSeaPeopleRaid(tier) {
+  state.seaPeopleRaidCooldown = 5;
+  state.seaPeopleRaidActive = true;
+
+  let raidSize, champCount, bossCount, title;
+  if (tier <= 1) { raidSize = floor(random(3, 6)); champCount = 0; bossCount = 0; title = 'Sea People Scout Party'; }
+  else if (tier === 2) { raidSize = floor(random(6, 11)); champCount = 1; bossCount = 0; title = 'Sea People War Band'; }
+  else if (tier === 3) { raidSize = floor(random(12, 19)); champCount = 2; bossCount = 0; title = 'Sea People Fleet'; }
+  else { raidSize = floor(random(20, 31)); champCount = 3; bossCount = 1; title = 'Sea People Armada'; }
+
+  let baseHp = 25 + tier * 10;
+  let baseDmg = 8 + tier * 3;
+
+  addNotification('Sea People longships spotted on the horizon!', '#ff4444');
+  addFloatingText(width / 2, height * 0.2, title.toUpperCase() + '!', '#ff4444');
+  if (snd) snd.playSFX('war_horn');
+  if (typeof triggerPlayerAlert === 'function') triggerPlayerAlert();
+
+  // Spawn 1-3 visual longships
+  state.seaPeopleShips = [];
+  let shipCount = min(3, tier);
+  for (let i = 0; i < shipCount; i++) {
+    state.seaPeopleShips.push({
+      x: width + 40 + i * 60,
+      y: max(height * 0.06, height * 0.25 - (horizonOffset || 0)) + 10 + i * 12,
+      phase: random(TWO_PI),
+    });
+  }
+
+  // Warning phase: 180 frames (3 seconds), then spawn raiders
+  state._seaPeopleWarning = 180;
+  state._seaPeopleRaidData = { raidSize: raidSize, champCount: champCount, bossCount: bossCount, baseHp: baseHp, baseDmg: baseDmg, tier: tier, title: title };
+}
+
+function updateSeaPeopleRaid(dt) {
+  if (!state.seaPeopleRaidActive) return;
+
+  // Warning phase — ships approach
+  if (state._seaPeopleWarning > 0) {
+    state._seaPeopleWarning -= dt;
+    for (let s of state.seaPeopleShips) {
+      s.x -= 1.2 * dt;
+    }
+    if (state._seaPeopleWarning <= 0) {
+      _spawnSeaPeopleRaiders();
+    }
+    return;
+  }
+
+  // After warning, update raid party like nation raids
+  if (!state._seaPeopleRaidParty || state._seaPeopleRaidParty.length === 0) {
+    state.seaPeopleRaidActive = false;
+    state.seaPeopleShips = [];
+    state._seaPeopleRaidParty = null;
+    let killed = state._seaPeopleRaidKills || 0;
+    addFloatingText(width / 2, height * 0.2, 'SEA PEOPLE REPELLED!', '#88ff88');
+    addNotification('Sea People raiders defeated! ' + killed + ' enemies slain.', '#88ff88');
+    state._seaPeopleRaidKills = 0;
+    return;
+  }
+
+  let p = state.player;
+  for (let i = state._seaPeopleRaidParty.length - 1; i >= 0; i--) {
+    let r = state._seaPeopleRaidParty[i];
+    r.flashTimer = max(0, r.flashTimer - dt);
+    r.attackTimer = max(0, r.attackTimer - dt);
+    let targetX = WORLD.islandCX + random(-100, 100);
+    let targetY = WORLD.islandCY + random(-50, 50);
+    let dx = targetX - r.x, dy = targetY - r.y;
+    let d = sqrt(dx * dx + dy * dy);
+    if (d > 30) {
+      let spd = 1.2 * dt;
+      r.x += (dx / d) * spd; r.y += (dy / d) * spd;
+      r.facing = dx > 0 ? 1 : -1;
+    } else {
+      r.stealTimer += dt;
+      if (r.stealTimer > 100) {
+        r.stealTimer = 0;
+        if (state.gold > 0) { let amt = min(state.gold, floor(3 + state._seaPeopleRaidData.tier * 2)); state.gold = max(0, state.gold - amt); addFloatingText(w2sX(r.x), w2sY(r.y) - 10, 'Plundered!', '#ff6644'); }
+        else if (state.wood > 0) { state.wood -= min(state.wood, 3); addFloatingText(w2sX(r.x), w2sY(r.y) - 10, 'Plundered!', '#ff6644'); }
+        else if (state.stone > 0) { state.stone -= min(state.stone, 2); addFloatingText(w2sX(r.x), w2sY(r.y) - 10, 'Plundered!', '#ff6644'); }
+      }
+    }
+    let pDist = dist(p.x, p.y, r.x, r.y);
+    if (p.attackTimer > 0 && p.slashPhase > 0 && pDist < p.attackRange + 10) {
+      let dmg = p.attackDamage;
+      r.hp -= dmg; r.flashTimer = 8;
+      addFloatingText(w2sX(r.x), w2sY(r.y) - 15, '-' + dmg, '#ffaa44');
+      spawnParticles(r.x, r.y, 'hit', 3);
+    }
+    if (pDist < 35 && r.attackTimer <= 0) {
+      let dmg = max(1, r.damage - (p.armor || 0) * 3);
+      p.hp = max(0, p.hp - dmg); p.invincTimer = 20; r.attackTimer = 60;
+      addFloatingText(w2sX(p.x), w2sY(p.y) - 15, '-' + dmg, '#ff4444');
+      triggerScreenShake(3, 6);
+    }
+    if (state.centurion && state.centurion.task !== 'idle') {
+      let cenDist = dist(state.centurion.x, state.centurion.y, r.x, r.y);
+      if (cenDist < 35 && state.centurion.attackTimer <= 0) {
+        r.hp -= state.centurion.attackDamage; r.flashTimer = 8;
+        state.centurion.attackTimer = state.centurion.attackCooldown;
+      }
+    }
+    let allyKeys = Object.keys(state.nations).filter(k2 => state.nations[k2].allied);
+    for (let ak of allyKeys) {
+      if (random() < 0.02 * dt) {
+        r.hp -= floor(3 + state.nations[ak].military * 0.5);
+        r.flashTimer = 5;
+        if (random() < 0.05) addFloatingText(w2sX(r.x), w2sY(r.y) - 20, getNationName(ak) + ' ally strikes!', '#88ccff');
+      }
+    }
+    if (state.buildings && frameCount % 40 === 0) {
+      for (let b of state.buildings) {
+        if (b.type === 'watchtower' && dist(b.x, b.y, r.x, r.y) < 200) {
+          let tDmg = floor(5 + random(3));
+          r.hp -= tDmg; r.flashTimer = 6;
+          addFloatingText(w2sX(r.x), w2sY(r.y) - 18, '-' + tDmg, '#ccaa44');
+          spawnParticles(r.x, r.y, 'hit', 2);
+          break;
+        }
+      }
+    }
+    if (r.hp <= 0) {
+      state._seaPeopleRaidParty.splice(i, 1);
+      spawnParticles(r.x, r.y, 'death', 5);
+      let xpAmt = 20 + state._seaPeopleRaidData.tier * 5;
+      if (r.champion) xpAmt *= 2;
+      if (r.boss) xpAmt *= 3;
+      if (typeof grantXP === 'function') grantXP(xpAmt);
+      addFloatingText(w2sX(r.x), w2sY(r.y) - 20, '+' + xpAmt + ' XP', '#ffdd44');
+      state._seaPeopleRaidKills = (state._seaPeopleRaidKills || 0) + 1;
+    }
+  }
+}
+
+function _spawnSeaPeopleRaiders() {
+  let data = state._seaPeopleRaidData;
+  if (!data) return;
+
+  if (typeof startIslandDefense === 'function' && typeof getGarrisonCount === 'function' && getGarrisonCount() > 0) {
+    addFloatingText(width / 2, height * 0.2, data.title.toUpperCase() + '! Garrison engaging!', '#ff8844');
+    let lg = state.legia;
+    let garrison = (lg && lg.army) ? lg.army.filter(u => u.garrison) : [];
+    if (garrison.length > 0) {
+      let attackers = [];
+      for (let i = 0; i < data.raidSize; i++) {
+        attackers.push({ type: 'legionary', hp: data.baseHp, maxHp: data.baseHp, damage: data.baseDmg, speed: 1.0 });
+      }
+      for (let i = 0; i < data.champCount; i++) {
+        let chp = data.baseHp * 2;
+        attackers.push({ type: 'legionary', hp: chp, maxHp: chp, damage: floor(data.baseDmg * 1.5), speed: 1.0 });
+      }
+      if (data.bossCount > 0) {
+        let bhp = data.baseHp * 5;
+        attackers.push({ type: 'cavalry', hp: bhp, maxHp: bhp, damage: data.baseDmg * 2, speed: 0.8 });
+      }
+      let cData = getCastrumLevelData();
+      let defMult = cData ? cData.defenseMult : 1.0;
+      let towers = (state.buildings || []).filter(b => b.type === 'watchtower' || b.type === 'guardtower');
+      let towerDmg = towers.length * 3;
+      let defenderUnits = garrison.map(u => ({
+        ...u, hp: floor(u.hp * defMult), maxHp: floor(u.maxHp * defMult), damage: u.damage + towerDmg,
+      }));
+      startArmyBattle(attackers, defenderUnits, {
+        type: 'defend', nationKey: 'seapeople', nationName: 'Sea People',
+        onVictory: function(battle) {
+          let stolen = floor(15 + data.tier * 10);
+          state.gold = max(0, state.gold - stolen);
+          addFloatingText(width / 2, height * 0.2, 'Defense failed! -' + stolen + 'g plundered', '#ff4444');
+          let garrisonAlive = battle.defenders.filter(u => u.alive);
+          lg.army = lg.army.filter(u => !u.garrison);
+          for (let s of garrisonAlive) { s.garrison = true; lg.army.push(s); }
+        },
+        onDefeat: function(battle) {
+          state.gold += floor(10 + data.raidSize * 3);
+          addFloatingText(width / 2, height * 0.2, 'Garrison defended! +' + floor(10 + data.raidSize * 3) + 'g', '#88ff88');
+          addNotification('Sea People raid repelled by your garrison!', '#88ff88');
+          if (typeof grantXP === 'function') grantXP(25 + data.raidSize * 5);
+          let garrisonAlive = battle.defenders.filter(u => u.alive);
+          lg.army = lg.army.filter(u => !u.garrison);
+          for (let s of garrisonAlive) { s.garrison = true; lg.army.push(s); }
+        },
+      });
+      state.seaPeopleRaidActive = false;
+      state.seaPeopleShips = [];
+      return;
+    }
+  }
+
+  // No garrison — spawn raider NPCs from eastern shore
+  state._seaPeopleRaidParty = [];
+  state._seaPeopleRaidKills = 0;
+  let shoreX = WORLD.islandCX + getSurfaceRX() * 0.95;
+  let shoreY = WORLD.islandCY;
+
+  for (let i = 0; i < data.raidSize; i++) {
+    state._seaPeopleRaidParty.push({
+      x: shoreX + random(20, 60), y: shoreY + random(-80, 80),
+      hp: data.baseHp, maxHp: data.baseHp, damage: data.baseDmg,
+      vx: 0, vy: 0, attackTimer: 0, facing: -1, flashTimer: 0, stealTimer: 0,
+    });
+  }
+  for (let i = 0; i < data.champCount; i++) {
+    let chp = data.baseHp * 2;
+    state._seaPeopleRaidParty.push({
+      x: shoreX + random(20, 60), y: shoreY + random(-80, 80),
+      hp: chp, maxHp: chp, damage: floor(data.baseDmg * 1.5),
+      vx: 0, vy: 0, attackTimer: 0, facing: -1, flashTimer: 0, stealTimer: 0, champion: true,
+    });
+  }
+  for (let i = 0; i < data.bossCount; i++) {
+    let bhp = data.baseHp * 5;
+    state._seaPeopleRaidParty.push({
+      x: shoreX + random(20, 60), y: shoreY + random(-60, 60),
+      hp: bhp, maxHp: bhp, damage: data.baseDmg * 2,
+      vx: 0, vy: 0, attackTimer: 0, facing: -1, flashTimer: 0, stealTimer: 0, boss: true,
+    });
+  }
+
+  state.seaPeopleShips = [];
+}
+
+function drawSeaPeopleShips() {
+  if (!state.seaPeopleShips || state.seaPeopleShips.length === 0) return;
+  for (let s of state.seaPeopleShips) {
+    let bob = sin(frameCount * 0.02 + s.phase) * 3;
+    let sx = s.x, sy = s.y + bob;
+    push();
+    translate(sx, sy);
+    noStroke();
+    // Hull
+    fill(50, 35, 20);
+    beginShape();
+    vertex(-30, 0); vertex(-25, 8); vertex(25, 8); vertex(30, 0);
+    vertex(25, -3); vertex(-25, -3);
+    endShape(CLOSE);
+    // Prow
+    fill(40, 28, 15);
+    beginShape();
+    vertex(28, -3); vertex(35, -12); vertex(32, -10); vertex(30, 0);
+    endShape(CLOSE);
+    // Stern
+    beginShape();
+    vertex(-28, -3); vertex(-33, -10); vertex(-30, -8); vertex(-28, 0);
+    endShape(CLOSE);
+    // Mast
+    stroke(60, 45, 25); strokeWeight(2);
+    line(0, -3, 0, -28);
+    // Sail
+    noStroke();
+    fill(120, 40, 30, 200);
+    beginShape();
+    vertex(-12, -26); vertex(12, -26); vertex(10, -10); vertex(-10, -10);
+    endShape(CLOSE);
+    // Oars
+    stroke(70, 50, 30); strokeWeight(1);
+    let oarPhase = sin(frameCount * 0.06 + s.phase) * 4;
+    for (let o = 0; o < 3; o++) {
+      let ox = -12 + o * 12;
+      line(ox, 4, ox - 5, 12 + oarPhase);
+      line(ox, 4, ox + 5, 12 - oarPhase);
+    }
+    noStroke();
+    pop();
+  }
+}
+
+function drawSeaPeopleRaiders() {
+  if (!state._seaPeopleRaidParty || state._seaPeopleRaidParty.length === 0) return;
+  if (state._seaPeopleWarning > 0) {
+    push();
+    fill(120, 40, 30, 180 + sin(frameCount * 0.15) * 60);
+    noStroke(); textAlign(CENTER); textSize(14);
+    text('SEA PEOPLE RAIDERS APPROACHING!', width / 2, height * 0.12);
+    textSize(9); fill(255, 200, 150, 160);
+    text('Defend your island!', width / 2, height * 0.15);
+    pop();
+    return;
+  }
+  let bannerCol = FACTIONS.seapeople ? FACTIONS.seapeople.bannerColor : [26, 58, 92];
+  for (let r of state._seaPeopleRaidParty) {
+    let sx = w2sX(r.x), sy = w2sY(r.y);
+    if (sx < -30 || sx > width + 30 || sy < -30 || sy > height + 30) continue;
+    push(); translate(sx, sy); scale(r.facing, 1); noStroke();
+    if (r.flashTimer > 0) { fill(255, 255, 255, 200); ellipse(0, -8, 18, 24); pop(); continue; }
+    fill(0, 0, 0, 30); ellipse(0, 2, 14, 5);
+    fill(60, 50, 40); rect(-4, 0, 3, 6); rect(1, 0, 3, 6);
+    fill(bannerCol[0] * 0.5, bannerCol[1] * 0.5, bannerCol[2] * 0.5); rect(-5, -10, 10, 12, 1);
+    fill(bannerCol[0], bannerCol[1], bannerCol[2]); rect(-5, -4, 10, 2);
+    fill(160, 120, 85); rect(-7, -8, 3, 7); rect(4, -8, 3, 7);
+    fill(150, 110, 75); ellipse(0, -13, 8, 8);
+    fill(bannerCol[0] * 0.8, bannerCol[1] * 0.8, bannerCol[2] * 0.8);
+    arc(0, -15, 10, 8, PI, 0);
+    fill(90, 70, 40);
+    beginShape(); vertex(-5, -17); vertex(-8, -23); vertex(-4, -19); endShape(CLOSE);
+    beginShape(); vertex(5, -17); vertex(8, -23); vertex(4, -19); endShape(CLOSE);
+    fill(bannerCol[0] * 0.7, bannerCol[1] * 0.7, bannerCol[2] * 0.7); ellipse(-8, -6, 7, 10);
+    fill(42, 138, 106); ellipse(-8, -6, 3, 3);
+    fill(180, 180, 190); rect(5, -10, 2, 9);
+    fill(120, 90, 40); rect(4, -4, 4, 2);
+    if (r.champion) { fill(255, 200, 50, 180); ellipse(0, -26, 6, 6); }
+    if (r.boss) { fill(255, 50, 50, 200); ellipse(0, -28, 8, 8); fill(255, 200, 50); ellipse(0, -28, 4, 4); }
+    let sz = r.boss ? 20 : (r.champion ? 18 : 16);
+    let hpPct = r.hp / r.maxHp;
+    fill(40, 0, 0, 150); rect(-sz / 2, -22, sz, 3);
+    fill(hpPct > 0.5 ? color(80, 180, 80) : color(200, 60, 40));
+    rect(-sz / 2, -22, floor(sz * hpPct), 3);
+    pop();
+  }
+}
+
 function drawNationRaiders() {
   let keys = Object.keys(state.nations);
   for (let k of keys) {
@@ -20585,6 +20927,8 @@ function mousePressed() {
   }
   // Hotbar tap detection (mobile + desktop click)
   if (typeof _handleHotbarTap === 'function' && _handleHotbarTap(mouseX, mouseY)) return;
+  // Legion button click
+  if (typeof handleLegionButtonClick === 'function' && handleLegionButtonClick(mouseX, mouseY)) return;
   // Wardrobe click handling
   if (wardrobeOpen) {
     let pw = 220, ph = 280;

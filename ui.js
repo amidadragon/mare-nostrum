@@ -2022,6 +2022,182 @@ function drawHUD() {
     fill(180, 160, 120, 100); textSize(4); textAlign(LEFT, CENTER);
     text('Bridge', mmX + 3, mcy + 6); textAlign(LEFT, TOP);
   }
+
+  // ─── SPAWN LEGION BUTTON (bottom-right, above hotbar) ───
+  drawLegionButton();
+}
+
+// Legion button state
+let _legionBtnPulse = 0;
+
+function drawLegionButton() {
+  if (!state.legia || !state.legia.army) return;
+  let army = state.legia.army;
+  if (army.length === 0) return;
+
+  let btnW = 60, btnH = 50;
+  // Position: right of hotbar area
+  let slotW = (typeof _isMobile !== 'undefined' && _isMobile) ? 44 : 36;
+  let gap = 3;
+  let totalHotbar = 10 * (slotW + gap) - gap;
+  let hotbarRight = floor((width + totalHotbar) / 2);
+  let bx = hotbarRight + 14;
+  let by = height - btnH - 16;
+
+  // Clamp so it doesn't go off-screen
+  if (bx + btnW > width - 8) bx = width - btnW - 8;
+
+  // Store for click detection
+  _legionBtnX = bx;
+  _legionBtnY = by;
+  _legionBtnW = btnW;
+  _legionBtnH = btnH;
+
+  let deployed = typeof getDeployedCount === 'function' ? getDeployedCount() : 0;
+  let garrison = typeof getGarrisonCount === 'function' ? getGarrisonCount() : 0;
+  let total = army.length;
+  let isDeployed = deployed > garrison;
+  let mil = typeof getFactionMilitary === 'function' ? getFactionMilitary() : { tunic: [180, 40, 40] };
+
+  // Pulse animation
+  _legionBtnPulse += 0.05;
+
+  // Button background
+  push();
+  noStroke();
+  fill(25, 20, 14, 220);
+  rect(bx, by, btnW, btnH, 5);
+
+  // Border color based on state
+  let borderCol;
+  if (total === 0) {
+    borderCol = color(80, 80, 80); // grayed out
+  } else if (isDeployed) {
+    borderCol = color(200, 60, 50); // red for recall
+  } else {
+    borderCol = color(210, 180, 60); // gold for deploy
+  }
+  stroke(borderCol);
+  strokeWeight(1.5);
+  noFill();
+  rect(bx, by, btnW, btnH, 5);
+
+  // Inner glow pulse when army available
+  if (total > 0) {
+    let pulse = sin(_legionBtnPulse) * 0.3 + 0.3;
+    stroke(red(borderCol), green(borderCol), blue(borderCol), pulse * 80);
+    strokeWeight(0.5);
+    rect(bx + 2, by + 2, btnW - 4, btnH - 4, 4);
+  }
+  noStroke();
+
+  // Shield + sword icon (centered top area)
+  let ix = bx + btnW / 2, iy = by + 16;
+  // Shield body
+  fill(mil.tunic[0], mil.tunic[1], mil.tunic[2], 200);
+  beginShape();
+  vertex(ix, iy - 8);
+  vertex(ix + 7, iy - 5);
+  vertex(ix + 6, iy + 3);
+  vertex(ix, iy + 8);
+  vertex(ix - 6, iy + 3);
+  vertex(ix - 7, iy - 5);
+  endShape(CLOSE);
+  // Shield boss (center circle)
+  fill(220, 200, 140, 180);
+  circle(ix, iy, 5);
+  // Sword (angled behind shield)
+  stroke(200, 200, 200, 200);
+  strokeWeight(1.5);
+  line(ix + 5, iy - 10, ix + 12, iy + 4);
+  // Sword guard
+  strokeWeight(2);
+  line(ix + 7, iy - 5, ix + 10, iy - 3);
+  noStroke();
+
+  // Label text
+  textAlign(CENTER, TOP);
+  textSize(8);
+  if (isDeployed) {
+    fill(200, 80, 60);
+    text('RECALL', bx + btnW / 2, by + 28);
+  } else {
+    fill(210, 190, 80);
+    text('DEPLOY', bx + btnW / 2, by + 28);
+  }
+
+  // Soldier count
+  textSize(9);
+  fill(180, 170, 140);
+  text(deployed + '/' + total, bx + btnW / 2, by + 38);
+
+  // Hotkey hint
+  textSize(6);
+  fill(120, 110, 90, 140);
+  text('[G]', bx + btnW / 2, by + btnH - 9);
+
+  pop();
+  textAlign(LEFT, TOP);
+}
+
+// Legion button hit area (set by drawLegionButton)
+let _legionBtnX = 0, _legionBtnY = 0, _legionBtnW = 0, _legionBtnH = 0;
+
+function handleLegionButtonClick(mx, my) {
+  if (!state.legia || !state.legia.army || state.legia.army.length === 0) return false;
+  if (mx < _legionBtnX || mx > _legionBtnX + _legionBtnW) return false;
+  if (my < _legionBtnY || my > _legionBtnY + _legionBtnH) return false;
+
+  let deployed = typeof getDeployedCount === 'function' ? getDeployedCount() : 0;
+  let garrison = typeof getGarrisonCount === 'function' ? getGarrisonCount() : 0;
+  let shouldRecall = deployed > garrison;
+
+  if (typeof setAllGarrison === 'function') {
+    setAllGarrison(shouldRecall);
+  }
+
+  // Sound
+  if (typeof snd !== 'undefined' && snd) snd.playSFX('war_horn');
+
+  // Floating text
+  let msg = shouldRecall ? 'LEGION RECALLED!' : 'LEGION DEPLOYED!';
+  let col = shouldRecall ? '#cc6644' : '#ddcc44';
+  if (typeof addFloatingText === 'function') addFloatingText(width / 2, height * 0.25, msg, col);
+
+  // Screen shake
+  if (typeof triggerScreenShake === 'function') triggerScreenShake(3, 12, 0, 0, 'random');
+
+  // If deploying, set formation positions around player
+  if (!shouldRecall && state.legia && state.legia.army) {
+    _spawnLegionFormation();
+  }
+
+  return true;
+}
+
+function _spawnLegionFormation() {
+  let army = state.legia.army;
+  let p = state.player;
+  // Facing direction based on player movement or default south
+  let facing = (p.vx !== undefined && (p.vx !== 0 || p.vy !== 0))
+    ? atan2(p.vy || 0, p.vx || 0)
+    : PI / 2; // default: facing down
+  let behindAngle = facing + PI; // behind the player
+  let spacing = 30;
+
+  let deployIdx = 0;
+  for (let i = 0; i < army.length; i++) {
+    if (army[i].garrison) continue;
+    // V-formation: spread units in two wings behind player
+    let row = floor(deployIdx / 2);
+    let side = (deployIdx % 2 === 0) ? -1 : 1;
+    let spreadAngle = behindAngle + side * 0.35 * (row + 1);
+    let dist = spacing + row * 20;
+    // Set target position — updatePlayerEscort will smooth-move them there
+    army[i].x = p.x + cos(spreadAngle) * dist;
+    army[i].y = p.y + sin(spreadAngle) * dist;
+    deployIdx++;
+  }
 }
 
 // Build menu slide-in animation state

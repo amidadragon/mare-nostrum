@@ -1738,6 +1738,7 @@ function launchRaidOnNation(nationKey) {
       nationName: nationName,
       onVictory: function(battle) {
         let loot = floor(20 + rv.level * 10 + random(10, 30));
+        if (typeof getFactionData === 'function') loot = floor(loot * (getFactionData().raidLootMult || 1));
         state.gold += loot;
         rv.reputation = max(-100, rv.reputation - 15);
         rv.military = max(0, rv.military - floor(defCount * 0.5));
@@ -1965,6 +1966,30 @@ const FACTION_ABILITIES = {
     passive: 'Agility',
     passiveDesc: '+15% move speed',
   },
+  seapeople: {
+    q: { name: 'Harpoon Throw', maxCD: 240, desc: 'Pull nearest enemy toward you', color: '#66aacc' },
+    r: { name: 'Tidal Wave', maxCD: 720, desc: 'Knockback + slow all nearby enemies', color: '#3388bb' },
+    passive: 'Sea Raider',
+    passiveDesc: '+50% raid loot, +30% sail speed',
+  },
+  persia: {
+    q: { name: 'Immortal Guard', maxCD: 360, desc: 'Block next 3 attacks', color: '#ddbb44' },
+    r: { name: "Satrap's Gold", maxCD: 900, desc: 'Spend gold to convert an enemy', color: '#ffcc22' },
+    passive: 'Imperial Administration',
+    passiveDesc: '+25% colony income, extra officer slot',
+  },
+  phoenicia: {
+    q: { name: 'Greek Fire', maxCD: 300, desc: 'Fire zone dealing damage over time', color: '#ff6622' },
+    r: { name: 'Trade Fleet', maxCD: 1200, desc: 'Call in a supply drop of resources', color: '#88ccff' },
+    passive: 'Master Traders',
+    passiveDesc: '+30% trade income, 2x discovery speed',
+  },
+  gaul: {
+    q: { name: 'Berserker Rage', maxCD: 480, desc: '+50% damage, -30% defense 5s', color: '#cc2222' },
+    r: { name: 'Forest Ambush', maxCD: 840, desc: 'Stealth 3s, first attack 3x damage', color: '#44aa44' },
+    passive: 'Wild Warriors',
+    passiveDesc: '+20% combat damage, +50% forest resources',
+  },
 };
 
 // Faction ability state
@@ -1982,6 +2007,13 @@ var _factionCombo = { count: 0, timer: 0, triggered: false };
 var _egyptAttackCounter = 0;  // Egypt: track attacks for crystal cost
 var _greekDodgeCounter = false; // Greece: recently dodged, next hit = crit
 var _greekDodgeWindow = 0;     // frames remaining for dodge-counter crit
+var _immortalGuardCharges = 0; // Persia Q: incoming hits blocked
+var _berserkTimer = 0;         // Gaul Q: +50% dmg, -30% def timer
+var _stealthTimer = 0;         // Gaul R: stealth timer
+var _stealthFirstStrike = false; // Gaul R: next attack deals 3x
+var _greekFireZones = [];      // Phoenicia Q: [{ x, y, timer, tickTimer, radius }]
+var _convertedEnemies = [];    // Persia R: [{ enemy, timer }]
+var _tidalWaveSlow = [];       // Sea People R: [{ enemy, timer }]
 
 // Initialize faction abilities (call on game start / load)
 function initFactionAbilities() {
@@ -1997,6 +2029,13 @@ function initFactionAbilities() {
   _egyptAttackCounter = 0;
   _greekDodgeCounter = false;
   _greekDodgeWindow = 0;
+  _immortalGuardCharges = 0;
+  _berserkTimer = 0;
+  _stealthTimer = 0;
+  _stealthFirstStrike = false;
+  _greekFireZones = [];
+  _convertedEnemies = [];
+  _tidalWaveSlow = [];
 }
 
 // Get faction combat data
@@ -2126,6 +2165,99 @@ function activateFactionQ() {
       if (typeof snd !== 'undefined' && snd) snd.playSFX('dodge');
       break;
     }
+    case 'seapeople': {
+      // HARPOON THROW — pull nearest enemy toward player
+      _factionAbilities.q.cooldown = FACTION_ABILITIES.seapeople.q.maxCD;
+      let nearest = null, nearD = Infinity;
+      for (let e of enemies) {
+        if (e.state === 'dying' || e.state === 'dead') continue;
+        let d = dist(p.x, p.y, e.x, e.y);
+        if (d < nearD && d < 200) { nearD = d; nearest = e; }
+      }
+      if (nearest) {
+        let kba = atan2(p.y - nearest.y, p.x - nearest.x);
+        nearest.x += cos(kba) * 80;
+        nearest.y += sin(kba) * 80;
+        nearest.hp -= 10;
+        nearest.flashTimer = 8;
+        nearest.state = 'stagger';
+        nearest.stateTimer = 15;
+        _spawnDamageNumber(nearest.x, nearest.y, 10, '#66aacc');
+        // Harpoon line particles
+        for (let i = 0; i < 6; i++) {
+          let t = i / 6;
+          particles.push({
+            x: lerp(p.x, nearest.x, t), y: lerp(p.y, nearest.y, t),
+            vx: random(-0.3, 0.3), vy: random(-0.3, 0.3),
+            life: random(10, 18), maxLife: 18, type: 'burst', size: random(2, 3),
+            r: 102, g: 170, b: 204, world: true,
+          });
+        }
+        addFloatingText(w2sX(p.x), w2sY(p.y) - 30, 'HARPOON!', '#66aacc');
+      }
+      triggerScreenShake(4, 8);
+      if (typeof snd !== 'undefined' && snd) snd.playSFX('whirlwind');
+      break;
+    }
+    case 'persia': {
+      // IMMORTAL GUARD — block next 3 incoming attacks
+      _factionAbilities.q.cooldown = FACTION_ABILITIES.persia.q.maxCD;
+      _immortalGuardCharges = 3;
+      addFloatingText(w2sX(p.x), w2sY(p.y) - 30, 'IMMORTAL GUARD!', '#ddbb44');
+      // Golden shield particles
+      for (let i = 0; i < 6; i++) {
+        let a = random(0, TWO_PI);
+        particles.push({
+          x: p.x + cos(a) * 12, y: p.y + sin(a) * 12,
+          vx: cos(a) * random(0.5, 1.5), vy: sin(a) * random(0.5, 1.5),
+          life: random(20, 35), maxLife: 35, type: 'burst', size: random(2, 4),
+          r: 221, g: 187, b: 68, world: true,
+        });
+      }
+      spawnParticles(p.x, p.y, 'divine', 6);
+      triggerScreenShake(2, 4);
+      if (typeof snd !== 'undefined' && snd) snd.playSFX('shield_bash');
+      break;
+    }
+    case 'phoenicia': {
+      // GREEK FIRE — fire zone at nearest enemy or facing direction
+      _factionAbilities.q.cooldown = FACTION_ABILITIES.phoenicia.q.maxCD;
+      let fAngle3 = getFacingAngle();
+      let fireX = p.x + cos(fAngle3) * 80;
+      let fireY = p.y + sin(fAngle3) * 80;
+      // Target nearest enemy if close enough
+      for (let e of enemies) {
+        if (e.state === 'dying' || e.state === 'dead') continue;
+        let d = dist(p.x, p.y, e.x, e.y);
+        if (d < 120) { fireX = e.x; fireY = e.y; break; }
+      }
+      _greekFireZones.push({ x: fireX, y: fireY, timer: 240, tickTimer: 0, radius: 35 });
+      addFloatingText(w2sX(fireX), w2sY(fireY) - 20, 'GREEK FIRE!', '#ff6622');
+      spawnParticles(fireX, fireY, 'combat', 10);
+      triggerScreenShake(3, 6);
+      if (typeof snd !== 'undefined' && snd) snd.playSFX('whirlwind');
+      break;
+    }
+    case 'gaul': {
+      // BERSERKER RAGE — +50% damage, -30% defense for 5 seconds
+      _factionAbilities.q.cooldown = FACTION_ABILITIES.gaul.q.maxCD;
+      _berserkTimer = 300; // 5s at 60fps
+      addFloatingText(w2sX(p.x), w2sY(p.y) - 30, 'BERSERKER RAGE!', '#cc2222');
+      spawnParticles(p.x, p.y, 'combat', 12);
+      triggerScreenShake(6, 12);
+      // Red rage particles
+      for (let i = 0; i < 8; i++) {
+        let a = random(0, TWO_PI);
+        particles.push({
+          x: p.x + cos(a) * 8, y: p.y + sin(a) * 8,
+          vx: cos(a) * random(1, 2.5), vy: sin(a) * random(1, 2.5),
+          life: random(15, 25), maxLife: 25, type: 'burst', size: random(2, 5),
+          r: 220, g: 40, b: 30, world: true,
+        });
+      }
+      if (typeof snd !== 'undefined' && snd) snd.playSFX('whirlwind');
+      break;
+    }
   }
 }
 
@@ -2210,6 +2342,123 @@ function activateFactionR() {
         });
       }
       if (typeof snd !== 'undefined' && snd) snd.playSFX('shield_bash');
+      break;
+    }
+    case 'seapeople': {
+      // TIDAL WAVE — AoE knockback + slow all nearby enemies
+      _factionAbilities.r.cooldown = FACTION_ABILITIES.seapeople.r.maxCD;
+      let enemies = (state.conquest && state.conquest.active) ? (state.conquest.enemies || []) : (state.adventure && state.adventure.enemies || []);
+      for (let e of enemies) {
+        if (e.state === 'dying' || e.state === 'dead') continue;
+        let d = dist(p.x, p.y, e.x, e.y);
+        if (d < 150) {
+          let kba = atan2(e.y - p.y, e.x - p.x);
+          e.x += cos(kba) * 100;
+          e.y += sin(kba) * 100;
+          e.hp -= 15;
+          e.flashTimer = 10;
+          e.state = 'stagger';
+          e.stateTimer = 20;
+          _spawnDamageNumber(e.x, e.y, 15, '#3388bb');
+          _tidalWaveSlow.push({ enemy: e, timer: 180 }); // 3s slow
+        }
+      }
+      for (let i = 0; i < 12; i++) {
+        let a = (TWO_PI / 12) * i;
+        particles.push({
+          x: p.x, y: p.y,
+          vx: cos(a) * random(2, 4), vy: sin(a) * random(2, 4),
+          life: random(18, 30), maxLife: 30, type: 'burst', size: random(3, 6),
+          r: 51, g: 136, b: 187, world: true,
+        });
+      }
+      addFloatingText(w2sX(p.x), w2sY(p.y) - 35, 'TIDAL WAVE!', '#3388bb');
+      triggerScreenShake(8, 16);
+      if (typeof snd !== 'undefined' && snd) snd.playSFX('whirlwind');
+      break;
+    }
+    case 'persia': {
+      // SATRAP'S GOLD — spend 50 gold to convert nearest enemy
+      let gold = state.resources ? (state.resources.gold || 0) : 0;
+      if (gold < 50) {
+        addFloatingText(w2sX(p.x), w2sY(p.y) - 30, 'Not enough gold!', '#ff4444');
+        return;
+      }
+      _factionAbilities.r.cooldown = FACTION_ABILITIES.persia.r.maxCD;
+      if (state.resources) state.resources.gold -= 50;
+      let enemies2 = (state.conquest && state.conquest.active) ? (state.conquest.enemies || []) : (state.adventure && state.adventure.enemies || []);
+      let nearest = null, nearD = Infinity;
+      for (let e of enemies2) {
+        if (e.state === 'dying' || e.state === 'dead' || e._converted) continue;
+        let d = dist(p.x, p.y, e.x, e.y);
+        if (d < nearD) { nearD = d; nearest = e; }
+      }
+      if (nearest) {
+        nearest._converted = true;
+        _convertedEnemies.push({ enemy: nearest, timer: 900 }); // 15s
+        addFloatingText(w2sX(nearest.x), w2sY(nearest.y) - 30, 'CONVERTED!', '#ffcc22');
+        spawnParticles(nearest.x, nearest.y, 'divine', 8);
+      }
+      addFloatingText(w2sX(p.x), w2sY(p.y) - 35, "SATRAP'S GOLD!", '#ffcc22');
+      triggerScreenShake(3, 6);
+      if (typeof snd !== 'undefined' && snd) snd.playSFX('skill_unlock');
+      break;
+    }
+    case 'phoenicia': {
+      // TRADE FLEET — grant resources scaled by level
+      _factionAbilities.r.cooldown = FACTION_ABILITIES.phoenicia.r.maxCD;
+      let lvl = (state.player.level || 1);
+      let scale = 1 + (lvl / 10);
+      let woodAmt = floor(30 * scale);
+      let stoneAmt = floor(20 * scale);
+      let ironAmt = floor(10 * scale);
+      let crystalAmt = floor(5 * scale);
+      if (state.resources) {
+        state.resources.wood = (state.resources.wood || 0) + woodAmt;
+        state.resources.stone = (state.resources.stone || 0) + stoneAmt;
+        state.resources.iron = (state.resources.iron || 0) + ironAmt;
+        state.resources.crystals = (state.resources.crystals || 0) + crystalAmt;
+      }
+      addFloatingText(w2sX(p.x), w2sY(p.y) - 50, 'TRADE FLEET!', '#88ccff');
+      addFloatingText(w2sX(p.x) - 30, w2sY(p.y) - 35, '+' + woodAmt + ' wood', '#88aa44');
+      addFloatingText(w2sX(p.x) + 30, w2sY(p.y) - 35, '+' + stoneAmt + ' stone', '#aaaaaa');
+      for (let i = 0; i < 6; i++) {
+        particles.push({
+          x: p.x + random(-40, 40), y: p.y - random(30, 60),
+          vx: random(-0.2, 0.2), vy: random(0.5, 1.2),
+          life: random(30, 50), maxLife: 50, type: 'burst', size: random(2, 4),
+          r: 136, g: 204, b: 255, world: true,
+        });
+      }
+      triggerScreenShake(2, 4);
+      if (typeof snd !== 'undefined' && snd) snd.playSFX('skill_unlock');
+      break;
+    }
+    case 'gaul': {
+      // FOREST AMBUSH — stealth 3s, first attack 3x damage
+      _factionAbilities.r.cooldown = FACTION_ABILITIES.gaul.r.maxCD;
+      _stealthTimer = 180; // 3s at 60fps
+      _stealthFirstStrike = true;
+      addFloatingText(w2sX(p.x), w2sY(p.y) - 30, 'FOREST AMBUSH!', '#44aa44');
+      for (let i = 0; i < 8; i++) {
+        let a = random(0, TWO_PI);
+        particles.push({
+          x: p.x + cos(a) * random(5, 20), y: p.y + sin(a) * random(5, 20),
+          vx: cos(a) * random(0.3, 1), vy: -random(0.5, 1.5),
+          life: random(20, 35), maxLife: 35, type: 'burst', size: random(2, 4),
+          r: 60, g: 140, b: 50, world: true,
+        });
+      }
+      // Clear enemy aggro
+      let enemies3 = (state.conquest && state.conquest.active) ? (state.conquest.enemies || []) : (state.adventure && state.adventure.enemies || []);
+      for (let e of enemies3) {
+        if (e.state === 'chasing' || e.state === 'attacking') {
+          e.state = 'idle';
+          e.stateTimer = 60;
+        }
+      }
+      triggerScreenShake(2, 4);
+      if (typeof snd !== 'undefined' && snd) snd.playSFX('dodge');
       break;
     }
   }
@@ -2431,6 +2680,91 @@ function updateFactionAoEs(dt, enemies) {
       }
     }
   }
+
+  // Greek Fire zones (Phoenicia Q)
+  for (let i = _greekFireZones.length - 1; i >= 0; i--) {
+    let gf = _greekFireZones[i];
+    gf.timer -= dt;
+    gf.tickTimer -= dt;
+    if (gf.timer <= 0) { _greekFireZones.splice(i, 1); continue; }
+    if (gf.tickTimer <= 0) {
+      gf.tickTimer = 20; // tick every ~0.33s
+      for (let e of enemies) {
+        if (e.state === 'dying' || e.state === 'dead') continue;
+        if (dist(gf.x, gf.y, e.x, e.y) < gf.radius + (e.size || 10)) {
+          let dmg = 5;
+          e.hp -= dmg;
+          e.flashTimer = 4;
+          _spawnDamageNumber(e.x, e.y, dmg, '#ff6622');
+        }
+      }
+    }
+    if (frameCount % 3 === 0) {
+      particles.push({
+        x: gf.x + random(-gf.radius * 0.6, gf.radius * 0.6),
+        y: gf.y + random(-gf.radius * 0.6, gf.radius * 0.6),
+        vx: random(-0.4, 0.4), vy: random(-2, -0.8),
+        life: random(10, 18), maxLife: 18, type: 'burst', size: random(2, 5),
+        r: 255, g: floor(random(60, 140)), b: 20, world: true,
+      });
+    }
+  }
+
+  // Converted enemies (Persia R)
+  for (let i = _convertedEnemies.length - 1; i >= 0; i--) {
+    let ce = _convertedEnemies[i];
+    ce.timer -= dt;
+    let e = ce.enemy;
+    if (ce.timer <= 0 || e.state === 'dying' || e.state === 'dead') {
+      if (e._converted) e._converted = false;
+      _convertedEnemies.splice(i, 1);
+      continue;
+    }
+    // Converted enemy attacks other enemies
+    let nearest = null, nearD = Infinity;
+    for (let other of enemies) {
+      if (other === e || other.state === 'dying' || other.state === 'dead' || other._converted) continue;
+      let d = dist(e.x, e.y, other.x, other.y);
+      if (d < nearD) { nearD = d; nearest = other; }
+    }
+    if (nearest && nearD > 25) {
+      let a = atan2(nearest.y - e.y, nearest.x - e.x);
+      e.x += cos(a) * 1.2 * dt;
+      e.y += sin(a) * 1.2 * dt;
+    }
+    if (nearest && nearD < 30) {
+      e.attackTimer = (e.attackTimer || 0) - dt;
+      if (e.attackTimer <= 0) {
+        e.attackTimer = 30;
+        nearest.hp -= 10;
+        nearest.flashTimer = 6;
+        _spawnDamageNumber(nearest.x, nearest.y, 10, '#ffcc22');
+      }
+    }
+    // Gold glow particles
+    if (frameCount % 8 === 0) {
+      particles.push({
+        x: e.x + random(-6, 6), y: e.y + random(-6, 6),
+        vx: random(-0.3, 0.3), vy: -random(0.3, 0.8),
+        life: random(10, 18), maxLife: 18, type: 'burst', size: random(1, 3),
+        r: 255, g: 204, b: 34, world: true,
+      });
+    }
+  }
+
+  // Tidal wave slow (Sea People R)
+  for (let i = _tidalWaveSlow.length - 1; i >= 0; i--) {
+    let ts = _tidalWaveSlow[i];
+    ts.timer -= dt;
+    if (ts.timer <= 0 || ts.enemy.state === 'dying' || ts.enemy.state === 'dead') {
+      _tidalWaveSlow.splice(i, 1);
+      continue;
+    }
+    // Apply slow by resetting stagger periodically
+    if (ts.enemy.state !== 'stagger' && ts.timer % 10 === 0) {
+      ts.enemy.stateTimer = max(ts.enemy.stateTimer || 0, 5);
+    }
+  }
 }
 
 function drawFactionAoEs() {
@@ -2539,6 +2873,76 @@ function drawFactionAoEs() {
     ellipse(psx, psy - 4, 28, 22);
     noStroke();
   }
+
+  // Greek Fire zones (Phoenicia Q)
+  for (let gf of _greekFireZones) {
+    let sx = w2sX(gf.x), sy = w2sY(gf.y);
+    let alpha = min(180, gf.timer * 2);
+    noFill();
+    stroke(255, 100, 30, alpha * 0.6);
+    strokeWeight(2);
+    ellipse(sx, sy, gf.radius * 2, gf.radius * 1.4);
+    fill(255, 80, 20, alpha * 0.2);
+    noStroke();
+    ellipse(sx, sy, gf.radius * 2, gf.radius * 1.4);
+  }
+
+  // Immortal Guard charges (Persia Q)
+  if (_immortalGuardCharges > 0) {
+    let p = state.player;
+    let psx = w2sX(p.x), psy = w2sY(p.y);
+    fill(221, 187, 68, 200);
+    noStroke();
+    textSize(10); textAlign(CENTER, CENTER);
+    text('GUARD x' + _immortalGuardCharges, psx, psy - 28);
+    noFill();
+    stroke(221, 187, 68, 80 + sin(frameCount * 0.12) * 40);
+    strokeWeight(2);
+    ellipse(psx, psy - 4, 30, 24);
+    noStroke();
+  }
+
+  // Berserker Rage (Gaul Q)
+  if (_berserkTimer > 0) {
+    let p = state.player;
+    let psx = w2sX(p.x), psy = w2sY(p.y);
+    fill(204, 34, 34, 180);
+    noStroke();
+    textSize(10); textAlign(CENTER, CENTER);
+    text('BERSERK', psx, psy - 28);
+    noFill();
+    stroke(220, 40, 30, 60 + sin(frameCount * 0.15) * 40);
+    strokeWeight(2);
+    ellipse(psx, psy - 4, 26, 20);
+    noStroke();
+  }
+
+  // Stealth (Gaul R)
+  if (_stealthTimer > 0) {
+    let p = state.player;
+    let psx = w2sX(p.x), psy = w2sY(p.y);
+    fill(68, 170, 68, 140);
+    noStroke();
+    textSize(9); textAlign(CENTER, CENTER);
+    text('STEALTH', psx, psy - 28);
+    noFill();
+    stroke(60, 140, 50, 40 + sin(frameCount * 0.08) * 20);
+    strokeWeight(1);
+    ellipse(psx, psy - 4, 32, 26);
+    noStroke();
+  }
+
+  // Converted enemies glow (Persia R)
+  for (let ce of _convertedEnemies) {
+    let e = ce.enemy;
+    if (e.state === 'dying' || e.state === 'dead') continue;
+    let sx = w2sX(e.x), sy = w2sY(e.y);
+    noFill();
+    stroke(255, 204, 34, 100 + sin(frameCount * 0.1) * 40);
+    strokeWeight(1.5);
+    ellipse(sx, sy - 4, 20, 16);
+    noStroke();
+  }
 }
 
 // ─── FACTION COMBAT UPDATE (called from updateCombatSystem) ─────────────
@@ -2559,6 +2963,27 @@ function updateFactionCombat(dt) {
 
   // Greek dodge counter window
   if (_greekDodgeWindow > 0) _greekDodgeWindow -= dt;
+
+  // Berserker rage timer (Gaul Q)
+  if (_berserkTimer > 0) {
+    _berserkTimer -= dt;
+    // Red rage particles while active
+    if (frameCount % 10 === 0) {
+      let p = state.player;
+      particles.push({
+        x: p.x + random(-8, 8), y: p.y + random(-8, 8),
+        vx: random(-0.5, 0.5), vy: -random(0.5, 1.2),
+        life: random(8, 15), maxLife: 15, type: 'burst', size: random(1, 3),
+        r: 220, g: 40, b: 30, world: true,
+      });
+    }
+  }
+
+  // Stealth timer (Gaul R)
+  if (_stealthTimer > 0) {
+    _stealthTimer -= dt;
+    if (_stealthTimer <= 0) _stealthFirstStrike = false;
+  }
 
   // Update projectiles
   updatePlayerProjectiles(dt, enemies);
@@ -2751,6 +3176,61 @@ function factionPlayerAttack() {
       }
       break;
     }
+    default: {
+      // Generic melee for seapeople, persia, phoenicia, gaul
+      p.attackTimer = p.attackCooldown;
+      p.slashPhase = 10;
+      let fAngle = getFacingAngle();
+      let arcHalf = PI * 0.3;
+      let range = p.attackRange + (p.weapon === 1 ? 12 : 0);
+      let baseDmg = floor(([15, 20, 25][p.weapon] || 15) * (typeof getNatBestiaryBonus === 'function' ? getNatBestiaryBonus() : 1));
+      baseDmg = floor(baseDmg * (getFactionData().combatDamageMult || 1));
+      // Gaul passive: +20% combat damage
+      if (f === 'gaul') baseDmg = floor(baseDmg * 1.2);
+      // Berserker Rage: +50% damage
+      if (_berserkTimer > 0) baseDmg = floor(baseDmg * 1.5);
+      // Stealth first strike: 3x damage
+      if (_stealthTimer > 0 && _stealthFirstStrike) {
+        baseDmg = floor(baseDmg * 3);
+        _stealthFirstStrike = false;
+        _stealthTimer = 0;
+        addFloatingText(w2sX(p.x), w2sY(p.y) - 40, 'AMBUSH STRIKE!', '#44aa44');
+        triggerScreenShake(8, 14);
+      }
+      // Standard bonuses
+      let lg = state.legia;
+      if (lg && lg.deployed > 0) baseDmg = floor(baseDmg * (1 + lg.deployed * 0.15));
+      if (state.conquest && state.conquest.active && state.conquest.buildings && state.conquest.buildings.some(b => b.type === 'campfire')) baseDmg += 3;
+      if (typeof hasTech === 'function' && hasTech('siege_weapons')) baseDmg = floor(baseDmg * 1.3);
+
+      for (let e of enemies) {
+        if (e.state === 'dying' || e.state === 'dead') continue;
+        if (e._converted) continue;
+        let d = dist(p.x, p.y, e.x, e.y);
+        if (d > range + (e.size || 10)) continue;
+        let angle = atan2(e.y - p.y, e.x - p.x);
+        let diff = angle - fAngle;
+        while (diff > PI) diff -= TWO_PI;
+        while (diff < -PI) diff += TWO_PI;
+        if (abs(diff) > arcHalf) continue;
+        if (e.type === 'secutor' && random() < 0.5) { addFloatingText(w2sX(e.x), w2sY(e.y) - 20, 'BLOCKED', '#aaaaaa'); e.flashTimer = 4; if (snd) snd.playSFX('shield_bash'); continue; }
+        if (e.type === 'shield_bearer' && random() < (e.blockChance || 0.5)) { addFloatingText(w2sX(e.x), w2sY(e.y) - 20, 'BLOCKED', '#ccbb88'); e.flashTimer = 4; if (snd) snd.playSFX('shield_bash'); continue; }
+        let dmg = baseDmg;
+        e.hp -= dmg;
+        e.flashTimer = 6;
+        e.state = 'stagger'; e.stateTimer = 8;
+        if (e.hp <= 0) { _juiceFreezeFrames = 2; _juiceCombatVignette = min(1, _juiceCombatVignette + 0.3); }
+        let kba = atan2(e.y - p.y, e.x - p.x);
+        e.x += cos(kba) * 5; e.y += sin(kba) * 5;
+        let dmgCol = f === 'gaul' ? '#cc2222' : f === 'seapeople' ? '#66aacc' : f === 'persia' ? '#ddbb44' : '#ff6622';
+        addFloatingText(w2sX(e.x), w2sY(e.y) - 20, '-' + dmg, dmgCol);
+        spawnParticles(e.x, e.y, 'combat', 4);
+        triggerScreenShake(2, 4, cos(kba), sin(kba), 'directional');
+        if (snd) snd.playSFX('hit');
+        _registerComboHit();
+      }
+      break;
+    }
   }
 }
 
@@ -2759,6 +3239,16 @@ function factionPlayerAttack() {
 function getFactionDamageReduction() {
   // Testudo: 80% reduction
   if (_testudoTimer > 0) return 0.8;
+  // Immortal Guard: block incoming hit entirely
+  if (_immortalGuardCharges > 0) {
+    _immortalGuardCharges--;
+    addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 25, 'BLOCKED!', '#ddbb44');
+    spawnParticles(state.player.x, state.player.y, 'divine', 3);
+    if (_immortalGuardCharges <= 0) addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 40, 'Guard ended', '#aaaaaa');
+    return 1.0; // full block
+  }
+  // Berserker Rage: -30% defense (take 30% more damage, negative reduction)
+  if (_berserkTimer > 0) return -0.3;
   return 0;
 }
 
@@ -3355,24 +3845,30 @@ function updatePlayerEscort(dt) {
   if (state.buildMode || (state.conquest && state.conquest.active) || (state.adventure && state.adventure.active)) return;
   if (state.rowing && state.rowing.active) return;
 
-  let escort = state.legia.army.filter(function(u) { return !u.garrison && !u._assignedOfficer; }).slice(0, 8);
+  let escort = state.legia.army.filter(function(u) { return !u.garrison && !u._assignedOfficer; }).slice(0, 20);
   if (escort.length === 0) return;
 
   let p = state.player;
   let inCombat = _isNearEnemies(p.x, p.y, 120);
-  let formationSpread = inCombat ? 0.2 : 0.3;
+  let formationSpread = inCombat ? 0.22 : 0.3;
   let formationDist = inCombat ? 18 : 25;
+  // Player facing direction for V-formation
+  let facingAngle = (p.vx !== undefined && (p.vx !== 0 || p.vy !== 0))
+    ? atan2(p.vy || 0, p.vx || 0) + PI
+    : PI; // default: behind = south
 
   for (let i = 0; i < escort.length; i++) {
     let unit = escort[i];
     let isRanged = UNIT_TYPES[unit.type] && UNIT_TYPES[unit.type].ranged;
 
-    // V-formation: melee in front, ranged in back
-    let row = isRanged ? 1 : 0;
-    let angle = PI + (i - escort.length / 2) * formationSpread;
-    let dist2 = formationDist + row * 15 + (i % 2) * 8;
-    let targetX = p.x + cos(angle) * dist2;
-    let targetY = p.y + sin(angle) * dist2;
+    // V-formation behind player: alternate left/right, deeper rows further back
+    let formRow = floor(i / 2);
+    let side = (i % 2 === 0) ? -1 : 1;
+    let spreadAngle = facingAngle + side * formationSpread * (formRow + 1);
+    let rangedOffset = isRanged ? 15 : 0;
+    let dist2 = formationDist + formRow * 14 + rangedOffset + (i % 2) * 6;
+    let targetX = p.x + cos(spreadAngle) * dist2;
+    let targetY = p.y + sin(spreadAngle) * dist2;
 
     // Initialize position
     if (unit.x === undefined || unit.x === 0) { unit.x = targetX; unit.y = targetY; }
