@@ -7330,7 +7330,7 @@ function selectFaction(faction) {
   // Sea People special start — skip wreck, start on ship
   if (faction === 'seapeople') {
     state.progression.triremeRepaired = true;
-    state.progression.homeIslandReached = false;
+    state.progression.homeIslandReached = true; // must be true or game falls into wreck mode on dock
     state.rowing.active = true;
     state.rowing.x = WORLD.islandCX - 800;
     state.rowing.y = WORLD.islandCY;
