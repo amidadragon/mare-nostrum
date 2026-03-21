@@ -1587,9 +1587,22 @@ function drawWreckIsland() {
   let rx = WRECK.rx, ry = WRECK.ry;
   let sx = w2sX(cx), sy = w2sY(cy);
 
+  // Distance-based scaling when sailing (not when player is on the wreck)
+  let _dScale = null;
+  if (state.rowing && state.rowing.active && typeof _getDistantScale === 'function') {
+    let horizMinY = max(height * 0.06, height * 0.25 - (typeof horizonOffset !== 'undefined' ? horizonOffset : 0)) + 10;
+    sy = max(sy, horizMinY);
+    _dScale = _getDistantScale(cx, cy, rx);
+    if (_dScale.dist > 4000) return;
+  }
+
   if (sx + rx < -400 || sx - rx > width + 400 || sy + ry < -300 || sy - ry > height + 300) return;
 
+  push();
   noStroke();
+  if (_dScale && _dScale.scale < 0.98) {
+    translate(sx, sy); scale(_dScale.scale); translate(-sx, -sy);
+  }
   let sandRX = rx * 0.88, sandRY = ry * 0.50;
   let bright = typeof getSkyBrightness === 'function' ? getSkyBrightness() : 0.6;
   let t0 = frameCount * 0.01;
@@ -2407,6 +2420,7 @@ function drawWreckIsland() {
       }
     }
   }
+  pop();
 }
 
 function drawWreckEntities() {

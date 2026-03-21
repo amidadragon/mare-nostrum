@@ -15,9 +15,24 @@ function getCoastlineVerts() {
   for (let i = 0; i < numVerts; i++) {
     let angle = (i / numVerts) * TWO_PI;
     let noiseVal = noise(cos(angle) * 2 + noiseSeed, sin(angle) * 2 + noiseSeed);
-    // Second octave at half frequency for larger-scale coastal irregularity
     let noiseVal2 = noise(cos(angle) * 0.9 + noiseSeed + 100, sin(angle) * 0.9 + noiseSeed + 100);
-    let offset = (noiseVal - 0.5) * 0.09 + (noiseVal2 - 0.5) * 0.05;
+    let offset = (noiseVal - 0.5) * 0.14 + (noiseVal2 - 0.5) * 0.08;
+
+    // Angular bias: south wider (beach/port), north narrower (rocky)
+    let sy = Math.sin(angle); // +1 at south (PI/2), -1 at north
+    offset += sy * 0.03; // south bulges out, north pulls in
+
+    // Fixed geographic features to break ellipse symmetry
+    // West headland/peninsula (angle ~PI)
+    let westDist = Math.abs(angle - Math.PI);
+    if (westDist < 0.35) offset += (0.35 - westDist) / 0.35 * 0.06;
+    // Northeast bay/indent (angle ~5.5 rad, i.e. ~315 degrees)
+    let neDist = Math.abs(angle - 0.4);
+    if (neDist < 0.3) offset -= (0.3 - neDist) / 0.3 * 0.05;
+    // South beach — wider flatter area (angle ~PI/2)
+    let southDist = Math.abs(angle - Math.PI * 0.5);
+    if (southDist < 0.5) offset += (0.5 - southDist) / 0.5 * 0.03;
+
     _coastlineVerts.push({ angle: angle, offset: offset });
   }
   _coastlineLastRX = rx;

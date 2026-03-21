@@ -1473,7 +1473,7 @@ function initState() {
 
     // Crystal shrine — far left side of island, well clear of farm grid
     crystalShrine: {
-      x: WORLD.islandCX - 440, y: WORLD.islandCY - 15,
+      x: WORLD.islandCX - 480, y: WORLD.islandCY - 15,
     },
 
     // Port positions — stored in state, updated on island expansion
@@ -3278,10 +3278,15 @@ function drawInner() {
       drawWreckIsland();
       // Distant label
       let wsx = w2sX(WRECK.cx), wsy = w2sY(WRECK.cy);
-      if (wsx > -100 && wsx < width + 100 && wsy > -100 && wsy < height + 100) {
-        fill(200, 180, 120, 120);
+      let _wreckHorizY = max(height * 0.06, height * 0.25 - horizonOffset) + 10;
+      wsy = max(wsy, _wreckHorizY);
+      let _wreckDS = typeof _getDistantScale === 'function' ? _getDistantScale(WRECK.cx, WRECK.cy, WRECK.rx) : null;
+      if (_wreckDS && _wreckDS.dist > 4000) {} // skip label if too far
+      else if (wsx > -100 && wsx < width + 100 && wsy > -100 && wsy < height + 100) {
+        let _wLabelAlpha = _wreckDS ? lerp(120, 40, constrain((_wreckDS.dist - 500) / 3000, 0, 1)) : 120;
+        fill(200, 180, 120, _wLabelAlpha);
         noStroke(); textSize(11); textAlign(CENTER, CENTER);
-        text('Wreck Beach', floor(wsx), floor(wsy - WRECK.ry * 0.5));
+        text('Wreck Beach', floor(wsx), floor(wsy - WRECK.ry * 0.5 * (_wreckDS ? _wreckDS.scale : 1)));
         textAlign(LEFT, TOP);
       }
       // New islands visible when sailing
@@ -12498,37 +12503,16 @@ function updateCenturion(dt) {
     }
   }
 
-  // Default: follow player
-  cen.task = 'follow';
-  let followDist = 35;
-  let dx = p.x - followDist * (p.facing === 'left' ? -1 : 1) - cen.x;
-  let dy = p.y + 5 - cen.y;
-  let d = sqrt(dx * dx + dy * dy);
-  if (d > 200 && !state.conquest.active) {
-    // Too far — snap to player (prevents rubber-banding across island)
-    cen.x = p.x + 20; cen.y = p.y + 10; cen.vx = 0; cen.vy = 0;
-  } else if (d > 20) {
-    let spd = min(cen.speed * 1.2, cen.speed + d * 0.005); // gentle speed boost, no wild teleporting
-    cen.vx = (dx / d) * spd;
-    cen.vy = (dy / d) * spd;
-    let nx = cen.x + cen.vx * dt, ny = cen.y + cen.vy * dt;
-    if (isWalkable(nx, ny)) { cen.x = nx; cen.y = ny; }
-    else { cen.vx *= 0.3; cen.vy *= 0.3; } // don't push through island edge
-    cen.facing = dx > 0 ? 1 : -1;
-  } else {
-    cen.vx *= 0.8;
-    cen.vy *= 0.8;
-  }
-
-  // Clamp to island
+  // Clamp centurion to island FIRST (before follow logic to prevent edge oscillation)
   if (!state.conquest.active) {
     let ix = WORLD.islandCX, iy = WORLD.islandCY;
-    let rx = getSurfaceRX() * 0.92, ry = getSurfaceRY() * 0.92;
+    let rx = getSurfaceRX() * 0.90, ry = getSurfaceRY() * 0.90;
     let ex = (cen.x - ix) / rx, ey = (cen.y - iy) / ry;
     if (ex * ex + ey * ey > 1) {
       let a = atan2(cen.y - iy, cen.x - ix);
       cen.x = ix + cos(a) * rx;
       cen.y = iy + sin(a) * ry;
+      cen.vx = 0; cen.vy = 0;
     }
   } else {
     let c = state.conquest;
@@ -12537,7 +12521,40 @@ function updateCenturion(dt) {
       let a = atan2(cen.y - c.isleY, cen.x - c.isleX);
       cen.x = c.isleX + cos(a) * c.isleRX * 0.9;
       cen.y = c.isleY + sin(a) * c.isleRY * 0.9;
+      cen.vx = 0; cen.vy = 0;
     }
+  }
+
+  // Default: follow player
+  cen.task = 'follow';
+  let followDist = 35;
+  let dx = p.x - followDist * (p.facing === 'left' ? -1 : 1) - cen.x;
+  let dy = p.y + 5 - cen.y;
+  let d = sqrt(dx * dx + dy * dy);
+
+  // Check if player is near the island edge — centurion should stop following
+  let playerNearEdge = false;
+  if (!state.conquest.active) {
+    let pix = WORLD.islandCX, piy = WORLD.islandCY;
+    let prx = getSurfaceRX() * 0.90, pry = getSurfaceRY() * 0.90;
+    let pex = (p.x - pix) / prx, pey = (p.y - piy) / pry;
+    playerNearEdge = pex * pex + pey * pey > 0.85;
+  }
+
+  if (d > 200 && !state.conquest.active) {
+    // Too far — snap to player (prevents rubber-banding across island)
+    cen.x = p.x + 20; cen.y = p.y + 10; cen.vx = 0; cen.vy = 0;
+  } else if (d > 20 && !playerNearEdge) {
+    let spd = min(cen.speed * 1.2, cen.speed + d * 0.005);
+    cen.vx = (dx / d) * spd;
+    cen.vy = (dy / d) * spd;
+    let nx = cen.x + cen.vx * dt, ny = cen.y + cen.vy * dt;
+    if (isWalkable(nx, ny)) { cen.x = nx; cen.y = ny; }
+    else { cen.vx = 0; cen.vy = 0; }
+    cen.facing = dx > 0 ? 1 : -1;
+  } else {
+    cen.vx *= 0.8;
+    cen.vy *= 0.8;
   }
 }
 
@@ -23405,6 +23422,112 @@ function keyPressed() {
     // Collect bottles
     let nearBottle = state.bottles.find(b => !b.collected && dist(state.player.x, state.player.y, b.x, b.y) < 40);
     if (nearBottle) { collectBottle(nearBottle); return; }
+    // E key: mine nearest charged crystal node
+    {
+      let nearCrystal = state.crystalNodes.find(c =>
+        c.charge > 0 && dist(state.player.x, state.player.y, c.x, c.y) < 60
+      );
+      if (nearCrystal) {
+        let pickBonus = state.player.hotbarSlot === 2;
+        if (!pickBonus) { state.player.hotbarSlot = 2; addFloatingText(width / 2, height - 110, 'Switched to Pick', '#aaddaa'); }
+        state.player.toolSwing = 12;
+        state.player._hitlagFrames = 2;
+        let amt = nearCrystal.charge >= 30 ? 2 : 1;
+        if (pickBonus) amt += 1;
+        amt = floor(amt * (getFactionData().crystalIncomeMult || 1));
+        state.crystals += amt;
+        if (snd) snd.playSFX('crystal');
+        state.dailyActivities.crystal += amt;
+        if (typeof trackStat === 'function') trackStat('crystalsCollected', amt);
+        if (typeof checkDailyQuestProgress === 'function') checkDailyQuestProgress('crystal', amt);
+        checkQuestProgress('crystal', amt);
+        if (typeof advanceMainQuestCounter === 'function') advanceMainQuestCounter('mq_crystals_gathered', amt);
+        unlockJournal('first_crystal');
+        nearCrystal.charge = 0;
+        nearCrystal.respawnTimer = state.tools.steelPick ? 400 : 800;
+        let csx = w2sX(nearCrystal.x), csy = w2sY(nearCrystal.y);
+        addFloatingText(csx, csy - 15, '+' + amt + ' Crystal', C.crystalGlow);
+        spawnCrystalPulse(nearCrystal.x, nearCrystal.y);
+        triggerScreenShake(2, 4);
+        return;
+      }
+    }
+    // E key: harvest nearest ripe crop
+    {
+      let nearPlot = state.plots.find(p =>
+        p.ripe && dist(state.player.x, state.player.y, p.x, p.y) < 40
+      );
+      if (nearPlot) {
+        let p = nearPlot;
+        let hs = state.player.hotbarSlot;
+        let toolBonus = hs === 0;
+        if (hs !== 0) { state.player.hotbarSlot = 0; addFloatingText(width / 2, height - 110, 'Switched to Sickle', '#aaddaa'); }
+        state.player.toolSwing = 12;
+        state.player._hitlagFrames = 2;
+        let wasBlessed = p.blessed;
+        p.planted = false; p.ripe = false; p.glowing = false;
+        p.timer = 0; p.stage = 0; p.blessed = false;
+        let harvestAmt = (state.npc && state.npc.hearts >= 5) ? 2 : 1;
+        if (state.tools && state.tools.sickle) harvestAmt *= 2;
+        if (state.blessing && state.blessing.type === 'luck') harvestAmt *= 2;
+        if (state.heartRewards && state.heartRewards.includes('golden')) harvestAmt *= 2;
+        if (wasBlessed) harvestAmt *= 3;
+        if (state.prophecy && state.prophecy.type === 'harvest') harvestAmt += 1;
+        let festR = getFestival();
+        if (festR && festR.effect.allResources) harvestAmt *= festR.effect.allResources;
+        if (toolBonus) harvestAmt += 1;
+        if (state.colonySpec && state.colonySpec['conquest'] === 'agricultural') harvestAmt = floor(harvestAmt * 1.3);
+        if (typeof getHarvestSkillBonus === 'function') harvestAmt = floor(harvestAmt * getHarvestSkillBonus());
+        harvestAmt = floor(harvestAmt * getEventHarvestMult());
+        harvestAmt = onHarvestCombo(p, harvestAmt);
+        if (typeof hasTech === 'function' && hasTech('selective_breeding') && random() < 0.25) {
+          harvestAmt *= 2;
+          addFloatingText(w2sX(p.x), w2sY(p.y) - 20, '2x BREED!', '#88cc44');
+        }
+        state.harvest += harvestAmt;
+        state.dailyActivities.harvested += harvestAmt;
+        if (snd) snd.playSFX('harvest');
+        triggerPlayerJoy();
+        unlockJournal('first_harvest');
+        if (!state.codex.cropsGrown) state.codex.cropsGrown = {};
+        state.codex.cropsGrown[p.cropType || 'grain'] = true;
+        let _ck = p.cropType || 'grain';
+        if (!state.codex.crops) state.codex.crops = {};
+        if (!state.codex.crops[_ck]) state.codex.crops[_ck] = { harvested: true, count: 0, firstDay: state.day };
+        state.codex.crops[_ck].count += harvestAmt;
+        state.codex.crops[_ck].harvested = true;
+        checkQuestProgress('harvest', harvestAmt);
+        if (typeof advanceMainQuestCounter === 'function') advanceMainQuestCounter('mq_harvested', harvestAmt);
+        if (typeof grantXP === 'function') grantXP(5 * harvestAmt);
+        trackMilestone('first_harvest');
+        if (typeof trackStat === 'function') trackStat('cropsHarvested', harvestAmt);
+        if (typeof checkDailyQuestProgress === 'function') checkDailyQuestProgress('harvest', harvestAmt);
+        if (typeof triggerNPCReaction === 'function') triggerNPCReaction('harvest', p.x, p.y);
+        let seedBack = 1 + (random() < 0.5 ? 1 : 0);
+        if (Object.keys(state.codex.crops).length >= 7) seedBack += 1;
+        state.seeds += seedBack;
+        let px = w2sX(p.x), py = w2sY(p.y);
+        addFloatingText(px, py - 25, '+' + seedBack + ' Seed', '#8fbc8f');
+        let scData = getSeasonalCropData(p.cropType);
+        if (scData) {
+          if (p.cropType === 'sunfruit') { state.solar = min(state.maxSolar, state.solar + 15); addFloatingText(px, py - 35, '+15 Solar!', '#ffaa33'); }
+          if (p.cropType === 'frostherb') { state.crystals += 1; addFloatingText(px, py - 35, '+1 Crystal!', '#88ddff'); }
+          if (p.cropType === 'pumpkin') { harvestAmt += 2; }
+          if (p.cropType === 'wildflower') { spawnParticles(p.x, p.y, 'build', 10); }
+        }
+        if (p.cropType === 'lotus') { let lc = 1 + floor(random(2)); state.crystals += lc; addFloatingText(px, py - 35, '+' + lc + ' Crystal!', '#f0a0c8'); }
+        if (p.cropType === 'pomegranate') { let pg = 3 + floor(random(3)); state.gold += pg; addFloatingText(px, py - 35, '+' + pg + ' Gold!', '#c82828'); }
+        if (p.cropType === 'flax') { let fb = 1; state.wood += fb; addFloatingText(px, py - 35, '+' + fb + ' Fiber!', '#6496dc'); }
+        let label = wasBlessed ? '+' + harvestAmt + ' BLESSED!' : (harvestAmt > 1 ? '+' + harvestAmt + ' Harvest!' : '+Harvest');
+        let labelColor = (typeof getSeasonalCropData === 'function' && getSeasonalCropData(p.cropType)) ? getSeasonalCropData(p.cropType).color : (wasBlessed ? '#ffdd00' : C.cropGlow);
+        addFloatingText(px, py - 20, label, labelColor);
+        if (typeof spawnHarvestArc === 'function') spawnHarvestArc(px, py - 20, label, labelColor, 'harvest');
+        if (typeof markCodexDiscovery === 'function' && state.codex.crops[_ck] && state.codex.crops[_ck].count === harvestAmt) markCodexDiscovery('crops', _ck);
+        spawnHarvestBurst(p.x, p.y, p.cropType || 'grain');
+        triggerScreenShake(wasBlessed ? 4 : 1.5, wasBlessed ? 8 : 4);
+        return;
+      }
+    }
     // Legia castrum interaction
     if (state.legia && state.legia.castrumLevel > 0 &&
         dist(state.player.x, state.player.y, state.legia.castrumX, state.legia.castrumY) < 50) {
@@ -25098,6 +25221,16 @@ function loadGame() {
       state.legia.expeditionTarget = null; // reset expedition state on load
       state.legia.marching = false;
     }
+    // Safety: ensure castrum is active if island level >= 8
+    if (state.islandLevel >= 8 && state.legia && state.legia.castrumLevel < 1) {
+      state.legia.castrumLevel = 1;
+      state.legia.castrumX = 920;
+      state.legia.castrumY = 480;
+      // Ensure castrum building exists
+      if (!state.buildings.some(b => b.type === 'castrum')) {
+        state.buildings.push({ x: 920, y: 480, w: 130, h: 100, type: 'castrum', rot: 0 });
+      }
+    }
     state.arenaHighWave = d.arenaHighWave || 0;
     // Random events
     if (d.activeEvent && typeof d.activeEvent === 'object') state.activeEvent = d.activeEvent;
@@ -25330,7 +25463,7 @@ function loadGame() {
       });
     }
     // Always use current shrine position (layout may have changed)
-    state.crystalShrine = { x: WORLD.islandCX - 440, y: WORLD.islandCY - 15 };
+    state.crystalShrine = { x: WORLD.islandCX - 480, y: WORLD.islandCY - 15 };
     // Rebuild crystal nodes around shrine
     let shX = state.crystalShrine.x, shY = state.crystalShrine.y;
     let cSlots = [
@@ -26535,6 +26668,11 @@ function _addProceduralPerimeter(lvl, cx, cy, rx, ry) {
     let ca = angle0 + PI;
     let crx = cx + cos(ca) * state.islandRX * 0.85;
     let cry = cy + sin(ca) * state.islandRY * 0.65;
+    // Push away from farm zone
+    if (typeof isInFarmZone === 'function' && isInFarmZone(crx, cry)) {
+      let f = getFarmBounds();
+      crx = f.x - f.hw - 40;
+    }
     let cSize = min(14 + floor(lvl / 5) * 2, 24);
     state.crystalNodes.push({
       x: crx, y: cry,
@@ -26583,7 +26721,7 @@ function placeEraBuildings(lvl) {
     let bld = { x: slot.x, y: slot.y, w: slot.w, h: slot.h, type: slot.type, rot: 0 };
     // Force-place decorative ground tiles (floors, mosaics) and castrum compound
     // parts that intentionally overlap parent structures
-    let forcePlace = slot.type === 'floor' || slot.type === 'mosaic'
+    let forcePlace = slot.type === 'floor' || slot.type === 'mosaic' || slot.type === 'castrum'
       || (slot.id && (slot.id.startsWith('wall_cast') || slot.id.startsWith('torch_cast') || slot.id === 'watchtower_cast'));
     if (forcePlace) {
       state.buildings.push(bld);
