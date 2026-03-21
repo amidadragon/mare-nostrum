@@ -2420,8 +2420,8 @@ function drawInner() {
   updateTutorialHint(dt);
   if (snd && frameCount % 10 === 0) { snd.updateAmbient(); }
 
-  // === WRECK BEACH MODE — before home island is reached ===
-  if (state.progression.gameStarted && !state.progression.homeIslandReached &&
+  // === WRECK BEACH MODE — before home island is reached, or revisiting ===
+  if (((state.progression.gameStarted && !state.progression.homeIslandReached) || state.wreck._visiting) &&
       !state.rowing.active && !state.conquest.active && !state.adventure.active) {
     updateWreckBeach(dt);
     updatePlayerAnim(dt);
@@ -2814,7 +2814,6 @@ function drawInner() {
       drawPlentyDistantLabel();
       drawNecropolisIsland();
       drawNecropolisDistantLabel();
-      drawRivalIsleDistant();
     }
     pop();
 
@@ -20248,6 +20247,17 @@ function keyPressed() {
     if (typeof worldMapOpen !== 'undefined' && worldMapOpen) { worldMapOpen = false; return; }
     if (state.nationDiplomacyOpen) { closeNationDiplomacy(); return; }
     if (state.visitingNation) { exitNationIsland(); return; }
+    if (state.wreck._visiting) {
+      state.wreck._visiting = false;
+      state.rowing.active = true;
+      state.rowing.x = WRECK.cx;
+      state.rowing.y = WRECK.cy + WRECK.ry * 1.1;
+      state.rowing.speed = 0; state.rowing.angle = HALF_PI; state.rowing.wakeTrail = [];
+      state.player.x = state.rowing.x; state.player.y = state.rowing.y;
+      cam.x = state.player.x; cam.y = state.player.y;
+      camSmooth.x = cam.x; camSmooth.y = cam.y;
+      return;
+    }
     if (state.buildMode) { state.buildMode = false; return; }
     if (state.insideTemple) { state.insideTemple = false; return; }
     if (wardrobeOpen) { wardrobeOpen = false; return; }
@@ -20308,9 +20318,29 @@ function keyPressed() {
   }
 
   // ─── WRECK BEACH KEYS ───
-  if (state.progression.gameStarted && !state.progression.homeIslandReached &&
+  if (((state.progression.gameStarted && !state.progression.homeIslandReached) || state.wreck._visiting) &&
       !state.rowing.active && !state.conquest.active && !state.adventure.active) {
-    if (key === 'e' || key === 'E') handleWreckInteract();
+    if (key === 'e' || key === 'E') {
+      // When visiting wreck from sailing, E at south shore to depart
+      if (state.wreck._visiting) {
+        let wbY = WRECK.cy + WRECK.ry * 0.75;
+        if (state.player.y > wbY) {
+          state.wreck._visiting = false;
+          state.rowing.active = true;
+          state.rowing.x = WRECK.cx;
+          state.rowing.y = WRECK.cy + WRECK.ry * 1.1;
+          state.rowing.speed = 0;
+          state.rowing.angle = HALF_PI;
+          state.rowing.wakeTrail = [];
+          state.player.x = state.rowing.x; state.player.y = state.rowing.y;
+          cam.x = state.player.x; cam.y = state.player.y;
+          camSmooth.x = cam.x; camSmooth.y = cam.y;
+          addFloatingText(width / 2, height * 0.35, 'Setting sail...', '#88ccff');
+          return;
+        }
+      }
+      handleWreckInteract();
+    }
     if (key === ' ' && typeof _wreckMiniGames !== 'undefined' && _wreckMiniGames.rockSkip && (_wreckMiniGames.rockPhase === 'throwing' || _wreckMiniGames.rockPhase === 'bouncing')) { handleRockBounce(); return false; }
     return; // block all other game keys on wreck
   }
@@ -20601,6 +20631,7 @@ function keyPressed() {
       if (r.nearIsle === 'wreck') {
         // Dock at wreck beach
         state.rowing.active = false;
+        state.wreck._visiting = true;
         state.player.x = WRECK.cx + 40;
         state.player.y = WRECK.cy + 10;
         state.player.vx = 0; state.player.vy = 0;
@@ -22362,6 +22393,10 @@ function loadGame() {
       if (state.wreck.wreckDayStart === undefined) state.wreck.wreckDayStart = state.day;
       if (state.wreck.caveDiscovered === undefined) state.wreck.caveDiscovered = false;
       if (!Array.isArray(state.wreck.glints)) state.wreck.glints = [];
+      if (!Array.isArray(state.wreck.palms)) state.wreck.palms = [];
+      if (!Array.isArray(state.wreck.crabs)) state.wreck.crabs = [];
+      if (!Array.isArray(state.wreck.decor)) state.wreck.decor = [];
+      if (!Array.isArray(state.wreck.scavNodes)) state.wreck.scavNodes = [];
     }
     // Diving resources & upgrades
     if (d.diving) {

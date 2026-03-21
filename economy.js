@@ -912,16 +912,30 @@ function doPrestige() {
   let unlockedBuildings = state.prestige ? [...state.prestige.unlockedBuildings] : [];
   // Keep tools
   let tools = { ...state.tools };
+  // Keep faction
+  let faction = state.faction || 'rome';
   // Keep some resources (50% of each)
   let keepGold = Math.floor((state.gold || 0) * 0.5);
   let keepCrystals = Math.floor((state.crystals || 0) * 0.5);
   let keepIron = Math.floor((state.ironOre || 0) * 0.5);
   // Keep achievement/codex progress
   let codex = state.codex ? JSON.parse(JSON.stringify(state.codex)) : null;
+  let achievements = state.achievements ? [...state.achievements] : [];
   let arenaHigh = state.arenaHighWave || 0;
 
   // Reset game state
   initState();
+
+  // NG+ skips wreck beach — start on home island directly
+  state.introPhase = 'done';
+  state.progression.gameStarted = true;
+  state.progression.homeIslandReached = true;
+  state.progression.villaCleared = true;
+  state.progression.farmCleared = true;
+  state.progression.wreckExplored = true;
+  state.progression.npcsFound = { livia: true, marcus: true, vesta: true, felix: true };
+  state.progression.companionsAwakened = { lares: true, woodcutter: true, harvester: true, centurion: true };
+  state.faction = faction;
 
   // Restore kept progress
   state.prestige = { count: count, totalScore: totalScore, unlockedBuildings: unlockedBuildings };
@@ -932,7 +946,14 @@ function doPrestige() {
   state.crystals = keepCrystals;
   state.ironOre = keepIron;
   if (codex) state.codex = codex;
+  state.achievements = achievements;
   state.arenaHighWave = arenaHigh;
+
+  // Initialize systems that depend on state being set up
+  if (typeof initConquestIsland === 'function') initConquestIsland();
+  if (typeof initNarrativeState === 'function') initNarrativeState();
+  if (typeof initNations === 'function') initNations();
+  if (typeof initFactionAbilities === 'function') initFactionAbilities();
 
   // Prestige difficulty scaling
   // (Applied via getPrestigeDifficultyMult in gameplay checks)
