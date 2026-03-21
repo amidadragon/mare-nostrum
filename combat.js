@@ -2876,3 +2876,1200 @@ function _drawAbilityIcon(x, y, key, name, col, frac, ready) {
     text(ceil(_factionAbilities[key.toLowerCase()].cooldown / 60) + 's', x + 53, y + 3);
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ─── OFFICER SYSTEM ─────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+
+const OFFICER_RANKS = {
+  decurion:  { name: 'Decurion',  maxTroops: 5,  xpThreshold: 0,    promoteCost: 0 },
+  centurion: { name: 'Centurion', maxTroops: 15, xpThreshold: 200,  promoteCost: 200 },
+  legate:    { name: 'Legate',    maxTroops: 30, xpThreshold: 600,  promoteCost: 500 },
+};
+
+const OFFICER_ORDERS = {
+  ESCORT:  { name: 'Escort Player', desc: 'Follow and protect' },
+  PATROL:  { name: 'Patrol',        desc: 'Walk between two points' },
+  ATTACK:  { name: 'Attack Island', desc: 'Sail and fight, return with loot' },
+  DEFEND:  { name: 'Defend Island', desc: 'Station garrison at island' },
+  SCOUT:   { name: 'Scout',         desc: 'Explore and reveal map' },
+};
+
+const OFFICER_NAMES = [
+  'Gaius', 'Lucius', 'Tiberius', 'Publius', 'Quintus', 'Servius',
+  'Aulus', 'Decimus', 'Gnaeus', 'Spurius', 'Manius', 'Appius',
+  'Numerius', 'Vibius', 'Statius', 'Volusus', 'Postumus', 'Agrippa',
+];
+
+var officerPanelOpen = false;
+var _officerSelectedIdx = -1;
+var _officerOrderMode = false; // true when choosing an order for selected officer
+
+function generateOfficerName() {
+  let used = (state.officers || []).map(o => o.name);
+  let avail = OFFICER_NAMES.filter(n => !used.includes(n));
+  if (avail.length === 0) avail = OFFICER_NAMES;
+  return avail[floor(random(avail.length))];
+}
+
+function hireOfficer() {
+  if (!state.officers) state.officers = [];
+  if (state.officers.length >= 3) {
+    addFloatingText(width / 2, height * 0.3, 'Max 3 officers!', '#ff6644');
+    return false;
+  }
+  let cost = 100 + state.officers.length * 100;
+  if (state.gold < cost) {
+    addFloatingText(width / 2, height * 0.3, 'Need ' + cost + ' gold', '#ff6644');
+    return false;
+  }
+  state.gold -= cost;
+  let o = {
+    name: generateOfficerName(),
+    level: 1,
+    xp: 0,
+    rank: 'decurion',
+    troops: [],
+    currentOrder: null,
+    x: state.player.x + random(-30, 30),
+    y: state.player.y + random(-20, 20),
+    portrait: floor(random(4)),
+    _patrolTimer: 0,
+    _scoutTimer: 0,
+    _attackTimer: 0,
+    _returnTimer: 0,
+  };
+  state.officers.push(o);
+  addFloatingText(width / 2, height * 0.3, 'Officer ' + o.name + ' hired!', '#ddaa44');
+  if (typeof snd !== 'undefined' && snd) snd.playSFX('upgrade');
+  return true;
+}
+
+function promoteOfficer(idx) {
+  let o = state.officers[idx];
+  if (!o) return false;
+  let nextRank = o.rank === 'decurion' ? 'centurion' : o.rank === 'centurion' ? 'legate' : null;
+  if (!nextRank) { addFloatingText(width / 2, height * 0.3, 'Already max rank!', '#aaaaaa'); return false; }
+  let req = OFFICER_RANKS[nextRank];
+  if (o.xp < req.xpThreshold) {
+    addFloatingText(width / 2, height * 0.3, 'Need ' + req.xpThreshold + ' XP (has ' + floor(o.xp) + ')', '#ff6644');
+    return false;
+  }
+  if (state.gold < req.promoteCost) {
+    addFloatingText(width / 2, height * 0.3, 'Need ' + req.promoteCost + ' gold', '#ff6644');
+    return false;
+  }
+  state.gold -= req.promoteCost;
+  o.rank = nextRank;
+  o.level++;
+  addFloatingText(width / 2, height * 0.3, o.name + ' promoted to ' + req.name + '!', '#ffdd44');
+  if (typeof snd !== 'undefined' && snd) snd.playSFX('skill_unlock');
+  return true;
+}
+
+function assignTroopsToOfficer(officerIdx, count) {
+  let o = state.officers[officerIdx];
+  if (!o) return;
+  let lg = state.legia;
+  if (!lg || !lg.army) return;
+  let maxT = OFFICER_RANKS[o.rank].maxTroops;
+  let available = lg.army.filter(u => u.garrison && !u._assignedOfficer);
+  let toAssign = min(count, maxT - o.troops.length, available.length);
+  for (let i = 0; i < toAssign; i++) {
+    available[i]._assignedOfficer = officerIdx;
+    o.troops.push(available[i]);
+  }
+  if (toAssign > 0) addFloatingText(width / 2, height * 0.3, toAssign + ' troops assigned to ' + o.name, '#cc8844');
+}
+
+function unassignTroopsFromOfficer(officerIdx) {
+  let o = state.officers[officerIdx];
+  if (!o) return;
+  o.troops.forEach(u => { u._assignedOfficer = undefined; });
+  let count = o.troops.length;
+  o.troops = [];
+  if (count > 0) addFloatingText(width / 2, height * 0.3, count + ' troops unassigned from ' + o.name, '#cc8844');
+}
+
+function setOfficerOrder(officerIdx, orderType, params) {
+  let o = state.officers[officerIdx];
+  if (!o) return;
+  o.currentOrder = { type: orderType, params: params || {}, timer: 0 };
+  addFloatingText(width / 2, height * 0.3, o.name + ': ' + (OFFICER_ORDERS[orderType] ? OFFICER_ORDERS[orderType].name : orderType), '#cc8844');
+}
+
+function grantOfficerXP(officerIdx, amount) {
+  let o = state.officers[officerIdx];
+  if (!o) return;
+  o.xp += amount;
+}
+
+function updateOfficers(dt) {
+  if (!state.officers) return;
+  let p = state.player;
+  for (let oi = 0; oi < state.officers.length; oi++) {
+    let o = state.officers[oi];
+    if (!o.currentOrder) {
+      // Idle: stand near castrum
+      let lg = state.legia;
+      let cx = (lg && lg.castrumX) ? lg.castrumX : WORLD.islandCX + 200;
+      let cy = (lg && lg.castrumY) ? lg.castrumY : WORLD.islandCY + 100;
+      let dx = cx + (oi * 25) - o.x, dy = cy + 15 - o.y;
+      let d = sqrt(dx * dx + dy * dy);
+      if (d > 5) { o.x += (dx / d) * 0.8 * dt; o.y += (dy / d) * 0.5 * dt; }
+      continue;
+    }
+    let order = o.currentOrder;
+    order.timer += dt;
+
+    switch (order.type) {
+      case 'ESCORT': {
+        // Follow player
+        let dx = p.x - 30 + oi * 20 - o.x;
+        let dy = p.y + 15 + oi * 10 - o.y;
+        let d = sqrt(dx * dx + dy * dy);
+        if (d > 15) {
+          let spd = min(d * 0.06, 2.5) * dt;
+          o.x += (dx / d) * spd;
+          o.y += (dy / d) * spd;
+        }
+        // Troops follow officer
+        _updateOfficerTroopFollow(o, dt);
+        // Auto-attack nearby enemies (home island raids)
+        _officerAutoAttack(o, oi, dt);
+        break;
+      }
+      case 'PATROL': {
+        let pts = order.params;
+        let tx = (order._leg || 0) === 0 ? (pts.x1 || o.x) : (pts.x2 || o.x);
+        let ty = (order._leg || 0) === 0 ? (pts.y1 || o.y) : (pts.y2 || o.y);
+        let dx = tx - o.x, dy = ty - o.y;
+        let d = sqrt(dx * dx + dy * dy);
+        if (d < 10) {
+          order._leg = order._leg === 0 ? 1 : 0;
+          order._waitTimer = 60;
+        } else if (!order._waitTimer || order._waitTimer <= 0) {
+          o.x += (dx / d) * 1.0 * dt;
+          o.y += (dy / d) * 0.7 * dt;
+        } else {
+          order._waitTimer -= dt;
+        }
+        _updateOfficerTroopFollow(o, dt);
+        _officerAutoAttack(o, oi, dt);
+        break;
+      }
+      case 'ATTACK': {
+        // Off-screen simulation: timer counts down, then return with loot
+        let attackDuration = 1800 + o.troops.length * 60; // 30s + troops
+        if (order.timer >= attackDuration && !order._resolved) {
+          order._resolved = true;
+          let troopPower = o.troops.reduce(function(s, u) { return s + (u.damage || 5); }, 0);
+          let success = random() < 0.5 + troopPower * 0.02;
+          if (success) {
+            let loot = floor(30 + o.troops.length * 10 + random(20, 50));
+            state.gold += loot;
+            grantOfficerXP(oi, 50);
+            // Casualties: 0-30% lost
+            let casualties = floor(o.troops.length * random(0, 0.3));
+            for (let c = 0; c < casualties && o.troops.length > 0; c++) {
+              let dead = o.troops.pop();
+              if (dead._assignedOfficer !== undefined) dead._assignedOfficer = undefined;
+              let lg2 = state.legia;
+              if (lg2 && lg2.army) {
+                let idx2 = lg2.army.indexOf(dead);
+                if (idx2 >= 0) lg2.army.splice(idx2, 1);
+              }
+            }
+            addFloatingText(width / 2, height * 0.2, o.name + ' raid success! +' + loot + 'g', '#ffdd44');
+            if (casualties > 0) addFloatingText(width / 2, height * 0.27, casualties + ' soldier' + (casualties > 1 ? 's' : '') + ' lost', '#ff6644');
+          } else {
+            // Failed: lose 50% troops
+            let lost = ceil(o.troops.length * 0.5);
+            for (let c = 0; c < lost && o.troops.length > 0; c++) {
+              let dead = o.troops.pop();
+              if (dead._assignedOfficer !== undefined) dead._assignedOfficer = undefined;
+              let lg2 = state.legia;
+              if (lg2 && lg2.army) {
+                let idx2 = lg2.army.indexOf(dead);
+                if (idx2 >= 0) lg2.army.splice(idx2, 1);
+              }
+            }
+            grantOfficerXP(oi, 15);
+            addFloatingText(width / 2, height * 0.2, o.name + ' raid failed! Lost ' + lost + ' troops', '#ff4444');
+          }
+          o.currentOrder = null;
+        }
+        break;
+      }
+      case 'DEFEND': {
+        // Stay at castrum area, fight incoming raids with bonus
+        let lg = state.legia;
+        let cx = (lg && lg.castrumX) ? lg.castrumX : WORLD.islandCX + 200;
+        let cy = (lg && lg.castrumY) ? lg.castrumY : WORLD.islandCY + 100;
+        let dx = cx - o.x, dy = cy - o.y;
+        let d = sqrt(dx * dx + dy * dy);
+        if (d > 20) { o.x += (dx / d) * 0.8 * dt; o.y += (dy / d) * 0.5 * dt; }
+        _updateOfficerTroopFollow(o, dt);
+        _officerAutoAttack(o, oi, dt);
+        break;
+      }
+      case 'SCOUT': {
+        // Off-screen: reveals map sectors over time
+        if (order.timer >= 900 && !order._resolved) { // 15 seconds
+          order._resolved = true;
+          grantOfficerXP(oi, 25);
+          addFloatingText(width / 2, height * 0.2, o.name + ' returned from scouting!', '#88ccff');
+          addNotification(o.name + ' discovered new territory', '#88ccff');
+          o.currentOrder = null;
+        }
+        break;
+      }
+    }
+  }
+}
+
+function _updateOfficerTroopFollow(officer, dt) {
+  let troops = officer.troops;
+  if (!troops || troops.length === 0) return;
+  for (let i = 0; i < troops.length; i++) {
+    let u = troops[i];
+    let angle = PI + (i - troops.length / 2) * 0.4;
+    let dist2 = 20 + (i % 2) * 8;
+    let tx = officer.x + cos(angle) * dist2;
+    let ty = officer.y + sin(angle) * dist2;
+    if (u.x === undefined || u.x === 0) { u.x = tx; u.y = ty; }
+    u.x += (tx - u.x) * 0.04 * dt;
+    u.y += (ty - u.y) * 0.04 * dt;
+  }
+}
+
+function _officerAutoAttack(officer, officerIdx, dt) {
+  // Check all nation raid parties for nearby enemies
+  if (!state.nations) return;
+  let attackRange = 60;
+  let troops = officer.troops || [];
+  let allUnits = [officer].concat(troops);
+
+  for (let nk of Object.keys(state.nations)) {
+    let rv = state.nations[nk];
+    if (!rv || !rv.raidParty || rv.raidParty.length === 0) continue;
+    for (let ri = rv.raidParty.length - 1; ri >= 0; ri--) {
+      let raider = rv.raidParty[ri];
+      for (let u of allUnits) {
+        let d = sqrt((u.x - raider.x) * (u.x - raider.x) + (u.y - raider.y) * (u.y - raider.y));
+        if (d < attackRange) {
+          if (!u._atkTimer || u._atkTimer <= 0) {
+            let dmg = u.damage || 5;
+            raider.hp -= dmg;
+            raider.flashTimer = 8;
+            u._atkTimer = 30;
+            if (raider.hp <= 0) {
+              rv.raidParty.splice(ri, 1);
+              rv._raidKills = (rv._raidKills || 0) + 1;
+              grantOfficerXP(officerIdx, 10);
+              if (typeof spawnParticles === 'function') spawnParticles(raider.x, raider.y, 'combat', 4);
+            }
+          }
+          break;
+        }
+      }
+    }
+  }
+  // Tick attack timers
+  for (let u of allUnits) {
+    if (u._atkTimer && u._atkTimer > 0) u._atkTimer -= dt;
+  }
+}
+
+// ─── OFFICER PANEL UI ────────────────────────────────────────────────────
+
+function toggleOfficerPanel() {
+  officerPanelOpen = !officerPanelOpen;
+  _officerSelectedIdx = -1;
+  _officerOrderMode = false;
+  if (officerPanelOpen && snd) snd.playSFX('page_turn');
+}
+
+function handleOfficerPanelKey(k) {
+  if (!officerPanelOpen) return false;
+
+  // Close
+  if (k === 'o' || k === 'O' || k === 'Escape') { officerPanelOpen = false; _officerSelectedIdx = -1; _officerOrderMode = false; return true; }
+
+  // Order mode
+  if (_officerOrderMode && _officerSelectedIdx >= 0) {
+    let o = state.officers[_officerSelectedIdx];
+    if (!o) { _officerOrderMode = false; return true; }
+    if (k === '1') { setOfficerOrder(_officerSelectedIdx, 'ESCORT'); _officerOrderMode = false; return true; }
+    if (k === '2') {
+      // Patrol between castrum and port
+      let lg = state.legia;
+      let cx = (lg && lg.castrumX) ? lg.castrumX : WORLD.islandCX + 200;
+      let cy = (lg && lg.castrumY) ? lg.castrumY : WORLD.islandCY + 100;
+      setOfficerOrder(_officerSelectedIdx, 'PATROL', { x1: cx, y1: cy, x2: WORLD.islandCX, y2: WORLD.islandCY + 200 });
+      _officerOrderMode = false;
+      return true;
+    }
+    if (k === '3') { setOfficerOrder(_officerSelectedIdx, 'ATTACK'); _officerOrderMode = false; return true; }
+    if (k === '4') { setOfficerOrder(_officerSelectedIdx, 'DEFEND'); _officerOrderMode = false; return true; }
+    if (k === '5') { setOfficerOrder(_officerSelectedIdx, 'SCOUT'); _officerOrderMode = false; return true; }
+    if (k === 'Escape') { _officerOrderMode = false; return true; }
+    return true;
+  }
+
+  // Select officer 1-3
+  if (k === '1' && state.officers.length >= 1) { _officerSelectedIdx = 0; return true; }
+  if (k === '2' && state.officers.length >= 2) { _officerSelectedIdx = 1; return true; }
+  if (k === '3' && state.officers.length >= 3) { _officerSelectedIdx = 2; return true; }
+
+  // Hire new
+  if (k === 'h' || k === 'H') { hireOfficer(); return true; }
+
+  // Assign order
+  if ((k === 'a' || k === 'A') && _officerSelectedIdx >= 0) { _officerOrderMode = true; return true; }
+
+  // Promote
+  if ((k === 'p' || k === 'P') && _officerSelectedIdx >= 0) { promoteOfficer(_officerSelectedIdx); return true; }
+
+  // Assign 5 troops
+  if ((k === 't' || k === 'T') && _officerSelectedIdx >= 0) { assignTroopsToOfficer(_officerSelectedIdx, 5); return true; }
+
+  // Unassign troops
+  if ((k === 'u' || k === 'U') && _officerSelectedIdx >= 0) { unassignTroopsFromOfficer(_officerSelectedIdx); return true; }
+
+  // Cancel order
+  if ((k === 'x' || k === 'X') && _officerSelectedIdx >= 0) {
+    let o = state.officers[_officerSelectedIdx];
+    if (o) { o.currentOrder = null; addFloatingText(width / 2, height * 0.3, o.name + ': order cancelled', '#cc8844'); }
+    return true;
+  }
+
+  return true; // absorb all keys while open
+}
+
+function drawOfficerPanel() {
+  if (!officerPanelOpen) return;
+  if (!state.officers) state.officers = [];
+
+  push();
+  noStroke();
+  fill(0, 0, 0, 160);
+  rect(0, 0, width, height);
+
+  let pw = min(380, width - 20), ph = min(360, height - 20);
+  let px = max(10, width / 2 - pw / 2), py = max(10, height / 2 - ph / 2);
+  drawParchmentPanel(px, py, pw, ph);
+
+  fill(210, 180, 80); textAlign(CENTER, TOP); textSize(14);
+  text('OFFICERS', px + pw / 2, py + 10);
+
+  let sy = py + 32;
+  fill(140, 120, 80); textSize(9); textAlign(CENTER, TOP);
+  text('Max 3 officers. Each commands troops independently.', px + pw / 2, sy);
+  sy += 16;
+
+  if (state.officers.length === 0) {
+    fill(160, 140, 100); textSize(10); textAlign(CENTER, TOP);
+    text('No officers yet.', px + pw / 2, sy); sy += 16;
+  }
+
+  for (let i = 0; i < state.officers.length; i++) {
+    let o = state.officers[i];
+    let selected = i === _officerSelectedIdx;
+    let rankData = OFFICER_RANKS[o.rank];
+    let cardH = 52;
+
+    // Card background
+    fill(selected ? color(50, 40, 25, 200) : color(35, 28, 18, 180));
+    rect(px + 10, sy, pw - 20, cardH, 4);
+    if (selected) {
+      stroke(200, 170, 80, 180); strokeWeight(1);
+      noFill(); rect(px + 10, sy, pw - 20, cardH, 4); noStroke();
+    }
+
+    // Portrait placeholder
+    fill(100, 80, 55); rect(px + 16, sy + 6, 20, 24, 2);
+    fill(195, 165, 130); ellipse(px + 26, sy + 13, 12, 10); // head
+    fill(160, 50, 40 + o.portrait * 20); rect(px + 20, sy + 18, 12, 10); // body
+
+    // Name + rank
+    fill(220, 195, 120); textSize(11); textAlign(LEFT, TOP);
+    text((i + 1) + '. ' + o.name, px + 42, sy + 6);
+    fill(160, 140, 100); textSize(9);
+    text(rankData.name + ' (Lv.' + o.level + ')  XP: ' + floor(o.xp), px + 42, sy + 19);
+
+    // Troops + order
+    fill(140, 120, 90); textSize(9);
+    let troopStr = 'Troops: ' + o.troops.length + '/' + rankData.maxTroops;
+    let orderStr = o.currentOrder ? o.currentOrder.type : 'Idle';
+    text(troopStr + '  |  Order: ' + orderStr, px + 42, sy + 32);
+
+    sy += cardH + 4;
+  }
+
+  // Order mode
+  if (_officerOrderMode && _officerSelectedIdx >= 0) {
+    sy += 4;
+    fill(200, 170, 80); textSize(10); textAlign(LEFT, TOP);
+    text('ASSIGN ORDER:', px + 14, sy); sy += 14;
+    let orders = [['1', 'Escort Player'], ['2', 'Patrol'], ['3', 'Attack Island'], ['4', 'Defend Island'], ['5', 'Scout']];
+    for (let ord of orders) {
+      fill(180, 160, 120); textSize(10);
+      text('[' + ord[0] + '] ' + ord[1], px + 20, sy); sy += 14;
+    }
+    fill(120, 100, 70); textSize(9);
+    text('[ESC] Cancel', px + 20, sy); sy += 14;
+  } else {
+    // Controls
+    sy += 6;
+    stroke(100, 80, 50, 120); strokeWeight(1);
+    line(px + 14, sy, px + pw - 14, sy); noStroke();
+    sy += 6;
+
+    fill(180, 160, 120); textSize(10); textAlign(LEFT, TOP);
+    if (state.officers.length < 3) {
+      let cost = 100 + state.officers.length * 100;
+      text('[H] Hire officer (' + cost + 'g)', px + 14, sy); sy += 14;
+    }
+    if (_officerSelectedIdx >= 0) {
+      text('[A] Assign order', px + 14, sy); sy += 14;
+      text('[P] Promote', px + 14, sy); sy += 14;
+      text('[T] Assign 5 troops', px + 14, sy); sy += 14;
+      text('[U] Unassign all troops', px + 14, sy); sy += 14;
+      text('[X] Cancel current order', px + 14, sy); sy += 14;
+    }
+    fill(120, 100, 70); textSize(9);
+    text('[1-3] Select officer  |  [O/ESC] Close', px + 14, sy);
+  }
+
+  pop();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ─── PLAYER ESCORT SYSTEM ───────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+
+function updatePlayerEscort(dt) {
+  if (!state.legia || !state.legia.army) return;
+  // Don't show escort when in building menus or conquest
+  if (state.buildMode || (state.conquest && state.conquest.active) || (state.adventure && state.adventure.active)) return;
+  if (state.rowing && state.rowing.active) return;
+
+  let escort = state.legia.army.filter(function(u) { return !u.garrison && !u._assignedOfficer; }).slice(0, 8);
+  if (escort.length === 0) return;
+
+  let p = state.player;
+  let inCombat = _isNearEnemies(p.x, p.y, 120);
+  let formationSpread = inCombat ? 0.2 : 0.3;
+  let formationDist = inCombat ? 18 : 25;
+
+  for (let i = 0; i < escort.length; i++) {
+    let unit = escort[i];
+    let isRanged = UNIT_TYPES[unit.type] && UNIT_TYPES[unit.type].ranged;
+
+    // V-formation: melee in front, ranged in back
+    let row = isRanged ? 1 : 0;
+    let angle = PI + (i - escort.length / 2) * formationSpread;
+    let dist2 = formationDist + row * 15 + (i % 2) * 8;
+    let targetX = p.x + cos(angle) * dist2;
+    let targetY = p.y + sin(angle) * dist2;
+
+    // Initialize position
+    if (unit.x === undefined || unit.x === 0) { unit.x = targetX; unit.y = targetY; }
+
+    // Smooth follow
+    let followSpeed = inCombat ? 0.08 : 0.05;
+    unit.x += (targetX - unit.x) * followSpeed * dt;
+    unit.y += (targetY - unit.y) * followSpeed * dt;
+
+    // Auto-attack enemies within 60px
+    unit._escortAtkTimer = (unit._escortAtkTimer || 0) - dt;
+    if (unit._escortAtkTimer <= 0) {
+      let target = _findNearestRaidEnemy(unit.x, unit.y, 60);
+      if (target) {
+        let dmg = unit.damage || 5;
+        target.hp -= dmg;
+        target.flashTimer = 8;
+        unit._escortAtkTimer = isRanged ? 45 : 30;
+        if (typeof _spawnDamageNumber === 'function') _spawnDamageNumber(target.x, target.y, dmg, '#ffaa44');
+        if (typeof spawnParticles === 'function') spawnParticles(target.x, target.y, 'combat', 2);
+      }
+    }
+  }
+}
+
+function _isNearEnemies(x, y, range) {
+  if (!state.nations) return false;
+  for (let k of Object.keys(state.nations)) {
+    let rv = state.nations[k];
+    if (!rv || !rv.raidParty) continue;
+    for (let r of rv.raidParty) {
+      if (sqrt((r.x - x) * (r.x - x) + (r.y - y) * (r.y - y)) < range) return true;
+    }
+  }
+  return false;
+}
+
+function _findNearestRaidEnemy(x, y, range) {
+  if (!state.nations) return null;
+  let nearest = null, nearD = range;
+  for (let k of Object.keys(state.nations)) {
+    let rv = state.nations[k];
+    if (!rv || !rv.raidParty) continue;
+    for (let r of rv.raidParty) {
+      let d = sqrt((r.x - x) * (r.x - x) + (r.y - y) * (r.y - y));
+      if (d < nearD) { nearD = d; nearest = r; }
+    }
+  }
+  return nearest;
+}
+
+function drawEscortSoldier(unit) {
+  let sx = w2sX(unit.x), sy = w2sY(unit.y);
+  if (sx < -30 || sx > width + 30 || sy < -30 || sy > height + 30) return;
+  let mil = getFactionMilitary();
+  let uDef = UNIT_TYPES[unit.type] || UNIT_TYPES.legionary;
+  let facing = (unit.x < state.player.x) ? 1 : -1;
+
+  push();
+  translate(sx, sy + floatOffset);
+  scale(facing, 1);
+  noStroke();
+
+  // Shadow
+  fill(0, 0, 0, 30);
+  ellipse(0, 3, 10, 4);
+
+  if (unit.type === 'cavalry') {
+    // Horse
+    fill(120, 90, 60);
+    rect(-5, -1, 10, 6, 2);
+    // Rider
+    fill(mil.tunic[0], mil.tunic[1], mil.tunic[2]);
+    rect(-2, -8, 4, 7);
+    fill(mil.helm[0], mil.helm[1], mil.helm[2]);
+    rect(-2, -10, 4, 2);
+    // Legs
+    fill(80, 60, 40);
+    let step = sin(frameCount * 0.15 + unit.x) * 1.5;
+    rect(-4, 5, 2, 3 + step);
+    rect(2, 5, 2, 3 - step);
+  } else if (unit.type === 'archer') {
+    fill(mil.tunic[0] * 0.8, mil.tunic[1] * 0.9, mil.tunic[2] * 0.8);
+    rect(-3, -8, 6, 10);
+    fill(195, 165, 130);
+    rect(-2, -12, 4, 4);
+    fill(mil.helm[0], mil.helm[1], mil.helm[2]);
+    rect(-3, -13, 6, 3);
+    // Bow
+    stroke(120, 90, 50); strokeWeight(1); noFill();
+    arc(4, -6, 4, 10, -HALF_PI, HALF_PI);
+    noStroke();
+    fill(mil.legs[0], mil.legs[1], mil.legs[2]);
+    rect(-2, 2, 2, 3);
+    rect(1, 2, 2, 3);
+  } else if (unit.type === 'siege_ram') {
+    fill(100, 70, 40);
+    rect(-8, -4, 16, 10, 2);
+    fill(160, 160, 170);
+    rect(8, -3, 3, 6);
+    fill(60, 50, 35);
+    ellipse(-5, 7, 5, 5);
+    ellipse(5, 7, 5, 5);
+  } else if (unit.type === 'centurion') {
+    fill(mil.tunic[0], mil.tunic[1], mil.tunic[2]);
+    rect(-4, -8, 8, 10);
+    fill(200, 170, 60);
+    rect(-4, -7, 8, 4);
+    fill(195, 165, 130);
+    rect(-2, -12, 4, 4);
+    fill(200, 40, 40);
+    rect(-1, -15, 2, 4);
+    fill(mil.shield[0], mil.shield[1], mil.shield[2]);
+    rect(-6, -6, 2, 8);
+    fill(mil.legs[0], mil.legs[1], mil.legs[2]);
+    rect(-3, 2, 2, 4);
+    rect(1, 2, 2, 4);
+    // Aura glow
+    noFill();
+    stroke(200, 170, 60, 50 + sin(frameCount * 0.08) * 25);
+    strokeWeight(1);
+    ellipse(0, -2, 24, 20);
+    noStroke();
+  } else {
+    // Legionary default
+    fill(mil.tunic[0], mil.tunic[1], mil.tunic[2]);
+    rect(-3, -8, 6, 10);
+    fill(mil.armor[0], mil.armor[1], mil.armor[2]);
+    rect(-3, -7, 6, 4);
+    fill(195, 165, 130);
+    rect(-2, -12, 4, 4);
+    fill(mil.helm[0], mil.helm[1], mil.helm[2]);
+    rect(-3, -13, 6, 3);
+    // Spear
+    stroke(100, 80, 60); strokeWeight(1);
+    line(3, -15, 3, 4); noStroke();
+    fill(mil.shield[0], mil.shield[1], mil.shield[2]);
+    if (mil.shieldShape === 'round') ellipse(-4, -3, 5, 5);
+    else rect(-5, -6, 2, 6);
+    // Walking anim
+    let step = sin(frameCount * 0.12 + unit.x) * 2;
+    fill(mil.legs[0], mil.legs[1], mil.legs[2]);
+    rect(-2, 2, 2, 3);
+    rect(0 + step * 0.3, 2, 2, 3);
+  }
+
+  pop();
+}
+
+function drawOfficerSprite(officer, idx) {
+  let sx = w2sX(officer.x), sy = w2sY(officer.y);
+  if (sx < -30 || sx > width + 30 || sy < -30 || sy > height + 30) return;
+  let mil = getFactionMilitary();
+
+  push();
+  translate(sx, sy + floatOffset);
+  noStroke();
+
+  // Shadow
+  fill(0, 0, 0, 35);
+  ellipse(0, 4, 14, 5);
+
+  // Body — officer cape
+  fill(mil.cape[0], mil.cape[1], mil.cape[2]);
+  rect(-4, -10, 8, 12);
+
+  // Gold armor plate
+  fill(200, 170, 60);
+  rect(-4, -9, 8, 5);
+
+  // Head
+  fill(195, 165, 130);
+  rect(-2, -14, 4, 4);
+
+  // Officer helm with tall crest
+  fill(mil.helm[0], mil.helm[1], mil.helm[2]);
+  rect(-3, -15, 6, 3);
+  fill(mil.helmCrest[0], mil.helmCrest[1], mil.helmCrest[2]);
+  rect(-1, -19, 2, 5); // tall crest
+
+  // Sword
+  fill(200, 200, 210);
+  rect(5, -12, 1, 8);
+
+  // Shield
+  fill(mil.shield[0], mil.shield[1], mil.shield[2]);
+  if (mil.shieldShape === 'round') ellipse(-5, -4, 6, 6);
+  else rect(-6, -7, 2, 7);
+
+  // Legs
+  fill(mil.legs[0], mil.legs[1], mil.legs[2]);
+  rect(-3, 2, 2, 4);
+  rect(1, 2, 2, 4);
+
+  // Rank indicator
+  let rankCol = officer.rank === 'legate' ? color(200, 170, 60) : officer.rank === 'centurion' ? color(180, 180, 190) : color(160, 120, 80);
+  fill(rankCol);
+  ellipse(0, -21, 4, 4);
+
+  // Name label
+  fill(220, 200, 140, 180); textSize(8); textAlign(CENTER, BOTTOM);
+  text(officer.name, 0, -23);
+
+  pop();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ─── WAR ENGINE — ATTACK SEQUENCE (enhanced naval + siege) ──────────────
+// ═══════════════════════════════════════════════════════════════════════════
+
+var _warBattle = null; // { phase, timer, attackers, defenders, ships, walls, projectiles, context }
+
+const WAR_PHASES = ['naval', 'landing', 'siege', 'battle', 'result'];
+
+function startWarBattle(attackerArmy, defenderArmy, context) {
+  // context: { type: 'attack'|'defend', nationKey, hasShips, hasWalls, onVictory, onDefeat }
+  let hasShips = context.hasShips || false;
+  let hasWalls = context.hasWalls || false;
+
+  _warBattle = {
+    phase: hasShips ? 'naval' : 'landing',
+    timer: 0,
+    phaseTimer: 0,
+    attackers: attackerArmy.map(function(u, i) {
+      return {
+        ...u,
+        x: 60 + (i % 6) * 18,
+        y: 100 + floor(i / 6) * 25 + random(-5, 5),
+        targetIdx: -1,
+        attackTimer: 0,
+        side: 'left',
+        alive: true,
+        flashTimer: 0,
+      };
+    }),
+    defenders: defenderArmy.map(function(u, i) {
+      return {
+        ...u,
+        x: width - 60 - (i % 6) * 18,
+        y: 100 + floor(i / 6) * 25 + random(-5, 5),
+        targetIdx: -1,
+        attackTimer: 0,
+        side: 'right',
+        alive: true,
+        flashTimer: 0,
+      };
+    }),
+    ships: {
+      player: hasShips ? { hp: 100, maxHp: 100, x: 80, y: height / 2 } : null,
+      enemy: hasShips ? { hp: 80, maxHp: 80, x: width - 80, y: height / 2 } : null,
+    },
+    walls: hasWalls ? { hp: 150, maxHp: 150, breached: false } : null,
+    projectiles: [],
+    context: context,
+    result: null,
+    resultTimer: 0,
+    _navalDone: false,
+    _landingDone: false,
+    _siegeDone: false,
+  };
+}
+
+function updateWarBattle(dt) {
+  let w = _warBattle;
+  if (!w) return;
+  w.timer += dt;
+  w.phaseTimer += dt;
+
+  switch (w.phase) {
+    case 'naval': {
+      // Ship HP bars, auto-fire
+      let ps = w.ships.player, es = w.ships.enemy;
+      if (ps && es) {
+        // Both ships fire at each other
+        if (w.phaseTimer % 30 < dt) {
+          es.hp -= 8 + floor(random(4));
+          w.projectiles.push({ x: ps.x + 20, y: ps.y, vx: 4, vy: random(-0.5, 0.5), life: 40, side: 'left', damage: 0 });
+        }
+        if (w.phaseTimer % 40 < dt) {
+          ps.hp -= 5 + floor(random(3));
+          w.projectiles.push({ x: es.x - 20, y: es.y, vx: -3, vy: random(-0.5, 0.5), life: 40, side: 'right', damage: 0 });
+        }
+        if (es.hp <= 0 || ps.hp <= 0 || w.phaseTimer > 600) {
+          w._navalDone = true;
+          w.phase = 'landing';
+          w.phaseTimer = 0;
+          // If player ship sunk, lose 30% army
+          if (ps.hp <= 0) {
+            let toLose = ceil(w.attackers.filter(function(u) { return u.alive; }).length * 0.3);
+            for (let i = 0; i < toLose; i++) {
+              let alive = w.attackers.filter(function(u) { return u.alive; });
+              if (alive.length > 0) alive[floor(random(alive.length))].alive = false;
+            }
+          }
+        }
+      } else {
+        w.phase = 'landing';
+        w.phaseTimer = 0;
+      }
+      break;
+    }
+    case 'landing': {
+      // Troops deploy: spread out over 2 seconds
+      if (w.phaseTimer > 120) {
+        w._landingDone = true;
+        w.phase = w.walls && !w.walls.breached ? 'siege' : 'battle';
+        w.phaseTimer = 0;
+      }
+      // Move attackers to landing positions
+      for (let u of w.attackers) {
+        if (!u.alive) continue;
+        let tx = 120 + (u.x - 60) * 0.8;
+        u.x += (tx - u.x) * 0.03 * dt;
+      }
+      break;
+    }
+    case 'siege': {
+      // Siege units attack walls, archers suppress
+      if (!w.walls || w.walls.breached) { w.phase = 'battle'; w.phaseTimer = 0; break; }
+      let wallX = width * 0.55;
+      for (let u of w.attackers) {
+        if (!u.alive) continue;
+        let uDef = UNIT_TYPES[u.type] || UNIT_TYPES.legionary;
+        if (u.type === 'siege_ram') {
+          // Move toward wall
+          if (u.x < wallX - 20) { u.x += 1.0 * dt; }
+          else if (u.attackTimer <= 0) {
+            let dmg = (u.damage || 15) * (uDef.vsBuildingMult || 1);
+            w.walls.hp -= dmg;
+            u.attackTimer = 45;
+            if (typeof triggerScreenShake === 'function') triggerScreenShake(3, 6);
+          }
+        } else if (uDef.ranged) {
+          // Shoot over walls at defenders
+          if (u.attackTimer <= 0) {
+            let aliveD = w.defenders.filter(function(e) { return e.alive; });
+            if (aliveD.length > 0) {
+              let t = aliveD[floor(random(aliveD.length))];
+              w.projectiles.push({ x: u.x, y: u.y, vx: 3, vy: (t.y - u.y) * 0.02, damage: u.damage || 5, life: 80, side: 'left' });
+              u.attackTimer = 50;
+            }
+          }
+        } else {
+          // Melee waits at wall
+          if (u.x < wallX - 30) u.x += 0.8 * dt;
+        }
+        u.attackTimer = max(0, u.attackTimer - dt);
+      }
+      // Defenders fire from behind walls
+      for (let d of w.defenders) {
+        if (!d.alive) continue;
+        d.attackTimer = max(0, d.attackTimer - dt);
+        if (d.attackTimer <= 0) {
+          let aliveA = w.attackers.filter(function(a) { return a.alive; });
+          if (aliveA.length > 0) {
+            let t = aliveA[floor(random(aliveA.length))];
+            t.hp -= 3;
+            t.flashTimer = 6;
+            if (t.hp <= 0) { t.alive = false; t.hp = 0; }
+            d.attackTimer = 50;
+          }
+        }
+      }
+      if (w.walls.hp <= 0) {
+        w.walls.breached = true;
+        w.phase = 'battle';
+        w.phaseTimer = 0;
+        if (typeof triggerScreenShake === 'function') triggerScreenShake(8, 20);
+        addFloatingText(width / 2, height * 0.3, 'WALLS BREACHED!', '#ffaa44');
+      }
+      break;
+    }
+    case 'battle': {
+      // Standard army battle logic
+      let atk = w.attackers.filter(function(u) { return u.alive; });
+      let def = w.defenders.filter(function(u) { return u.alive; });
+      if (atk.length === 0) { w.phase = 'result'; w.result = 'defeat'; w.resultTimer = 0; break; }
+      if (def.length === 0) { w.phase = 'result'; w.result = 'victory'; w.resultTimer = 0; break; }
+
+      let atkHasCent = atk.some(function(u) { return u.type === 'centurion'; });
+      let defHasCent = def.some(function(u) { return u.type === 'centurion'; });
+      _updateBattleSide(w.attackers, w.defenders, dt, atkHasCent ? 1.2 : 1.0, w);
+      _updateBattleSide(w.defenders, w.attackers, dt, defHasCent ? 1.2 : 1.0, w);
+      break;
+    }
+    case 'result': {
+      w.resultTimer += dt;
+      if (w.resultTimer > 300) {
+        let ctx = w.context;
+        if (w.result === 'victory' && ctx.onVictory) ctx.onVictory(w);
+        if (w.result === 'defeat' && ctx.onDefeat) ctx.onDefeat(w);
+        _warBattle = null;
+      }
+      break;
+    }
+  }
+
+  // Update projectiles
+  for (let i = w.projectiles.length - 1; i >= 0; i--) {
+    let pr = w.projectiles[i];
+    pr.x += pr.vx * dt;
+    pr.y += pr.vy * dt;
+    pr.life -= dt;
+    if (pr.life <= 0) { w.projectiles.splice(i, 1); continue; }
+    if (pr.damage > 0) {
+      let targets = pr.side === 'left' ? w.defenders : w.attackers;
+      for (let t of targets) {
+        if (!t.alive) continue;
+        if (abs(t.x - pr.x) < 12 && abs(t.y - pr.y) < 12) {
+          t.hp -= pr.damage;
+          t.flashTimer = 8;
+          if (t.hp <= 0) { t.alive = false; t.hp = 0; }
+          w.projectiles.splice(i, 1);
+          break;
+        }
+      }
+    }
+  }
+}
+
+function drawWarBattle() {
+  let w = _warBattle;
+  if (!w) return;
+
+  push();
+  noStroke();
+
+  // Background
+  let nKey = w.context.nationKey;
+  if (nKey && typeof _drawNationBattleBackground === 'function') {
+    _drawNationBattleBackground(nKey, w);
+  } else {
+    fill(15, 10, 8, 230);
+    rect(0, 0, width, height);
+  }
+
+  // Phase banner
+  fill(220, 185, 80); textAlign(CENTER, TOP); textSize(14);
+  let phaseLabel = w.phase === 'naval' ? 'NAVAL BATTLE' :
+                   w.phase === 'landing' ? 'BEACH LANDING' :
+                   w.phase === 'siege' ? 'SIEGE' :
+                   w.phase === 'battle' ? 'BATTLE' : '';
+  text(phaseLabel, width / 2, 10);
+
+  // Ground
+  fill(60, 50, 35);
+  rect(0, height - 40, width, 40);
+
+  // Naval phase: draw ships
+  if (w.phase === 'naval' && w.ships.player && w.ships.enemy) {
+    _drawWarShip(w.ships.player, true);
+    _drawWarShip(w.ships.enemy, false);
+    // Water
+    fill(40, 80, 120, 100);
+    rect(0, height - 60, width, 20);
+  }
+
+  // Walls during siege
+  if (w.walls && !w.walls.breached && (w.phase === 'siege' || w.phase === 'battle')) {
+    let wallX = width * 0.55;
+    let wallH = 60;
+    let hpPct = max(0, w.walls.hp / w.walls.maxHp);
+    fill(160 * hpPct, 140 * hpPct, 110 * hpPct);
+    rect(wallX - 4, height - 40 - wallH, 8, wallH);
+    // Crenellations
+    for (let c = 0; c < 3; c++) {
+      rect(wallX - 8 + c * 6, height - 40 - wallH - 6, 4, 6);
+    }
+    // HP bar
+    fill(40, 0, 0, 180);
+    rect(wallX - 20, height - 40 - wallH - 14, 40, 4);
+    fill(hpPct > 0.5 ? color(80, 180, 80) : color(200, 60, 40));
+    rect(wallX - 20, height - 40 - wallH - 14, floor(40 * hpPct), 4);
+    // Damage cracks
+    if (hpPct < 0.5) {
+      stroke(40, 30, 20, 200); strokeWeight(1);
+      line(wallX - 2, height - 40 - wallH * 0.3, wallX + 2, height - 40 - wallH * 0.7);
+      noStroke();
+    }
+  }
+
+  // Draw units
+  _drawBattleUnits(w.attackers, '#cc4444', 1);
+  _drawBattleUnits(w.defenders, '#4488cc', -1);
+
+  // Projectiles
+  for (let pr of w.projectiles) {
+    push();
+    translate(pr.x, pr.y);
+    let angle = atan2(pr.vy, pr.vx);
+    rotate(angle);
+    fill(120, 100, 70); noStroke();
+    rect(-5, -1, 10, 2);
+    fill(180, 180, 190);
+    triangle(5, -2, 5, 2, 8, 0);
+    pop();
+  }
+
+  // Army counts
+  let atkAlive = w.attackers.filter(function(u) { return u.alive; }).length;
+  let defAlive = w.defenders.filter(function(u) { return u.alive; }).length;
+  fill(200, 80, 80); textSize(11); textAlign(LEFT, TOP);
+  text('Your Army: ' + atkAlive + '/' + w.attackers.length, 10, 30);
+  fill(80, 130, 200); textAlign(RIGHT, TOP);
+  text('Enemy: ' + defAlive + '/' + w.defenders.length, width - 10, 30);
+
+  // Ship HP bars (naval)
+  if (w.ships.player && w.phase === 'naval') {
+    _drawHPBar(30, 50, 80, 6, w.ships.player.hp, w.ships.player.maxHp, 'Your Ship');
+    _drawHPBar(width - 110, 50, 80, 6, w.ships.enemy.hp, w.ships.enemy.maxHp, 'Enemy Ship');
+  }
+
+  // Result screen
+  if (w.phase === 'result') {
+    fill(0, 0, 0, min(180, w.resultTimer * 3));
+    rect(0, 0, width, height);
+    let rAlpha = min(255, w.resultTimer * 4);
+    if (w.result === 'victory') {
+      fill(220, 185, 60, rAlpha); textSize(22); textAlign(CENTER, CENTER);
+      text('VICTORY!', width / 2, height / 2 - 30);
+      fill(180, 220, 120, rAlpha); textSize(11);
+      let survived = w.attackers.filter(function(u) { return u.alive; }).length;
+      text(survived + ' of ' + w.attackers.length + ' soldiers survived', width / 2, height / 2);
+      // Loot options
+      fill(200, 180, 120, rAlpha); textSize(10);
+      text('[1] Occupy  [2] Vassalize  [3] Colonize', width / 2, height / 2 + 25);
+    } else {
+      fill(255, 80, 60, rAlpha); textSize(22); textAlign(CENTER, CENTER);
+      text('DEFEAT', width / 2, height / 2 - 30);
+      fill(200, 160, 120, rAlpha); textSize(11);
+      text('Your army was overwhelmed...', width / 2, height / 2);
+    }
+  }
+
+  pop();
+}
+
+function _drawWarShip(ship, isPlayer) {
+  let sx = ship.x, sy = ship.y;
+  push();
+  translate(sx, sy);
+  if (!isPlayer) scale(-1, 1);
+  noStroke();
+  // Hull
+  fill(isPlayer ? color(120, 80, 40) : color(100, 60, 30));
+  beginShape();
+  vertex(-25, 0); vertex(-20, 10); vertex(20, 10); vertex(25, -2); vertex(20, -8); vertex(-18, -8);
+  endShape(CLOSE);
+  // Sail
+  fill(isPlayer ? color(200, 180, 140) : color(180, 120, 80));
+  rect(-5, -30, 10, 22);
+  // Mast
+  stroke(80, 60, 40); strokeWeight(2);
+  line(0, -32, 0, 5);
+  noStroke();
+  // Ram
+  fill(160, 160, 170);
+  rect(22, -4, 6, 4);
+  pop();
+}
+
+function _drawHPBar(x, y, w2, h, hp, maxHp, label) {
+  let pct = max(0, hp / maxHp);
+  fill(40, 0, 0, 180); noStroke();
+  rect(x, y, w2, h);
+  fill(pct > 0.5 ? color(80, 180, 80) : pct > 0.25 ? color(200, 180, 40) : color(200, 60, 40));
+  rect(x, y, floor(w2 * pct), h);
+  fill(200, 180, 140); textSize(8); textAlign(LEFT, BOTTOM);
+  text(label + ': ' + ceil(hp) + '/' + maxHp, x, y - 2);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ─── WAR ENGINE — DEFENSE SEQUENCE (enhanced with warning + camera) ─────
+// ═══════════════════════════════════════════════════════════════════════════
+
+var _defenseWarning = null; // { timer, nationKey, raidSize }
+
+function triggerDefenseWarning(raidSize, nationKey) {
+  _defenseWarning = {
+    timer: 300, // 5 seconds
+    nationKey: nationKey,
+    raidSize: raidSize,
+    phase: 'warning', // warning -> battle
+    _hornPlayed: false,
+    _cameraPanned: false,
+  };
+}
+
+function updateDefenseWarning(dt) {
+  let dw = _defenseWarning;
+  if (!dw) return;
+
+  if (dw.phase === 'warning') {
+    // Play warning horn
+    if (!dw._hornPlayed) {
+      dw._hornPlayed = true;
+      if (typeof snd !== 'undefined' && snd) snd.playSFX('war_horn');
+    }
+    dw.timer -= dt;
+    if (dw.timer <= 0) {
+      // Start the defense battle
+      dw.phase = 'battle';
+      let lg = state.legia;
+      let garrison = (lg && lg.army) ? lg.army.filter(function(u) { return u.garrison; }) : [];
+      if (garrison.length > 0) {
+        startIslandDefense(dw.raidSize, dw.nationKey);
+      }
+      _defenseWarning = null;
+    }
+  }
+}
+
+function drawDefenseWarning() {
+  let dw = _defenseWarning;
+  if (!dw || dw.phase !== 'warning') return;
+
+  push();
+  noStroke();
+
+  // Flashing red banner
+  let flashAlpha = 150 + sin(frameCount * 0.15) * 80;
+  fill(180, 30, 20, flashAlpha);
+  rect(0, height * 0.15, width, 40);
+
+  // Text
+  fill(255, 240, 200, min(255, flashAlpha + 50));
+  textAlign(CENTER, CENTER); textSize(16);
+  text('INCOMING RAID!', width / 2, height * 0.15 + 14);
+
+  let nationName = (typeof getNationName === 'function') ? getNationName(dw.nationKey) : dw.nationKey;
+  fill(255, 220, 160, flashAlpha);
+  textSize(11);
+  text(nationName + ' sends ' + dw.raidSize + ' warriors!', width / 2, height * 0.15 + 30);
+
+  // Countdown
+  let secs = ceil(dw.timer / 60);
+  fill(255, 255, 200);
+  textSize(12);
+  text('Prepare! ' + secs + 's', width / 2, height * 0.22 + 14);
+
+  pop();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ─── FORMATION COMBAT VISUALS — cluster HP bars + kill animations ───────
+// ═══════════════════════════════════════════════════════════════════════════
+
+function drawFormationOverlay(battle) {
+  if (!battle) return;
+  push();
+
+  // Group HP bars for clusters of units
+  let leftAlive = battle.attackers.filter(function(u) { return u.alive; });
+  let rightAlive = battle.defenders.filter(function(u) { return u.alive; });
+
+  if (leftAlive.length > 0) {
+    let avgX = leftAlive.reduce(function(s, u) { return s + u.x; }, 0) / leftAlive.length;
+    let avgY = min.apply(null, leftAlive.map(function(u) { return u.y; })) - 25;
+    let totalHP = leftAlive.reduce(function(s, u) { return s + u.hp; }, 0);
+    let maxHP = leftAlive.reduce(function(s, u) { return s + u.maxHp; }, 0);
+    _drawHPBar(avgX - 30, avgY, 60, 5, totalHP, maxHP, 'Your Forces');
+  }
+
+  if (rightAlive.length > 0) {
+    let avgX = rightAlive.reduce(function(s, u) { return s + u.x; }, 0) / rightAlive.length;
+    let avgY = min.apply(null, rightAlive.map(function(u) { return u.y; })) - 25;
+    let totalHP = rightAlive.reduce(function(s, u) { return s + u.hp; }, 0);
+    let maxHP = rightAlive.reduce(function(s, u) { return s + u.maxHp; }, 0);
+    _drawHPBar(avgX - 30, avgY, 60, 5, totalHP, maxHP, 'Enemy Forces');
+  }
+
+  // Commander aura glow (if centurion present)
+  let cents = leftAlive.filter(function(u) { return u.type === 'centurion'; });
+  for (let c of cents) {
+    noFill();
+    stroke(200, 170, 60, 40 + sin(frameCount * 0.06) * 20);
+    strokeWeight(1);
+    ellipse(c.x, c.y, 50, 40);
+    noStroke();
+  }
+
+  // Dead unit fade-out
+  for (let u of battle.attackers.concat(battle.defenders)) {
+    if (!u.alive && u._fadeTimer === undefined) u._fadeTimer = 30;
+    if (!u.alive && u._fadeTimer > 0) {
+      u._fadeTimer -= 1;
+      let fa = (u._fadeTimer / 30) * 150;
+      fill(100, 50, 50, fa);
+      noStroke();
+      // Fallen soldier
+      push();
+      translate(u.x, u.y);
+      rotate(HALF_PI);
+      rect(-3, -4, 6, 8);
+      pop();
+    }
+  }
+
+  pop();
+}

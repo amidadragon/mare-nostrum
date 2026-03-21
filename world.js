@@ -3125,3 +3125,740 @@ function drawAtmosphericHaze() {
     }
   }
 }
+
+// ======================================================================
+// === UNIVERSAL ISLAND RENDERER ========================================
+// ======================================================================
+// Renders any island from a standard islandData descriptor.
+// Biomes: mediterranean, desert, frozen, volcanic, tropical, dark, ocean
+// Used for nation visits, colony visits, and distant rendering.
+
+function getUniversalBiomePalette(biome) {
+  let palettes = {
+    mediterranean: {
+      terrain: [140, 155, 110], terrainDark: [115, 130, 85], terrainRim: [150, 165, 120],
+      beachSand: [195, 180, 145], beachDark: [175, 160, 125],
+      water: [40, 100, 155], waterShallow: [55, 145, 165],
+      grass: [60, 105, 42], grassLight: [70, 120, 48],
+      path: [175, 160, 130], pathLight: [190, 175, 145],
+      shadow: [20, 60, 80], shadowAlpha: 40,
+      skyTint: null, fogColor: null,
+    },
+    desert: {
+      terrain: [210, 185, 130], terrainDark: [180, 155, 100], terrainRim: [195, 170, 115],
+      beachSand: [225, 205, 155], beachDark: [200, 180, 130],
+      water: [40, 90, 140], waterShallow: [50, 130, 150],
+      grass: [180, 160, 110], grassLight: [195, 175, 125],
+      path: [190, 165, 110], pathLight: [205, 180, 125],
+      shadow: [25, 55, 70], shadowAlpha: 35,
+      skyTint: [255, 220, 140, 10], fogColor: null,
+    },
+    frozen: {
+      terrain: [230, 240, 248], terrainDark: [195, 215, 232], terrainRim: [215, 230, 242],
+      beachSand: [200, 218, 235], beachDark: [185, 205, 225],
+      water: [30, 70, 120], waterShallow: [60, 140, 180],
+      grass: [220, 235, 248], grassLight: [235, 245, 252],
+      path: [190, 210, 228], pathLight: [210, 225, 240],
+      shadow: [15, 30, 55], shadowAlpha: 45,
+      skyTint: [180, 210, 240, 12], fogColor: [200, 220, 240],
+    },
+    volcanic: {
+      terrain: [45, 38, 30], terrainDark: [30, 25, 18], terrainRim: [55, 45, 36],
+      beachSand: [38, 32, 22], beachDark: [28, 22, 15],
+      water: [15, 5, 2], waterShallow: [30, 60, 65],
+      grass: [50, 42, 32], grassLight: [60, 50, 38],
+      path: [42, 35, 26], pathLight: [52, 44, 34],
+      shadow: [10, 5, 2], shadowAlpha: 55,
+      skyTint: [255, 80, 20, 8], fogColor: [60, 30, 10],
+    },
+    tropical: {
+      terrain: [30, 125, 45], terrainDark: [22, 100, 35], terrainRim: [38, 140, 55],
+      beachSand: [235, 222, 192], beachDark: [215, 200, 168],
+      water: [20, 120, 100], waterShallow: [35, 170, 150],
+      grass: [35, 140, 52], grassLight: [45, 160, 62],
+      path: [160, 145, 110], pathLight: [180, 165, 130],
+      shadow: [8, 50, 35], shadowAlpha: 40,
+      skyTint: [120, 255, 120, 6], fogColor: null,
+    },
+    dark: {
+      terrain: [42, 35, 48], terrainDark: [32, 25, 38], terrainRim: [52, 42, 58],
+      beachSand: [55, 48, 62], beachDark: [42, 35, 50],
+      water: [15, 8, 30], waterShallow: [30, 20, 55],
+      grass: [38, 32, 45], grassLight: [48, 40, 55],
+      path: [50, 42, 58], pathLight: [60, 52, 68],
+      shadow: [8, 3, 18], shadowAlpha: 60,
+      skyTint: [80, 40, 130, 10], fogColor: [80, 70, 100],
+    },
+    ocean: {
+      terrain: [110, 80, 45], terrainDark: [85, 60, 30], terrainRim: [125, 95, 55],
+      beachSand: [130, 100, 55], beachDark: [100, 75, 40],
+      water: [25, 65, 100], waterShallow: [40, 110, 140],
+      grass: [120, 90, 50], grassLight: [140, 110, 65],
+      path: [105, 80, 45], pathLight: [120, 95, 55],
+      shadow: [15, 40, 60], shadowAlpha: 35,
+      skyTint: null, fogColor: null,
+    },
+  };
+  return palettes[biome] || palettes.mediterranean;
+}
+
+function drawUniversalIsland(islandData) {
+  let d = islandData;
+  let ix = w2sX(d.cx), iy = w2sY(d.cy);
+  let rx = d.rx, ry = d.ry;
+  let pal = getUniversalBiomePalette(d.biome);
+  let vt = frameCount * 0.01;
+
+  push(); noStroke();
+
+  // --- Water shadow ---
+  fill(pal.shadow[0], pal.shadow[1], pal.shadow[2], pal.shadowAlpha);
+  ellipse(ix + 4, iy + 6, (rx + 25) * 2, (ry + 18) * 2);
+
+  // --- Shallow water ring ---
+  fill(pal.waterShallow[0], pal.waterShallow[1], pal.waterShallow[2], 55);
+  ellipse(ix, iy, (rx + 22) * 2, (ry + 15) * 2);
+
+  // --- Shore waves ---
+  stroke(200, 220, 255, 25 + sin(frameCount * 0.04) * 12);
+  strokeWeight(1.5); noFill();
+  ellipse(ix, iy, (rx + 14) * 2 + sin(frameCount * 0.025) * 3, (ry + 10) * 2 + sin(frameCount * 0.025) * 2);
+  noStroke();
+
+  // --- Beach ring ---
+  fill(pal.beachSand[0], pal.beachSand[1], pal.beachSand[2]);
+  ellipse(ix, iy, rx * 2 + 10, ry * 2 + 8);
+  // Beach texture dots
+  fill(pal.beachDark[0], pal.beachDark[1], pal.beachDark[2], 50);
+  for (let i = 0; i < 8; i++) {
+    let ba = (i / 8) * TWO_PI + 0.9;
+    ellipse(ix + cos(ba) * rx * 0.95, iy + sin(ba) * ry * 0.68, 10, 5);
+  }
+
+  // --- Main terrain (scanline fill for crispy pixel look) ---
+  for (let row = -ry; row < ry; row += 2) {
+    let t = row / ry;
+    let w2 = rx * sqrt(max(0, 1 - t * t));
+    let wobble = sin(row * 0.07 + 1.2) * 3;
+    let band = abs(t);
+    let r = lerp(pal.terrain[0], pal.terrainDark[0], band * 0.5);
+    let g = lerp(pal.terrain[1], pal.terrainDark[1], band * 0.5);
+    let b = lerp(pal.terrain[2], pal.terrainDark[2], band * 0.5);
+    fill(r, g, b);
+    rect(floor(ix - w2 + wobble), floor(iy + row), floor(w2 * 2), 2);
+  }
+
+  // --- Rim highlight (lighter center area) ---
+  fill(pal.terrainRim[0], pal.terrainRim[1], pal.terrainRim[2], 80);
+  ellipse(ix, iy - ry * 0.12, rx * 1.4, ry * 0.9);
+
+  // --- Biome-specific terrain details ---
+  _drawBiomeTerrainDetails(ix, iy, rx, ry, d.biome, pal, vt);
+
+  // --- Paths (2 crossing paths for populated islands) ---
+  if (d.buildings && d.buildings.length > 0) {
+    fill(pal.path[0], pal.path[1], pal.path[2], 70);
+    rect(ix - 3, iy - ry * 0.45, 6, ry * 0.75);
+    rect(ix - rx * 0.25, iy - 3, rx * 0.5, 6);
+  }
+
+  // --- Walls (if level >= 3) ---
+  if (d.level >= 3 && d.faction) {
+    let fac = FACTIONS[d.faction];
+    let bannerCol = fac ? fac.bannerColor : [150, 100, 60];
+    let accentCol = fac ? fac.accentColor : [180, 140, 100];
+    stroke(bannerCol[0] * 0.5, bannerCol[1] * 0.5, bannerCol[2] * 0.5, 140);
+    strokeWeight(2); noFill();
+    ellipse(ix, iy - ry * 0.05, rx * 1.3, ry * 1.1);
+    noStroke();
+    // Corner towers at level >= 5
+    if (d.level >= 5) {
+      let towerPos = [
+        { x: ix - rx * 0.6, y: iy - ry * 0.2 },
+        { x: ix + rx * 0.6, y: iy - ry * 0.2 },
+        { x: ix - rx * 0.5, y: iy + ry * 0.35 },
+        { x: ix + rx * 0.5, y: iy + ry * 0.35 },
+      ];
+      for (let tp of towerPos) {
+        fill(accentCol[0] * 0.4 + 80, accentCol[1] * 0.4 + 60, accentCol[2] * 0.4 + 40);
+        rect(floor(tp.x) - 6, floor(tp.y) - 18, 12, 18, 1);
+        fill(accentCol[0] * 0.6, accentCol[1] * 0.6, accentCol[2] * 0.6);
+        rect(floor(tp.x) - 7, floor(tp.y) - 20, 14, 4);
+        for (let c = 0; c < 4; c++) rect(floor(tp.x) - 7 + c * 4, floor(tp.y) - 23, 2, 3);
+      }
+    }
+  }
+
+  // --- Trees ---
+  if (d.trees) {
+    let treePal = d.faction ? getNationIslandPalette(d.faction) : pal;
+    for (let t of d.trees) {
+      _drawUniversalTree(t, treePal, vt);
+    }
+  }
+
+  // --- Buildings ---
+  if (d.buildings) {
+    let s = d.style || (d.faction && FACTIONS[d.faction] ? FACTIONS[d.faction].style : FACTIONS.rome.style);
+    for (let b of d.buildings) {
+      let bx = w2sX(b.x), by = w2sY(b.y);
+      fill(0, 0, 0, 25); ellipse(floor(bx), floor(by) + 3, b.w + 4, 6);
+      fill(s.wall[0], s.wall[1], s.wall[2]);
+      rect(floor(bx) - floor(b.w / 2), floor(by) - floor(b.h), b.w, b.h, 1);
+      fill(s.roof[0], s.roof[1], s.roof[2]);
+      if (s.roofType === 'pediment') {
+        triangle(floor(bx), floor(by) - floor(b.h) - 8, floor(bx) - floor(b.w / 2) - 2, floor(by) - floor(b.h), floor(bx) + floor(b.w / 2) + 2, floor(by) - floor(b.h));
+      } else if (s.roofType === 'flat') {
+        rect(floor(bx) - floor(b.w / 2) - 1, floor(by) - floor(b.h) - 3, b.w + 2, 3);
+      } else {
+        rect(floor(bx) - floor(b.w / 2) - 2, floor(by) - floor(b.h) - 4, b.w + 4, 4);
+        triangle(floor(bx) - floor(b.w / 2) - 2, floor(by) - floor(b.h) - 4, floor(bx) + floor(b.w / 2) + 2, floor(by) - floor(b.h) - 4, floor(bx), floor(by) - floor(b.h) - 10);
+      }
+      fill(s.door[0], s.door[1], s.door[2]);
+      rect(floor(bx) - 3, floor(by) - 8, 6, 8, 1);
+      fill(s.window[0], s.window[1], s.window[2], 160);
+      rect(floor(bx) - floor(b.w / 4) - 2, floor(by) - floor(b.h * 0.6), 4, 4, 1);
+      rect(floor(bx) + floor(b.w / 4) - 2, floor(by) - floor(b.h * 0.6), 4, 4, 1);
+    }
+  }
+
+  // --- Palace (central landmark building) ---
+  if (d.palace) {
+    let px = w2sX(d.palace.x), py = w2sY(d.palace.y);
+    let pw = d.palace.w, ph = d.palace.h;
+    let s = d.style || (d.faction && FACTIONS[d.faction] ? FACTIONS[d.faction].style : FACTIONS.rome.style);
+    let bannerCol = d.faction && FACTIONS[d.faction] ? FACTIONS[d.faction].bannerColor : [150, 100, 60];
+    fill(0, 0, 0, 30); ellipse(floor(px), floor(py) + 4, pw + 10, 8);
+    fill(s.wall[0] + 10, s.wall[1] + 10, s.wall[2] + 10);
+    rect(floor(px) - floor(pw / 2), floor(py) - floor(ph), pw, ph, 2);
+    fill(s.column[0], s.column[1], s.column[2]);
+    let numCols = 4 + floor((d.level || 1) / 2);
+    for (let c = 0; c < numCols; c++) {
+      let colX = floor(px) - floor(pw / 2) + 4 + c * floor((pw - 8) / max(1, numCols - 1));
+      rect(colX - 1, floor(py) - floor(ph) + 3, 3, ph - 3);
+    }
+    fill(s.roof[0], s.roof[1], s.roof[2]);
+    if (s.roofType === 'pediment') {
+      triangle(floor(px), floor(py) - floor(ph) - 14, floor(px) - floor(pw / 2) - 4, floor(py) - floor(ph), floor(px) + floor(pw / 2) + 4, floor(py) - floor(ph));
+      fill(s.accent[0], s.accent[1], s.accent[2], 120);
+      triangle(floor(px), floor(py) - floor(ph) - 11, floor(px) - floor(pw / 2) + 5, floor(py) - floor(ph) + 1, floor(px) + floor(pw / 2) - 5, floor(py) - floor(ph) + 1);
+    } else {
+      rect(floor(px) - floor(pw / 2) - 2, floor(py) - floor(ph) - 5, pw + 4, 5);
+    }
+    fill(s.door[0], s.door[1], s.door[2]);
+    rect(floor(px) - 5, floor(py) - 14, 10, 14, 2);
+    fill(bannerCol[0], bannerCol[1], bannerCol[2], 160);
+    rect(floor(px) - 4, floor(py) - 12, 8, 2);
+    fill(bannerCol[0], bannerCol[1], bannerCol[2]);
+    rect(floor(px) - 1, floor(py) - floor(ph) - 22, 2, 18);
+    rect(floor(px) + 1, floor(py) - floor(ph) - 22, 8, 6);
+    fill(bannerCol[0] + 40, bannerCol[1] + 40, bannerCol[2] + 40);
+    rect(floor(px) + 2, floor(py) - floor(ph) - 21, 6, 4);
+  }
+
+  // --- Flora ---
+  if (d.flora) { for (let fl of d.flora) drawOneFlora(fl); }
+
+  // --- Features (biome-specific landmarks) ---
+  if (d.features) {
+    for (let feat of d.features) {
+      _drawUniversalFeature(feat, ix, iy, rx, ry, pal, vt);
+    }
+  }
+
+  // --- Faction-specific scenery ---
+  if (d.factionScenery) d.factionScenery(ix, iy, rx, ry, pal, d);
+
+  // --- Port / Dock ---
+  if (d.port) {
+    let dx = w2sX(d.port.x), dy = w2sY(d.port.y);
+    fill(120, 90, 50);
+    rect(floor(dx) - 25, floor(dy), 50, 8, 1);
+    rect(floor(dx) - 3, floor(dy) + 6, 6, 10);
+    rect(floor(dx) - 20, floor(dy) + 6, 4, 8);
+    rect(floor(dx) + 16, floor(dy) + 6, 4, 8);
+    // Moored boat if port active
+    if (d.port.active) {
+      fill(140, 100, 55);
+      rect(floor(dx) + 22, floor(dy) + 10, 14, 4, 2);
+      fill(180, 160, 120);
+      rect(floor(dx) + 28, floor(dy) + 2, 2, 8);
+    }
+  }
+
+  // --- Atmosphere / sky tint overlay ---
+  if (pal.skyTint) {
+    fill(pal.skyTint[0], pal.skyTint[1], pal.skyTint[2], pal.skyTint[3]);
+    ellipse(ix, iy, rx * 2.2, ry * 2.2);
+  }
+
+  // --- Biome fog ---
+  if (pal.fogColor) {
+    let fogA = 10 + sin(vt * 1.5) * 5;
+    fill(pal.fogColor[0], pal.fogColor[1], pal.fogColor[2], fogA);
+    ellipse(ix, iy, rx * 2.05, ry * 2.05);
+  }
+
+  pop();
+}
+
+// Distant version with scale + haze
+function drawUniversalIslandDistant(islandData, _dScale) {
+  let d = islandData;
+  let ix = w2sX(d.cx), iy = w2sY(d.cy);
+  let pal = getUniversalBiomePalette(d.biome);
+  let rx = d.rx, ry = d.ry;
+
+  // Clamp to horizon
+  let _horizY = max(height * 0.06, height * 0.25 - (typeof horizonOffset !== 'undefined' ? horizonOffset : 0)) + 10;
+  iy = max(iy, _horizY);
+
+  if (!_dScale) {
+    _dScale = _getDistantScale(d.cx, d.cy, rx);
+  }
+  if (_dScale.dist > 4000) return;
+  if (ix < -400 || ix > width + 400 || iy < -400 || iy > height + 400) return;
+
+  push(); noStroke();
+  if (_dScale.scale < 0.98) {
+    translate(ix, iy); scale(_dScale.scale); translate(-ix, -iy);
+  }
+
+  let bright = (typeof getSkyBrightness === 'function') ? getSkyBrightness() : 0.7;
+  let fsx = floor(ix), fsy = floor(iy);
+
+  // Water shadow
+  fill(pal.shadow[0], pal.shadow[1], pal.shadow[2], pal.shadowAlpha * 0.7);
+  ellipse(fsx + 3, fsy + 4, rx * 2.1, ry * 2.1);
+
+  // Shallow water ring
+  fill(pal.waterShallow[0], pal.waterShallow[1], pal.waterShallow[2], 45);
+  ellipse(fsx, fsy, rx * 2.05, ry * 2.05);
+
+  // Beach ring
+  fill(pal.beachSand[0], pal.beachSand[1], pal.beachSand[2]);
+  ellipse(fsx, fsy, rx * 1.95, ry * 1.95);
+
+  // Main terrain
+  fill(pal.terrain[0], pal.terrain[1], pal.terrain[2]);
+  ellipse(fsx, fsy, rx * 1.78, ry * 1.78);
+
+  // Lighter center
+  fill(pal.terrainRim[0], pal.terrainRim[1], pal.terrainRim[2], 60);
+  ellipse(fsx, fsy + ry * 0.05, rx * 0.9, ry * 0.6);
+
+  // Simplified trees (4-8)
+  let numTrees = min(4 + (d.level || 1), 8);
+  let treeLeaf = pal.grass;
+  for (let i = 0; i < numTrees; i++) {
+    let ta = (i * 2.39996) % TWO_PI;
+    let tr = 0.25 + ((i * 19 + 3) % 50) / 100 * 0.4;
+    let tpx = fsx + cos(ta) * rx * tr;
+    let tpy = fsy + sin(ta) * ry * tr * 0.7;
+    fill(treeLeaf[0] - 15, treeLeaf[1] - 20, treeLeaf[2] - 10, 100);
+    rect(floor(tpx - 1), floor(tpy - 2), 2, 5);
+    fill(treeLeaf[0], treeLeaf[1], treeLeaf[2], 120);
+    ellipse(tpx, tpy - 4, 10 + (i % 3) * 2, 7 + (i % 2) * 2);
+  }
+
+  // Simplified buildings (3-6)
+  let numB = min(3 + floor((d.level || 1) * 0.5), 6);
+  let s = d.style || (d.faction && FACTIONS[d.faction] ? FACTIONS[d.faction].style : FACTIONS.rome.style);
+  for (let i = 0; i < numB; i++) {
+    let ba = (i / numB) * PI + 0.3;
+    let br = rx * 0.25 + (i % 3) * rx * 0.12;
+    let bx = fsx + cos(ba) * br - rx * 0.15;
+    let by = fsy + sin(ba) * br * 0.5 - ry * 0.15;
+    let bw = 6 + (i % 2) * 3, bh = 5 + floor((d.level || 1) * 0.4) + (i % 3) * 2;
+    fill(s.wall[0], s.wall[1], s.wall[2], 130);
+    rect(floor(bx), floor(by - bh), bw, bh);
+    fill(s.roof[0], s.roof[1], s.roof[2], 120);
+    rect(floor(bx - 1), floor(by - bh - 2), bw + 2, 3);
+  }
+
+  // Dock indicator
+  fill(110, 85, 50);
+  rect(fsx - 3, floor(fsy + ry * 0.88), 6, 12);
+  fill(130, 100, 60);
+  rect(fsx - 5, floor(fsy + ry * 0.86), 10, 3);
+
+  // Atmospheric haze overlay
+  let _hazeAlpha = max(20, floor(_dScale.haze * 0.5));
+  fill(140 + 30 * bright, 165 + 20 * bright, 195 + 10 * bright, _hazeAlpha);
+  ellipse(fsx, fsy, rx * 2.2, ry * 2.2);
+
+  pop();
+}
+
+// Internal: biome-specific terrain texture overlays
+function _drawBiomeTerrainDetails(ix, iy, rx, ry, biome, pal, vt) {
+  if (biome === 'desert') {
+    // Sand dune patches
+    for (let i = 0; i < 8; i++) {
+      let sx = ix + sin(i * 2.7 + 0.5) * rx * 0.45, sy = iy + cos(i * 1.9 + 1.2) * ry * 0.25;
+      fill(pal.beachSand[0], pal.beachSand[1], pal.beachSand[2], 40);
+      ellipse(sx, sy, 25 + (i % 3) * 10, 12 + (i % 2) * 8);
+    }
+    // Oasis shimmer
+    fill(50, 120, 80, 30 + sin(vt * 3) * 10);
+    ellipse(ix + rx * 0.2, iy + ry * 0.15, 30, 16);
+  } else if (biome === 'frozen') {
+    // Ice cracks
+    for (let cr = 0; cr < 6; cr++) {
+      let ca = (cr / 6) * TWO_PI + cr * 0.8;
+      let cLen = rx * (0.2 + (cr % 3) * 0.12);
+      fill(160, 200, 230, 50);
+      for (let seg = 0; seg < 5; seg++) {
+        let st = seg / 5;
+        let crx = ix + cos(ca) * cLen * st + sin(seg * 1.5 + ca) * 2;
+        let cry = iy + sin(ca) * cLen * st * 0.69 + cos(seg * 1.2) * 1;
+        rect(floor(crx), floor(cry), 3, 1);
+      }
+    }
+    // Snow drifts
+    for (let i = 0; i < 10; i++) {
+      let sa = (i * 2.39996) % TWO_PI;
+      let sr = ((i * 19 + 3) % 70) / 100 * 0.6;
+      let spx = ix + cos(sa) * rx * sr, spy = iy + sin(sa) * ry * sr * 0.69;
+      fill(248, 252, 255, 60); rect(floor(spx), floor(spy), 8, 2);
+    }
+  } else if (biome === 'volcanic') {
+    // Lava veins
+    for (let lv = 0; lv < 6; lv++) {
+      let la = (lv / 6) * TWO_PI + lv * 0.6;
+      let lr = rx * (0.25 + (lv % 3) * 0.12);
+      let lvGlow = sin(vt * 4 + lv * 1.5) * 0.3 + 0.7;
+      fill(200, 60, 10, 40 * lvGlow);
+      for (let seg = 0; seg < 5; seg++) {
+        let st = seg / 5;
+        let segX = ix + cos(la) * lr * st + sin(seg * 1.3 + la) * 3;
+        let segY = iy + sin(la) * lr * st * 0.69;
+        rect(floor(segX), floor(segY), 3, 2);
+      }
+    }
+    // Volcanic rock scatter
+    for (let i = 0; i < 12; i++) {
+      let ra = (i * 2.39996) % TWO_PI;
+      let rr = ((i * 23 + 5) % 80) / 100 * 0.6;
+      let rpx = ix + cos(ra) * rx * rr, rpy = iy + sin(ra) * ry * rr * 0.69;
+      fill(25, 20, 15, 100); rect(floor(rpx), floor(rpy), 5, 3);
+    }
+  } else if (biome === 'tropical') {
+    // Lush canopy patches
+    for (let i = 0; i < 14; i++) {
+      let ja = (i * 2.39996) % TWO_PI;
+      let jr = ((i * 13 + 7) % 75) / 100 * 0.65;
+      let jpx = ix + cos(ja) * rx * jr, jpy = iy + sin(ja) * ry * jr * 0.69;
+      fill(40, 150, 58, 80); ellipse(jpx, jpy, 14, 9);
+    }
+    // Flower clusters
+    let flSpots = [[-0.3, -0.2], [0.4, -0.15], [-0.15, 0.25], [0.3, 0.3]];
+    for (let fs of flSpots) {
+      let fpx = ix + fs[0] * rx * 0.65, fpy = iy + fs[1] * ry * 0.5;
+      let fPhase = sin(vt * 2 + fs[0] * 5);
+      fill(fPhase > 0 ? 255 : 255, fPhase > 0 ? 180 : 80, fPhase > 0 ? 40 : 100, 100);
+      rect(floor(fpx), floor(fpy), 3, 3);
+    }
+  } else if (biome === 'dark') {
+    // Ghostly ground veins
+    for (let fv = 0; fv < 5; fv++) {
+      let fa = (fv / 5) * TWO_PI + fv * 1.2;
+      let fLen = rx * (0.2 + (fv % 3) * 0.15);
+      let fGlow = sin(vt * 3 + fv * 1.8) * 0.3 + 0.5;
+      fill(120, 60, 180, 30 * fGlow);
+      for (let seg = 0; seg < 5; seg++) {
+        let st = seg / 5;
+        let fx = ix + cos(fa) * fLen * st + sin(seg * 1.4 + fa) * 2;
+        let fy = iy + sin(fa) * fLen * st * 0.69;
+        rect(floor(fx), floor(fy), 3, 1);
+      }
+    }
+    // Dead grass patches
+    for (let i = 0; i < 10; i++) {
+      let ga = (i * 2.39996) % TWO_PI;
+      let gr = ((i * 17 + 11) % 70) / 100 * 0.6;
+      let gpx = ix + cos(ga) * rx * gr, gpy = iy + sin(ga) * ry * gr * 0.69;
+      fill(38, 32, 28, 70); rect(floor(gpx), floor(gpy), 6, 2);
+    }
+    // Ground fog
+    for (let fg = 0; fg < 6; fg++) {
+      let fga = (fg / 6) * TWO_PI + vt * 0.3;
+      let fgr = rx * (0.2 + (fg % 3) * 0.15);
+      let fgx = ix + cos(fga) * fgr, fgy = iy + sin(fga) * fgr * 0.6;
+      fill(80, 70, 100, 10 + sin(vt * 2 + fg * 1.5) * 5);
+      ellipse(fgx, fgy, 30, 10);
+    }
+  } else if (biome === 'mediterranean') {
+    // Grass tufts
+    for (let i = 0; i < 8; i++) {
+      let ga = (i * 2.39996) % TWO_PI;
+      let gr = ((i * 13 + 5) % 65) / 100 * 0.55;
+      let gpx = ix + cos(ga) * rx * gr, gpy = iy + sin(ga) * ry * gr * 0.69;
+      fill(75, 125, 52, 60); ellipse(gpx, gpy, 12, 7);
+    }
+  }
+}
+
+// Internal: render a tree in universal style with faction-aware type
+function _drawUniversalTree(t, pal, vt) {
+  let tx = w2sX(t.x), ty = w2sY(t.y);
+  let sz = t.size;
+  let sway = floor(sin(vt + t.x * 0.1) * 2);
+  push(); translate(floor(tx), floor(ty)); noStroke();
+  fill(0, 0, 0, 25); ellipse(0, 2, sz, 3);
+  let trunkCol = pal.treeTrunk || [100, 75, 45];
+  let leafCol = pal.treeLeaf || [55, 100, 40];
+  if (t.type === 'palm' || t.type === 'datepalm') {
+    fill(trunkCol[0], trunkCol[1], trunkCol[2]); rect(-1, -sz, 2, sz);
+    fill(leafCol[0], leafCol[1], leafCol[2]);
+    for (let f = 0; f < 6; f++) { let fa = (f / 6) * TWO_PI + sin(vt) * 0.12; ellipse(floor(cos(fa) * sz * 0.6 + sway * 0.3), floor(sin(fa) * sz * 0.25 - sz - 1), sz * 0.45, sz * 0.2); }
+    if (t.type === 'datepalm') { fill(160, 100, 30, 140); rect(-1, -sz - 1, 2, 2); }
+  } else if (t.type === 'acacia') {
+    fill(trunkCol[0], trunkCol[1], trunkCol[2]); rect(-1, -sz * 0.6, 2, sz * 0.6);
+    fill(leafCol[0], leafCol[1], leafCol[2]); rect(-sz * 0.8 + sway, -sz * 0.9, sz * 1.6, sz * 0.25);
+    fill(leafCol[0] + 15, leafCol[1] + 15, leafCol[2] + 10, 160); rect(-sz * 0.65 + sway, -sz, sz * 1.3, sz * 0.2);
+  } else if (t.type === 'fig' || t.type === 'sycamore') {
+    fill(trunkCol[0], trunkCol[1], trunkCol[2]); rect(-2, -sz * 0.5, 4, sz * 0.5);
+    fill(leafCol[0], leafCol[1], leafCol[2]); ellipse(sway * 0.3, -sz * 0.8, sz * 1.2, sz * 0.8);
+  } else if (t.type === 'papyrus') {
+    fill(90, 120, 55); rect(-1, -sz, 1, sz); rect(0, -sz * 0.85, 1, sz * 0.85);
+    fill(100, 140, 65); ellipse(sway * 0.2, -sz - 2, sz * 0.5, sz * 0.2);
+  } else if (t.type === 'olive') {
+    fill(trunkCol[0], trunkCol[1], trunkCol[2]); rect(-2, -sz * 0.6, 4, sz * 0.6);
+    fill(78, 98, 58); ellipse(sway * 0.3, -sz * 0.8, sz * 0.8, sz * 0.6);
+    fill(120, 145, 95, 100); ellipse(sway * 0.2, -sz * 0.9, sz * 0.5, sz * 0.35);
+  } else if (t.type === 'laurel') {
+    fill(trunkCol[0], trunkCol[1], trunkCol[2]); rect(-1, -sz * 0.6, 2, sz * 0.6);
+    fill(45, 85, 30); ellipse(sway * 0.3, -sz * 0.85, sz * 0.7, sz * 0.7);
+    fill(55, 100, 38, 180); ellipse(sway * 0.2, -sz * 0.9, sz * 0.55, sz * 0.55);
+  } else {
+    fill(trunkCol[0], trunkCol[1], trunkCol[2]); rect(-1, -sz * 0.7, 2, sz * 0.7);
+    fill(leafCol[0], leafCol[1], leafCol[2]);
+    if (t.type === 'oak') {
+      for (let li = 0; li < 4; li++) { let lw = (3 - abs(li - 1.5)) * sz * 0.15; rect(floor(-lw + sway * (li / 4)), floor(-sz * 0.7 - li * sz * 0.22), floor(lw * 2), floor(sz * 0.22)); }
+    } else {
+      rect(-sz * 0.6 + sway, -sz - 2, sz * 1.2, sz * 0.25);
+      rect(-sz * 0.45 + sway, -sz - 4, sz * 0.9, sz * 0.2);
+    }
+  }
+  pop();
+}
+
+// Internal: render special island features (lava pools, frozen lake, waterfalls, tombs, etc.)
+function _drawUniversalFeature(feat, ix, iy, rx, ry, pal, vt) {
+  let fx = feat.screenX !== undefined ? feat.screenX : (feat.x !== undefined ? w2sX(feat.x) : ix + (feat.ox || 0) * rx);
+  let fy = feat.screenY !== undefined ? feat.screenY : (feat.y !== undefined ? w2sY(feat.y) : iy + (feat.oy || 0) * ry);
+
+  if (feat.type === 'lavaPool') {
+    let pulse = sin(frameCount * 0.06 + (feat.phase || 0)) * 0.2 + 0.8;
+    let r = feat.r || 12;
+    fill(35, 22, 10, 140); ellipse(fx, fy, r * 2.3, r * 1.6);
+    fill(160, 40, 8, 130 * pulse); ellipse(fx, fy, r * 2, r * 1.4);
+    fill(230, 100, 20, 90 * pulse); ellipse(fx, fy, r * 1.4, r);
+    fill(255, 180, 50, 60 * pulse); ellipse(fx, fy, r * 0.8, r * 0.5);
+  } else if (feat.type === 'frozenLake') {
+    let w = feat.w || 55, h = feat.h || 30;
+    fill(140, 185, 215, 100); ellipse(fx, fy, w, h);
+    fill(170, 210, 235, 80); ellipse(fx, fy, w * 0.72, h * 0.67);
+    let iceShim = sin(vt * 3) * 0.3 + 0.7;
+    fill(220, 240, 255, 30 * iceShim); ellipse(fx - 5, fy - 3, w * 0.36, h * 0.33);
+  } else if (feat.type === 'waterfall') {
+    let wfH = feat.h || 20;
+    fill(65, 55, 40); rect(floor(fx - 5), floor(fy - 4), 10, wfH + 4);
+    for (let wi = 0; wi < wfH; wi += 2) {
+      let shimmer = sin(vt * 12 + wi * 0.4) * 1.5;
+      fill(90, 195, 215, 160 - wi * 3); rect(floor(fx + shimmer) - 2, floor(fy) + wi, 4, 2);
+    }
+    fill(70, 175, 195, 90); ellipse(fx, fy + wfH + 4, 18, 8);
+  } else if (feat.type === 'gravestone') {
+    fill(62, 55, 68); rect(floor(fx - 3), floor(fy - 2), 6, 4);
+    fill(72, 65, 78); rect(floor(fx - 2), floor(fy - 8), 4, 8);
+  } else if (feat.type === 'volcano') {
+    fill(48, 40, 32); ellipse(fx, fy - 8, 130, 90);
+    fill(55, 45, 36); ellipse(fx, fy - 12, 100, 68);
+    fill(62, 52, 42); ellipse(fx, fy - 16, 72, 50);
+    fill(45, 35, 28); ellipse(fx, fy - 18, 48, 32);
+    fill(30, 20, 14); ellipse(fx, fy - 18, 36, 24);
+    let glow = sin(vt * 4) * 0.3 + 0.7;
+    fill(255, 70, 15, 70 * glow); ellipse(fx, fy - 18, 28, 18);
+    fill(255, 130, 35, 50 * glow); ellipse(fx, fy - 18, 44, 30);
+  } else if (feat.type === 'glacier') {
+    fill(185, 215, 235); ellipse(fx, fy - 12, 90, 62);
+    fill(200, 225, 242); ellipse(fx, fy - 18, 65, 45);
+    fill(230, 242, 252); ellipse(fx, fy - 24, 40, 28);
+    fill(245, 250, 255); ellipse(fx, fy - 28, 22, 16);
+  } else if (feat.type === 'hill') {
+    let col = feat.col || [pal.terrain[0] - 10, pal.terrain[1] + 10, pal.terrain[2] - 5];
+    fill(col[0], col[1], col[2]); ellipse(fx, fy - 8, feat.w || 100, feat.h || 65);
+    fill(col[0] + 10, col[1] + 10, col[2] + 8); ellipse(fx, fy - 14, (feat.w || 100) * 0.7, (feat.h || 65) * 0.7);
+  } else if (feat.type === 'mausoleum') {
+    fill(48, 42, 55); rect(floor(fx) - 28, floor(fy) - 18, 56, 32);
+    fill(58, 52, 65); rect(floor(fx) - 24, floor(fy) - 26, 48, 12);
+    fill(65, 58, 72); rect(floor(fx) - 28, floor(fy) - 28, 56, 4);
+    fill(72, 64, 78); rect(floor(fx) - 22, floor(fy) - 32, 44, 6);
+    fill(78, 70, 85); rect(floor(fx) - 26, floor(fy) - 26, 4, 26); rect(floor(fx) + 22, floor(fy) - 26, 4, 26);
+    fill(20, 15, 28); rect(floor(fx) - 6, floor(fy) - 8, 12, 14);
+    let eGlow = sin(vt * 3) * 0.3 + 0.5;
+    fill(120, 60, 180, 25 * eGlow); rect(floor(fx) - 4, floor(fy) - 6, 8, 10);
+  } else if (feat.type === 'pyramid') {
+    fill(220, 195, 120, 160);
+    triangle(floor(fx), floor(fy) - 30, floor(fx) - 22, floor(fy) + 8, floor(fx) + 22, floor(fy) + 8);
+    fill(210, 185, 110, 100);
+    triangle(floor(fx), floor(fy) - 30, floor(fx), floor(fy) + 8, floor(fx) + 22, floor(fy) + 8);
+  } else if (feat.type === 'obelisk') {
+    let oCol = feat.col || [200, 170, 40];
+    fill(oCol[0], oCol[1], oCol[2]); rect(floor(fx) - 3, floor(fy) - 28, 6, 28);
+    fill(255, 230, 100); triangle(floor(fx), floor(fy) - 32, floor(fx) - 4, floor(fy) - 28, floor(fx) + 4, floor(fy) - 28);
+  } else if (feat.type === 'amphitheater') {
+    for (let s = 3; s >= 0; s--) {
+      fill(220 - s * 10, 218 - s * 10, 210 - s * 10, 150);
+      arc(floor(fx), floor(fy), (20 + s * 12), (12 + s * 8), PI, TWO_PI);
+    }
+  } else if (feat.type === 'marketStall') {
+    fill(180, 130, 70); rect(floor(fx) - 10, floor(fy) - 12, 20, 12, 1);
+    let awningCol = feat.col || [160, 80, 40];
+    fill(awningCol[0], awningCol[1], awningCol[2], 180);
+    rect(floor(fx) - 12, floor(fy) - 14, 24, 3);
+  } else if (feat.type === 'columns') {
+    let cCol = feat.col || [200, 200, 210];
+    fill(cCol[0], cCol[1], cCol[2], 200);
+    for (let i = 0; i < (feat.count || 2); i++) {
+      let cx = fx - ((feat.count || 2) - 1) * 8 + i * 16;
+      rect(floor(cx) - 2, floor(fy) - 20, 4, 20);
+      rect(floor(cx) - 4, floor(fy) - 22, 8, 3);
+    }
+  }
+}
+
+// Convert nation island visit data to universal format
+function getNationIslandData(key) {
+  let rv = state.nations[key];
+  if (!rv) return null;
+  let ni = state.nationIsland;
+  if (!ni) return null;
+  let fac = FACTIONS[key];
+  let biomeMap = { carthage: 'desert', egypt: 'desert', greece: 'mediterranean', rome: 'mediterranean' };
+  let biome = biomeMap[key] || 'mediterranean';
+  let rx = rv.isleRX * 0.7, ry = rv.isleRY * 0.7;
+
+  // Build faction-specific scenery callback
+  let factionScenery = null;
+  if (key === 'carthage') {
+    factionScenery = function(ix, iy, rx, ry, pal, d) {
+      noStroke();
+      for (let i = 0; i < 3; i++) {
+        let mx = ix + (i - 1) * 35, my = iy + ry * 0.15;
+        fill(180, 130, 70); rect(floor(mx) - 10, floor(my) - 12, 20, 12, 1);
+        fill(160, 80, 40, 180); rect(floor(mx) - 12, floor(my) - 14, 24, 3);
+        fill(140, 100, 50, 100);
+        for (let g = 0; g < 3; g++) rect(floor(mx) - 6 + g * 5, floor(my) - 8, 3, 4);
+      }
+      fill(200, 170, 100, 150);
+      rect(floor(ix) - rx * 0.2 - 3, floor(iy) - ry * 0.4, 6, 25);
+      rect(floor(ix) + rx * 0.2 - 3, floor(iy) - ry * 0.4, 6, 25);
+      fill(200, 170, 100, 100);
+      rect(floor(ix) - rx * 0.2 - 5, floor(iy) - ry * 0.4 - 3, 10, 3);
+      rect(floor(ix) + rx * 0.2 - 5, floor(iy) - ry * 0.4 - 3, 10, 3);
+      let lv = d.level || 1;
+      for (let i = 0; i < min(3, floor(lv / 2) + 1); i++) {
+        let hx = ix + (i - 1) * 30 + 5, hy = iy + ry * 0.75;
+        fill(120, 80, 40); rect(floor(hx) - 8, floor(hy), 16, 4, 2);
+        fill(160, 120, 60); rect(floor(hx), floor(hy) - 10, 2, 10);
+        fill(240, 230, 210, 120); triangle(floor(hx) + 2, floor(hy) - 9, floor(hx) + 10, floor(hy) - 5, floor(hx) + 2, floor(hy) - 2);
+      }
+    };
+  } else if (key === 'egypt') {
+    factionScenery = function(ix, iy, rx, ry, pal, d) {
+      noStroke();
+      for (let i = 0; i < 2; i++) {
+        let ox = ix + (i === 0 ? -1 : 1) * rx * 0.25, oy = iy - ry * 0.15;
+        fill(200, 170, 40); rect(floor(ox) - 3, floor(oy) - 28, 6, 28);
+        fill(255, 230, 100); triangle(floor(ox), floor(oy) - 32, floor(ox) - 4, floor(oy) - 28, floor(ox) + 4, floor(oy) - 28);
+      }
+      fill(200, 175, 110);
+      let spx = ix + rx * 0.3, spy = iy + ry * 0.2;
+      rect(floor(spx) - 12, floor(spy) - 6, 24, 10, 2);
+      fill(190, 165, 100); rect(floor(spx) - 4, floor(spy) - 14, 8, 10, 2);
+      fill(60, 50, 40); ellipse(floor(spx) - 1, floor(spy) - 10, 2, 2); ellipse(floor(spx) + 3, floor(spy) - 10, 2, 2);
+      fill(220, 195, 120, 160);
+      let prx = ix - rx * 0.35, pry = iy - ry * 0.1;
+      triangle(floor(prx), floor(pry) - 30, floor(prx) - 22, floor(pry) + 8, floor(prx) + 22, floor(pry) + 8);
+      fill(210, 185, 110, 100);
+      triangle(floor(prx), floor(pry) - 30, floor(prx), floor(pry) + 8, floor(prx) + 22, floor(pry) + 8);
+      for (let i = 0; i < 5; i++) {
+        let rpx = floor(ix - rx * 0.3 + i * rx * 0.15), rpy = floor(iy + ry * 0.75);
+        fill(80, 130, 50); rect(rpx, rpy, 2, -12 - (i % 3) * 2);
+        fill(100, 150, 60); ellipse(rpx + 1, rpy - 14, 6, 4);
+      }
+    };
+  } else if (key === 'greece') {
+    factionScenery = function(ix, iy, rx, ry, pal, d) {
+      noStroke();
+      fill(230, 228, 220, 80);
+      rect(ix - 3, iy - ry * 0.5, 6, ry * 0.8);
+      rect(ix - rx * 0.3, iy - 3, rx * 0.6, 6);
+      let ax = ix + rx * 0.3, ay = iy + ry * 0.1;
+      for (let s = 3; s >= 0; s--) {
+        fill(220 - s * 10, 218 - s * 10, 210 - s * 10, 150);
+        arc(floor(ax), floor(ay), (20 + s * 12), (12 + s * 8), PI, TWO_PI);
+      }
+      for (let i = 0; i < 4; i++) {
+        let colX = ix - 25 + i * 17, colY = iy - ry * 0.15;
+        fill(240, 240, 248, 200); rect(floor(colX) - 2, floor(colY) - 20, 4, 20);
+        fill(240, 240, 248, 240); rect(floor(colX) - 4, floor(colY) - 22, 8, 3);
+        ellipse(floor(colX) - 3, floor(colY) - 22, 4, 4); ellipse(floor(colX) + 3, floor(colY) - 22, 4, 4);
+      }
+    };
+  }
+  // Rome has no extra faction scenery (paths + buildings are enough)
+
+  return {
+    cx: rv.isleX, cy: rv.isleY, rx: rx, ry: ry,
+    biome: biome,
+    faction: key,
+    level: rv.level,
+    buildings: ni.buildings,
+    trees: ni.trees,
+    flora: ni.flora || [],
+    palace: ni.palace,
+    port: { x: ni.dock.x, y: ni.dock.y, active: true },
+    style: ni.style,
+    features: [],
+    factionScenery: factionScenery,
+  };
+}
+
+// Convert colony (conquest) island to universal format for full rendering
+function getColonyIslandData() {
+  let c = state.conquest;
+  if (!c) return null;
+  let faction = state.faction || 'rome';
+  return {
+    cx: c.isleX, cy: c.isleY, rx: c.isleRX, ry: c.isleRY,
+    biome: 'mediterranean',
+    faction: faction,
+    level: c.colonized ? max(1, (c.buildings || []).length) : 0,
+    buildings: [],
+    trees: [],
+    flora: [],
+    palace: null,
+    port: { x: c.isleX, y: c.isleY + c.isleRY * 0.85, active: c.colonized },
+    style: FACTIONS[faction] ? FACTIONS[faction].style : FACTIONS.rome.style,
+    features: [],
+    factionScenery: null,
+  };
+}
+
+// Convert nation distant data to universal format
+function getNationDistantIslandData(key) {
+  let rv = state.nations[key];
+  if (!rv) return null;
+  let biomeMap = { carthage: 'desert', egypt: 'desert', greece: 'mediterranean', rome: 'mediterranean' };
+  return {
+    cx: rv.isleX, cy: rv.isleY, rx: rv.isleRX, ry: rv.isleRY,
+    biome: biomeMap[key] || 'mediterranean',
+    faction: key,
+    level: rv.level,
+    style: FACTIONS[key] ? FACTIONS[key].style : FACTIONS.rome.style,
+  };
+}

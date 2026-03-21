@@ -199,6 +199,127 @@ const FACTIONS = {
     player: { tunic: [240, 238, 230], sash: [80, 144, 192], cape: [80, 144, 192], helm: [200, 195, 185] },
     npcNames: { livia: 'Helena', marcus: 'Leonidas', vesta: 'Athena', felix: 'Socrates' },
   },
+  seapeople: {
+    name: 'SEA PEOPLE',
+    subtitle: 'Raiders of the Deep',
+    bonuses: ['+30% sailing speed', '+50% raid loot', 'No starting island', 'Starts on a ship'],
+    buildSpeedMult: 1.0,
+    recruitBonus: 0,
+    tradeIncomeMult: 1.0,
+    sailSpeedMult: 1.3,
+    combatDamageMult: 1.0,
+    fishYieldMult: 1.0,
+    npcFavorMult: 1.0,
+    crystalIncomeMult: 1.0,
+    cropGrowthMult: 1.0,
+    buildCostMult: 1.0,
+    raidLootMult: 1.5,
+    noStartIsland: true,
+    bannerColor: [26, 58, 92],
+    accentColor: [42, 138, 106],
+    accentColorHex: '#2a8a6a',
+    bannerGlyph: 'trident',
+    style: {
+      wall: [138, 112, 80], roof: [90, 80, 65], trim: [110, 100, 80],
+      accent: [42, 138, 106], door: [70, 55, 35], window: [26, 58, 92],
+      column: [120, 105, 80], ground: [105, 90, 70],
+      roofType: 'flat', columnType: 'wooden', doorShape: 'rect',
+      wallTexture: 'plank', groundTint: [115, 100, 78],
+    },
+    player: { tunic: [26, 58, 92], sash: [90, 70, 45], cape: [42, 138, 106], helm: [138, 112, 80] },
+    npcNames: { livia: 'Thalassa', marcus: 'Nereus', vesta: 'Scylla', felix: 'Triton' },
+  },
+  persia: {
+    name: 'PERSIA',
+    subtitle: 'The Immortal Empire',
+    bonuses: ['+25% colony income', '+1 officer capacity', '+30% governor efficiency', 'Starts with royal scepter'],
+    buildSpeedMult: 1.0,
+    recruitBonus: 0,
+    tradeIncomeMult: 1.0,
+    sailSpeedMult: 1.0,
+    combatDamageMult: 1.0,
+    fishYieldMult: 1.0,
+    npcFavorMult: 1.0,
+    crystalIncomeMult: 1.0,
+    cropGrowthMult: 1.0,
+    buildCostMult: 1.0,
+    colonyIncomeMult: 1.25,
+    officerCapacity: 1,
+    governorEfficiency: 1.3,
+    bannerColor: [106, 42, 138],
+    accentColor: [212, 160, 48],
+    accentColorHex: '#d4a030',
+    bannerGlyph: 'wingedlion',
+    style: {
+      wall: [240, 232, 208], roof: [106, 42, 138], trim: [212, 160, 48],
+      accent: [42, 74, 138], door: [80, 50, 30], window: [42, 74, 138],
+      column: [230, 220, 200], ground: [180, 160, 130],
+      roofType: 'domed', columnType: 'twisted', doorShape: 'arch',
+      wallTexture: 'mosaic', groundTint: [195, 178, 148],
+    },
+    player: { tunic: [106, 42, 138], sash: [212, 160, 48], cape: [106, 42, 138], helm: [212, 160, 48] },
+    npcNames: { livia: 'Esther', marcus: 'Cyrus', vesta: 'Darius', felix: 'Zarathustra' },
+  },
+  phoenicia: {
+    name: 'PHOENICIA',
+    subtitle: 'Masters of the Sea',
+    bonuses: ['+30% trade income', '2x island discovery speed', '+50% ship cargo', 'Starts with navigator\'s chart'],
+    buildSpeedMult: 1.0,
+    recruitBonus: 0,
+    tradeIncomeMult: 1.3,
+    sailSpeedMult: 1.0,
+    combatDamageMult: 1.0,
+    fishYieldMult: 1.0,
+    npcFavorMult: 1.0,
+    crystalIncomeMult: 1.0,
+    cropGrowthMult: 1.0,
+    buildCostMult: 1.0,
+    discoverIslandSpeed: 2.0,
+    shipCargoMult: 1.5,
+    bannerColor: [138, 16, 80],
+    accentColor: [48, 112, 176],
+    accentColorHex: '#3070b0',
+    bannerGlyph: 'cedar',
+    style: {
+      wall: [240, 240, 240], roof: [106, 74, 42], trim: [138, 16, 80],
+      accent: [48, 112, 176], door: [80, 55, 30], window: [48, 112, 176],
+      column: [230, 225, 218], ground: [160, 150, 135],
+      roofType: 'flat', columnType: 'rounded', doorShape: 'arch',
+      wallTexture: 'ashlar', groundTint: [175, 165, 148],
+    },
+    player: { tunic: [240, 240, 240], sash: [138, 16, 80], cape: [138, 16, 80], helm: [212, 160, 48] },
+    npcNames: { livia: 'Dido', marcus: 'Hiram', vesta: 'Jezebel', felix: 'Cadmus' },
+  },
+  gaul: {
+    name: 'GAUL',
+    subtitle: 'Children of the Forest',
+    bonuses: ['+20% combat damage', '+50% forest resources', 'Wildlife friendly', 'Starts with druid staff'],
+    buildSpeedMult: 1.0,
+    recruitBonus: 0,
+    tradeIncomeMult: 1.0,
+    sailSpeedMult: 1.0,
+    combatDamageMult: 1.2,
+    fishYieldMult: 1.0,
+    npcFavorMult: 1.0,
+    crystalIncomeMult: 1.0,
+    cropGrowthMult: 1.0,
+    buildCostMult: 1.0,
+    forestResourceMult: 1.5,
+    wildlifeFriendly: true,
+    bannerColor: [42, 106, 48],
+    accentColor: [200, 160, 32],
+    accentColorHex: '#c8a020',
+    bannerGlyph: 'boar',
+    style: {
+      wall: [140, 110, 70], roof: [160, 145, 90], trim: [90, 64, 32],
+      accent: [42, 106, 48], door: [60, 42, 20], window: [42, 106, 48],
+      column: [100, 80, 50], ground: [85, 100, 60],
+      roofType: 'thatched', columnType: 'wooden', doorShape: 'rect',
+      wallTexture: 'wattle', groundTint: [95, 110, 68],
+    },
+    player: { tunic: [42, 106, 48], sash: [200, 160, 32], cape: [90, 64, 32], helm: [112, 120, 124] },
+    npcNames: { livia: 'Boudicca', marcus: 'Vercingetorix', vesta: 'Druantia', felix: 'Brennus' },
+  },
 };
 
 // Faction data caches — invalidated only when faction changes (never mid-game)
@@ -242,10 +363,14 @@ function getNPCDisplayName(npcKey) {
 function getFactionTreeTypes(factionKey) {
   let f = factionKey || state.faction || 'rome';
   let types = {
-    rome:     ['oak', 'pine', 'olive'],
-    carthage: ['palm', 'acacia', 'fig'],
-    egypt:    ['papyrus', 'datepalm', 'sycamore'],
-    greece:   ['olive', 'oak', 'laurel'],
+    rome:      ['oak', 'pine', 'olive'],
+    carthage:  ['palm', 'acacia', 'fig'],
+    egypt:     ['papyrus', 'datepalm', 'sycamore'],
+    greece:    ['olive', 'oak', 'laurel'],
+    seapeople: ['palm', 'driftwood', 'mangrove'],
+    persia:    ['cypress', 'pomegranate', 'cedar'],
+    phoenicia: ['cedar', 'olive', 'fig'],
+    gaul:      ['oak', 'birch', 'elm'],
   };
   return types[f] || types.rome;
 }
@@ -270,6 +395,26 @@ const FACTION_FLORA = {
     { col: [230, 230, 220], w: 3, h: 3 },
     { col: [70, 110, 50], w: 4, h: 2 },
     { col: [220, 220, 210], w: 2, h: 2 },
+  ],
+  seapeople: [
+    { col: [40, 100, 120], w: 3, h: 2 },
+    { col: [80, 130, 90], w: 4, h: 3 },
+    { col: [60, 90, 110], w: 2, h: 2 },
+  ],
+  persia: [
+    { col: [180, 100, 200], w: 3, h: 3 },
+    { col: [200, 160, 60], w: 4, h: 2 },
+    { col: [160, 80, 180], w: 2, h: 2 },
+  ],
+  phoenicia: [
+    { col: [180, 30, 100], w: 3, h: 3 },
+    { col: [60, 110, 170], w: 4, h: 2 },
+    { col: [160, 20, 80], w: 2, h: 2 },
+  ],
+  gaul: [
+    { col: [60, 130, 50], w: 3, h: 3 },
+    { col: [100, 80, 40], w: 4, h: 2 },
+    { col: [50, 120, 45], w: 2, h: 2 },
   ],
 };
 
@@ -302,6 +447,34 @@ const FACTION_MILITARY = {
     shieldShape: 'round', helmStyle: 'corinthian', weapon: 'spear',
     conquestFlag: [50, 100, 170],
   },
+  seapeople: {
+    tunic: [26, 58, 92], cape: [42, 138, 106], armor: [138, 112, 80],
+    helm: [138, 112, 80], helmCrest: [42, 138, 106], shield: [26, 58, 92],
+    shieldBoss: [138, 112, 80], legs: [80, 65, 45], plume: [42, 138, 106],
+    shieldShape: 'round', helmStyle: 'nasal', weapon: 'axe',
+    conquestFlag: [26, 58, 92],
+  },
+  persia: {
+    tunic: [106, 42, 138], cape: [212, 160, 48], armor: [230, 220, 200],
+    helm: [212, 160, 48], helmCrest: [106, 42, 138], shield: [106, 42, 138],
+    shieldBoss: [212, 160, 48], legs: [90, 60, 40], plume: [212, 160, 48],
+    shieldShape: 'round', helmStyle: 'tiara', weapon: 'scimitar',
+    conquestFlag: [106, 42, 138],
+  },
+  phoenicia: {
+    tunic: [240, 240, 240], cape: [138, 16, 80], armor: [200, 180, 140],
+    helm: [200, 180, 140], helmCrest: [138, 16, 80], shield: [138, 16, 80],
+    shieldBoss: [48, 112, 176], legs: [100, 80, 50], plume: [138, 16, 80],
+    shieldShape: 'round', helmStyle: 'turban', weapon: 'curved_sword',
+    conquestFlag: [138, 16, 80],
+  },
+  gaul: {
+    tunic: [42, 106, 48], cape: [90, 64, 32], armor: [112, 120, 124],
+    helm: [112, 120, 124], helmCrest: [200, 160, 32], shield: [42, 106, 48],
+    shieldBoss: [200, 160, 32], legs: [70, 50, 30], plume: [200, 160, 32],
+    shieldShape: 'round', helmStyle: 'galea', weapon: 'longsword',
+    conquestFlag: [42, 106, 48],
+  },
 };
 
 function getFactionMilitary() {
@@ -332,6 +505,106 @@ const FACTION_WILDLIFE = {
     { type: 'turtle', speed: 0.08, size: 5 },
     { type: 'owl', speed: 0.5, size: 6 },
   ],
+  seapeople: [
+    { type: 'seagull', speed: 0.7, size: 6 },
+    { type: 'crab', speed: 0.15, size: 4 },
+    { type: 'pelican', speed: 0.4, size: 8 },
+  ],
+  persia: [
+    { type: 'peacock', speed: 0.2, size: 9 },
+    { type: 'gazelle', speed: 0.5, size: 8 },
+    { type: 'nightingale', speed: 0.6, size: 5 },
+  ],
+  phoenicia: [
+    { type: 'dolphin', speed: 0.6, size: 7 },
+    { type: 'seagull', speed: 0.7, size: 6 },
+    { type: 'cat', speed: 0.3, size: 6 },
+  ],
+  gaul: [
+    { type: 'boar', speed: 0.25, size: 11 },
+    { type: 'stag', speed: 0.4, size: 12 },
+    { type: 'raven', speed: 0.5, size: 6 },
+  ],
+};
+
+// ─── FACTION UNITS ────────────────────────────────────────────────────────
+const FACTION_UNITS = {
+  rome: [
+    { name: 'Hastatus', cost: 8, currency: 'gold', hp: 30, atk: 8, def: 4, desc: 'Light infantry' },
+    { name: 'Princeps', cost: 18, currency: 'gold', hp: 50, atk: 12, def: 8, desc: 'Heavy infantry' },
+    { name: 'Triarius', cost: 30, currency: 'gold', hp: 70, atk: 14, def: 14, desc: 'Elite veteran' },
+    { name: 'Equites', cost: 25, currency: 'gold', hp: 45, atk: 16, def: 6, desc: 'Cavalry' },
+    { name: 'Scorpion', cost: 40, currency: 'gold', hp: 25, atk: 25, def: 2, desc: 'Siege weapon' },
+    { name: 'Praetorian', cost: 50, currency: 'gold', hp: 80, atk: 18, def: 16, desc: 'Imperial guard' },
+  ],
+  carthage: [
+    { name: 'Libyan', cost: 6, currency: 'gold', hp: 25, atk: 7, def: 4, desc: 'Light spearman' },
+    { name: 'Numidian', cost: 15, currency: 'gold', hp: 35, atk: 10, def: 5, desc: 'Skirmish cavalry' },
+    { name: 'Slinger', cost: 12, currency: 'gold', hp: 20, atk: 14, def: 2, desc: 'Ranged unit' },
+    { name: 'Sacred Band', cost: 35, currency: 'gold', hp: 65, atk: 16, def: 12, desc: 'Elite warriors' },
+    { name: 'War Elephant', cost: 60, currency: 'gold', hp: 120, atk: 22, def: 10, desc: 'Trampling beast' },
+    { name: 'Hannibal', cost: 50, currency: 'gold', hp: 90, atk: 20, def: 14, desc: 'Legendary general' },
+  ],
+  egypt: [
+    { name: 'Medjay', cost: 12, currency: 'gold', hp: 40, atk: 10, def: 6, desc: 'Desert ranger' },
+    { name: 'Priest of Ra', cost: 20, currency: 'gold', hp: 30, atk: 8, def: 4, desc: 'Healer' },
+    { name: 'Chariot', cost: 22, currency: 'gold', hp: 50, atk: 15, def: 6, desc: 'Fast attack' },
+    { name: 'Sand Golem', cost: 15, currency: 'crystals', hp: 80, atk: 12, def: 12, desc: 'Mystic construct' },
+    { name: 'Scarab Swarm', cost: 8, currency: 'crystals', hp: 20, atk: 18, def: 1, desc: 'Swarm attack' },
+    { name: 'Anubis', cost: 40, currency: 'crystals', hp: 100, atk: 22, def: 16, desc: 'Death guardian' },
+  ],
+  greece: [
+    { name: 'Hoplite', cost: 12, currency: 'gold', hp: 45, atk: 10, def: 10, desc: 'Shield wall' },
+    { name: 'Peltast', cost: 10, currency: 'gold', hp: 25, atk: 12, def: 3, desc: 'Javelin thrower' },
+    { name: 'Spartan', cost: 35, currency: 'gold', hp: 70, atk: 16, def: 14, desc: 'Elite hoplite' },
+    { name: 'Companion Cavalry', cost: 28, currency: 'gold', hp: 55, atk: 18, def: 8, desc: 'Shock cavalry' },
+    { name: 'Siege Trireme', cost: 45, currency: 'gold', hp: 60, atk: 20, def: 6, desc: 'Naval siege' },
+    { name: 'Achilles', cost: 50, currency: 'gold', hp: 95, atk: 24, def: 12, desc: 'Legendary hero' },
+  ],
+  seapeople: [
+    { name: 'Raider', cost: 5, currency: 'gold', hp: 20, atk: 8, def: 2, desc: 'Fast raider' },
+    { name: 'Sea Warrior', cost: 14, currency: 'gold', hp: 40, atk: 12, def: 6, desc: 'Seasoned fighter' },
+    { name: 'Berserker', cost: 20, currency: 'gold', hp: 50, atk: 20, def: 2, desc: 'Reckless fury' },
+    { name: 'Shieldmaiden', cost: 18, currency: 'gold', hp: 45, atk: 12, def: 10, desc: 'Balanced warrior' },
+    { name: 'Longship Captain', cost: 35, currency: 'gold', hp: 65, atk: 16, def: 12, desc: 'Naval commander' },
+    { name: 'Sea King', cost: 0, currency: 'gold', hp: 100, atk: 22, def: 14, desc: 'Born ruler of waves' },
+  ],
+  persia: [
+    { name: 'Immortal', cost: 15, currency: 'gold', hp: 50, atk: 12, def: 8, desc: 'Never-ending guard' },
+    { name: 'Horse Archer', cost: 20, currency: 'gold', hp: 35, atk: 16, def: 4, desc: 'Mobile ranged' },
+    { name: 'War Chariot', cost: 25, currency: 'gold', hp: 55, atk: 14, def: 8, desc: 'Scythed wheels' },
+    { name: 'Satrap Guard', cost: 30, currency: 'gold', hp: 60, atk: 14, def: 12, desc: 'Provincial elite' },
+    { name: 'Elephant Archer', cost: 50, currency: 'gold', hp: 100, atk: 20, def: 10, desc: 'Mounted archers' },
+    { name: 'Great King', cost: 0, currency: 'gold', hp: 110, atk: 20, def: 16, desc: 'King of Kings' },
+  ],
+  phoenicia: [
+    { name: 'Sailor', cost: 8, currency: 'gold', hp: 25, atk: 8, def: 4, desc: 'Deckhand fighter' },
+    { name: 'Marine', cost: 16, currency: 'gold', hp: 40, atk: 12, def: 8, desc: 'Ship-to-ship' },
+    { name: 'Fire Ship Crew', cost: 22, currency: 'gold', hp: 30, atk: 20, def: 2, desc: 'Incendiary' },
+    { name: 'Temple Guard', cost: 28, currency: 'gold', hp: 55, atk: 14, def: 12, desc: 'Sacred defender' },
+    { name: 'Purple Guard', cost: 40, currency: 'gold', hp: 70, atk: 16, def: 14, desc: 'Royal marines' },
+    { name: 'Admiral', cost: 45, currency: 'gold', hp: 80, atk: 18, def: 12, desc: 'Fleet commander' },
+  ],
+  gaul: [
+    { name: 'Warrior', cost: 6, currency: 'gold', hp: 30, atk: 10, def: 4, desc: 'Tribal fighter' },
+    { name: 'Druid', cost: 18, currency: 'gold', hp: 25, atk: 6, def: 4, desc: 'Healer and buffer' },
+    { name: 'Woad Raider', cost: 14, currency: 'gold', hp: 35, atk: 14, def: 2, desc: 'Painted berserker' },
+    { name: 'Carnyx Bearer', cost: 20, currency: 'gold', hp: 40, atk: 10, def: 8, desc: 'Morale boost' },
+    { name: 'Chieftain Guard', cost: 35, currency: 'gold', hp: 60, atk: 16, def: 12, desc: 'Noble retinue' },
+    { name: 'War Chief', cost: 50, currency: 'gold', hp: 85, atk: 20, def: 14, desc: 'Tribal champion' },
+  ],
+};
+
+// ─── GOD DEFINITIONS ──────────────────────────────────────────────────────
+const GODS = {
+  rome:      { name: 'Mars', domain: 'War', ultimate: 'Blood Oath', blessingOptions: ['battle_fury', 'iron_skin', 'rally_cry'] },
+  carthage:  { name: 'Tanit', domain: 'Moon', ultimate: 'Lunar Tide', blessingOptions: ['night_veil', 'trade_wind', 'silver_tongue'] },
+  egypt:     { name: 'Ra', domain: 'Sun', ultimate: 'Solar Judgment', blessingOptions: ['solar_shield', 'harvest_blessing', 'crystal_growth'] },
+  greece:    { name: 'Athena', domain: 'Wisdom', ultimate: 'Oracle Vision', blessingOptions: ['tactical_insight', 'scholar_focus', 'divine_aegis'] },
+  seapeople: { name: 'Poseidon', domain: 'Sea', ultimate: 'Tsunami', blessingOptions: ['calm_seas', 'fish_bounty', 'storm_call'] },
+  persia:    { name: 'Ahura Mazda', domain: 'Light', ultimate: 'Eternal Flame', blessingOptions: ['purity', 'royal_decree', 'fire_blessing'] },
+  phoenicia: { name: 'Melqart', domain: 'Trade', ultimate: 'Golden Touch', blessingOptions: ['merchant_favor', 'fair_winds', 'harbor_blessing'] },
+  gaul:      { name: 'Cernunnos', domain: 'Nature', ultimate: 'Wild Hunt', blessingOptions: ['forest_growth', 'beast_bond', 'earth_strength'] },
 };
 
 // ─── WRECK ISLAND CONFIG ────────────────────────────────────────────────
@@ -984,7 +1257,10 @@ function initState() {
       battleCryTimer: 0,  // soldier buff active timer
     },
 
-    faction: null, // 'rome' or 'carthage' — chosen after wreck, before home island
+    faction: null, // 'rome' | 'carthage' | 'egypt' | 'greece' | 'seapeople' | 'persia' | 'phoenicia' | 'gaul'
+
+    // God system — faction deity
+    god: { faction: null, prayerCooldown: 0, ultimateCharge: 0, blessingActive: null, blessingTimer: 0 },
 
     wardrobe: { tunicColor: 0, headwear: 0 },
 
@@ -3261,6 +3537,12 @@ function updateTime(dt) {
     }
     // ─── NEW BUILDING DAILY EFFECTS ──────────────────────────────────────
     state._altarPrayedToday = false; // Reset altar prayer
+    // God prayer cooldown tick
+    if (state.god && state.god.prayerCooldown > 0) state.god.prayerCooldown = max(0, state.god.prayerCooldown - 1440);
+    if (state.god && state.god.blessingTimer > 0) {
+      state.god.blessingTimer = max(0, state.god.blessingTimer - 1440);
+      if (state.god.blessingTimer <= 0) state.god.blessingActive = null;
+    }
     // Bakery: +2 food (harvest) per bakery
     let bakeries = state.buildings.filter(b2 => b2.type === 'bakery');
     if (bakeries.length > 0) {
@@ -5101,16 +5383,6 @@ function drawDailySummary() {
     text('No wreath today. Do 3+ activities!', width / 2, ly);
   }
 
-  // Tomorrow teaser — "one more day" hook
-  ly += 16;
-  fill(170, 155, 100);
-  textAlign(CENTER, TOP);
-  textSize(9);
-  let _tomorrowHint = _getTomorrowHint();
-  if (_tomorrowHint) {
-    text('Tomorrow: ' + _tomorrowHint, width / 2, ly);
-  }
-
   textAlign(LEFT, TOP);
 
   fill(120, 100, 70);
@@ -5118,38 +5390,6 @@ function drawDailySummary() {
   textSize(10);
   text('[ click to dismiss ]', width / 2, py + ph - 16);
   textAlign(LEFT, TOP);
-}
-
-function _getTomorrowHint() {
-  let hints = [];
-  // Check for crops about to ripen
-  let nearRipe = 0;
-  if (state.plots) {
-    for (let p of state.plots) {
-      if (p.planted && p.growth >= 0.75 && p.growth < 1.0) nearRipe++;
-    }
-  }
-  if (nearRipe > 0) hints.push(nearRipe + ' crop' + (nearRipe > 1 ? 's' : '') + ' nearly ripe');
-  // Check for day milestones
-  if (typeof DAY_MILESTONES !== 'undefined') {
-    for (let m of DAY_MILESTONES) {
-      if (state.day + 1 === m.day && !(state.milestonesClaimed || []).includes(m.id)) {
-        hints.push('a milestone awaits');
-        break;
-      }
-    }
-  }
-  // Season change check
-  let curSeason = getSeason();
-  let _tmpDay = state.day + 1;
-  let nextSeason = floor((_tmpDay % 120) / 30);
-  if (nextSeason !== curSeason) {
-    let names = ['Spring', 'Summer', 'Autumn', 'Winter'];
-    hints.push(names[nextSeason] + ' begins');
-  }
-  // Fallback tease
-  if (hints.length === 0) hints.push('the stars shift');
-  return hints[floor(random(min(hints.length, 3)))];
 }
 
 function resetDailyActivities() {
@@ -6935,24 +7175,31 @@ function drawFactionSelect(dt) {
   text('CHOOSE YOUR ALLEGIANCE', width / 2, height * 0.08);
   textSize(9); fill(160, 150, 130);
   text('This choice shapes your destiny across the Mediterranean', width / 2, height * 0.08 + 26);
-  let fKeys = ['rome', 'carthage', 'egypt', 'greece'];
-  let cardW = min(155, width * 0.22), cardH = 270, gap = 12;
+  let fKeys = ['rome', 'carthage', 'egypt', 'greece', 'seapeople', 'persia', 'phoenicia', 'gaul'];
+  let cardW = min(140, width * 0.2), cardH = 220, gap = 10;
   let totalW = cardW * 4 + gap * 3;
-  let startX = (width - totalW) / 2, cardY = height * 0.18;
+  let startX = (width - totalW) / 2;
+  let row1Y = height * 0.12, row2Y = row1Y + cardH + gap;
   factionSelectHover = null;
-  for (let fi = 0; fi < 4; fi++) {
-    let cx = startX + fi * (cardW + gap);
-    if (mouseX >= cx && mouseX <= cx + cardW && mouseY >= cardY && mouseY <= cardY + cardH) {
+  for (let fi = 0; fi < 8; fi++) {
+    let row = fi < 4 ? 0 : 1;
+    let col = fi % 4;
+    let cx = startX + col * (cardW + gap);
+    let cy = row === 0 ? row1Y : row2Y;
+    if (mouseX >= cx && mouseX <= cx + cardW && mouseY >= cy && mouseY <= cy + cardH) {
       factionSelectHover = fKeys[fi];
     }
   }
-  for (let fi = 0; fi < 4; fi++) {
-    let cx = startX + fi * (cardW + gap);
-    _drawFactionCard(cx, cardY, cardW, cardH, FACTIONS[fKeys[fi]], factionSelectHover === fKeys[fi], a);
+  for (let fi = 0; fi < 8; fi++) {
+    let row = fi < 4 ? 0 : 1;
+    let col = fi % 4;
+    let cx = startX + col * (cardW + gap);
+    let cy = row === 0 ? row1Y : row2Y;
+    _drawFactionCard(cx, cy, cardW, cardH, FACTIONS[fKeys[fi]], factionSelectHover === fKeys[fi], a);
   }
-  textAlign(CENTER, TOP); textSize(11);
+  textAlign(CENTER, TOP); textSize(10);
   fill(130, 120, 100, 200 * a);
-  text('Click to choose  —  R: Rome  C: Carthage  E: Egypt  G: Greece', width / 2, cardY + cardH + 24);
+  text('R: Rome  C: Carthage  E: Egypt  G: Greece  S: Sea People  P: Persia  F: Phoenicia  L: Gaul', width / 2, row2Y + cardH + 16);
   drawingContext.globalAlpha = 1;
 }
 function _drawFactionCard(x, y, w, h, fac, hovered, a) {
@@ -6998,6 +7245,45 @@ function _drawFactionCard(x, y, w, h, fac, hovered, a) {
     fill(220, 220, 230, 180 * a);
     beginShape(); vertex(cx - 8, gy - 8); vertex(cx - 6, gy - 14); vertex(cx - 4, gy - 8); endShape(CLOSE);
     beginShape(); vertex(cx + 4, gy - 8); vertex(cx + 6, gy - 14); vertex(cx + 8, gy - 8); endShape(CLOSE);
+  } else if (fac.bannerGlyph === 'trident') {
+    // Trident of Poseidon
+    fill(42, 138, 106, 220 * a);
+    rect(cx - 1, gy - 12, 3, 24); // shaft
+    rect(cx - 8, gy - 14, 3, 10); rect(cx + 6, gy - 14, 3, 10); // outer prongs
+    rect(cx - 1, gy - 16, 3, 4); // center prong tip
+    fill(26, 58, 92, 200 * a);
+    rect(cx - 9, gy - 4, 19, 3); // crossbar
+  } else if (fac.bannerGlyph === 'wingedlion') {
+    // Winged lion of Persia
+    fill(212, 160, 48, 220 * a);
+    ellipse(cx, gy, 16, 14); // body
+    ellipse(cx - 2, gy - 8, 10, 10); // head
+    fill(106, 42, 138, 200 * a);
+    beginShape(); vertex(cx + 6, gy - 6); vertex(cx + 14, gy - 14); vertex(cx + 10, gy - 2); endShape(CLOSE); // wing R
+    beginShape(); vertex(cx - 6, gy - 6); vertex(cx - 14, gy - 14); vertex(cx - 10, gy - 2); endShape(CLOSE); // wing L
+    fill(30, 25, 20, 240 * a);
+    ellipse(cx - 4, gy - 9, 3, 3); // eye
+  } else if (fac.bannerGlyph === 'cedar') {
+    // Cedar tree of Phoenicia
+    fill(106, 74, 42, 220 * a);
+    rect(cx - 2, gy + 2, 4, 12); // trunk
+    fill(42, 106, 48, 220 * a);
+    beginShape(); vertex(cx, gy - 14); vertex(cx - 12, gy + 2); vertex(cx + 12, gy + 2); endShape(CLOSE); // canopy
+    fill(60, 130, 60, 180 * a);
+    beginShape(); vertex(cx, gy - 10); vertex(cx - 8, gy - 1); vertex(cx + 8, gy - 1); endShape(CLOSE); // inner layer
+  } else if (fac.bannerGlyph === 'boar') {
+    // Boar of Gaul
+    fill(90, 64, 32, 220 * a);
+    ellipse(cx, gy, 22, 16); // body
+    fill(70, 50, 25, 220 * a);
+    ellipse(cx + 8, gy - 2, 10, 10); // head
+    fill(200, 160, 32, 200 * a);
+    beginShape(); vertex(cx + 10, gy - 6); vertex(cx + 14, gy - 10); vertex(cx + 12, gy - 4); endShape(CLOSE); // tusk
+    fill(30, 25, 20, 240 * a);
+    ellipse(cx + 10, gy - 4, 3, 3); // eye
+    // Bristle crest
+    fill(42, 106, 48, 180 * a);
+    for (let bi = -4; bi <= 4; bi += 2) rect(cx + bi, gy - 10, 2, 4);
   }
   textAlign(CENTER, TOP); textSize(14);
   fill(bc[0] + 60, bc[1] + 60, bc[2] + 60, 240 * a); text(fac.name, cx, gy + 20);
@@ -7026,11 +7312,38 @@ function selectFaction(faction) {
     addFloatingText(width / 2, height * 0.35, 'Ankh charm: +20% crystal income', '#40b0a0');
   } else if (faction === 'greece') {
     addFloatingText(width / 2, height * 0.35, 'Olive wreath: +20% NPC favor gain', '#5090c0');
+  } else if (faction === 'seapeople') {
+    addFloatingText(width / 2, height * 0.35, 'Ship start: +30% sail speed, +50% raid loot', '#2a8a6a');
+  } else if (faction === 'persia') {
+    addFloatingText(width / 2, height * 0.35, 'Royal scepter: +25% colony income', '#d4a030');
+  } else if (faction === 'phoenicia') {
+    addFloatingText(width / 2, height * 0.35, 'Navigator\'s chart: +30% trade, 2x discovery', '#3070b0');
+  } else if (faction === 'gaul') {
+    addFloatingText(width / 2, height * 0.35, 'Druid staff: +20% combat, +50% forest yield', '#c8a020');
   }
   addFloatingText(width / 2, height * 0.25, FACTIONS[faction].name + ' — ' + FACTIONS[faction].subtitle, FACTIONS[faction].accentColorHex);
+  // Initialize god for this faction
+  state.god = { faction: faction, prayerCooldown: 0, ultimateCharge: 0, blessingActive: null, blessingTimer: 0 };
   trackMilestone('faction_chosen_' + faction);
   // Initialize all rival nations (everyone except player's faction)
   initNations();
+  // Sea People special start — skip wreck, start on ship
+  if (faction === 'seapeople') {
+    state.progression.triremeRepaired = true;
+    state.progression.homeIslandReached = false;
+    state.rowing.active = true;
+    state.rowing.x = WORLD.islandCX - 800;
+    state.rowing.y = WORLD.islandCY;
+    state.rowing.angle = 0;
+    state.rowing.speed = 0;
+    state.player.x = state.rowing.x;
+    state.player.y = state.rowing.y;
+    cam.x = state.rowing.x; cam.y = state.rowing.y;
+    camSmooth.x = cam.x; camSmooth.y = cam.y;
+    state.wood = 3; state.stone = 1; state.fish = 2; state.gold = 10;
+    addFloatingText(width / 2, height * 0.45, 'You begin at sea. Raid an island to settle!', '#2a8a6a');
+    return;
+  }
   if (state.cutscene === null && state.progression.homeIslandReached) {
     state.cutscene = 'home_sunrise'; state.cutsceneTimer = 0;
   }
@@ -16841,14 +17154,23 @@ const NATION_DEFAULTS = {
               position: { angle: 1.571, dist: 2800 }, isleRX: 420, isleRY: 290 },  // S
   greece:   { gold: 80,  military: 4, population: 5, personality: 'balanced',
               position: { angle: 0, dist: 2800 }, isleRX: 390, isleRY: 270 },      // E
-  rome:     { gold: 100, military: 3, population: 5, personality: 'balanced',
+  rome:      { gold: 100, military: 3, population: 5, personality: 'balanced',
               position: { angle: 3.927, dist: 2800 }, isleRX: 400, isleRY: 280 },  // NW (fallback if not player)
+  seapeople: { gold: 60,  military: 5, population: 4, personality: 'aggressive',
+              position: { angle: 2.356, dist: 3000 }, isleRX: 350, isleRY: 250 },  // SW
+  persia:    { gold: 150, military: 3, population: 6, personality: 'trader',
+              position: { angle: 0.785, dist: 3200 }, isleRX: 430, isleRY: 300 },  // NE far
+  phoenicia: { gold: 130, military: 2, population: 5, personality: 'trader',
+              position: { angle: -1.571, dist: 2800 }, isleRX: 380, isleRY: 260 }, // N
+  gaul:      { gold: 70,  military: 4, population: 5, personality: 'aggressive',
+              position: { angle: 3.14, dist: 3000 }, isleRX: 410, isleRY: 290 },   // W
 };
 
 const NATION_PERSONALITIES = {
   aggressive: { goldMult: 1.0, buildChance: 0.15, militaryChance: 0.15, raidThreshold: -20, allyThreshold: 60 },
   trader:     { goldMult: 1.3, buildChance: 0.25, militaryChance: 0.05, raidThreshold: -40, allyThreshold: 30 },
   balanced:   { goldMult: 1.0, buildChance: 0.20, militaryChance: 0.10, raidThreshold: -30, allyThreshold: 40 },
+  raider:     { goldMult: 0.8, buildChance: 0.10, militaryChance: 0.20, raidThreshold: -15, allyThreshold: 70 },
 };
 
 const NATION_TRADE_GOODS = {
@@ -16871,6 +17193,26 @@ const NATION_TRADE_GOODS = {
     { name: 'Roman Steel', resource: 'steel', amount: 2, cost: 20, desc: 'Fine metalwork' },
     { name: 'Garum', resource: 'meals', amount: 3, cost: 10, desc: 'Fish sauce' },
     { name: 'Legion Drill', resource: 'military', amount: 1, cost: 35, desc: 'Military training' },
+  ],
+  seapeople: [
+    { name: 'Raided Treasure', resource: 'gold', amount: 15, cost: 10, desc: 'Plundered goods' },
+    { name: 'Sea Chart', resource: 'xp', amount: 30, cost: 20, desc: 'Navigation knowledge' },
+    { name: 'Coral Armor', resource: 'combatBuff', amount: 1, cost: 30, desc: 'Ocean-forged mail' },
+  ],
+  persia: [
+    { name: 'Silk Brocade', resource: 'perfume', amount: 3, cost: 25, desc: 'Luxury fabric' },
+    { name: 'Immortal Training', resource: 'military', amount: 2, cost: 40, desc: 'Elite drill' },
+    { name: 'Royal Wine', resource: 'wine', amount: 5, cost: 15, desc: 'Finest vintage' },
+  ],
+  phoenicia: [
+    { name: 'Tyrian Dye', resource: 'exoticSpices', amount: 3, cost: 20, desc: 'Royal purple' },
+    { name: 'Cedar Timber', resource: 'wood', amount: 10, cost: 15, desc: 'Ship-grade wood' },
+    { name: 'Glass Beads', resource: 'crystal', amount: 4, cost: 30, desc: 'Artisan glasswork' },
+  ],
+  gaul: [
+    { name: 'Mistletoe', resource: 'crystal', amount: 2, cost: 15, desc: 'Sacred herb' },
+    { name: 'Iron Torque', resource: 'steel', amount: 3, cost: 25, desc: 'Celtic metalwork' },
+    { name: 'Boar Hide', resource: 'rareHide', amount: 2, cost: 20, desc: 'Thick forest leather' },
   ],
 };
 
@@ -16908,7 +17250,7 @@ function makeNation(key) {
 
 function initNations() {
   let playerFaction = state.faction || 'rome';
-  let allKeys = ['carthage', 'egypt', 'greece', 'rome'];
+  let allKeys = ['carthage', 'egypt', 'greece', 'rome', 'seapeople', 'persia', 'phoenicia', 'gaul'];
   state.nations = {};
   for (let k of allKeys) {
     if (k === playerFaction) continue;
@@ -18641,9 +18983,7 @@ function updateConquest(dt) {
   // Player death — retreat with 50% loot
   if (p.hp <= 0) {
     p.hp = floor(p.maxHp * 0.5);
-    addFloatingText(width / 2, height * 0.35, 'Forced retreat!', '#ff6644');
     triggerScreenShake(8, 20);
-    if (snd) snd.playSFX('player_hurt');
     exitConquest(true);
   }
 }
@@ -20684,6 +21024,10 @@ function keyPressed() {
     if (key === 'c' || key === 'C') { selectFaction('carthage'); return; }
     if (key === 'e' || key === 'E') { selectFaction('egypt'); return; }
     if (key === 'g' || key === 'G') { selectFaction('greece'); return; }
+    if (key === 's' || key === 'S') { selectFaction('seapeople'); return; }
+    if (key === 'p' || key === 'P') { selectFaction('persia'); return; }
+    if (key === 'f' || key === 'F') { selectFaction('phoenicia'); return; }
+    if (key === 'l' || key === 'L') { selectFaction('gaul'); return; }
     return;
   }
   // Island milestone overlay — dismiss on any key
@@ -20693,8 +21037,8 @@ function keyPressed() {
   // Debug console intercepts all keys when open
   if (typeof Debug !== 'undefined' && Debug.handleKey(key, keyCode)) return;
   if (gameScreen !== 'game') {
-    // ESC from settings/credits/howtoplay back to menu
-    if (keyCode === 27 && (gameScreen === 'settings' || gameScreen === 'credits' || gameScreen === 'howtoplay')) {
+    // ESC from settings/credits back to menu
+    if (keyCode === 27 && (gameScreen === 'settings' || gameScreen === 'credits')) {
       gameScreen = 'menu';
     }
     if (keyCode === 27 && gameScreen === 'multiplayer') {
@@ -20721,7 +21065,7 @@ function keyPressed() {
     // Menu keyboard navigation
     if (gameScreen === 'menu') {
       let hasSave = !!localStorage.getItem('sunlitIsles_save');
-      let btnCount = hasSave ? 6 : 5;
+      let btnCount = hasSave ? 5 : 4;
       if (keyCode === DOWN_ARROW || keyCode === 83) { // down or S
         menuKeyIdx = (menuKeyIdx + 1) % btnCount;
         menuHover = menuKeyIdx;
@@ -21101,6 +21445,46 @@ function keyPressed() {
     if (interactAncientSpirit()) return;
     if (interactGhostSighting()) return;
     if (interactWanderingSoldier()) return;
+
+    // God prayer at temple: E near temple → god dialogue → choose blessing → 1-day cooldown
+    {
+      let nearTemple = state.buildings.find(b => b.type === 'temple' &&
+        dist(state.player.x, state.player.y, b.x, b.y) < 50);
+      if (nearTemple && state.faction && GODS[state.faction]) {
+        let god = GODS[state.faction];
+        if (state.god.prayerCooldown <= 0) {
+          // Show blessing choice dialog
+          let opts = god.blessingOptions;
+          let blessingNames = opts.map(b => b.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()));
+          dialogState.active = true;
+          dialogState.speaker = god.name;
+          dialogState.portrait = null;
+          dialogState.text = god.name + ', ' + god.domain + ' deity, hears your prayer. Choose a blessing:';
+          dialogState.displayLen = 999;
+          dialogState.choices = blessingNames.map((name, i) => ({
+            text: name,
+            action: function() {
+              state.god.blessingActive = opts[i];
+              state.god.blessingTimer = 1440; // 1 day
+              state.god.prayerCooldown = 1440; // 1 day cooldown
+              state.god.ultimateCharge = min(5, state.god.ultimateCharge + 1);
+              addFloatingText(width / 2, height * 0.3, god.name + ' blesses you: ' + name + '!', FACTIONS[state.faction].accentColorHex);
+              spawnParticles(nearTemple.x, nearTemple.y, 'divine', 12);
+              if (snd) snd.playSFX('crystal');
+              if (state.god.ultimateCharge >= 5) {
+                addFloatingText(width / 2, height * 0.38, 'Ultimate ready! Press G to activate ' + god.ultimate, '#ffd700');
+              }
+              dialogState.active = false;
+            }
+          }));
+          dialogState.onComplete = null;
+          return;
+        } else {
+          addFloatingText(width / 2, height * 0.3, god.name + ' requires rest before next prayer', '#998866');
+          return;
+        }
+      }
+    }
 
     // Altar prayer: once/day random blessing
     {
@@ -21660,6 +22044,27 @@ function keyPressed() {
       prayAtTemple();
     } else {
       addFloatingText(width / 2, height * 0.4, 'Get closer to the temple', C.textDim);
+    }
+  }
+
+  // God ultimate — G key (requires 5 prayers)
+  if (key === 'g' || key === 'G') {
+    if (state.god && state.god.ultimateCharge >= 5 && state.faction && GODS[state.faction]) {
+      let god = GODS[state.faction];
+      state.god.ultimateCharge = 0;
+      addFloatingText(width / 2, height * 0.25, god.ultimate + '!', '#ffd700');
+      spawnParticles(state.player.x, state.player.y, 'divine', 20);
+      if (snd) snd.playSFX('fanfare');
+      // Apply ultimate effect based on faction
+      if (state.faction === 'rome') { state.player.battleCryTimer = 600; } // 10 sec battle fury
+      else if (state.faction === 'carthage') { state.gold += 100; }
+      else if (state.faction === 'egypt') { state.solar = state.maxSolar; state.crystals += 10; }
+      else if (state.faction === 'greece') { state.player.xp += 200; }
+      else if (state.faction === 'seapeople') { state.fish += 50; state.wood += 20; }
+      else if (state.faction === 'persia') { state.gold += 80; if (state.colonies) for (let ck of Object.keys(state.colonies)) state.colonies[ck].gold += 30; }
+      else if (state.faction === 'phoenicia') { state.gold += 60; state.tradeRoutes.forEach(r => { r.goldEarned += 50; }); }
+      else if (state.faction === 'gaul') { state.wood += 30; state.stone += 20; state.harvest += 20; }
+      trackMilestone('god_ultimate_' + state.faction);
     }
   }
 
@@ -22372,6 +22777,8 @@ function saveGame() {
     eventHistory: state.eventHistory || [],
     // Faction
     faction: state.faction || 'rome',
+    // God system
+    god: state.god || { faction: null, prayerCooldown: 0, ultimateCharge: 0, blessingActive: null, blessingTimer: 0 },
     // Wardrobe cosmetics
     wardrobe: state.wardrobe || { tunicColor: 0, headwear: 0 },
     // Victory
@@ -22501,7 +22908,7 @@ function saveGame() {
 //         dynamic market prices with supply/demand
 // ─────────────────────────────────────────────────────────────────────────
 
-const SAVE_VERSION = 9;
+const SAVE_VERSION = 10;
 
 function migrateSave(d) {
   let v = d.version || 1;
@@ -22630,6 +23037,12 @@ function migrateSave(d) {
   if (v < 9) {
     d.colonies = d.colonies || {};
     v = 9;
+  }
+
+  // v9 -> v10: 8-faction system, god NPCs, faction units
+  if (v < 10) {
+    d.god = d.god || { faction: d.faction || 'rome', prayerCooldown: 0, ultimateCharge: 0, blessingActive: null, blessingTimer: 0 };
+    v = 10;
   }
 
   d.version = v;
@@ -22898,6 +23311,14 @@ function loadGame() {
     if (Array.isArray(d.eventHistory)) state.eventHistory = d.eventHistory;
     // Faction — default to 'rome' for existing saves
     state.faction = d.faction || 'rome';
+    // God system
+    if (d.god) {
+      state.god = { faction: d.god.faction || state.faction, prayerCooldown: d.god.prayerCooldown || 0,
+        ultimateCharge: d.god.ultimateCharge || 0, blessingActive: d.god.blessingActive || null,
+        blessingTimer: d.god.blessingTimer || 0 };
+    } else {
+      state.god = { faction: state.faction, prayerCooldown: 0, ultimateCharge: 0, blessingActive: null, blessingTimer: 0 };
+    }
     // Regenerate faction wildlife/flora (not saved, always regenerated)
     if (typeof initFactionNaturals === 'function') initFactionNaturals();
     // Wardrobe cosmetics
