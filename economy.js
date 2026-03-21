@@ -123,7 +123,7 @@ function updateTradeRoutes(dt) {
         route.tripPhase = 'outbound';
         let goldGain = TRADE_GOODS[route.good].goldPerTrip;
         // Faction bonus: Carthage +15% trade income
-        if (typeof getFactionData === 'function') goldGain = floor(goldGain * getFactionData().tradeIncomeMult);
+        if (typeof getFactionData === 'function') goldGain = floor(goldGain * (getFactionData().tradeIncomeMult || 1));
         // Vineyard bonus: +30% trade value per vineyard
         if (state.buildings) {
           let vineyards = state.buildings.filter(b => b.type === 'vineyard').length;
@@ -939,7 +939,7 @@ function doPrestige() {
   let arenaHigh = state.arenaHighWave || 0;
 
   // Reset game state
-  initState();
+  initState(); _demandDay = -1; _marketPriceDay = -1; _prestigeInited = false;
 
   // NG+ skips wreck beach — start on home island directly
   state.introPhase = 'done';
@@ -1320,7 +1320,7 @@ function drawColonyManageUI() {
 
   // Total income summary
   let totalIncome = 0;
-  for (let k of colKeys) totalIncome += state.colonies[k].income + Math.floor(state.colonies[k].population * 0.5);
+  for (let k of colKeys) { let col = state.colonies[k]; totalIncome += (col.income || 0) + Math.floor((col.population || 0) * 0.5); }
   fill(200, 190, 140); textSize(9);
   text('Total colony income: +' + totalIncome + 'g/day  |  Home income: ~' + (state.islandLevel || 1) * 5 + 'g/day', width / 2, py + 30);
 
@@ -1459,7 +1459,7 @@ function handleColonyManageKey(k, kCode) {
     // Visit colony — sail there
     // Put player in rowboat aimed at colony position
     state.colonyManageOpen = false; state.colonyManageSelected = null;
-    state.rowing.active = true;
+    state.rowing.active = true; state.rowing.docked = false;
     state.rowing.x = state.player.x;
     state.rowing.y = state.player.y + 50;
     state.rowing.speed = 0;

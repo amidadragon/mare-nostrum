@@ -63,7 +63,7 @@ function updateVulcanIsland(dt) {
   p.x += p.vx; p.y += p.vy; if (!isOnVulcanIsland(p.x, p.y)) { p.x -= p.vx; p.y -= p.vy; }
   for (let hs of v.hotSprings) { if (dist(p.x, p.y, hs.x, hs.y) < 30) { hs.healTimer += dt; if (hs.healTimer > 60) { hs.healTimer = 0; if (p.hp < p.maxHp) { p.hp = min(p.hp + 5, p.maxHp); addFloatingText(w2sX(p.x), w2sY(p.y) - 20, '+5 HP', '#44ff88'); } } } }
   for (let lp of v.lavaPools) { if (dist(p.x, p.y, lp.x, lp.y) < lp.r + 5 && p.invincTimer <= 0) { p.hp = Math.max(0, p.hp - 3); p.invincTimer = 30; shakeTimer = 5; addFloatingText(w2sX(p.x), w2sY(p.y) - 15, '-3', '#ff4422'); } }
-  if (p.invincTimer > 0) p.invincTimer -= dt;
+  // invincTimer decremented in main loop
   if (frameCount % 3 === 0) v.ambientAsh.push({ x: v.isleX + random(-v.isleRX, v.isleRX), y: v.isleY - v.isleRY, vy: random(0.3, 0.8), vx: random(-0.2, 0.2), life: 180, size: random(1, 3) });
   v.ambientAsh.forEach(a => { a.x += a.vx; a.y += a.vy; a.life -= dt; }); v.ambientAsh = v.ambientAsh.filter(a => a.life > 0);
   if (p.y > v.isleY + v.isleRY * 0.88) exitVulcan();
@@ -799,7 +799,7 @@ function updateNecropolisIsland(dt) {
   if (keyIsDown(87) || keyIsDown(UP_ARROW)) dy -= 1; if (keyIsDown(83) || keyIsDown(DOWN_ARROW)) dy += 1;
   if (dx || dy) { let m = sqrt(dx * dx + dy * dy); p.vx = (dx / m) * p.speed * dt; p.vy = (dy / m) * p.speed * dt; p.moving = true; if (abs(dx) > abs(dy)) p.facing = dx > 0 ? 'right' : 'left'; else p.facing = dy > 0 ? 'down' : 'up'; } else { p.vx = 0; p.vy = 0; p.moving = false; }
   p.x += p.vx; p.y += p.vy; if (!isOnNecropolisIsland(p.x, p.y)) { p.x -= p.vx; p.y -= p.vy; }
-  if (p.invincTimer > 0) p.invincTimer -= dt; if (p.attackTimer > 0) p.attackTimer -= dt; if (p.slashPhase > 0) p.slashPhase -= dt;
+  // timers decremented in main loop
   for (let sk of n.skeletons) { if (sk.hp <= 0) continue; if (sk.flashTimer > 0) sk.flashTimer -= dt; let dToP = dist(sk.x, sk.y, p.x, p.y);
     if (dToP < 150) { let ang = atan2(p.y - sk.y, p.x - sk.x); sk.vx = cos(ang) * 1.2; sk.vy = sin(ang) * 1.2; sk.facing = sk.vx > 0 ? 1 : -1; if (dToP < 25 && sk.attackTimer <= 0) { sk.attackTimer = 60; if (p.invincTimer <= 0) { let dmg = 8 - (p.armor > 0 ? p.armor * 3 : 0); p.hp = Math.max(0, p.hp - max(1, dmg)); p.invincTimer = 30; shakeTimer = 4; addFloatingText(w2sX(p.x), w2sY(p.y) - 15, '-' + max(1, dmg), '#ff4444'); } } }
     else { sk.patrolAngle += random(-0.05, 0.05); sk.vx = cos(sk.patrolAngle) * 0.3; sk.vy = sin(sk.patrolAngle) * 0.3; sk.facing = sk.vx > 0 ? 1 : -1; }

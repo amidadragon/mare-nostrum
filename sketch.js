@@ -2338,6 +2338,7 @@ function startNewGame() {
   initConquestIsland();
   initNarrativeState();
   gameScreen = 'game';
+  factionSelectActive = true; factionSelectFade = 0;
   noCursor();
 }
 
@@ -2621,7 +2622,7 @@ function draw() {
   }
 
   // ─── SCREEN ROUTER ───
-  if (gameScreen === 'menu' || gameScreen === 'settings' || gameScreen === 'credits' || gameScreen === 'multiplayer') {
+  if (gameScreen === 'menu' || gameScreen === 'settings' || gameScreen === 'credits' || gameScreen === 'multiplayer' || gameScreen === 'howtoplay') {
     menuFadeIn = min(menuFadeIn + _delta * 255, 255); // 1 sec fade-in
     if (menuFadeOut > 0) {
       menuFadeOut = min(menuFadeOut + _delta * 510, 255); // 0.5 sec fade-out
@@ -2710,7 +2711,7 @@ function drawInner() {
     drawTempleInterior(dt);
     drawHUD();
     if (!screenshotMode) drawCursor();
-    drawVignette();
+    drawGameVignette();
     drawScreenshotFilter();
     drawScreenshotIndicator();
     drawPhotoModeOverlay();
@@ -3415,7 +3416,7 @@ function drawInner() {
       drawCursor();
     }
     // Screenshot mode overlays — always on top of world
-    drawVignette();
+    drawGameVignette();
     drawScreenshotFilter();
     drawScreenshotIndicator();
     // Photo mode overlays (watermark, vignette, tip, flash)
@@ -21041,13 +21042,13 @@ function keyPressed() {
     if (keyCode === 27 && (gameScreen === 'settings' || gameScreen === 'credits')) {
       gameScreen = 'menu';
     }
-    if (keyCode === 27 && gameScreen === 'multiplayer') {
+    if (keyCode === 27 && gameScreen === 'multiplayer' || gameScreen === 'howtoplay') {
       if (typeof _mpSubScreen !== 'undefined' && _mpSubScreen !== 'main') { _mpSubScreen = 'main'; }
       else { gameScreen = 'menu'; if (state) state._mpMenuOpen = false; }
       return;
     }
     // Multiplayer join input
-    if (gameScreen === 'multiplayer' && typeof _mpSubScreen !== 'undefined' && _mpSubScreen === 'join') {
+    if (gameScreen === 'multiplayer' || gameScreen === 'howtoplay' && typeof _mpSubScreen !== 'undefined' && _mpSubScreen === 'join') {
       if (keyCode === ENTER && typeof _mpJoinInput !== 'undefined' && _mpJoinInput.length > 0) {
         MP.join(_mpJoinInput);
         _mpSubScreen = 'host'; // reuse host screen to show waiting
