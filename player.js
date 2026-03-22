@@ -75,8 +75,9 @@ function updatePlayer(dt) {
     shakeY += sin(prog * PI) * 2;
   }
   if (inShallows) spd *= (state.diving && state.diving.active) ? 0.7 : 0.55;
-  // Swimming to arena: slow speed in deep water
-  let _inSwimZone = typeof isInArenaSwimZone === 'function' && isInArenaSwimZone(p.x, p.y);
+  // Universal swimming: slow speed in deep water near any island
+  let _onAnySurface = typeof isOnAnyIslandSurface === 'function' && isOnAnyIslandSurface(p.x, p.y);
+  let _inSwimZone = !_onAnySurface && !inShallows && typeof isNearAnyIsland === 'function' && isNearAnyIsland(p.x, p.y, 300);
   if (_inSwimZone) spd *= 0.4;
 
   // Sprint: hold SHIFT to run 1.6x faster
@@ -173,13 +174,14 @@ function updatePlayer(dt) {
     p.y = newY;
     p.vx = 0;
   } else {
-    // Fully blocked — push back toward island center
-    let pushX = WORLD.islandCX - p.x;
-    let pushY = WORLD.islandCY - p.y;
+    // Fully blocked — push back toward nearest island center
+    let _nearest = typeof findNearestIsland === 'function' ? findNearestIsland(p.x, p.y) : { x: WORLD.islandCX, y: WORLD.islandCY };
+    let pushX = _nearest.x - p.x;
+    let pushY = _nearest.y - p.y;
     let pushD = sqrt(pushX * pushX + pushY * pushY);
     if (pushD > 0) {
-      p.x += (pushX / pushD) * 1.5;
-      p.y += (pushY / pushD) * 1.5;
+      p.x += (pushX / pushD) * 2;
+      p.y += (pushY / pushD) * 2;
     }
     p.vx = 0;
     p.vy = 0;
@@ -278,7 +280,7 @@ function updatePlayerAnim(dt) {
       a.walkTimer = 0; a.walkFrame = (a.walkFrame + 1) % 4;
       // Footstep sound on frames 1 and 3 (feet hitting ground)
       if ((a.walkFrame === 1 || a.walkFrame === 3) && snd && frameCount % 2 === 0) {
-        snd.playSFX((isInShallows(p.x, p.y) || (typeof isInArenaSwimZone === 'function' && isInArenaSwimZone(p.x, p.y))) ? 'water' : 'step_sand');
+        snd.playSFX((isInShallows(p.x, p.y) || (typeof isNearAnyIsland === 'function' && !isOnAnyIslandSurface(p.x, p.y) && isNearAnyIsland(p.x, p.y, 300))) ? 'water' : 'step_sand');
       }
     }
   } else {
@@ -575,11 +577,11 @@ function drawPlayer() {
   }
 
   let inWater = isInShallows(p.x, p.y);
-  let _swimming = typeof isInArenaSwimZone === 'function' && isInArenaSwimZone(p.x, p.y);
+  let _swimming = typeof isNearAnyIsland === 'function' && !isOnAnyIslandSurface(p.x, p.y) && isNearAnyIsland(p.x, p.y, 300);
   let isDiving = state.diving && state.diving.active;
 
   if (_swimming && !isDiving) {
-    // Swimming to arena — only head + arms visible, body submerged
+    // Swimming — only head + arms visible, body submerged
     let bob = sin(frameCount * 0.08) * 2;
     translate(0, 4 + bob);
     // Water surface around player

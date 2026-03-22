@@ -2881,13 +2881,61 @@ function isInShallows(wx, wy) {
 }
 
 function isInArenaSwimZone(wx, wy) {
-  let a = state.adventure;
-  let homeNorthEdge = WORLD.islandCY - getSurfaceRY();
-  let arenaSouthEdge = a.isleY + a.isleRY;
-  return wy < homeNorthEdge && wy > arenaSouthEdge && abs(wx - WORLD.islandCX) < 120;
+  // Legacy compat — now uses universal swim system
+  return !isOnIsland(wx, wy) && !isOnArenaIsland(wx, wy) && isNearAnyIsland(wx, wy, 300);
 }
 
-// Check if a point is walkable (on island, shallows, bridge, pier, or imperial bridge)
+function getAllIslandPositions() {
+  let islands = [
+    { x: WORLD.islandCX, y: WORLD.islandCY, rx: getSurfaceRX(), ry: getSurfaceRY(), key: 'home' },
+    { x: state.adventure.isleX, y: state.adventure.isleY, rx: state.adventure.isleRX, ry: state.adventure.isleRY, key: 'arena' },
+  ];
+  if (state.conquest) islands.push({ x: state.conquest.isleX, y: state.conquest.isleY, rx: state.conquest.isleRX, ry: state.conquest.isleRY, key: 'conquest' });
+  if (state.vulcan) islands.push({ x: state.vulcan.isleX, y: state.vulcan.isleY, rx: state.vulcan.isleRX, ry: state.vulcan.isleRY, key: 'vulcan' });
+  if (state.hyperborea) islands.push({ x: state.hyperborea.isleX, y: state.hyperborea.isleY, rx: state.hyperborea.isleRX, ry: state.hyperborea.isleRY, key: 'hyperborea' });
+  if (state.plenty) islands.push({ x: state.plenty.isleX, y: state.plenty.isleY, rx: state.plenty.isleRX, ry: state.plenty.isleRY, key: 'plenty' });
+  if (state.necropolis) islands.push({ x: state.necropolis.isleX, y: state.necropolis.isleY, rx: state.necropolis.isleRX, ry: state.necropolis.isleRY, key: 'necropolis' });
+  for (let k of Object.keys(state.nations || {})) {
+    let n = state.nations[k];
+    if (n && n.isleX) islands.push({ x: n.isleX, y: n.isleY, rx: n.isleRX || 300, ry: n.isleRY || 200, key: k });
+  }
+  return islands;
+}
+
+function isNearAnyIsland(wx, wy, range) {
+  range = range || 300;
+  let islands = getAllIslandPositions();
+  for (let isle of islands) {
+    let dx = (wx - isle.x) / (isle.rx + range);
+    let dy = (wy - isle.y) / (isle.ry + range);
+    if (dx * dx + dy * dy < 1) return true;
+  }
+  return false;
+}
+
+function isOnAnyIslandSurface(wx, wy) {
+  let islands = getAllIslandPositions();
+  for (let isle of islands) {
+    let dx = (wx - isle.x) / isle.rx;
+    let dy = (wy - isle.y) / isle.ry;
+    if (dx * dx + dy * dy <= 1.15) return true;
+  }
+  return false;
+}
+
+function findNearestIsland(wx, wy) {
+  let islands = getAllIslandPositions();
+  let best = islands[0], bestD = Infinity;
+  for (let isle of islands) {
+    let dx = (wx - isle.x) / isle.rx;
+    let dy = (wy - isle.y) / isle.ry;
+    let d = dx * dx + dy * dy;
+    if (d < bestD) { bestD = d; best = isle; }
+  }
+  return best;
+}
+
+// Check if a point is walkable (on island, shallows, bridge, pier, swimming, or imperial bridge)
 function isWalkable(wx, wy) {
   // Temple room — rectangular boundary
   if (state && state.insideTemple) {
@@ -2903,12 +2951,12 @@ function isWalkable(wx, wy) {
     let dy = (wy - WORLD.islandCY) / (state.islandRY * 0.8);
     return dx * dx + dy * dy < 1;
   }
-  if (isOnIsland(wx, wy) || isInShallows(wx, wy) || isOnBridge(wx, wy) || isOnPier(wx, wy) || isOnImperialBridge(wx, wy)) return true;
-  // Arena island + swim zone always walkable (outside combat/rowing)
-  if (!state.adventure.active && !state.rowing.active) {
-    if (isOnArenaIsland(wx, wy)) return true;
-    if (isInArenaSwimZone(wx, wy)) return true;
-  }
+  // On any island surface (includes shallows)
+  if (isOnAnyIslandSurface(wx, wy)) return true;
+  // Bridges/piers
+  if (isOnBridge(wx, wy) || isOnPier(wx, wy) || isOnImperialBridge(wx, wy)) return true;
+  // Universal swimming — walkable in water near any island
+  if (!state.rowing.active && isNearAnyIsland(wx, wy, 300)) return true;
   return false;
 }
 
@@ -17576,10 +17624,11 @@ function drawArenaIsleDistant() {
 
   // Only render the arena island when player is NEAR it (swimming, on it, or fighting)
   // From the home island, just show a small label -- no island rendering
-  let playerSwimming = typeof isInArenaSwimZone === 'function' &&
-    state.player && isInArenaSwimZone(state.player.x, state.player.y);
   let playerOnArena = typeof isOnArenaIsland === 'function' &&
     state.player && isOnArenaIsland(state.player.x, state.player.y);
+  let playerSwimming = !playerOnArena && typeof isNearAnyIsland === 'function' &&
+    state.player && isNearAnyIsland(state.player.x, state.player.y, 300) &&
+    !isOnIsland(state.player.x, state.player.y);
   if (!a.active && !playerSwimming && !playerOnArena) {
     // Just draw a tiny label on the horizon, no island shape
     let lsx = w2sX(a.isleX), lsy = w2sY(a.isleY);
@@ -26132,10 +26181,8 @@ function keyPressed() {
         !(state.plenty && state.plenty.active) && !(state.necropolis && state.necropolis.active)) {
       let _port = typeof getPortPosition === 'function' ? getPortPosition() : { x: 0, y: 0 };
       let _nearBoat = dist(state.player.x, state.player.y, _port.x - 80, _port.y + 20) < 70;
-      if (!_nearBoat && !isInArenaSwimZone(state.player.x, state.player.y) && !isOnArenaIsland(state.player.x, state.player.y)) {
-        let inWater = isInShallows(state.player.x, state.player.y) ||
-                      !isOnIsland(state.player.x, state.player.y);
-        if (inWater) { startDive(); return; }
+      if (!_nearBoat && isInShallows(state.player.x, state.player.y)) {
+        startDive(); return;
       }
     }
 
