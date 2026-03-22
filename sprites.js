@@ -23,9 +23,15 @@ const SpriteManager = {
       let s = this.sheets[name];
       s.img = loadImage(s.path,
         () => {
-          s.loaded = true;
+          // Validate: image must be exact multiple of frame size and have at least 2 frames
           s.cols = Math.floor(s.img.width / s.frameW);
           s.rows = Math.floor(s.img.height / s.frameH);
+          if (s.cols < 2 || s.rows < 1 || s.img.width % s.frameW !== 0 || s.img.height % s.frameH !== 0) {
+            console.warn('Sprite invalid (not a proper sheet): ' + s.path + ' (' + s.img.width + 'x' + s.img.height + ')');
+            s.loaded = false; // reject -- fall back to rect drawing
+          } else {
+            s.loaded = true;
+          }
           this._loadCount++;
           if (this._loadCount >= this._totalCount) this.loaded = true;
         },
