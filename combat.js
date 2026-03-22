@@ -1303,6 +1303,7 @@ const UNIT_TYPES = {
   cavalry:    { name: 'Cavalry',         hp: 30, damage: 7,  speed: 2.0, cost: 25, minLevel: 3, ranged: false, desc: 'Fast charger', upkeep: 4 },
   siege_ram:  { name: 'Siege Ram',       hp: 50, damage: 15, speed: 0.4, cost: 40, minLevel: 4, ranged: false, desc: 'Destroys buildings', vsBuildingMult: 3, upkeep: 5 },
   centurion:  { name: 'Elite Centurion', hp: 40, damage: 12, speed: 1.2, cost: 50, minLevel: 5, ranged: false, desc: 'Buffs nearby +20%', aura: 0.2, upkeep: 6 },
+  flag_bearer: { name: 'Flag Bearer', hp: 30, damage: 3, speed: 1.0, cost: 40, minLevel: 5, ranged: false, desc: 'Morale +10% dmg nearby', moraleBonus: 0.10, upkeep: 4, unique: true },
 };
 
 function getUnitDisplayName(type) {
@@ -1310,6 +1311,7 @@ function getUnitDisplayName(type) {
   if (!ft) return UNIT_TYPES[type] ? UNIT_TYPES[type].name : type;
   if (type === 'legionary') return ft.soldier;
   if (type === 'centurion') return 'Elite ' + ft.elite;
+  if (type === 'flag_bearer') return 'Standard Bearer';
   return UNIT_TYPES[type] ? UNIT_TYPES[type].name : type;
 }
 
@@ -1319,7 +1321,7 @@ const CASTRUM_LEVELS = [
   { name: 'Armory',           maxSoldiers: 20, damageMult: 1.2, hpMult: 1.0, defenseMult: 1.0, unlocks: ['legionary','archer'],  cost: { gold: 100, stone: 20 } },
   { name: 'War Academy',      maxSoldiers: 30, damageMult: 1.2, hpMult: 1.3, defenseMult: 1.0, unlocks: ['legionary','archer','cavalry'], cost: { gold: 300, stone: 50, ironOre: 10 } },
   { name: 'Fortress',         maxSoldiers: 40, damageMult: 1.2, hpMult: 1.3, defenseMult: 1.5, unlocks: ['legionary','archer','cavalry','siege_ram'], cost: { gold: 500, stone: 80, ironOre: 20 } },
-  { name: 'Imperial Legion',  maxSoldiers: 50, damageMult: 1.4, hpMult: 1.3, defenseMult: 1.5, unlocks: ['legionary','archer','cavalry','siege_ram','centurion'], cost: { gold: 800, stone: 100, ironOre: 30, crystals: 10 } },
+  { name: 'Imperial Legion',  maxSoldiers: 50, damageMult: 1.4, hpMult: 1.3, defenseMult: 1.5, unlocks: ['legionary','archer','cavalry','siege_ram','centurion','flag_bearer'], cost: { gold: 800, stone: 100, ironOre: 30, crystals: 10 } },
 ];
 
 const CASTRUM_LV5_NAMES = {
@@ -1381,6 +1383,10 @@ function trainUnit(type) {
     addFloatingText(width / 2, height * 0.3, 'Need ' + getFactionTerms().barracks + ' level ' + def.minLevel, '#ff6644');
     return false;
   }
+  if (def.unique && lg.army.some(u => u.type === type)) {
+    addFloatingText(width / 2, height * 0.3, 'Only one ' + def.name + ' allowed!', '#ff6644');
+    return false;
+  }
   if (getArmyCount() >= getMaxSoldiers()) {
     addFloatingText(width / 2, height * 0.3, 'Army at capacity!', '#ff6644');
     return false;
@@ -1399,10 +1405,10 @@ function trainUnit(type) {
     maxHp: maxHp,
     damage: damage,
     speed: def.speed,
-    x: 0, y: 0, // set when deployed
+    x: 0, y: 0, // position set by formation system
     state: 'idle',
     attackTimer: 0,
-    garrison: true, // true = home defense, false = deployed on expedition
+    garrison: false, // all units follow player in formation
   });
   addFloatingText(width / 2, height * 0.3, def.name + ' trained!', '#cc8844');
   if (typeof snd !== 'undefined' && snd) snd.playSFX('upgrade');
@@ -1618,11 +1624,13 @@ function updateArmyBattle(dt) {
     b.phase = 'result'; b.result = 'victory'; return;
   }
 
-  // Check for centurion aura buffs
+  // Check for centurion aura buffs + flag bearer morale bonus
   let atkHasCenturion = atk.some(u => u.type === 'centurion');
   let defHasCenturion = def.some(u => u.type === 'centurion');
-  let atkAura = atkHasCenturion ? 1.2 : 1.0;
-  let defAura = defHasCenturion ? 1.2 : 1.0;
+  let atkHasBearer = atk.some(u => u.type === 'flag_bearer');
+  let defHasBearer = def.some(u => u.type === 'flag_bearer');
+  let atkAura = (atkHasCenturion ? 1.2 : 1.0) * (atkHasBearer ? 1.1 : 1.0);
+  let defAura = (defHasCenturion ? 1.2 : 1.0) * (defHasBearer ? 1.1 : 1.0);
 
   // Move and fight
   _updateBattleSide(b.attackers, b.defenders, dt, atkAura, b);
@@ -1715,7 +1723,14 @@ function _updateBattleSide(units, enemies, dt, auraMult, battle) {
         nearest.hp -= finalDmg;
         nearest.flashTimer = 8;
         _spawnBattleDamageNumber(nearest.x, nearest.y, finalDmg, isCounter ? '#ffdd44' : '#ff4444', isCounter);
-        if (nearest.hp <= 0) { nearest.alive = false; nearest.hp = 0; }
+        if (nearest.hp <= 0) {
+          nearest.alive = false; nearest.hp = 0;
+          if (nearest.type === 'flag_bearer' && nearest.side === 'left' && state.legia) {
+            state.legia.morale = max(0, (state.legia.morale || 100) - 30);
+            addFloatingText(width / 2, height * 0.25, 'Standard fallen! Morale -30!', '#ff4444');
+            state.legia._fallenBanner = true;
+          }
+        }
       }
       u.attackTimer = isRanged ? 45 : 30;
     }
@@ -2167,6 +2182,35 @@ function _drawBattleUnits(units, teamCol, facing) {
       stroke(200, 170, 60, 60 + sin(frameCount * 0.08) * 30);
       strokeWeight(1);
       ellipse(0, -2, 28, 24);
+      noStroke();
+    } else if (u.type === 'flag_bearer') {
+      // Body
+      fill(160, 50, 40);
+      rect(-3, -8, 6, 10);
+      // Head
+      fill(195, 165, 130);
+      rect(-2, -12, 4, 4);
+      // Helmet
+      fill(150, 140, 120);
+      rect(-3, -13, 6, 3);
+      // Banner pole
+      fill(120, 100, 60);
+      rect(3, -28, 2, 22);
+      // Banner cloth with flutter
+      let bFlutter = sin(frameCount * 0.08 + ux * 0.1) * 2;
+      let fk = state.faction || 'rome';
+      let bfm = (typeof FACTION_MILITARY !== 'undefined') ? (FACTION_MILITARY[fk] || FACTION_MILITARY.rome) : { cape: [160,50,40] };
+      fill(bfm.cape[0], bfm.cape[1], bfm.cape[2]);
+      quad(5, -26, 15 + bFlutter, -24, 13 + bFlutter, -16, 5, -18);
+      // Legs
+      fill(120, 40, 30);
+      rect(-2, 2, 2, 3);
+      rect(1, 2, 2, 3);
+      // Morale aura glow
+      noFill();
+      stroke(255, 220, 100, 40 + sin(frameCount * 0.06) * 20);
+      strokeWeight(1);
+      ellipse(0, -2, 24, 20);
       noStroke();
     } else {
       // Legionary (default)
@@ -4347,57 +4391,110 @@ function drawOfficerPanel() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ─── PLAYER ESCORT SYSTEM ───────────────────────────────────────────────
+// ─── FORMATION SYSTEM + PLAYER ESCORT ───────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════════════
+
+let _currentFormation = 'march';
+let _formationAutoTimer = 0; // timer for auto-switch back to march
+const FORMATION_ORDER = ['march', 'battle', 'guard'];
+
+const FORMATION_TYPES = {
+  march: {
+    name: 'March',
+    getPos: function(index, total, px, py, facingAngle) {
+      let row = floor(index / 2), col = (index % 2 === 0) ? -1 : 1;
+      let behind = facingAngle + PI;
+      return {
+        x: px + cos(behind) * (row + 1) * 25 + cos(behind + HALF_PI) * col * 8,
+        y: py + sin(behind) * (row + 1) * 25 + sin(behind + HALF_PI) * col * 8
+      };
+    }
+  },
+  battle: {
+    name: 'Battle',
+    getPos: function(index, total, px, py, facingAngle) {
+      let angle = facingAngle + (-PI / 4 + (index / max(1, total - 1)) * PI / 2);
+      let dist = 30 + floor(index / 4) * 15;
+      return { x: px + cos(angle) * dist, y: py + sin(angle) * dist * 0.5 };
+    }
+  },
+  guard: {
+    name: 'Guard',
+    getPos: function(index, total, px, py, facingAngle) {
+      let angle = (index / max(1, total)) * TWO_PI;
+      return { x: px + cos(angle) * 35, y: py + sin(angle) * 35 * 0.5 };
+    }
+  }
+};
+
+function cycleFormation() {
+  let idx = FORMATION_ORDER.indexOf(_currentFormation);
+  _currentFormation = FORMATION_ORDER[(idx + 1) % FORMATION_ORDER.length];
+  if (typeof addFloatingText === 'function')
+    addFloatingText(width / 2, height * 0.25, FORMATION_TYPES[_currentFormation].name + ' Formation!', '#ddcc44');
+  if (typeof snd !== 'undefined' && snd) snd.playSFX('war_horn');
+  if (typeof triggerScreenShake === 'function') triggerScreenShake(2, 8, 0, 0, 'random');
+}
+
+function getFormationName() { return FORMATION_TYPES[_currentFormation].name; }
+
+// Sort army by type priority for formation positioning
+function _sortArmyForFormation(army) {
+  let priority = { centurion: 0, legionary: 1, cavalry: 2, siege_ram: 3, archer: 4 };
+  return army.slice().sort(function(a, b) { return (priority[a.type] || 1) - (priority[b.type] || 1); });
+}
 
 function updatePlayerEscort(dt) {
   if (!state.legia || !state.legia.army) return;
-  // Don't show escort when in building menus or conquest
-  if (state.buildMode || (state.conquest && state.conquest.active) || (state.adventure && state.adventure.active)) return;
+  if (state.buildMode || (state.adventure && state.adventure.active)) return;
+  // Sailing: just mark positions on ship (cosmetic, no update needed)
   if (state.rowing && state.rowing.active) return;
 
-  let escort = state.legia.army.filter(function(u) { return !u.garrison && !u._assignedOfficer; }).slice(0, 20);
-  if (escort.length === 0) return;
+  let army = state.legia.army.filter(function(u) { return !u._assignedOfficer; }).slice(0, 20);
+  if (army.length === 0) return;
 
   let p = state.player;
-  let inCombat = _isNearEnemies(p.x, p.y, 120);
-  let formationSpread = inCombat ? 0.22 : 0.3;
-  let formationDist = inCombat ? 18 : 25;
-  // Player facing direction for V-formation
+  let nearEnemy = _isNearEnemies(p.x, p.y, 150);
+
+  // Auto-switch to battle when enemies near, back to march after 5s
+  if (nearEnemy) {
+    if (_currentFormation === 'march') _currentFormation = 'battle';
+    _formationAutoTimer = 300; // ~5s at 60fps
+  } else if (_formationAutoTimer > 0) {
+    _formationAutoTimer -= dt;
+    if (_formationAutoTimer <= 0 && _currentFormation === 'battle') _currentFormation = 'march';
+  }
+
   let facingAngle = (p.vx !== undefined && (p.vx !== 0 || p.vy !== 0))
-    ? atan2(p.vy || 0, p.vx || 0) + PI
-    : PI; // default: behind = south
+    ? atan2(p.vy || 0, p.vx || 0) : PI / 2;
 
-  for (let i = 0; i < escort.length; i++) {
-    let unit = escort[i];
+  let sorted = _sortArmyForFormation(army);
+  let formation = FORMATION_TYPES[_currentFormation];
+
+  for (let i = 0; i < sorted.length; i++) {
+    let unit = sorted[i];
     let isRanged = UNIT_TYPES[unit.type] && UNIT_TYPES[unit.type].ranged;
-
-    // V-formation behind player: alternate left/right, deeper rows further back
-    let formRow = floor(i / 2);
-    let side = (i % 2 === 0) ? -1 : 1;
-    let spreadAngle = facingAngle + side * formationSpread * (formRow + 1);
-    let rangedOffset = isRanged ? 15 : 0;
-    let dist2 = formationDist + formRow * 14 + rangedOffset + (i % 2) * 6;
-    let targetX = p.x + cos(spreadAngle) * dist2;
-    let targetY = p.y + sin(spreadAngle) * dist2;
+    let isCav = unit.type === 'cavalry';
+    let pos = formation.getPos(i, sorted.length, p.x, p.y, facingAngle);
 
     // Initialize position
-    if (unit.x === undefined || unit.x === 0) { unit.x = targetX; unit.y = targetY; }
+    if (unit.x === undefined || unit.x === 0) { unit.x = pos.x; unit.y = pos.y; }
 
-    // Smooth follow
-    let followSpeed = inCombat ? 0.08 : 0.05;
-    unit.x += (targetX - unit.x) * followSpeed * dt;
-    unit.y += (targetY - unit.y) * followSpeed * dt;
+    // Smooth lerp to formation position
+    let followSpeed = nearEnemy ? 0.09 : 0.05;
+    unit.x += (pos.x - unit.x) * followSpeed * dt;
+    unit.y += (pos.y - unit.y) * followSpeed * dt;
 
-    // Auto-attack enemies within 60px
+    // Auto-attack enemies within range
+    let atkRange = isRanged ? 90 : (isCav ? 70 : 60);
     unit._escortAtkTimer = (unit._escortAtkTimer || 0) - dt;
     if (unit._escortAtkTimer <= 0) {
-      let target = _findNearestRaidEnemy(unit.x, unit.y, 60);
+      let target = _findNearestRaidEnemy(unit.x, unit.y, atkRange);
       if (target) {
         let dmg = unit.damage || 5;
         target.hp -= dmg;
         target.flashTimer = 8;
-        unit._escortAtkTimer = isRanged ? 45 : 30;
+        unit._escortAtkTimer = isRanged ? 45 : (isCav ? 25 : 30);
         if (typeof _spawnDamageNumber === 'function') _spawnDamageNumber(target.x, target.y, dmg, '#ffaa44');
         if (typeof spawnParticles === 'function') spawnParticles(target.x, target.y, 'combat', 2);
       }
@@ -4761,8 +4858,10 @@ function updateWarBattle(dt) {
 
       let atkHasCent = atk.some(function(u) { return u.type === 'centurion'; });
       let defHasCent = def.some(function(u) { return u.type === 'centurion'; });
-      _updateBattleSide(w.attackers, w.defenders, dt, atkHasCent ? 1.2 : 1.0, w);
-      _updateBattleSide(w.defenders, w.attackers, dt, defHasCent ? 1.2 : 1.0, w);
+      let atkHasFB = atk.some(function(u) { return u.type === 'flag_bearer'; });
+      let defHasFB = def.some(function(u) { return u.type === 'flag_bearer'; });
+      _updateBattleSide(w.attackers, w.defenders, dt, (atkHasCent ? 1.2 : 1.0) * (atkHasFB ? 1.1 : 1.0), w);
+      _updateBattleSide(w.defenders, w.attackers, dt, (defHasCent ? 1.2 : 1.0) * (defHasFB ? 1.1 : 1.0), w);
       break;
     }
     case 'result': {

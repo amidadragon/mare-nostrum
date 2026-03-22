@@ -26,10 +26,21 @@ const LOBBY = {
   started: false,
   beachBounds: { x1: 340, y1: 210, x2: 860, y2: 450 },
   campfireFlicker: 0,
+  allPickedBanner: 0,  // fade-in timer for "ALL FACTIONS CHOSEN" banner
+  autoStartTimer: 0,   // auto-start countdown (frames) after all picked
+  cinematicTimer: 0,   // sailing cinematic timer
+  cinematicActive: false,
 };
 
 function drawLobby() {
   push();
+  // Sailing cinematic takes over entire screen
+  if (LOBBY.cinematicActive) {
+    _drawLobbySailingCinematic();
+    textAlign(LEFT, TOP);
+    pop();
+    return;
+  }
   // Ocean background gradient
   for (let y = 0; y < height; y += 4) {
     let t = y / height;
@@ -133,6 +144,35 @@ function drawLobby() {
   text('Room: ' + (MP.roomCode || '???'), 10, 10);
   let pCount = 1 + Object.keys(LOBBY.remotePlayers).length;
   text(pCount + ' player' + (pCount > 1 ? 's' : '') + ' in lobby', 10, 24);
+
+  // All-picked detection
+  let _allPicked = _checkAllFactionsPicked();
+  if (_allPicked && !LOBBY.allPickedBanner) LOBBY.allPickedBanner = 1;
+  if (LOBBY.allPickedBanner > 0 && LOBBY.allPickedBanner < 60) LOBBY.allPickedBanner++;
+
+  // "ALL FACTIONS CHOSEN" banner
+  if (LOBBY.allPickedBanner > 0 && !LOBBY.countdown && !LOBBY.cinematicActive) {
+    let bannerAlpha = min(255, LOBBY.allPickedBanner * 8);
+    fill(0, 0, 0, bannerAlpha * 0.4);
+    rect(width / 2 - 160, 65, 320, 30, 6);
+    fill(255, 220, 80, bannerAlpha);
+    textAlign(CENTER, CENTER);
+    textSize(14);
+    text('ALL FACTIONS CHOSEN', width / 2, 80);
+    // Auto-start countdown (10 seconds = 600 frames)
+    if (LOBBY.allPickedBanner >= 60) {
+      LOBBY.autoStartTimer++;
+      let autoSecs = ceil((600 - LOBBY.autoStartTimer) / 60);
+      fill(200, 180, 130, bannerAlpha * 0.8);
+      textSize(9);
+      text('Auto-departing in ' + autoSecs + 's...', width / 2, 98);
+      if (LOBBY.autoStartTimer >= 600 && !LOBBY.countdown) {
+        LOBBY.countdown = 180;
+        MP.send('lobby_start', {});
+      }
+    }
+    textAlign(LEFT, TOP);
+  }
 
   // Ready / Start UI
   _drawLobbyButtons();
@@ -385,12 +425,15 @@ function lobbyHandleClick() {
 }
 
 function _lobbyStartGame() {
+  // Begin sailing cinematic instead of immediate game start
+  LOBBY.cinematicActive = true;
+  LOBBY.cinematicTimer = 0;
+}
+
+function _lobbyFinishTransition() {
   LOBBY.started = true;
-  // Apply faction
-  if (LOBBY.myFaction && typeof selectFaction === 'function') {
-    // Set faction before starting game
-    state.faction = LOBBY.myFaction;
-  }
+  LOBBY.cinematicActive = false;
+
   // Start the actual game
   let _rs = null;
   try { _rs = localStorage.getItem('sunlitIsles_save'); } catch(e) {}
@@ -401,9 +444,144 @@ function _lobbyStartGame() {
   } else {
     startNewGame();
   }
-  // Override faction after init
-  if (LOBBY.myFaction) {
-    state.faction = LOBBY.myFaction;
+
+  // Apply faction via selectFaction (sets bonuses, god, starter gear, inits nations)
+  if (LOBBY.myFaction && typeof selectFaction === 'function') {
+    selectFaction(LOBBY.myFaction);
+  }
+
+  // Tag human players in state.nations
+  _tagHumanPlayers();
+
+  // Set game screen
+  gameScreen = 'game';
+}
+
+function _tagHumanPlayers() {
+  if (!state.nations) return;
+  // Tag remote human players
+  for (let pid in LOBBY.remotePlayers) {
+    let rp = LOBBY.remotePlayers[pid];
+    if (rp.faction && state.nations[rp.faction]) {
+      state.nations[rp.faction].isHuman = true;
+      state.nations[rp.faction].humanName = rp.name || 'Player';
+      state.nations[rp.faction].peerId = pid;
+    }
+  }
+}
+
+function _checkAllFactionsPicked() {
+  // Player must have picked
+  if (!LOBBY.myFaction) return false;
+  // All remote players must have picked
+  for (let pid in LOBBY.remotePlayers) {
+    if (!LOBBY.remotePlayers[pid].faction) return false;
+  }
+  // All bots must have picked
+  if (typeof MP !== 'undefined' && MP.bots) {
+    for (let b of MP.bots) {
+      if (!b.faction) return false;
+    }
+  }
+  // Must have at least one other (remote or bot)
+  let hasOthers = Object.keys(LOBBY.remotePlayers).length > 0 || (typeof MP !== 'undefined' && MP.bots && MP.bots.length > 0);
+  return hasOthers;
+}
+
+function _drawLobbySailingCinematic() {
+  LOBBY.cinematicTimer++;
+  let t = LOBBY.cinematicTimer;
+  let w = width, h = height;
+  let DURATION = 180; // 3 seconds at 60fps
+
+  // Fade to black then show ships sailing
+  let fadeIn = min(1, t / 30);
+  let fadeOut = t > DURATION - 30 ? min(1, (t - (DURATION - 30)) / 30) : 0;
+
+  // Ocean background
+  for (let y = 0; y < h; y += 4) {
+    let amt = y / h;
+    fill(lerp(15, 30, amt) * (1 - fadeOut), lerp(25, 60, amt) * (1 - fadeOut), lerp(50, 90, amt) * (1 - fadeOut), 255 * fadeIn);
+    noStroke();
+    rect(0, y, w, 4);
+  }
+
+  // Sun glow
+  let sunY = h * 0.3 - t * 0.1;
+  fill(255, 200, 80, 40 * fadeIn * (1 - fadeOut));
+  ellipse(w / 2, sunY, 100, 100);
+  fill(255, 240, 180, 120 * fadeIn * (1 - fadeOut));
+  ellipse(w / 2, sunY, 30, 30);
+
+  // Waves
+  for (let wx = 0; wx < w; wx += 60) {
+    let wy = h * 0.55 + sin((wx + t * 2) * 0.02) * 8;
+    fill(40, 80, 120, 60 * fadeIn * (1 - fadeOut));
+    ellipse(wx, wy, 80, 6);
+  }
+
+  // Draw ships sailing away (one per claimed faction)
+  let ships = [];
+  if (LOBBY.myFaction) ships.push({ faction: LOBBY.myFaction, isPlayer: true });
+  for (let pid in LOBBY.remotePlayers) {
+    let rp = LOBBY.remotePlayers[pid];
+    if (rp.faction) ships.push({ faction: rp.faction, isPlayer: false });
+  }
+  if (typeof MP !== 'undefined' && MP.bots) {
+    for (let b of MP.bots) {
+      if (b.faction) ships.push({ faction: b.faction, isPlayer: false });
+    }
+  }
+
+  let shipCount = ships.length;
+  for (let i = 0; i < shipCount; i++) {
+    let ship = ships[i];
+    let angle = (i / shipCount) * PI - PI / 2; // fan out in semicircle
+    let progress = min(1, t / (DURATION - 30));
+    let sx = w / 2 + cos(angle) * progress * w * 0.4;
+    let sy = h * 0.5 + sin(angle) * progress * h * 0.15 + sin(t * 0.08 + i) * 3;
+    let shipScale = ship.isPlayer ? 1.2 : 0.8 - progress * 0.3;
+
+    let r = LOBBY_RELICS.find(r => r.faction === ship.faction);
+    let c = r ? r.color : [160, 160, 160];
+    let alpha = 255 * fadeIn * (1 - fadeOut);
+
+    // Hull
+    fill(90, 65, 35, alpha);
+    rect(sx - 12 * shipScale, sy, 24 * shipScale, 6 * shipScale, 2);
+    // Mast
+    fill(70, 55, 30, alpha);
+    rect(sx - 1, sy - 18 * shipScale, 2, 18 * shipScale);
+    // Sail (faction color)
+    fill(c[0], c[1], c[2], alpha * 0.9);
+    let sway = sin(t * 0.06 + i * 2) * 2;
+    triangle(sx + 2, sy - 16 * shipScale, sx + 2, sy - 4 * shipScale, sx + 10 * shipScale + sway, sy - 8 * shipScale);
+
+    // Player ship highlight
+    if (ship.isPlayer) {
+      fill(255, 220, 80, 60 * fadeIn * (1 - fadeOut));
+      ellipse(sx, sy, 30, 16);
+    }
+  }
+
+  // Title text
+  let textAlpha = 255 * fadeIn * (1 - fadeOut);
+  fill(255, 220, 120, textAlpha);
+  textAlign(CENTER, CENTER);
+  textSize(20);
+  text('THE VOYAGE BEGINS', w / 2, h * 0.2);
+
+  // Faction music fade in hint
+  if (t > 60 && LOBBY.myFaction) {
+    fill(200, 180, 130, textAlpha * 0.6);
+    textSize(10);
+    let facData = (typeof FACTIONS !== 'undefined' && FACTIONS[LOBBY.myFaction]) ? FACTIONS[LOBBY.myFaction] : null;
+    if (facData) text(facData.name + ' - ' + facData.subtitle, w / 2, h * 0.85);
+  }
+
+  // End cinematic
+  if (t >= DURATION) {
+    _lobbyFinishTransition();
   }
 }
 
@@ -417,6 +595,10 @@ function resetLobby() {
   LOBBY.myReady = false;
   LOBBY.countdown = 0;
   LOBBY.started = false;
+  LOBBY.allPickedBanner = 0;
+  LOBBY.autoStartTimer = 0;
+  LOBBY.cinematicTimer = 0;
+  LOBBY.cinematicActive = false;
 }
 
 // ─── MP MESSAGE HANDLERS (called from multiplayer.js _onData) ────────────

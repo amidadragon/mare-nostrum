@@ -667,6 +667,19 @@ const TEMPLE_ACHIEVEMENTS=[{id:'first_harvest',name:'First Harvest',icon:'crop',
 // ─── TEMPLE ROOM (engine-based interior) ────────────────────────────────
 const TEMPLE_ROOM = { cx: 600, cy: -300, hw: 180, hh: 110 };
 
+// ─── CASTRUM ROOM (engine-based interior) ────────────────────────────────
+const CASTRUM_ROOM = { cx: 600, cy: -600, hw: 200, hh: 130 };
+const CASTRUM_COMMANDER_ADVICE = [
+  'We need more archers to counter ranged threats.',
+  'Our morale is high. Good time to attack.',
+  'Build more watchtowers for defense.',
+  'Train cavalry for flanking maneuvers.',
+  'A siege ram would break their walls.',
+  'Our soldiers grow restless. Deploy them soon.',
+  'The enemy has numbers. We need elite centurions.',
+  'Fortify the castrum before the next raid.',
+];
+
 // ─── WRECK ISLAND CONFIG ────────────────────────────────────────────────
 const WRECK = {
   cx: -4800, cy: 0,       // wreck beach center (far west, separate from everything)
@@ -1104,6 +1117,7 @@ const BLUEPRINTS = {
   sculptor:   { name: 'Sculptor',   w: 50, h: 40, cost: { gold: 120, stone: 40, ironOre: 10 },       key: '', blocks: true,  minLevel: 9, upkeep: 4 },
   crystal_collector: { name: 'Crystal Collector', w: 40, h: 30, cost: { stone: 15, gold: 30 }, key: '', blocks: true, minLevel: 5, desc: 'Automatically harvests nearby crystal nodes', upkeep: 1 },
   windmill: { name: 'Windmill', w: 50, h: 45, cost: { wood: 20, stone: 15, gold: 40 }, key: '', blocks: true, minLevel: 6, upkeep: 1, desc: 'Grinds grain into flour. Doubles bakery output.' },
+  shipyard: { name: 'Shipyard', w: 60, h: 50, cost: { wood: 30, stone: 20, ironOre: 10, gold: 80 }, key: '', blocks: true, minLevel: 8, upkeep: 2, desc: 'Upgrade your ship: hull, cannons, sails' },
 };
 
 const ROTATABLE_TYPES = ['wall', 'door', 'fence', 'bridge', 'aqueduct', 'arch'];
@@ -1456,6 +1470,21 @@ function initState() {
       nearIsle: null,    // 'arena' or 'conquest' when near dock
     },
 
+    naval: {
+      enemies: [],
+      cannonCooldown: 0,
+      cannonballs: [],
+      wind: { angle: 0, targetAngle: 0, speed: 1, changeTimer: 0 },
+      boardingTarget: null,
+      shipHP: 100,
+      shipMaxHP: 100,
+      cannonDamage: 15,
+      reloadTime: 60,
+      hullLevel: 0,
+      cannonLevel: 0,
+      sailLevel: 0,
+    },
+
     companion: {
       x: 640, y: 420,
       vx: 0, vy: 0,
@@ -1630,6 +1659,11 @@ function initState() {
     templeJesterJokedToday: false,
     templeAdvisorTalked: false,
     templePetAnimTimer: 0,
+
+    // Castrum interior
+    insideCastrum: false,
+    _castrumReturnX: 0, _castrumReturnY: 0,
+    castrumSparAnim: 0,
 
     // Build mode
     buildMode: false,
@@ -2731,6 +2765,10 @@ function isWalkable(wx, wy) {
   if (state && state.insideTemple) {
     return abs(wx - TEMPLE_ROOM.cx) <= TEMPLE_ROOM.hw && abs(wy - TEMPLE_ROOM.cy) <= TEMPLE_ROOM.hh;
   }
+  // Castrum room — rectangular boundary
+  if (state && state.insideCastrum) {
+    return abs(wx - CASTRUM_ROOM.cx) <= CASTRUM_ROOM.hw && abs(wy - CASTRUM_ROOM.cy) <= CASTRUM_ROOM.hh;
+  }
   // While diving, player can swim in wider water area around island
   if (state && state.diving && state.diving.active) {
     let dx = (wx - WORLD.islandCX) / (state.islandRX * 2.0);
@@ -2743,6 +2781,7 @@ function isWalkable(wx, wy) {
 // Check if a wall/fence/chest blocks movement at this point
 function isBlockedByBuilding(wx, wy) {
   if (state && state.insideTemple) return false;
+  if (state && state.insideCastrum) return false;
   return state.buildings.some(b => {
     if (!BLUEPRINTS[b.type] || !BLUEPRINTS[b.type].blocks) return false;
     let hw = b.w / 2 + 4;
@@ -2951,9 +2990,26 @@ function drawInner() {
     updateTime(dt);
     updatePlayer(dt);
     updatePlayerAnim(dt);
+    // Reduce particle effects inside temple (calm space)
+    if (particles && particles.length > 10) particles.length = 10;
     updateParticles(dt);
     updateFloatingText(dt);
     updateShake(dt);
+    // Temple ambient: slow day/night cycle (always warm indoor lighting)
+    if (state.time !== undefined) state._templeTimeBackup = state.time;
+    // Pet animal occasional sounds (every ~30 seconds = 1800 frames)
+    if (!state._templePetSoundTimer) state._templePetSoundTimer = 0;
+    state._templePetSoundTimer++;
+    if (state._templePetSoundTimer >= 1800) {
+      state._templePetSoundTimer = 0;
+      if (snd) {
+        var _hall = TEMPLE_HALLS[state.faction || 'rome'] || TEMPLE_HALLS.rome;
+        if (_hall.pet === 'cat') snd.playSFX('cat_meow');
+        else if (_hall.pet === 'owl' || _hall.pet === 'falcon' || _hall.pet === 'parrot') snd.playSFX('bird_chirp');
+        else if (_hall.pet === 'wolf' || _hall.pet === 'boar') snd.playSFX('oar_splash'); // low rumble as bark substitute
+        else snd.playSFX('click'); // generic small sound for crab/monkey etc
+      }
+    }
     cam.x = TEMPLE_ROOM.cx; cam.y = TEMPLE_ROOM.cy - height * 0.06;
     camSmooth.x = lerp(camSmooth.x, cam.x, 0.1);
     camSmooth.y = lerp(camSmooth.y, cam.y, 0.1);
@@ -2981,6 +3037,50 @@ function drawInner() {
     pop();
     drawHUD();
     drawTempleRoomHUD();
+    if (!screenshotMode) drawCursor();
+    drawGameVignette();
+    drawDoorTransition();
+    drawSaveIndicator();
+    return;
+  }
+
+  // === CASTRUM INTERIOR (main engine) ===
+  if (state.insideCastrum) {
+    updateDoorTransition();
+    updateTime(dt);
+    updatePlayer(dt);
+    updatePlayerAnim(dt);
+    updateParticles(dt);
+    updateFloatingText(dt);
+    updateShake(dt);
+    state.castrumSparAnim = (state.castrumSparAnim + dt) % 240;
+    cam.x = CASTRUM_ROOM.cx; cam.y = CASTRUM_ROOM.cy - height * 0.06;
+    camSmooth.x = lerp(camSmooth.x, cam.x, 0.1);
+    camSmooth.y = lerp(camSmooth.y, cam.y, 0.1);
+    camZoom = lerp(camZoom, camZoomTarget, 0.1);
+    if (state.player.y > CASTRUM_ROOM.cy + CASTRUM_ROOM.hh - 10 && !_doorTransition) {
+      if (snd) snd.playSFX('door_close');
+      let _rx = state._castrumReturnX, _ry = state._castrumReturnY;
+      startDoorTransition(function() {
+        state.insideCastrum = false;
+        state.player.x = _rx; state.player.y = _ry;
+        camSmooth.x = _rx; camSmooth.y = _ry - height * 0.12;
+      });
+    }
+    push();
+    translate(width / 2, height / 2);
+    scale(camZoom);
+    translate(-width / 2, -height / 2);
+    push();
+    translate(shakeX, shakeY + floatOffset);
+    drawCastrumRoom();
+    drawPlayer();
+    drawParticles();
+    drawFloatingText();
+    pop();
+    pop();
+    drawHUD();
+    drawCastrumRoomHUD();
     if (!screenshotMode) drawCursor();
     drawGameVignette();
     drawDoorTransition();
@@ -3142,6 +3242,7 @@ function drawInner() {
   if (state.visitingNation) {
     updatePlayerAnim(dt);
     updateNationIslandVisit(dt);
+    if (typeof updatePlayerEscort === 'function') updatePlayerEscort(dt);
     updateParticles(dt);
     updateFloatingText(dt);
     updateShake(dt);
@@ -3329,9 +3430,11 @@ function drawInner() {
     updateBridgeConstruction(dt);
     updateLegia(dt);
     updateLegionAmbient(dt);
+    if (typeof updatePlayerEscort === 'function') updatePlayerEscort(dt);
     if (typeof updateDiving === 'function') updateDiving(dt);
     updateRivalRaid(dt);
     updateSeaPeopleRaid(dt);
+    if (typeof updateNavalCombat === 'function') updateNavalCombat(dt);
     updateNotifications(dt);
     // Narrative engine updates
     if (typeof updateMainQuest === 'function') { updateMainQuest(); updateNPCQuests(); updateNarrativeDialogue(); checkLoreTabletPickup(); }
@@ -3485,6 +3588,7 @@ function drawInner() {
       drawShoreWaves();
     }
     drawRowingBoat();
+    if (typeof drawNavalCombat === 'function') drawNavalCombat();
     // Diving overlay — underwater tint + entities drawn in world space
     if (state.diving && state.diving.active && typeof drawDivingOverlay === 'function') drawDivingOverlay();
     if (!state.rowing || !state.rowing.active || _homeDist < 300) {
@@ -3526,6 +3630,16 @@ function drawInner() {
       }
     }
 
+    // Shipyard prompt
+    if (!state.rowing.active) {
+      let _syB2 = (state.buildings || []).find(b => b.type === 'shipyard' && dist(state.player.x, state.player.y, b.x, b.y) < 60);
+      if (_syB2) {
+        let _sysx = w2sX(_syB2.x), _sysy = w2sY(_syB2.y) - 30 + floatOffset;
+        fill(255, 220, 150, 200 + sin(frameCount * 0.06) * 30);
+        noStroke(); textAlign(CENTER, CENTER); textSize(11);
+        text('[E] Shipyard', _sysx, _sysy);
+      }
+    }
     // Dive prompt
     if (typeof drawDivePrompt === 'function') drawDivePrompt();
 
@@ -3686,6 +3800,7 @@ function drawInner() {
       drawBuildUI();
       drawShopUI();
       drawUpgradeShopUI();
+      if (typeof drawShipyardUI === 'function') drawShipyardUI();
       drawMarketUI();
       drawCodexUI();
       drawNaturalistCodex();
@@ -6844,8 +6959,15 @@ function drawTempleRoom() {
     })(TEMPLE_ACHIEVEMENTS[ai], ai);
   }
 
-  // Torch sconces
-  var torchPos = [{ x: R.cx - hw + 15, y: R.cy - hh + 10 }, { x: R.cx + hw - 15, y: R.cy - hh + 10 }];
+  // Flickering wall torches (6 total — 3 per side)
+  var torchPos = [
+    { x: R.cx - hw + 15, y: R.cy - hh + 10 },
+    { x: R.cx - hw + 15, y: R.cy },
+    { x: R.cx - hw + 15, y: R.cy + hh * 0.6 },
+    { x: R.cx + hw - 15, y: R.cy - hh + 10 },
+    { x: R.cx + hw - 15, y: R.cy },
+    { x: R.cx + hw - 15, y: R.cy + hh * 0.6 },
+  ];
   for (var ti = 0; ti < torchPos.length; ti++) {
     (function(tp, idx) {
       items.push({ y: tp.y, draw: function() {
@@ -6853,15 +6975,111 @@ function drawTempleRoom() {
         noStroke();
         fill(100, 80, 50);
         rect(tsx - 2, tsy, 4, 8);
-        var tFlicker = sin(ft * 0.12 + idx * 3) * 1.5;
+        var tFlicker = sin(ft * 0.12 + idx * 2.7) * 2;
+        var fSize = 7 + sin(ft * 0.18 + idx * 1.3) * 2;
         fill(255, 140, 30, 200);
-        ellipse(tsx + tFlicker, tsy - 3, 7, 10);
+        ellipse(tsx + tFlicker, tsy - 3, fSize, fSize + 3);
         fill(255, 220, 70, 160);
-        ellipse(tsx + tFlicker * 0.6, tsy - 5, 4, 6);
-        fill(255, 160, 50, 10);
-        circle(tsx, tsy, 80);
+        ellipse(tsx + tFlicker * 0.6, tsy - 5, fSize * 0.6, fSize * 0.8);
+        fill(255, 250, 200, 80);
+        ellipse(tsx, tsy - 4, 3, 4);
+        fill(255, 160, 50, 8);
+        circle(tsx, tsy, 90);
       }});
     })(torchPos[ti], ti);
+  }
+
+  // Swaying faction banners (3 on back wall)
+  var bannerXs = [R.cx - hw * 0.4, R.cx, R.cx + hw * 0.4];
+  for (var bi = 0; bi < bannerXs.length; bi++) {
+    (function(bx, idx) {
+      var by = R.cy - hh - 10;
+      items.push({ y: by, draw: function() {
+        var bsx = w2sX(bx), bsy = w2sY(by);
+        var sway = sin(ft * 0.04 + idx * 2.1) * 3;
+        noStroke();
+        // Banner rod
+        fill(hall.trim[0] * 0.7, hall.trim[1] * 0.7, hall.trim[2] * 0.7);
+        rect(bsx - 8, bsy, 16, 2);
+        // Cloth
+        fill(hall.drape[0], hall.drape[1], hall.drape[2], 200);
+        quad(bsx - 6, bsy + 2, bsx + 6, bsy + 2,
+             bsx + 5 + sway, bsy + 22, bsx - 5 + sway, bsy + 22);
+        // Accent stripe
+        fill(hall.accent[0], hall.accent[1], hall.accent[2], 140);
+        rect(bsx - 3 + sway * 0.5, bsy + 8, 6, 3);
+        // Bottom fringe
+        fill(hall.drape[0] * 0.8, hall.drape[1] * 0.8, hall.drape[2] * 0.8, 180);
+        triangle(bsx - 5 + sway, bsy + 22, bsx + 5 + sway, bsy + 22, bsx + sway, bsy + 28);
+      }});
+    })(bannerXs[bi], bi);
+  }
+
+  // Water reflections (coastal factions: seapeople, phoenicia, greece)
+  var coastFactions = ['seapeople', 'phoenicia', 'greece'];
+  if (coastFactions.indexOf(fk) >= 0) {
+    items.push({ y: R.cy + hh - 1, draw: function() {
+      noStroke();
+      for (var wi = 0; wi < 6; wi++) {
+        var wx = R.cx - hw + 20 + wi * (hw * 2 - 40) / 5;
+        var wy = R.cy + hh - 8 + sin(ft * 0.06 + wi * 1.5) * 2;
+        var shimmer = 20 + sin(ft * 0.1 + wi * 0.8) * 15;
+        fill(60, 140, 200, shimmer);
+        ellipse(w2sX(wx), w2sY(wy), 20, 4);
+      }
+    }});
+  }
+
+  // Trophy wall — defeated/vassal nations
+  var trophies = [];
+  if (state.nations) {
+    var nKeys = Object.keys(state.nations);
+    for (var ni = 0; ni < nKeys.length; ni++) {
+      var nv = state.nations[nKeys[ni]];
+      if (nv && (nv.defeated || nv.vassal)) {
+        trophies.push({ key: nKeys[ni], defeated: !!nv.defeated, vassal: !!nv.vassal });
+      }
+    }
+  }
+  if (trophies.length > 0) {
+    for (var tri = 0; tri < trophies.length; tri++) {
+      (function(trophy, idx) {
+        var tx = R.cx + hw - 25;
+        var ty = R.cy - hh * 0.3 + idx * 24;
+        items.push({ y: ty, draw: function() {
+          var tsx = w2sX(tx), tsy = w2sY(ty);
+          noStroke();
+          // Trophy banner background
+          var trRelic = LOBBY_RELICS ? LOBBY_RELICS.find(function(r) { return r.faction === trophy.key; }) : null;
+          var tc = trRelic ? trRelic.color : [120, 120, 120];
+          fill(tc[0], tc[1], tc[2], 60);
+          rect(tsx - 14, tsy - 8, 28, 18, 2);
+          fill(tc[0], tc[1], tc[2], 180);
+          rect(tsx - 12, tsy - 6, 24, 14, 1);
+          // Symbol placeholder (small colored rect)
+          fill(tc[0] * 0.6, tc[1] * 0.6, tc[2] * 0.6);
+          rect(tsx - 4, tsy - 3, 8, 8, 1);
+          // Label
+          fill(255, 240, 200, 200);
+          textSize(5); textAlign(CENTER, CENTER);
+          var facName = (typeof getNationName === 'function') ? getNationName(trophy.key) : trophy.key;
+          text((trophy.vassal ? 'Vassal: ' : 'Conquered: ') + facName, tsx, tsy + 12);
+        }});
+      })(trophies[tri], tri);
+    }
+  }
+
+  // Multiplayer temple visit placeholder
+  if (typeof MP !== 'undefined' && MP.connected) {
+    items.push({ y: R.cy + hh * 0.7, draw: function() {
+      var nx = w2sX(R.cx), ny = w2sY(R.cy + hh * 0.7);
+      fill(160, 150, 130, 120);
+      noStroke();
+      rect(nx - 80, ny, 160, 16, 3);
+      fill(220, 210, 180, 180);
+      textSize(6); textAlign(CENTER, CENTER);
+      text('In multiplayer, other players can visit your temple hall (coming soon)', nx, ny + 8);
+    }});
   }
 
   // Door marker at bottom
@@ -6880,10 +7098,15 @@ function drawTempleRoom() {
   items.sort(function(a, b) { return a.y - b.y; });
   for (var i = 0; i < items.length; i++) items[i].draw();
 
-  // Warm ambient glow
+  // Warm ambient glow (always warm indoor lighting — slower cycle)
   noStroke();
-  fill(255, 180, 80, 6);
+  var warmPulse = 6 + sin(ft * 0.01) * 3;
+  fill(255, 180, 80, warmPulse);
   rect(w2sX(R.cx - hw), w2sY(R.cy - hh), hw * 2, hh * 2);
+  // Soft golden vignette edges
+  fill(255, 160, 60, 4);
+  rect(w2sX(R.cx - hw), w2sY(R.cy - hh), 20, hh * 2);
+  rect(w2sX(R.cx + hw - 20), w2sY(R.cy - hh), 20, hh * 2);
 }
 
 function drawTempleRoomHUD() {
@@ -7046,6 +7269,254 @@ function _drawTemplePet(hall, px, py) {
     fill(pa[0], pa[1], pa[2]);
     ellipse(px - 5, py, 5, 4);
   }
+}
+
+// ─── CASTRUM ROOM (engine-based interior) ─────────────────────────────────
+function drawCastrumRoom() {
+  var R = CASTRUM_ROOM, fk = state.faction || 'rome';
+  var mil = FACTION_MILITARY[fk] || FACTION_MILITARY.rome;
+  var ft = frameCount, hw = R.hw, hh = R.hh;
+  var clv = state.legia ? state.legia.castrumLevel : 1;
+  noStroke();
+  var wc = clv >= 5 ? [55,50,45] : clv >= 3 ? [50,45,38] : [42,36,28];
+  fill(wc[0]*0.3, wc[1]*0.3, wc[2]*0.3);
+  rect(w2sX(R.cx - hw - 20), w2sY(R.cy - hh - 40), (hw + 20) * 2, (hh + 60) * 2);
+  var tileS = 24;
+  var f1 = clv >= 5 ? [200,195,185] : clv >= 3 ? [175,168,155] : [155,138,112];
+  var f2 = clv >= 5 ? [180,175,165] : clv >= 3 ? [155,148,135] : [140,125,100];
+  for (var tx = -hw; tx < hw; tx += tileS) {
+    for (var ty = -hh; ty < hh; ty += tileS) {
+      var light = (floor((tx + hw) / tileS) + floor((ty + hh) / tileS)) % 2 === 0;
+      fill(light ? f1[0] : f2[0], light ? f1[1] : f2[1], light ? f1[2] : f2[2]);
+      rect(w2sX(R.cx + tx), w2sY(R.cy + ty), tileS, tileS);
+    }
+  }
+  fill(wc[0], wc[1], wc[2]);
+  rect(w2sX(R.cx - hw), w2sY(R.cy - hh - 30), hw * 2, 30);
+  fill(wc[0]+20, wc[1]+20, wc[2]+20);
+  rect(w2sX(R.cx - hw), w2sY(R.cy - hh - 2), hw * 2, 4);
+  fill(wc[0]*0.8, wc[1]*0.8, wc[2]*0.8);
+  rect(w2sX(R.cx - hw - 10), w2sY(R.cy - hh), 10, hh * 2);
+  rect(w2sX(R.cx + hw), w2sY(R.cy - hh), 10, hh * 2);
+  if (clv >= 7) { fill(200,170,50,80); rect(w2sX(R.cx - hw), w2sY(R.cy - hh - 4), hw * 2, 2); }
+  var items = [];
+  // Training Yard (center)
+  var sparX = R.cx, sparY = R.cy + 10, sparPhase = state.castrumSparAnim;
+  items.push({ y: sparY, draw: function() {
+    var sx1 = w2sX(sparX - 12), sy1 = w2sY(sparY), sx2 = w2sX(sparX + 12), sy2 = w2sY(sparY);
+    noStroke();
+    fill(mil.tunic[0], mil.tunic[1], mil.tunic[2]); rect(sx1 - 3, sy1 - 5, 6, 10, 1);
+    fill(196,160,110); ellipse(sx1, sy1 - 9, 7, 7);
+    fill(mil.helm[0], mil.helm[1], mil.helm[2]); arc(sx1, sy1 - 9, 8, 5, PI, TWO_PI);
+    var swAng = sin(sparPhase * 0.06) * 0.6;
+    push(); translate(sx1 + 4, sy1 - 2); rotate(swAng);
+    fill(180,180,190); rect(0, -8, 2, 10); pop();
+    fill(mil.tunic[0]*0.9, mil.tunic[1]*0.9, mil.tunic[2]*0.9); rect(sx2 - 3, sy2 - 5, 6, 10, 1);
+    fill(196,160,110); ellipse(sx2, sy2 - 9, 7, 7);
+    fill(mil.helm[0], mil.helm[1], mil.helm[2]); arc(sx2, sy2 - 9, 8, 5, PI, TWO_PI);
+    fill(mil.shield[0], mil.shield[1], mil.shield[2]); rect(sx2 - 6, sy2 - 6, 5, 8, 1);
+    var dx2 = w2sX(sparX), dy2 = w2sY(sparY - 25);
+    fill(180,160,100); rect(dx2 - 2, dy2, 4, 14);
+    fill(200,180,120); rect(dx2 - 6, dy2 + 2, 12, 3);
+    fill(160,140,90); ellipse(dx2, dy2 - 2, 8, 8);
+    var wrx = w2sX(sparX + 30), wry = w2sY(sparY - 10);
+    fill(100,80,50); rect(wrx, wry, 3, 16);
+    fill(180,180,190); rect(wrx - 3, wry - 6, 2, 10); rect(wrx + 4, wry - 4, 2, 8);
+  }});
+  // Recruitment Station (right)
+  var recX = R.cx + hw * 0.55, recY = R.cy;
+  items.push({ y: recY, draw: function() {
+    var rsx = w2sX(recX), rsy = w2sY(recY); noStroke();
+    fill(120,100,70); rect(rsx - 14, rsy - 2, 28, 8, 1);
+    fill(100,85,60); rect(rsx - 16, rsy + 6, 32, 4, 1);
+    fill(mil.cape[0], mil.cape[1], mil.cape[2]); rect(rsx - 3, rsy - 14, 6, 10, 1);
+    fill(196,160,110); ellipse(rsx, rsy - 18, 7, 7);
+    fill(180,160,100); rect(rsx + 18, rsy - 20, 16, 10, 1);
+    fill(60,30,20); textSize(5); textAlign(CENTER,CENTER); text('RECRUIT', rsx + 26, rsy - 15);
+    if (dist(state.player.x, state.player.y, recX, recY) < 40) {
+      fill(255,220,120, 200 + sin(ft * 0.08) * 40); textSize(7); textAlign(CENTER,CENTER);
+      text('[E] Recruit Soldiers', rsx, rsy + 18);
+    }
+  }});
+  // Armory Wall (left)
+  var armX = R.cx - hw * 0.55, armY = R.cy;
+  items.push({ y: armY, draw: function() {
+    var asx = w2sX(armX), asy = w2sY(armY); noStroke();
+    fill(wc[0]+10, wc[1]+10, wc[2]+10); rect(asx - 20, asy - 20, 40, 30, 1);
+    fill(mil.shield[0], mil.shield[1], mil.shield[2]);
+    ellipse(asx - 10, asy - 10, 10, 10); ellipse(asx + 10, asy - 10, 10, 10);
+    fill(180,180,190); rect(asx - 2, asy - 18, 2, 14); rect(asx + 6, asy - 16, 2, 12);
+    fill(mil.shieldBoss[0], mil.shieldBoss[1], mil.shieldBoss[2]);
+    circle(asx - 10, asy - 10, 3); circle(asx + 10, asy - 10, 3);
+    if (clv >= 5) { fill(mil.armor[0], mil.armor[1], mil.armor[2]); rect(asx - 3, asy + 2, 6, 10, 1);
+      fill(mil.helm[0], mil.helm[1], mil.helm[2]); ellipse(asx, asy - 1, 7, 6); }
+    if (dist(state.player.x, state.player.y, armX, armY) < 40) {
+      fill(255,220,120, 200 + sin(ft * 0.08) * 40); textSize(7); textAlign(CENTER,CENTER);
+      text('[E] Armory', asx, asy + 20); }
+  }});
+  // War Table (back center)
+  var wtX = R.cx, wtY = R.cy - hh + 35;
+  items.push({ y: wtY, draw: function() {
+    var tsx = w2sX(wtX), tsy = w2sY(wtY); noStroke();
+    fill(90,70,45); rect(tsx - 25, tsy, 50, 14, 2);
+    fill(70,55,35); rect(tsx - 22, tsy + 14, 4, 6); rect(tsx + 18, tsy + 14, 4, 6);
+    fill(160,150,120); rect(tsx - 20, tsy + 2, 40, 10, 1);
+    var facs = ['rome','carthage','egypt','greece','seapeople','persia','phoenicia','gaul'];
+    for (var fi = 0; fi < facs.length; fi++) {
+      var fm2 = FACTION_MILITARY[facs[fi]];
+      if (fm2) { fill(fm2.cape[0], fm2.cape[1], fm2.cape[2]); circle(tsx - 16 + fi * 5, tsy + 7, 3); }
+    }
+    if (dist(state.player.x, state.player.y, wtX, wtY) < 40) {
+      fill(255,220,120, 200 + sin(ft * 0.08) * 40); textSize(7); textAlign(CENTER,CENTER);
+      text('[E] War Planning', tsx, tsy + 28); }
+  }});
+  // Trophy Wall (back left)
+  var trX = R.cx - hw * 0.55, trY = R.cy - hh + 30;
+  items.push({ y: trY, draw: function() {
+    var tsx = w2sX(trX), tsy = w2sY(trY); noStroke(); var tc = 0;
+    if (state.nations) { var nk = Object.keys(state.nations);
+      for (var ni = 0; ni < nk.length; ni++) { if (state.nations[nk[ni]] && state.nations[nk[ni]].defeated) {
+        var dfm = FACTION_MILITARY[nk[ni]]; if (dfm) { fill(dfm.cape[0], dfm.cape[1], dfm.cape[2], 180);
+          rect(tsx - 8 + tc * 14, tsy, 10, 16, 1); fill(255,255,255,150); textSize(4); textAlign(CENTER,CENTER);
+          text(nk[ni].charAt(0).toUpperCase(), tsx - 3 + tc * 14, tsy + 8); tc++; } } } }
+    if (tc === 0) { fill(80,75,65,120); rect(tsx - 8, tsy, 10, 16, 1);
+      fill(120,115,105); textSize(4); textAlign(CENTER,CENTER); text('?', tsx - 3, tsy + 8); }
+  }});
+  // Commander NPC
+  var cmdX = R.cx + hw * 0.3, cmdY = R.cy - hh + 40;
+  items.push({ y: cmdY, draw: function() {
+    var csx = w2sX(cmdX), csy = w2sY(cmdY); noStroke();
+    fill(mil.cape[0]*0.7, mil.cape[1]*0.7, mil.cape[2]*0.7); rect(csx - 4, csy - 5, 8, 12, 2);
+    fill(196,160,110); ellipse(csx, csy - 10, 8, 8);
+    fill(mil.helm[0], mil.helm[1], mil.helm[2]); arc(csx, csy - 10, 9, 6, PI, TWO_PI);
+    fill(mil.helmCrest[0], mil.helmCrest[1], mil.helmCrest[2]); rect(csx - 1, csy - 15, 2, 5);
+    if (dist(state.player.x, state.player.y, cmdX, cmdY) < 35) {
+      fill(255,220,120, 200 + sin(ft * 0.08) * 40); textSize(7); textAlign(CENTER,CENTER);
+      text('[E] Commander', csx, csy + 16); }
+  }});
+  // Flag Holder (back right)
+  var fhX = R.cx + hw * 0.55, fhY = R.cy - hh + 30;
+  items.push({ y: fhY, draw: function() {
+    var fsx = w2sX(fhX), fsy = w2sY(fhY);
+    drawFactionStandard(fsx, fsy, fk, 1.2);
+    fill(255,220,100, 20 + sin(ft * 0.04) * 10); noStroke(); circle(fsx + 8, fsy - 10, 30);
+  }});
+  // Torches
+  var tps = [{ x: R.cx - hw + 15, y: R.cy - hh + 10 }, { x: R.cx + hw - 15, y: R.cy - hh + 10 }];
+  for (var ti3 = 0; ti3 < tps.length; ti3++) { (function(tp, idx) {
+    items.push({ y: tp.y, draw: function() {
+      var tsx = w2sX(tp.x), tsy = w2sY(tp.y); noStroke();
+      fill(100,80,50); rect(tsx - 2, tsy, 4, 8);
+      var fl = sin(ft * 0.12 + idx * 3) * 1.5;
+      fill(255,140,30,200); ellipse(tsx + fl, tsy - 3, 7, 10);
+      fill(255,220,70,160); ellipse(tsx + fl * 0.6, tsy - 5, 4, 6);
+      fill(255,160,50,10); circle(tsx, tsy, 80);
+    }}); })(tps[ti3], ti3); }
+  // Faction banners at lv5+
+  if (clv >= 5) { var bps = [R.cx - hw + 30, R.cx + hw - 30];
+    for (var bi = 0; bi < bps.length; bi++) { (function(bx) {
+      items.push({ y: R.cy - hh + 15, draw: function() {
+        var bsx = w2sX(bx), bsy = w2sY(R.cy - hh + 15); noStroke();
+        fill(mil.cape[0], mil.cape[1], mil.cape[2], 160); rect(bsx - 5, bsy, 10, 20, 1);
+        fill(mil.tunic[0], mil.tunic[1], mil.tunic[2], 100); rect(bsx - 3, bsy + 4, 6, 6);
+      }}); })(bps[bi]); } }
+  // Door marker
+  var doorX = R.cx, doorY = R.cy + hh - 5;
+  items.push({ y: doorY + 999, draw: function() {
+    var dsx = w2sX(doorX), dsy = w2sY(doorY); noStroke();
+    fill(wc[0]*0.6, wc[1]*0.6, wc[2]*0.6); rect(dsx - 14, dsy - 4, 28, 8, 2);
+    fill(200,195,185,160); textSize(7); textAlign(CENTER,CENTER); text('v Exit', dsx, dsy + 10);
+  }});
+  items.sort(function(a, b) { return a.y - b.y; });
+  for (var i = 0; i < items.length; i++) items[i].draw();
+  noStroke(); fill(255,160,60, clv >= 5 ? 4 : 6);
+  rect(w2sX(R.cx - hw), w2sY(R.cy - hh), hw * 2, hh * 2);
+}
+
+function drawCastrumRoomHUD() {
+  var ft2 = getFactionTerms();
+  var clv = state.legia ? state.legia.castrumLevel : 1;
+  fill(200,180,140); noStroke(); textAlign(CENTER, TOP); textSize(10);
+  text(ft2.barracks + ' Interior (Lv ' + clv + ')', width / 2, 14);
+  fill(180,170,155); textSize(8);
+  text('[ESC] Exit ' + ft2.barracks, width / 2, height - 20);
+  textAlign(LEFT, TOP);
+}
+
+function _castrumRoomInteractE() {
+  var R = CASTRUM_ROOM;
+  var recX = R.cx + R.hw * 0.55, recY = R.cy;
+  if (dist(state.player.x, state.player.y, recX, recY) < 40) {
+    if (state.legia) state.legia.legiaUIOpen = !state.legia.legiaUIOpen;
+    return true;
+  }
+  var armX = R.cx - R.hw * 0.55, armY = R.cy;
+  if (dist(state.player.x, state.player.y, armX, armY) < 40) {
+    if (state.legia && state.legia.army && state.legia.army.length > 0 && state.gold >= 50) {
+      state.gold -= 50;
+      for (var i = 0; i < state.legia.army.length; i++) {
+        state.legia.army[i].damage = floor(state.legia.army[i].damage * 1.05);
+        state.legia.army[i].maxHp = floor(state.legia.army[i].maxHp * 1.05);
+        state.legia.army[i].hp = min(state.legia.army[i].hp + 5, state.legia.army[i].maxHp);
+      }
+      addFloatingText(w2sX(armX), w2sY(armY) - 20, 'Army +5% stats! (-50g)', '#ccaa44');
+      if (snd) snd.playSFX('upgrade');
+    } else if (state.gold < 50) {
+      addFloatingText(w2sX(armX), w2sY(armY) - 20, 'Need 50 gold', '#ff8888');
+    } else { addFloatingText(w2sX(armX), w2sY(armY) - 20, 'No soldiers to upgrade', '#aaaaaa'); }
+    return true;
+  }
+  var wtX = R.cx, wtY = R.cy - R.hh + 35;
+  if (dist(state.player.x, state.player.y, wtX, wtY) < 40) {
+    if (typeof state.nationPanelOpen !== 'undefined') { state.nationPanelOpen = !state.nationPanelOpen; }
+    else { addFloatingText(w2sX(wtX), w2sY(wtY) - 20, 'Study the war map...', '#ddccaa'); }
+    return true;
+  }
+  var cmdX = R.cx + R.hw * 0.3, cmdY = R.cy - R.hh + 40;
+  if (dist(state.player.x, state.player.y, cmdX, cmdY) < 35) {
+    var advice, lg = state.legia;
+    if (lg && lg.army) {
+      var archers = lg.army.filter(function(u) { return u.type === 'archer'; }).length;
+      var total = lg.army.length;
+      if (total === 0) advice = 'We have no army! Recruit soldiers immediately.';
+      else if (archers === 0 && total > 3) advice = CASTRUM_COMMANDER_ADVICE[0];
+      else if (lg.morale > 80) advice = CASTRUM_COMMANDER_ADVICE[1];
+      else advice = CASTRUM_COMMANDER_ADVICE[floor(random(CASTRUM_COMMANDER_ADVICE.length))];
+    } else { advice = 'Build your army, commander.'; }
+    addFloatingText(w2sX(cmdX), w2sY(cmdY) - 20, advice, '#ffd080');
+    if (snd) snd.playSFX('click');
+    return true;
+  }
+  // Flag Holder — recover fallen banner
+  var fhX = R.cx + R.hw * 0.55, fhY = R.cy - R.hh + 30;
+  if (dist(state.player.x, state.player.y, fhX, fhY) < 40) {
+    if (state.legia && state.legia._fallenBanner) {
+      state.legia._fallenBanner = false;
+      addFloatingText(w2sX(fhX), w2sY(fhY) - 20, 'Standard recovered!', '#ffd700');
+      spawnParticles(state.player.x, state.player.y, 'divine', 6);
+      if (snd) snd.playSFX('crystal');
+    } else {
+      addFloatingText(w2sX(fhX), w2sY(fhY) - 20, 'Your faction standard.', '#ddccaa');
+    }
+    return true;
+  }
+  return false;
+}
+
+function drawFactionStandard(x, y, faction, scale) {
+  var sc = scale || 1, fm = FACTION_MILITARY[faction] || FACTION_MILITARY.rome;
+  noStroke(); fill(120,100,60); rect(x, y - 20 * sc, 2 * sc, 25 * sc);
+  var flutter = sin(frameCount * 0.08 + x * 0.1) * 3;
+  fill(fm.cape[0], fm.cape[1], fm.cape[2]);
+  quad(x + 2*sc, y - 18*sc, x + 14*sc + flutter, y - 16*sc,
+       x + 12*sc + flutter, y - 6*sc, x + 2*sc, y - 8*sc);
+  fill(fm.tunic[0], fm.tunic[1], fm.tunic[2], 180);
+  textSize(5 * sc); textAlign(CENTER,CENTER);
+  var sym = faction === 'rome' ? 'E' : faction === 'carthage' ? 'C' : faction === 'egypt' ? 'O' :
+            faction === 'greece' ? 'A' : faction === 'seapeople' ? '~' : faction === 'persia' ? 'F' :
+            faction === 'phoenicia' ? 'S' : 'D';
+  text(sym, x + 8*sc + flutter*0.5, y - 12*sc);
+  fill(200,170,50); circle(x + 1*sc, y - 20*sc, 3*sc);
 }
 
 function drawPyramid() {
@@ -8641,8 +9112,12 @@ function drawWorldObjectsSorted() {
       }
     }
   }
-  // Legion soldiers on home island
+  // Legion soldiers on home island (ambient garrison)
   if (state.legia && state.legia.soldiers) state.legia.soldiers.forEach(s => _sortItems.push({ y: s.y, draw: () => drawLegionAmbientSoldier(s) }));
+  // Army escort following player
+  if (state.legia && state.legia.army && typeof drawEscortSoldier === 'function') {
+    state.legia.army.filter(u => !u._assignedOfficer && u.x).slice(0, 20).forEach(u => _sortItems.push({ y: u.y, draw: () => drawEscortSoldier(u) }));
+  }
   // Characters — gated by progression
   if (fullyUnlocked || prog.companionsAwakened.lares)
     _sortItems.push({ y: state.companion.y, draw: drawCompanion });
@@ -11894,6 +12369,11 @@ function updateRowing(dt) {
 
   let rowSpeed = 3.5 * getFactionData().sailSpeedMult;
   if (typeof hasTech === 'function' && hasTech('celestial_navigation')) rowSpeed *= 1.15;
+  if (state.naval) {
+    let _windMult = 0.5 + cos(r.angle - (state.naval.wind ? state.naval.wind.angle : 0)) * 0.5;
+    rowSpeed *= (1 + (state.naval.sailLevel || 0) * 0.15);
+    rowSpeed *= (0.6 + _windMult * 0.4);
+  }
   if (dx !== 0 || dy !== 0) {
     let len = sqrt(dx * dx + dy * dy);
     r.speed = lerp(r.speed, rowSpeed, 0.05);
@@ -12414,6 +12894,18 @@ function drawRowingBoat() {
     pop();
   }
 
+  // Army units as tiny dots on ship deck
+  if (state.legia && state.legia.army && state.legia.army.length > 0) {
+    let _am = getFactionMilitary();
+    noStroke();
+    let armyN = min(state.legia.army.length, 12);
+    for (let i = 0; i < armyN; i++) {
+      fill(_am.tunic[0], _am.tunic[1], _am.tunic[2]);
+      let dx = floor(-15 + (i % 4) * 8), dy = floor(-2 + floor(i / 4) * 5);
+      rect(floor(sx) + dx, floor(sy + bob) + dy, 3, 3);
+    }
+  }
+
   // Legion formation behind boat when marching
   if (state.legia && state.legia.marching && state.legia.soldiers) {
     let boatX = floor(sx);
@@ -12430,6 +12922,11 @@ function drawRowingBoat() {
       fill(_bm.helm[0], _bm.helm[1], _bm.helm[2]);
       rect(boatX + ox, boatY + oy - 2, 4, 2);
     });
+    // Flag bearer standard in formation (front)
+    if (state.legia.army && state.legia.army.some(u => u.type === 'flag_bearer')) {
+      let fbx = boatX - 8, fby = boatY + 4;
+      if (typeof drawFactionStandard === 'function') drawFactionStandard(fbx, fby, state.faction || 'rome', 0.6);
+    }
   }
 }
 
@@ -18066,14 +18563,9 @@ function handleLegiaKey(k) {
   if (k === '5' && typeof trainUnit === 'function') { trainUnit('siege_ram'); return true; }
   // [6] Train centurion (level 5+)
   if (k === '6' && typeof trainUnit === 'function') { trainUnit('centurion'); return true; }
-  // [G] Toggle all garrison/deploy
+  // [G] Cycle formation
   if (k === 'g' || k === 'G') {
-    if (typeof setAllGarrison === 'function') {
-      let deployed = typeof getDeployedCount === 'function' ? getDeployedCount() : 0;
-      setAllGarrison(deployed > 0);
-      let garr = typeof getGarrisonCount === 'function' ? getGarrisonCount() : 0;
-      addFloatingText(width / 2, height * 0.3, garr > 0 ? 'All garrisoned' : 'All deployed', '#cc8844');
-    }
+    if (typeof cycleFormation === 'function') cycleFormation();
     return true;
   }
   return false;
@@ -18121,7 +18613,7 @@ function drawLegionPatrol() {
     push();
     fill(255, 255, 255, 200); noStroke();
     textAlign(CENTER, CENTER); textSize(10);
-    text('[E] Enter Barracks', w2sX(cx), w2sY(gateY) - 20 + floatOffset);
+    text('[E] Enter ' + getFactionTerms().barracks, w2sX(cx), w2sY(gateY) - 20 + floatOffset);
     pop();
   }
 }
@@ -19160,6 +19652,15 @@ function initNations() {
     }
   }
 
+  // Determine which factions are controlled by human players (MP lobby)
+  let humanFactions = {};
+  if (typeof LOBBY !== 'undefined' && LOBBY.remotePlayers) {
+    for (let pid in LOBBY.remotePlayers) {
+      let rp = LOBBY.remotePlayers[pid];
+      if (rp.faction) humanFactions[rp.faction] = { isHuman: true, humanName: rp.name || 'Player', peerId: pid };
+    }
+  }
+
   for (let k of allKeys) {
     if (k === playerFaction) continue;
     state.nations[k] = makeNation(k);
@@ -19168,6 +19669,12 @@ function initNations() {
       state.nations[k].isBot = true;
       state.nations[k].botDifficulty = botFactions[k].difficulty;
       state.nations[k].botName = botFactions[k].botName;
+    }
+    // Tag human-controlled nations
+    if (humanFactions[k]) {
+      state.nations[k].isHuman = true;
+      state.nations[k].humanName = humanFactions[k].humanName;
+      state.nations[k].peerId = humanFactions[k].peerId;
     }
   }
   let nationKeys = Object.keys(state.nations);
@@ -21022,6 +21529,10 @@ function drawNationIslandEntities() {
   // Faction wildlife on nation island
   if (ni.wildlife) { for (let w of ni.wildlife) drawOneFactionCreature(w); }
 
+  // Army escort on nation island
+  if (state.legia && state.legia.army && typeof drawEscortSoldier === 'function') {
+    state.legia.army.filter(u => !u._assignedOfficer && u.x).slice(0, 20).forEach(u => drawEscortSoldier(u));
+  }
   // Draw player
   drawPlayer();
   pop();
@@ -23678,6 +24189,8 @@ function mousePressed() {
     if (state._mpTradeOffer && MP.handleTradeOfferClick(mouseX, mouseY)) return;
     if (MP.handleRivalPanelClick(mouseX, mouseY)) return;
   }
+  // Shipyard click
+  if (typeof handleShipyardClick === 'function' && handleShipyardClick()) return;
   // Army battle — allow clicks during deploy for formation picker
   if (typeof _armyBattle !== 'undefined' && _armyBattle) {
     if (typeof handleArmyBattleClick === 'function') handleArmyBattleClick(mouseX, mouseY);
@@ -24362,10 +24875,18 @@ function keyPressed() {
       camSmooth.x = state.player.x; camSmooth.y = state.player.y - height * 0.12;
       return;
     }
+    if (state.insideCastrum) {
+      state.insideCastrum = false;
+      state.player.x = state._castrumReturnX || (state.legia ? state.legia.castrumX : WORLD.islandCX);
+      state.player.y = state._castrumReturnY || (state.legia ? state.legia.castrumY + 50 : WORLD.islandCY);
+      camSmooth.x = state.player.x; camSmooth.y = state.player.y - height * 0.12;
+      return;
+    }
     if (wardrobeOpen) { wardrobeOpen = false; return; }
     if (dialogState.active) { dialogState.active = false; return; }
     if (state.expeditionModifierSelect) { state.expeditionModifierSelect = false; return; }
     if (state.upgradeShopOpen) { state.upgradeShopOpen = false; return; }
+    if (typeof _shipyardOpen !== 'undefined' && _shipyardOpen) { closeShipyard(); return; }
     if (state.nightMarket && state.nightMarket.shopOpen) { state.nightMarket.shopOpen = false; return; }
     if (state.ship && state.ship.shopOpen) { state.ship.shopOpen = false; return; }
     if (state.tradeRouteUI) { state.tradeRouteUI = false; return; }
@@ -24698,6 +25219,10 @@ function keyPressed() {
     return;
   }
 
+  // Naval combat — SPACE fires cannons, E boards when sailing
+  if (state.rowing && state.rowing.active) {
+    if (key === ' ' && typeof playerFireCannons === 'function') { playerFireCannons(); return; }
+  }
   // Adventure mode keys
   if (state.adventure.active) {
     // Attack
@@ -24747,6 +25272,11 @@ function keyPressed() {
     // Temple interior interactions (advisor, jester, pet, altar)
     if (state.insideTemple) {
       _templeRoomInteractE();
+      return;
+    }
+    // Castrum interior interactions
+    if (state.insideCastrum) {
+      _castrumRoomInteractE();
       return;
     }
     // Dive — E near water, but NOT if near the rowboat
@@ -24918,6 +25448,8 @@ function keyPressed() {
     if (state.rowing.active) {
       let r = state.rowing;
       // Dock at nearby island
+      // Board enemy ship if boarding target available
+      if (state.naval && state.naval.boardingTarget && typeof startBoardingCombat === 'function') { startBoardingCombat(); return; }
       if (r.nearIsle === 'arena') { enterAdventure(); return; }
       if (r.nearIsle === 'conquest') {
         if (state.conquest.colonized) {
@@ -24956,6 +25488,11 @@ function keyPressed() {
       state.player.vy = 0;
       addFloatingText(width / 2, height * 0.35, 'Back on solid ground', C.textBright);
       return;
+    }
+    // Shipyard interaction — E near shipyard building
+    if (typeof openShipyard === 'function' && !state.rowing.active) {
+      let _syB = (state.buildings || []).find(b => b.type === 'shipyard' && dist(state.player.x, state.player.y, b.x, b.y) < 60);
+      if (_syB) { openShipyard(); return; }
     }
     // Check if near rowboat at pier (pier extends left from port) — gate behind villa
     let _canBoard = !state.progression.gameStarted || state.progression.villaCleared;
@@ -25098,7 +25635,21 @@ function keyPressed() {
     // Legia castrum interaction — gate is on south side of building
     if (state.legia && state.legia.castrumLevel > 0 &&
         dist(state.player.x, state.player.y, state.legia.castrumX, state.legia.castrumY + 50) < 40) {
-      state.legia.legiaUIOpen = !state.legia.legiaUIOpen;
+      if (!state.insideCastrum && !_doorTransition) {
+        if (snd) snd.playSFX('door_creak');
+        state.player.vx = 0; state.player.vy = 0; state.player.moving = false;
+        state._castrumReturnX = state.player.x;
+        state._castrumReturnY = state.player.y;
+        startDoorTransition(function() {
+          state.insideCastrum = true;
+          state.player.x = CASTRUM_ROOM.cx;
+          state.player.y = CASTRUM_ROOM.cy + CASTRUM_ROOM.hh * 0.5;
+          state.player.vx = 0; state.player.vy = 0; state.player.moving = false;
+          camSmooth.x = CASTRUM_ROOM.cx; camSmooth.y = CASTRUM_ROOM.cy - height * 0.06;
+          var ft2 = getFactionTerms();
+          addFloatingText(width / 2, height * 0.3, 'Entering ' + ft2.barracks, '#ddccaa');
+        });
+      }
       return;
     }
     // Night market interaction
@@ -26178,6 +26729,7 @@ function saveGame() {
     islandLevel: state.islandLevel, islandRX: state.islandRX, islandRY: state.islandRY, islandName: state.islandName || null,
     pyramidLevel: state.pyramid.level,
     insideTemple: false,
+    insideCastrum: false,
     playerX: state.player.x, playerY: state.player.y, playerFacing: state.player.facing,
     playerXp: state.player.xp, playerTotalXp: state.player.totalXp,
     playerLevel: state.player.level, playerSkillPoints: state.player.skillPoints, playerDefense: state.player.defense || 2, playerLevelAtk: state.player.levelAtk || 0,
@@ -26323,6 +26875,7 @@ function saveGame() {
     god: state.god || { faction: null, prayerCooldown: 0, ultimateCharge: 0, blessingActive: null, blessingTimer: 0 },
     // Wardrobe cosmetics
     wardrobe: state.wardrobe || { tunicColor: 0, headwear: 0 },
+    naval: state.naval ? { shipHP: state.naval.shipHP, shipMaxHP: state.naval.shipMaxHP, cannonDamage: state.naval.cannonDamage, hullLevel: state.naval.hullLevel || 0, cannonLevel: state.naval.cannonLevel || 0, sailLevel: state.naval.sailLevel || 0 } : null,
     // Victory
     won: state.won || false,
     achievements: state.achievements || [],
@@ -26890,6 +27443,7 @@ function loadGame() {
     if (typeof initFactionNaturals === 'function') initFactionNaturals();
     // Wardrobe cosmetics
     state.wardrobe = d.wardrobe || { tunicColor: 0, headwear: 0 };
+    if (d.naval) { state.naval.shipHP = d.naval.shipHP || 100; state.naval.shipMaxHP = d.naval.shipMaxHP || 100; state.naval.cannonDamage = d.naval.cannonDamage || 15; state.naval.hullLevel = d.naval.hullLevel || 0; state.naval.cannonLevel = d.naval.cannonLevel || 0; state.naval.sailLevel = d.naval.sailLevel || 0; }
     // Research / Technology
     if (d.research) {
       state.research = {

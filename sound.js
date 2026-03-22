@@ -904,6 +904,7 @@ class SoundManager {
       else if (state.plenty && state.plenty.active) island = 'plenty';
       else if (state.necropolis && state.necropolis.active) island = 'necropolis';
       else if (state.visitingNation) island = 'nation';
+      if (state.insideTemple) island = 'temple';
     }
     this._islandAmbient = island;
 
