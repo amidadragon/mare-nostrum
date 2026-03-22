@@ -675,22 +675,21 @@ function drawMoonPhased(bright) {
 
   // Moonlight glow on water/ground (stronger at full moon)
   let fullness = 1 - abs(phase - 0.5) * 2; // 0 at new, 1 at full
-  let glowR = 4 + fullness * 3; // much smaller glow
-  fill(140, 170, 210, moonAlpha * 0.04 * fullness);
-  ellipse(moonX, moonY, glowR * 2.5, glowR * 2);
-  fill(160, 185, 220, moonAlpha * 0.02 * fullness);
-  ellipse(moonX, moonY, glowR * 3.5, glowR * 2.5);
+  // Subtle glow (barely visible)
+  let glowR = 2 + fullness * 2;
+  fill(140, 170, 210, moonAlpha * 0.02 * fullness);
+  ellipse(moonX, moonY, glowR * 2, glowR * 1.5);
 
-  // Pixel cross glow (smaller)
-  fill(180, 200, 230, moonAlpha * 0.1 * (0.3 + fullness * 0.7));
-  rect(moonX - 1, moonY - 8, 2, 16);
-  rect(moonX - 8, moonY - 1, 16, 2);
+  // Tiny cross glow
+  fill(180, 200, 230, moonAlpha * 0.06 * (0.3 + fullness * 0.7));
+  rect(moonX, moonY - 4, 1, 8);
+  rect(moonX - 4, moonY, 8, 1);
 
-  // Moon body (~16px)
+  // Moon body (~8px, small crescent)
   fill(220, 225, 235, moonAlpha);
-  rect(moonX - 6, moonY - 8, 12, 16);
-  rect(moonX - 8, moonY - 6, 16, 12);
-  rect(moonX - 7, moonY - 7, 14, 14);
+  rect(moonX - 3, moonY - 4, 6, 8);
+  rect(moonX - 4, moonY - 3, 8, 6);
+  rect(moonX - 3, moonY - 3, 7, 7);
 
   // Phase shadow — crescent moves based on phase
   if (phase < 0.45 || phase > 0.55) {
