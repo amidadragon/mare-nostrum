@@ -21654,7 +21654,13 @@ function enterNationIsland(key) {
   let rv = state.nations[key];
   if (!rv || rv.defeated) return;
   state.visitingNation = key;
-  state.nationIsland = generateNationIslandContent(key);
+  // Persistent islands: restore from cache if previously visited
+  if (rv._islandCache) {
+    state.nationIsland = rv._islandCache;
+  } else {
+    state.nationIsland = generateNationIslandContent(key);
+    rv._islandCache = state.nationIsland;
+  }
   state.rowing.active = false;
   let ni = state.nationIsland;
   let p = state.player;
@@ -21673,6 +21679,10 @@ function exitNationIsland() {
   let key = state.visitingNation;
   if (!key) return;
   let rv = state.nations[key];
+  // Save island state back to cache so changes persist
+  if (rv && state.nationIsland) {
+    rv._islandCache = state.nationIsland;
+  }
   state.visitingNation = null;
   state.nationIsland = null;
   state.nationDiplomacyOpen = null;
