@@ -17575,7 +17575,7 @@ function drawConquestDistantEntities() {
 // ─── ARENA DRAWING ───────────────────────────────────────────────────────
 
 function drawArenaIsleDistant() {
-  // Draw the arena as a nearby small island north of home
+  // Draw the arena as a proper island with layered coastline (same technique as main island)
   if (state.adventure.active) return;
   let a = state.adventure;
   let sx = w2sX(a.isleX);
@@ -17596,95 +17596,122 @@ function drawArenaIsleDistant() {
   let fsx = floor(sx), fsy = floor(sy);
   let rx = a.isleRX, ry = a.isleRY;
   let bright = getSkyBrightness();
+  let dayMix = max(0.15, bright);
   let aLv = getArenaLevel();
 
-  // Deep water shadow
-  fill(20, 60, 80, 35);
-  ellipse(fsx + 2, fsy + 3, rx * 2.3, ry * 2.3);
-  // Shore water ring
-  fill(55, 140, 160, 50);
-  ellipse(fsx, fsy, rx * 2.2, ry * 2.2);
-  // Beach sand
-  fill(210, 195, 150);
-  ellipse(fsx, fsy, rx * 2.05, ry * 2.05);
-  // Grass/terrain
-  fill(135, 155, 95);
-  ellipse(fsx, fsy, rx * 1.8, ry * 1.8);
+  // --- Shallow water gradient (same layered approach as main island) ---
+  // Opaque base — blocks deep ocean from bleeding through
+  fill(lerp(18, 42, dayMix), lerp(45, 130, dayMix), lerp(68, 170, dayMix));
+  drawArenaCoastShape(fsx, fsy, rx * 1.12, ry * 1.12, -4);
+  // Outermost shallow water
+  fill(lerp(20, 48, dayMix), lerp(50, 140, dayMix), lerp(75, 180, dayMix), 180);
+  drawArenaCoastShape(fsx, fsy, rx * 1.12, ry * 1.12, -4);
+  // Mid shallow — turquoise
+  fill(lerp(25, 60, dayMix), lerp(65, 160, dayMix), lerp(85, 190, dayMix), 200);
+  drawArenaCoastShape(fsx, fsy, rx * 1.06, ry * 1.06, -5);
+  // Inner shallow — bright warm turquoise
+  fill(lerp(30, 80, dayMix), lerp(75, 175, dayMix), lerp(88, 192, dayMix), 210);
+  drawArenaCoastShape(fsx, fsy, rx * 1.0, ry * 1.0, -6);
+  // Near-shore — lightest aqua
+  fill(lerp(38, 95, dayMix), lerp(85, 185, dayMix), lerp(92, 190, dayMix), 220);
+  drawArenaCoastShape(fsx, fsy, rx * 0.96, ry * 0.96, -6);
 
-  // Arena structure by level
+  // Foam dots at waterline
+  let foamPhase = frameCount * 0.02;
+  let _foamStep = 0.6;
+  for (let fa = 0; fa < TWO_PI; fa += _foamStep) {
+    let foamPulse = sin(foamPhase + fa * 3) * 0.008;
+    let fBase = _getArenaCoastRadiusAtAngle(fa, rx * 0.93, ry * 0.93);
+    let ffx = fsx + cos(fa) * (fBase.rx + foamPulse * rx);
+    let ffy = (fsy - 6 * abs(sin(fa))) + sin(fa) * (fBase.ry + foamPulse * ry);
+    fill(255, 255, 255, 35 + sin(foamPhase + fa * 5) * 18);
+    ellipse(ffx, ffy, 5 + sin(fa * 2.7) * 2, 2);
+  }
+
+  // --- Cliff edge (rock band) ---
+  fill(130, 115, 88);
+  drawArenaCoastShape(fsx, fsy, rx * 0.92, ry * 0.92, -3);
+  fill(155, 140, 110);
+  drawArenaCoastShape(fsx, fsy, rx * 0.91, ry * 0.91, -4);
+
+  // --- Beach sand layers ---
+  fill(190, 170, 140);
+  drawArenaCoastShape(fsx, fsy, rx * 0.90, ry * 0.90, -5);
+  fill(225, 205, 165);
+  drawArenaCoastShape(fsx, fsy, rx * 0.88, ry * 0.88, -6);
+  fill(235, 218, 178);
+  drawArenaCoastShape(fsx, fsy, rx * 0.85, ry * 0.85, -7);
+
+  // --- Grass surface ---
+  let sg = typeof getSeasonGrass === 'function' ? getSeasonGrass() : { r: 90, g: 130, b: 70 };
+  fill(sg.r + 15, sg.g + 15, sg.b + 15);
+  drawArenaCoastShape(fsx, fsy, rx * 0.82, ry * 0.82, -8);
+  fill(sg.r, sg.g, sg.b);
+  drawArenaCoastShape(fsx, fsy, rx * 0.78, ry * 0.78, -9);
+  // Darker grass center
+  fill(sg.r - 12, sg.g - 12, sg.b - 10);
+  drawArenaCoastShape(fsx, fsy, rx * 0.72, ry * 0.72, -10);
+
+  // Arena structure by level (drawn on top of grass)
   if (aLv === 1) {
-    // Simple fighting pit — dirt circle with wooden stakes
     fill(185, 170, 130);
-    ellipse(fsx, fsy, rx * 1.2, ry * 1.2);
+    ellipse(fsx, fsy - 9, rx * 1.2, ry * 1.2);
     fill(170, 155, 115);
-    ellipse(fsx, fsy, rx * 0.9, ry * 0.9);
-    // Wooden stakes around pit
+    ellipse(fsx, fsy - 9, rx * 0.9, ry * 0.9);
     fill(110, 80, 40);
     for (let i = 0; i < 12; i++) {
       let ang = i * TWO_PI / 12;
       let stx = fsx + cos(ang) * rx * 0.55;
-      let sty = fsy + sin(ang) * ry * 0.55;
+      let sty = fsy - 9 + sin(ang) * ry * 0.55;
       rect(stx - 1, sty - 6, 2, 8);
     }
   } else if (aLv === 2) {
-    // Stone arena with seating walls
     fill(155, 145, 125);
-    ellipse(fsx, fsy, rx * 1.4, ry * 1.4);
+    ellipse(fsx, fsy - 9, rx * 1.4, ry * 1.4);
     fill(145, 135, 110);
-    ellipse(fsx, fsy, rx * 1.2, ry * 1.2);
-    // Sand floor
+    ellipse(fsx, fsy - 9, rx * 1.2, ry * 1.2);
     fill(195, 180, 140);
-    ellipse(fsx, fsy, rx * 0.9, ry * 0.9);
-    // Stone wall blocks
+    ellipse(fsx, fsy - 9, rx * 0.9, ry * 0.9);
     fill(120, 110, 95);
     for (let i = 0; i < 16; i++) {
       let ang = i * TWO_PI / 16;
       let wx = fsx + cos(ang) * rx * 0.65;
-      let wy = fsy + sin(ang) * ry * 0.65;
+      let wy = fsy - 9 + sin(ang) * ry * 0.65;
       rect(wx - 3, wy - 4, 6, 6, 1);
     }
   } else if (aLv === 3) {
-    // Colosseum-style with arches and tiers
     fill(160, 150, 130);
-    ellipse(fsx, fsy, rx * 1.5, ry * 1.5);
-    // Seating tiers
+    ellipse(fsx, fsy - 9, rx * 1.5, ry * 1.5);
     fill(150, 140, 120);
-    ellipse(fsx, fsy, rx * 1.35, ry * 1.35);
+    ellipse(fsx, fsy - 9, rx * 1.35, ry * 1.35);
     fill(140, 130, 110);
-    ellipse(fsx, fsy, rx * 1.2, ry * 1.2);
-    // Sand floor
+    ellipse(fsx, fsy - 9, rx * 1.2, ry * 1.2);
     fill(200, 185, 145);
-    ellipse(fsx, fsy, rx * 0.85, ry * 0.85);
-    // Arched walls
+    ellipse(fsx, fsy - 9, rx * 0.85, ry * 0.85);
     fill(115, 105, 90);
     for (let i = 0; i < 20; i++) {
       let ang = i * TWO_PI / 20;
       let wx = fsx + cos(ang) * rx * 0.72;
-      let wy = fsy + sin(ang) * ry * 0.72;
+      let wy = fsy - 9 + sin(ang) * ry * 0.72;
       rect(wx - 3, wy - 6, 6, 9, 1);
     }
-    // Arch openings at cardinal points
     fill(200, 185, 145);
     for (let ga of [0, HALF_PI, PI, PI + HALF_PI]) {
       let gx = fsx + cos(ga) * rx * 0.72;
-      let gy = fsy + sin(ga) * ry * 0.72;
+      let gy = fsy - 9 + sin(ga) * ry * 0.72;
       ellipse(gx, gy - 2, 10, 8);
     }
   } else {
-    // Grand amphitheater with faction decorations
     fill(165, 155, 135);
-    ellipse(fsx, fsy, rx * 1.6, ry * 1.6);
-    // Multiple seating tiers
+    ellipse(fsx, fsy - 9, rx * 1.6, ry * 1.6);
     fill(155, 145, 125);
-    ellipse(fsx, fsy, rx * 1.45, ry * 1.45);
+    ellipse(fsx, fsy - 9, rx * 1.45, ry * 1.45);
     fill(145, 135, 115);
-    ellipse(fsx, fsy, rx * 1.3, ry * 1.3);
+    ellipse(fsx, fsy - 9, rx * 1.3, ry * 1.3);
     fill(135, 125, 105);
-    ellipse(fsx, fsy, rx * 1.15, ry * 1.15);
-    // Sand floor
+    ellipse(fsx, fsy - 9, rx * 1.15, ry * 1.15);
     fill(205, 190, 150);
-    ellipse(fsx, fsy, rx * 0.8, ry * 0.8);
-    // Grand arched wall ring
+    ellipse(fsx, fsy - 9, rx * 0.8, ry * 0.8);
     fill(110, 100, 85);
     for (let i = 0; i < 24; i++) {
       let ang = i * TWO_PI / 24;
@@ -17694,25 +17721,23 @@ function drawArenaIsleDistant() {
       }
       if (isGate) continue;
       let wx = fsx + cos(ang) * rx * 0.78;
-      let wy = fsy + sin(ang) * ry * 0.78;
+      let wy = fsy - 9 + sin(ang) * ry * 0.78;
       rect(wx - 3, wy - 8, 7, 12, 1);
     }
-    // Columns at 8 points
     fill(195, 185, 165);
     for (let i = 0; i < 8; i++) {
       let ca = (i / 8) * TWO_PI + PI / 8;
       let cx = fsx + cos(ca) * rx * 0.7;
-      let cy = fsy + sin(ca) * ry * 0.7;
+      let cy = fsy - 9 + sin(ca) * ry * 0.7;
       rect(cx - 2, cy - 14, 4, 16);
-      rect(cx - 4, cy - 16, 8, 3, 1); // capital
+      rect(cx - 4, cy - 16, 8, 3, 1);
     }
-    // Faction-colored banners
     let fc = typeof getFactionColors === 'function' ? getFactionColors() : { accent: [160, 35, 25] };
     let ac = fc.accent || [160, 35, 25];
     for (let bi = 0; bi < 4; bi++) {
       let ba = bi * HALF_PI + PI / 4;
       let bx = fsx + cos(ba) * rx * 0.85;
-      let by = fsy + sin(ba) * ry * 0.85;
+      let by = fsy - 9 + sin(ba) * ry * 0.85;
       fill(ac[0], ac[1], ac[2], 200);
       rect(bx - 3, by - 10, 6, 8);
       fill(100, 80, 45);
@@ -17726,7 +17751,7 @@ function drawArenaIsleDistant() {
     for (let ti = 0; ti < 4; ti++) {
       let ta = ti * HALF_PI + PI / 4;
       let tx = fsx + cos(ta) * rx * 0.6;
-      let ty = fsy + sin(ta) * ry * 0.6;
+      let ty = fsy - 9 + sin(ta) * ry * 0.6;
       let fl = sin(frameCount * 0.18 + ti * 2) * 2;
       fill(255, 200, 60, 180 * nightA);
       ellipse(tx, ty - 4 + fl, 6, 8);
@@ -17735,7 +17760,7 @@ function drawArenaIsleDistant() {
     }
   }
 
-  // Water reflection
+  // Water reflection below island
   fill(30 + 20 * bright, 60 + 40 * bright, 80 + 30 * bright, 12);
   ellipse(fsx, fsy + ry * 1.2, rx * 2.0, ry * 0.4);
   pop();

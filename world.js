@@ -65,6 +65,60 @@ function drawCoastlineShape(screenCX, screenCY, radiusX, radiusY, yOffset) {
   endShape(CLOSE);
 }
 
+// ─── ARENA ISLAND COASTLINE ──────────────────────────────────────────────
+let _arenaCoastVerts = null;
+
+function getArenaCoastVerts() {
+  if (_arenaCoastVerts) return _arenaCoastVerts;
+  _arenaCoastVerts = [];
+  let numVerts = 64; // fewer verts than main island (smaller)
+  let nSeed = 87; // different seed from main island
+  for (let i = 0; i < numVerts; i++) {
+    let angle = (i / numVerts) * TWO_PI;
+    let nv = noise(cos(angle) * 2.5 + nSeed, sin(angle) * 2.5 + nSeed);
+    let nv2 = noise(cos(angle) * 1.2 + nSeed + 50, sin(angle) * 1.2 + nSeed + 50);
+    let offset = (nv - 0.5) * 0.14 + (nv2 - 0.5) * 0.08;
+    // Slight north indent (rocky), south bulge (beach facing home)
+    let sy = Math.sin(angle);
+    offset += sy * 0.025;
+    // Small west bump
+    let wDist = Math.abs(angle - Math.PI);
+    if (wDist < 0.4) offset += (0.4 - wDist) / 0.4 * 0.06;
+    // East indent
+    let eDist = Math.abs(angle - 0.3);
+    if (eDist < 0.3) offset -= (0.3 - eDist) / 0.3 * 0.05;
+    _arenaCoastVerts.push({ angle: angle, offset: offset });
+  }
+  return _arenaCoastVerts;
+}
+
+function drawArenaCoastShape(screenCX, screenCY, radiusX, radiusY, yOffset) {
+  let verts = getArenaCoastVerts();
+  beginShape();
+  for (let i = 0; i < verts.length; i++) {
+    let v = verts[i];
+    let r = 1 + v.offset;
+    let vx = screenCX + cos(v.angle) * radiusX * r;
+    let yOff = yOffset * abs(sin(v.angle));
+    let vy = (screenCY + yOff) + sin(v.angle) * radiusY * r;
+    vertex(vx, vy);
+  }
+  endShape(CLOSE);
+}
+
+function _getArenaCoastRadiusAtAngle(angle, baseRX, baseRY) {
+  let verts = getArenaCoastVerts();
+  let numVerts = verts.length;
+  let normAngle = ((angle % TWO_PI) + TWO_PI) % TWO_PI;
+  let idx = (normAngle / TWO_PI) * numVerts;
+  let i0 = Math.floor(idx) % numVerts;
+  let i1 = (i0 + 1) % numVerts;
+  let t = idx - Math.floor(idx);
+  let offset = verts[i0].offset * (1 - t) + verts[i1].offset * t;
+  let r = 1 + offset;
+  return { rx: baseRX * r, ry: baseRY * r };
+}
+
 function _getCoastlineRadiusAtAngle(angle, baseRX, baseRY) {
   let verts = getCoastlineVerts();
   // Find the two closest verts and interpolate
