@@ -499,7 +499,7 @@ const EVENT_DEFS = [
     duration: 600,     // brief tremor ~10 seconds
     cooldown: 12,
     oneShot: false,
-    eligible() { return (state.islandLevel || 1) >= 3; },
+    eligible() { return (state.islandLevel || 1) >= 8; },
     onStart() {
       triggerScreenShake(8, 60);
       addFloatingText(width / 2, height * 0.22, 'Earthquake! The island trembles!', '#ff6633');
@@ -513,7 +513,8 @@ const EVENT_DEFS = [
       let damaged = 0;
       if (state.plots) {
         state.plots.forEach(p => {
-          if (p.planted && !p.ripe && p.stage > 0 && random() < 0.3) {
+          let dmgChance = (state.islandLevel || 1) >= 12 ? 0.3 : 0.1;
+          if (p.planted && !p.ripe && p.stage > 0 && random() < dmgChance) {
             p.stage = max(0, p.stage - 1);
             p.timer = 0;
             damaged++;
@@ -781,8 +782,9 @@ function isEventEligible(def) {
 
 function checkRandomEvent() {
   if (state.activeEvent) return;
-  // Balanced frequency: 30% base, +10% if no event in 3+ days
-  let chance = 0.30;
+  // Scaled frequency by island level
+  let lvl = state.islandLevel || 1;
+  let chance = lvl >= 10 ? 0.30 : lvl >= 5 ? 0.20 : 0.10;
   let daysSince = state._daysSinceLastEvent || 0;
   if (daysSince >= 3) chance += 0.10;
   if (daysSince >= 5) chance += 0.15; // catch-up if player hasn't seen anything
@@ -792,7 +794,12 @@ function checkRandomEvent() {
   }
   // Prioritize seasonal events if season just changed
   let seasonDay = state.day % 10; // day within season
-  let eligible = EVENT_DEFS.filter(isEventEligible);
+  let negativeEvents = ["pirate_raid", "earthquake", "storm_surge", "bandit_raid", "summer_drought", "winter_frost"];
+  let eligible = EVENT_DEFS.filter(d => {
+    if (!isEventEligible(d)) return false;
+    if (lvl < 5 && negativeEvents.includes(d.id)) return false;
+    return true;
+  });
   if (!eligible.length) return;
   // Weight seasonal events higher on first 2 days of season
   let picked;

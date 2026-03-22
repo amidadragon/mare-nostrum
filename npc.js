@@ -103,7 +103,7 @@ function getNPCDialogue(npc, lines, linesMid, linesHigh, npcName) {
 
 // ─── NPC DAILY WANTS + FAVOR ─────────────────────────────────────────────
 function getTodayDateString() {
-  return new Date().toISOString().split('T')[0];
+  return 'day-' + (state.day || 0);
 }
 
 function resetDailyWantsIfNeeded() {
@@ -117,7 +117,7 @@ function resetDailyWantsIfNeeded() {
 
 function getNPCDailyWant(npcName) {
   if (typeof getDailyWant === 'function') return getDailyWant(npcName);
-  let daySeed = Math.floor(Date.now() / 86400000);
+  let daySeed = state.day || 0;
   let offsets = { livia: 0, marcus: 3, vesta: 5, felix: 7 };
   let gifts = { livia: 'flower', marcus: 'fish', vesta: 'harvest', felix: 'gold' };
   let offset = offsets[npcName] || 0;
@@ -244,7 +244,7 @@ function drawFavorStars(x, y, npcName) {
 
 // ─── MAX FAVOR ENDGAME REWARDS ───────────────────────────────────────────
 function getMaxFavorReward(npcName) {
-  let daySeed = Math.floor(Date.now() / 86400000);
+  let daySeed = state.day || 0;
   let npcOffset = { livia: 0, marcus: 3, vesta: 5, felix: 7 }[npcName] || 0;
   let rewards = {
     livia: [
