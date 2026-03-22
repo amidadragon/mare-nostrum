@@ -65,60 +65,6 @@ function drawCoastlineShape(screenCX, screenCY, radiusX, radiusY, yOffset) {
   endShape(CLOSE);
 }
 
-// ─── ARENA ISLAND COASTLINE ──────────────────────────────────────────────
-let _arenaCoastVerts = null;
-
-function getArenaCoastVerts() {
-  if (_arenaCoastVerts) return _arenaCoastVerts;
-  _arenaCoastVerts = [];
-  let numVerts = 64; // fewer verts than main island (smaller)
-  let nSeed = 87; // different seed from main island
-  for (let i = 0; i < numVerts; i++) {
-    let angle = (i / numVerts) * TWO_PI;
-    let nv = noise(cos(angle) * 2.5 + nSeed, sin(angle) * 2.5 + nSeed);
-    let nv2 = noise(cos(angle) * 1.2 + nSeed + 50, sin(angle) * 1.2 + nSeed + 50);
-    let offset = (nv - 0.5) * 0.14 + (nv2 - 0.5) * 0.08;
-    // Slight north indent (rocky), south bulge (beach facing home)
-    let sy = Math.sin(angle);
-    offset += sy * 0.025;
-    // Small west bump
-    let wDist = Math.abs(angle - Math.PI);
-    if (wDist < 0.4) offset += (0.4 - wDist) / 0.4 * 0.06;
-    // East indent
-    let eDist = Math.abs(angle - 0.3);
-    if (eDist < 0.3) offset -= (0.3 - eDist) / 0.3 * 0.05;
-    _arenaCoastVerts.push({ angle: angle, offset: offset });
-  }
-  return _arenaCoastVerts;
-}
-
-function drawArenaCoastShape(screenCX, screenCY, radiusX, radiusY, yOffset) {
-  let verts = getArenaCoastVerts();
-  beginShape();
-  for (let i = 0; i < verts.length; i++) {
-    let v = verts[i];
-    let r = 1 + v.offset;
-    let vx = screenCX + cos(v.angle) * radiusX * r;
-    let yOff = yOffset * abs(sin(v.angle));
-    let vy = (screenCY + yOff) + sin(v.angle) * radiusY * r;
-    vertex(vx, vy);
-  }
-  endShape(CLOSE);
-}
-
-function _getArenaCoastRadiusAtAngle(angle, baseRX, baseRY) {
-  let verts = getArenaCoastVerts();
-  let numVerts = verts.length;
-  let normAngle = ((angle % TWO_PI) + TWO_PI) % TWO_PI;
-  let idx = (normAngle / TWO_PI) * numVerts;
-  let i0 = Math.floor(idx) % numVerts;
-  let i1 = (i0 + 1) % numVerts;
-  let t = idx - Math.floor(idx);
-  let offset = verts[i0].offset * (1 - t) + verts[i1].offset * t;
-  let r = 1 + offset;
-  return { rx: baseRX * r, ry: baseRY * r };
-}
-
 function _getCoastlineRadiusAtAngle(angle, baseRX, baseRY) {
   let verts = getCoastlineVerts();
   // Find the two closest verts and interpolate
@@ -603,34 +549,31 @@ function drawDriftClouds(bright) {
         w: random(55, 150),
         h: random(16, 38),
         speed: random(0.06, 0.22),
-        depth: random(0.5, 1), // parallax depth
+        depth: random(0.5, 1),
       });
     }
   }
   noStroke();
 
-  // Cloud color varies by time of day
   let cloudR = 235, cloudG = 240, cloudB = 245;
   let highlightR = 255, highlightG = 255, highlightB = 255;
   let shadowR = 210, shadowG = 218, shadowB = 228;
 
   if (h >= 5 && h < 7) {
-    // Dawn clouds — pink/orange lit undersides
     let dt = map(h, 5, 7, 0, 1);
     cloudR = lerp(180, 235, dt); cloudG = lerp(140, 240, dt); cloudB = lerp(160, 245, dt);
     highlightR = 255; highlightG = lerp(180, 255, dt); highlightB = lerp(160, 255, dt);
     shadowR = lerp(200, 210, dt); shadowG = lerp(120, 218, dt); shadowB = lerp(140, 228, dt);
   } else if (h >= 16.5 && h < 19) {
-    // Sunset clouds — golden/orange/purple
     let dt = map(h, 16.5, 19, 0, 1);
     cloudR = lerp(245, 160, dt); cloudG = lerp(220, 120, dt); cloudB = lerp(200, 140, dt);
     highlightR = lerp(255, 220, dt); highlightG = lerp(240, 150, dt); highlightB = lerp(200, 130, dt);
     shadowR = lerp(220, 100, dt); shadowG = lerp(180, 70, dt); shadowB = lerp(170, 110, dt);
   } else if (h >= 19 || h < 5) {
-    // Night clouds — dark silhouettes
-    cloudR = 30; cloudG = 35; cloudB = 55;
-    highlightR = 50; highlightG = 55; highlightB = 75;
-    shadowR = 15; shadowG = 18; shadowB = 35;
+    // Night clouds — lighter, more transparent (was too dark, looked like blobs)
+    cloudR = 60; cloudG = 65; cloudB = 90;
+    highlightR = 80; highlightG = 85; highlightB = 110;
+    shadowR = 45; shadowG = 50; shadowB = 70;
   }
 
   cloudPositions.forEach(cl => {
@@ -638,26 +581,22 @@ function drawDriftClouds(bright) {
     if (cl.x > width + cl.w) cl.x = -cl.w;
     cl.y -= camDY * 0.04;
     cl.y = constrain(cl.y, height * 0.02, height * 0.22);
-    let alpha = map(bright, 0.1, 0.5, 15, 55) * cl.depth;
+    // Night clouds: much lower alpha to avoid dark blob appearance
+    let nightDim = (h >= 19 || h < 5) ? 0.4 : 1;
+    let alpha = map(bright, 0.1, 0.5, 15, 55) * cl.depth * nightDim;
     let cx = floor(cl.x), cy = floor(cl.y);
     let cw = floor(cl.w), ch = floor(cl.h);
 
-    // Chunky pixel-art cloud — overlapping rects
-    // Main body block
     fill(cloudR, cloudG, cloudB, alpha);
     rect(cx - cw * 0.3, cy - ch * 0.15, cw * 0.6, ch * 0.4);
-    // Top bumps — offset blocks
     fill(highlightR, highlightG, highlightB, alpha * 0.75);
     rect(cx - cw * 0.2, cy - ch * 0.35, cw * 0.3, ch * 0.25);
     rect(cx + cw * 0.05, cy - ch * 0.3, cw * 0.22, ch * 0.2);
-    // Side chunks
     fill(cloudR, cloudG, cloudB, alpha * 0.7);
     rect(cx - cw * 0.45, cy - ch * 0.05, cw * 0.2, ch * 0.25);
     rect(cx + cw * 0.28, cy - ch * 0.05, cw * 0.18, ch * 0.22);
-    // Bottom shadow strip
     fill(shadowR, shadowG, shadowB, alpha * 0.5);
     rect(cx - cw * 0.25, cy + ch * 0.2, cw * 0.5, ch * 0.12);
-    // Highlight block on top
     fill(highlightR, highlightG, highlightB, alpha * 0.35);
     rect(cx - cw * 0.15, cy - ch * 0.38, cw * 0.2, ch * 0.1);
   });

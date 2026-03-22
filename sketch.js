@@ -17556,6 +17556,43 @@ function enemyDeath(e, a) {
 
 // ─── DISTANT ISLAND LABELS & ENTITIES ────────────────────────────────────
 
+// ─── UNIFIED DISTANT ISLAND RENDERER ──────────────────────────────────────
+// All distant islands share this base: water shadow > shallow water > beach > grass
+// Individual renderers call this, then add their own structures on top.
+function drawDistantIslandBase(fsx, fsy, rx, ry, opts) {
+  let bright = (typeof getSkyBrightness === 'function') ? getSkyBrightness() : 0.7;
+  let beachCol = (opts && opts.beachCol) || [215, 195, 155];
+  let grassCol = (opts && opts.grassCol) || null;
+  if (!grassCol) {
+    let sg = (typeof getSeasonGrass === 'function') ? getSeasonGrass() : { r: 90, g: 130, b: 70 };
+    grassCol = [sg.r, sg.g, sg.b];
+  }
+  noStroke();
+  // Water shadow
+  fill(20, 60, 80, 35);
+  ellipse(fsx + 3, fsy + 4, rx * 2.2, ry * 2.2);
+  // Shallow water
+  fill(lerp(40, 80, bright), lerp(80, 160, bright), lerp(110, 185, bright), 200);
+  ellipse(fsx, fsy, rx * 2.1, ry * 2.1);
+  fill(lerp(50, 95, bright), lerp(90, 175, bright), lerp(120, 190, bright), 210);
+  ellipse(fsx, fsy, rx * 1.9, ry * 1.9);
+  // Shore wave animation
+  if (!(opts && opts.noWaves)) {
+    stroke(200, 220, 255, 20 + sin(frameCount * 0.04) * 10);
+    strokeWeight(1.5); noFill();
+    ellipse(fsx, fsy, rx * 1.85 + sin(frameCount * 0.025) * 3, ry * 1.85 + sin(frameCount * 0.025) * 2);
+    noStroke();
+  }
+  // Beach
+  fill(beachCol[0], beachCol[1], beachCol[2]);
+  ellipse(fsx, fsy - 2, rx * 1.7, ry * 1.7);
+  // Grass layers
+  fill(grassCol[0] + 10, grassCol[1] + 10, grassCol[2] + 5);
+  ellipse(fsx, fsy - 3, rx * 1.5, ry * 1.5);
+  fill(grassCol[0], grassCol[1], grassCol[2]);
+  ellipse(fsx, fsy - 4, rx * 1.3, ry * 1.3);
+}
+
 function drawArenaDistantLabel() {
   if (state.adventure.active) return;
   let a = state.adventure;
@@ -17691,47 +17728,24 @@ function drawArenaIsleDistant() {
   }
 
   let sx = w2sX(a.isleX), sy = w2sY(a.isleY);
-  // Player is already confirmed near (swimming, on island, or fighting) from check above
-  if (!a.active && !playerSwimming && !playerOnArena) {
-    let _horizY = max(height * 0.06, height * 0.25 - horizonOffset) + 5;
-    sy = max(sy, _horizY);
-    let _dScale = (typeof _getDistantScale === 'function') ? _getDistantScale(a.isleX, a.isleY, a.isleRX) : null;
-    if (_dScale && _dScale.dist > (typeof _getMaxViewDist === 'function' ? _getMaxViewDist() : 4000)) return;
-  }
   if (sx < -400 || sx > width + 400) return;
   if (sy < -400 || sy > height + 400) return;
 
   push(); noStroke();
   // Only apply distance scaling when far away, not when swimming nearby
-  if (!playerNear) {
+  if (!playerSwimming && !playerOnArena) {
     let _dScale = (typeof _getDistantScale === 'function') ? _getDistantScale(a.isleX, a.isleY, a.isleRX) : null;
     if (_dScale && _dScale.scale < 0.98) {
       translate(sx, sy); scale(_dScale.scale); translate(-sx, -sy);
     }
   }
-  let bright = getSkyBrightness();
   let fsx = floor(sx), fsy = floor(sy);
   // Use combat size when fighting, small size when viewing from distance
   let rx = a.active ? (a.combatRX || 200) : a.isleRX;
   let ry = a.active ? (a.combatRY || 140) : a.isleRY;
 
-  // Water shadow
-  fill(20, 60, 80, 35);
-  ellipse(fsx + 3, fsy + 4, rx * 2.2, ry * 2.2);
-  // Shallow water
-  fill(lerp(40, 80, bright), lerp(80, 160, bright), lerp(110, 185, bright), 200);
-  ellipse(fsx, fsy, rx * 2.1, ry * 2.1);
-  fill(lerp(50, 95, bright), lerp(90, 175, bright), lerp(120, 190, bright), 210);
-  ellipse(fsx, fsy, rx * 1.9, ry * 1.9);
-  // Beach
-  fill(215, 195, 155);
-  ellipse(fsx, fsy - 2, rx * 1.7, ry * 1.7);
-  // Grass
-  let sg = (typeof getSeasonGrass === 'function') ? getSeasonGrass() : { r: 90, g: 130, b: 70 };
-  fill(sg.r + 10, sg.g + 10, sg.b + 5);
-  ellipse(fsx, fsy - 3, rx * 1.5, ry * 1.5);
-  fill(sg.r, sg.g, sg.b);
-  ellipse(fsx, fsy - 4, rx * 1.3, ry * 1.3);
+  // Unified base: water > beach > grass
+  drawDistantIslandBase(fsx, fsy, rx, ry);
 
   // Arena structure (fits INSIDE the grass surface)
   let aLv = (typeof getArenaLevel === 'function') ? getArenaLevel() : 1;
@@ -17799,449 +17813,8 @@ function drawArenaIsleDistant() {
   textAlign(LEFT, TOP);
 
   pop();
-  if (a.bridgeBuilt) drawArenaBridge();
 }
 
-/* OLD drawArenaIsleDistant code deleted - was 200 lines of custom coastline rendering
-   that didn't work with perspective scaling. Replaced with simple ellipse-based renderer
-   matching nation island style. */
-
-function _drawArenaIsleDistant_DELETED() { // placeholder to maintain line numbers
-  if (state.adventure.active) return;
-  let a = state.adventure;
-  let sx = w2sX(a.isleX);
-  let sy = w2sY(a.isleY);
-  // Clamp to horizon — never float above water
-  let _horizY = max(height * 0.06, height * 0.25 - horizonOffset) + 5;
-  sy = max(sy, _horizY);
-  let _dScale = null;
-  if (typeof _getDistantScale === 'function') {
-    _dScale = _getDistantScale(a.isleX, a.isleY, a.isleRX);
-    if (_dScale.dist > (typeof _getMaxViewDist === 'function' ? _getMaxViewDist() : 4000)) return;
-  }
-  if (sx < -300 || sx > width + 300) return;
-  push();
-  noStroke();
-
-  // Perspective scaling: islands higher on screen (closer to horizon) appear smaller
-  // This creates the realistic "far away = small" effect
-  let horizonY = max(height * 0.06, height * 0.25 - (typeof horizonOffset !== 'undefined' ? horizonOffset : 0));
-  let screenBottom = height * 0.85; // where the player's island sits on screen
-  let normalizedDepth = constrain((sy - horizonY) / (screenBottom - horizonY), 0.05, 1.0);
-  // Perspective scale: at horizon = 0.15, at player level = 1.0
-  let perspScale = 0.15 + normalizedDepth * 0.85;
-  // Also apply distance scale if available
-  let distScale = (_dScale && _dScale.scale < 0.98) ? _dScale.scale : 1;
-  let sc = min(perspScale, distScale);
-
-  // Bake perspective scale directly into radii (more reliable than transform)
-  let fsx = floor(sx), fsy = floor(sy);
-  let rx = a.isleRX * sc, ry = a.isleRY * 0.45 * sc;
-  let ysc = sc; // scale yOffsets too so layers don't separate at small sizes
-  let bright = getSkyBrightness();
-  let dayMix = max(0.15, bright);
-  let aLv = getArenaLevel();
-
-  // --- Shallow water gradient (same layered approach as main island) ---
-  fill(lerp(18, 42, dayMix), lerp(45, 130, dayMix), lerp(68, 170, dayMix));
-  drawArenaCoastShape(fsx, fsy, rx * 1.12, ry * 1.12, -4 * ysc);
-  fill(lerp(20, 48, dayMix), lerp(50, 140, dayMix), lerp(75, 180, dayMix), 180);
-  drawArenaCoastShape(fsx, fsy, rx * 1.12, ry * 1.12, -4 * ysc);
-  fill(lerp(25, 60, dayMix), lerp(65, 160, dayMix), lerp(85, 190, dayMix), 200);
-  drawArenaCoastShape(fsx, fsy, rx * 1.06, ry * 1.06, -5 * ysc);
-  fill(lerp(30, 80, dayMix), lerp(75, 175, dayMix), lerp(88, 192, dayMix), 210);
-  drawArenaCoastShape(fsx, fsy, rx * 1.0, ry * 1.0, -6 * ysc);
-  fill(lerp(38, 95, dayMix), lerp(85, 185, dayMix), lerp(92, 190, dayMix), 220);
-  drawArenaCoastShape(fsx, fsy, rx * 0.96, ry * 0.96, -6 * ysc);
-
-  // Foam dots at waterline
-  let foamPhase = frameCount * 0.02;
-  let _foamStep = 0.6;
-  for (let fa = 0; fa < TWO_PI; fa += _foamStep) {
-    let foamPulse = sin(foamPhase + fa * 3) * 0.008;
-    let fBase = _getArenaCoastRadiusAtAngle(fa, rx * 0.93, ry * 0.93);
-    let ffx = fsx + cos(fa) * (fBase.rx + foamPulse * rx);
-    let ffy = (fsy - 6 * ysc * abs(sin(fa))) + sin(fa) * (fBase.ry + foamPulse * ry);
-    fill(255, 255, 255, 35 + sin(foamPhase + fa * 5) * 18);
-    ellipse(ffx, ffy, max(2, 5 * sc), max(1, 2 * sc));
-  }
-
-  // --- Cliff edge (rock band) ---
-  fill(130, 115, 88);
-  drawArenaCoastShape(fsx, fsy, rx * 0.92, ry * 0.92, -3 * ysc);
-  fill(155, 140, 110);
-  drawArenaCoastShape(fsx, fsy, rx * 0.91, ry * 0.91, -4 * ysc);
-
-  // --- Beach sand layers ---
-  fill(190, 170, 140);
-  drawArenaCoastShape(fsx, fsy, rx * 0.90, ry * 0.90, -5 * ysc);
-  fill(225, 205, 165);
-  drawArenaCoastShape(fsx, fsy, rx * 0.88, ry * 0.88, -6 * ysc);
-  fill(235, 218, 178);
-  drawArenaCoastShape(fsx, fsy, rx * 0.85, ry * 0.85, -7 * ysc);
-
-  // --- Grass surface ---
-  let sg = typeof getSeasonGrass === 'function' ? getSeasonGrass() : { r: 90, g: 130, b: 70 };
-  fill(sg.r + 15, sg.g + 15, sg.b + 15);
-  drawArenaCoastShape(fsx, fsy, rx * 0.82, ry * 0.82, -8 * ysc);
-  fill(sg.r, sg.g, sg.b);
-  drawArenaCoastShape(fsx, fsy, rx * 0.78, ry * 0.78, -9 * ysc);
-  fill(sg.r - 12, sg.g - 12, sg.b - 10);
-  drawArenaCoastShape(fsx, fsy, rx * 0.72, ry * 0.72, -10 * ysc);
-
-  // Arena structure by level (drawn on top of grass)
-  if (aLv === 1) {
-    fill(185, 170, 130);
-    ellipse(fsx, fsy - 9 * ysc, rx * 1.2, ry * 1.2);
-    fill(170, 155, 115);
-    ellipse(fsx, fsy - 9 * ysc, rx * 0.9, ry * 0.9);
-    fill(110, 80, 40);
-    for (let i = 0; i < 12; i++) {
-      let ang = i * TWO_PI / 12;
-      let stx = fsx + cos(ang) * rx * 0.55;
-      let sty = fsy - 9 + sin(ang) * ry * 0.55;
-      rect(stx - 1, sty - 6, 2, 8);
-    }
-  } else if (aLv === 2) {
-    fill(155, 145, 125);
-    ellipse(fsx, fsy - 9 * ysc, rx * 1.4, ry * 1.4);
-    fill(145, 135, 110);
-    ellipse(fsx, fsy - 9 * ysc, rx * 1.2, ry * 1.2);
-    fill(195, 180, 140);
-    ellipse(fsx, fsy - 9 * ysc, rx * 0.9, ry * 0.9);
-    fill(120, 110, 95);
-    for (let i = 0; i < 16; i++) {
-      let ang = i * TWO_PI / 16;
-      let wx = fsx + cos(ang) * rx * 0.65;
-      let wy = fsy - 9 + sin(ang) * ry * 0.65;
-      rect(wx - 3, wy - 4, 6, 6, 1);
-    }
-  } else if (aLv === 3) {
-    fill(160, 150, 130);
-    ellipse(fsx, fsy - 9 * ysc, rx * 1.5, ry * 1.5);
-    fill(150, 140, 120);
-    ellipse(fsx, fsy - 9 * ysc, rx * 1.35, ry * 1.35);
-    fill(140, 130, 110);
-    ellipse(fsx, fsy - 9 * ysc, rx * 1.2, ry * 1.2);
-    fill(200, 185, 145);
-    ellipse(fsx, fsy - 9 * ysc, rx * 0.85, ry * 0.85);
-    fill(115, 105, 90);
-    for (let i = 0; i < 20; i++) {
-      let ang = i * TWO_PI / 20;
-      let wx = fsx + cos(ang) * rx * 0.72;
-      let wy = fsy - 9 + sin(ang) * ry * 0.72;
-      rect(wx - 3, wy - 6, 6, 9, 1);
-    }
-    fill(200, 185, 145);
-    for (let ga of [0, HALF_PI, PI, PI + HALF_PI]) {
-      let gx = fsx + cos(ga) * rx * 0.72;
-      let gy = fsy - 9 + sin(ga) * ry * 0.72;
-      ellipse(gx, gy - 2, 10, 8);
-    }
-  } else {
-    fill(165, 155, 135);
-    ellipse(fsx, fsy - 9 * ysc, rx * 1.6, ry * 1.6);
-    fill(155, 145, 125);
-    ellipse(fsx, fsy - 9 * ysc, rx * 1.45, ry * 1.45);
-    fill(145, 135, 115);
-    ellipse(fsx, fsy - 9 * ysc, rx * 1.3, ry * 1.3);
-    fill(135, 125, 105);
-    ellipse(fsx, fsy - 9 * ysc, rx * 1.15, ry * 1.15);
-    fill(205, 190, 150);
-    ellipse(fsx, fsy - 9 * ysc, rx * 0.8, ry * 0.8);
-    fill(110, 100, 85);
-    for (let i = 0; i < 24; i++) {
-      let ang = i * TWO_PI / 24;
-      let isGate = false;
-      for (let ca of [0, HALF_PI, PI, PI + HALF_PI]) {
-        if (abs(ang - ca) < 0.15 || abs(ang - ca - TWO_PI) < 0.15) isGate = true;
-      }
-      if (isGate) continue;
-      let wx = fsx + cos(ang) * rx * 0.78;
-      let wy = fsy - 9 + sin(ang) * ry * 0.78;
-      rect(wx - 3, wy - 8, 7, 12, 1);
-    }
-    fill(195, 185, 165);
-    for (let i = 0; i < 8; i++) {
-      let ca = (i / 8) * TWO_PI + PI / 8;
-      let cx = fsx + cos(ca) * rx * 0.7;
-      let cy = fsy - 9 + sin(ca) * ry * 0.7;
-      rect(cx - 2, cy - 14, 4, 16);
-      rect(cx - 4, cy - 16, 8, 3, 1);
-    }
-    let fc = typeof getFactionColors === 'function' ? getFactionColors() : { accent: [160, 35, 25] };
-    let ac = fc.accent || [160, 35, 25];
-    for (let bi = 0; bi < 4; bi++) {
-      let ba = bi * HALF_PI + PI / 4;
-      let bx = fsx + cos(ba) * rx * 0.85;
-      let by = fsy - 9 + sin(ba) * ry * 0.85;
-      fill(ac[0], ac[1], ac[2], 200);
-      rect(bx - 3, by - 10, 6, 8);
-      fill(100, 80, 45);
-      rect(bx - 0.5, by - 14, 1, 16);
-    }
-  }
-
-  // Torches at night
-  if (bright < 0.35) {
-    let nightA = map(bright, 0, 0.35, 1, 0);
-    for (let ti = 0; ti < 4; ti++) {
-      let ta = ti * HALF_PI + PI / 4;
-      let tx = fsx + cos(ta) * rx * 0.6;
-      let ty = fsy - 9 + sin(ta) * ry * 0.6;
-      let fl = sin(frameCount * 0.18 + ti * 2) * 2;
-      fill(255, 200, 60, 180 * nightA);
-      ellipse(tx, ty - 4 + fl, 6, 8);
-      fill(255, 160, 50, 25 * nightA);
-      ellipse(tx, ty, 30, 18);
-    }
-  }
-
-  // Water reflection below island
-  fill(30 + 20 * bright, 60 + 40 * bright, 80 + 30 * bright, 12);
-  ellipse(fsx, fsy + ry * 1.2, rx * 2.0, ry * 0.4);
-  pop();
-
-  // Draw arena bridge if built
-  drawArenaBridge();
-}
-
-function drawArenaBridge() { } // deprecated — swimming replaced bridge
-
-// drawArena DELETED -- replaced by drawArenaIsleDistant with proper coastline rendering
-function drawArena() { return; /* old arena renderer completely disabled */
-  let a = state.adventure;
-  push();
-
-  let ix = w2sX(a.isleX);
-  let iy = w2sY(a.isleY);
-  noStroke();
-
-  // Deep water shadow beneath island
-  fill(20, 60, 80, 50);
-  ellipse(ix + 5, iy + 8, a.isleRX * 2.3, a.isleRY * 2.3);
-  // Shallow water ring with foam
-  fill(60, 150, 170, 70);
-  ellipse(ix, iy, a.isleRX * 2.25, a.isleRY * 2.25);
-  fill(80, 170, 190, 50);
-  let foamPulse = sin(frameCount * 0.025) * 3;
-  ellipse(ix, iy, a.isleRX * 2.2 + foamPulse, a.isleRY * 2.2 + foamPulse);
-
-  // Rocky cliff base
-  fill(110, 95, 75);
-  ellipse(ix, iy + 4, a.isleRX * 2.05, a.isleRY * 2.05);
-  // Beach sand
-  fill(215, 200, 155);
-  ellipse(ix, iy, a.isleRX * 2, a.isleRY * 2);
-
-  // Outer spectator seating (tiered stone)
-  fill(155, 145, 125);
-  ellipse(ix, iy, a.isleRX * 1.85, a.isleRY * 1.85);
-  fill(145, 135, 115);
-  ellipse(ix, iy, a.isleRX * 1.78, a.isleRY * 1.78);
-  // Seating rows (subtle lines)
-  noFill();
-  stroke(130, 120, 100, 80);
-  strokeWeight(0.5);
-  ellipse(ix, iy, a.isleRX * 1.82, a.isleRY * 1.82);
-  noStroke();
-
-  // Arena sand floor
-  fill(200, 185, 145);
-  ellipse(ix, iy, a.isleRX * 1.7, a.isleRY * 1.7);
-  // Inner arena — compacted sand
-  fill(185, 170, 130);
-  ellipse(ix, iy, a.isleRX * 1.5, a.isleRY * 1.5);
-
-  // Sand texture dots
-  fill(175, 160, 120, 60);
-  for (let i = 0; i < 30; i++) {
-    let ang = (i / 30) * TWO_PI + i * 1.7;
-    let r2 = (i % 3 + 1) * a.isleRX * 0.18;
-    ellipse(ix + cos(ang) * r2, iy + sin(ang) * r2 * 0.68, 3, 2);
-  }
-
-  // Arena circle marking (inscribed)
-  noFill();
-  stroke(150, 135, 100, 120);
-  strokeWeight(2);
-  ellipse(ix, iy, a.isleRX * 1.2, a.isleRY * 1.2);
-  // Decorative inner ring
-  strokeWeight(1);
-  stroke(150, 135, 100, 60);
-  ellipse(ix, iy, a.isleRX * 0.6, a.isleRY * 0.6);
-  // Cross markings
-  stroke(140, 125, 90, 80);
-  strokeWeight(1);
-  line(ix - a.isleRX * 0.55, iy, ix + a.isleRX * 0.55, iy);
-  line(ix, iy - a.isleRY * 0.55, ix, iy + a.isleRY * 0.55);
-  noStroke();
-
-  // Scuff marks / old battle marks on sand
-  fill(160, 140, 100, 30);
-  ellipse(ix - 30, iy + 15, 18, 8);
-  ellipse(ix + 45, iy - 20, 14, 6);
-  ellipse(ix - 10, iy - 35, 12, 10);
-
-  // Stone wall ring with arched openings
-  for (let i = 0; i < 24; i++) {
-    let ang = (i / 24) * TWO_PI;
-    let wx = ix + cos(ang) * a.isleRX * 0.92;
-    let wy = iy + sin(ang) * a.isleRY * 0.92;
-    // Skip openings at cardinal points (gates)
-    let isGate = false;
-    for (let ca of [0, HALF_PI, PI, PI + HALF_PI]) {
-      if (abs(ang - ca) < 0.15 || abs(ang - ca - TWO_PI) < 0.15) isGate = true;
-    }
-    if (isGate) continue;
-    // Stone block with shadow
-    fill(105, 95, 80);
-    rect(wx - 5, wy - 8, 11, 13, 1);
-    fill(130, 120, 100);
-    rect(wx - 5, wy - 9, 10, 12, 1);
-  }
-
-  // Gate arches at cardinal points
-  let gateAngles = [0, HALF_PI, PI, PI + HALF_PI];
-  for (let ga of gateAngles) {
-    let gx = ix + cos(ga) * a.isleRX * 0.92;
-    let gy = iy + sin(ga) * a.isleRY * 0.92;
-    // Arch pillars
-    fill(150, 140, 120);
-    rect(gx - 8, gy - 14, 4, 18, 1);
-    rect(gx + 4, gy - 14, 4, 18, 1);
-    // Arch top
-    fill(160, 150, 130);
-    arc(gx, gy - 14, 16, 10, PI, TWO_PI);
-    // Keystone
-    fill(180, 170, 140);
-    rect(gx - 2, gy - 18, 4, 4, 1);
-  }
-
-  // Columns — 8 around the arena (alternating intact/ruined)
-  for (let ci = 0; ci < 8; ci++) {
-    let ca = (ci / 8) * TWO_PI + PI / 8;
-    let cx = ix + cos(ca) * a.isleRX * 0.84;
-    let cy = iy + sin(ca) * a.isleRY * 0.84;
-    let intact = ci % 3 !== 2; // every 3rd is ruined
-    // Column shadow
-    fill(100, 90, 70, 40);
-    ellipse(cx + 2, cy + 2, 10, 6);
-    if (intact) {
-      // Full column
-      fill(185, 175, 155);
-      rect(cx - 5, cy, 10, 5, 1); // base
-      fill(200, 192, 175);
-      rect(cx - 3, cy - 28, 6, 30); // shaft
-      // Fluting (vertical lines)
-      stroke(180, 172, 155, 80);
-      strokeWeight(0.5);
-      line(cx - 1, cy - 26, cx - 1, cy);
-      line(cx + 1, cy - 26, cx + 1, cy);
-      noStroke();
-      // Ionic capital (scrolls)
-      fill(215, 205, 185);
-      rect(cx - 6, cy - 31, 12, 3, 1);
-      ellipse(cx - 5, cy - 30, 4, 4);
-      ellipse(cx + 5, cy - 30, 4, 4);
-    } else {
-      // Ruined stump
-      fill(160, 150, 130);
-      rect(cx - 5, cy, 10, 5, 1);
-      fill(170, 160, 140);
-      rect(cx - 3, cy - 12, 6, 14);
-      // Rubble
-      fill(145, 135, 115);
-      ellipse(cx + 7, cy + 2, 5, 4);
-      ellipse(cx - 6, cy + 3, 4, 3);
-      ellipse(cx + 3, cy + 5, 3, 3);
-    }
-  }
-
-  // Torches with animated flames
-  let torchAngles = [PI / 4, 3 * PI / 4, 5 * PI / 4, 7 * PI / 4];
-  for (let ti = 0; ti < torchAngles.length; ti++) {
-    let ta = torchAngles[ti];
-    let tx = ix + cos(ta) * a.isleRX * 0.78;
-    let ty = iy + sin(ta) * a.isleRY * 0.78;
-    // Torch bracket (on wall)
-    fill(80, 60, 35);
-    rect(tx - 1, ty - 4, 3, 8);
-    // Torch bowl
-    fill(90, 65, 30);
-    ellipse(tx, ty - 6, 8, 4);
-    // Flame layers
-    let fl1 = sin(frameCount * 0.18 + ti * 2) * 2;
-    let fl2 = cos(frameCount * 0.22 + ti * 3) * 1.5;
-    fill(255, 200, 60, 220);
-    ellipse(tx + fl2 * 0.3, ty - 12 + fl1, 7, 11);
-    fill(255, 140, 30, 180);
-    ellipse(tx + fl2 * 0.5, ty - 14 + fl1, 5, 8);
-    fill(255, 80, 20, 120);
-    ellipse(tx, ty - 15 + fl1, 3, 5);
-    // Warm glow on ground
-    fill(255, 160, 50, 18);
-    ellipse(tx, ty, 40, 25);
-    // Spark particles
-    if (frameCount % 12 === ti * 3) {
-      fill(255, 200, 80, 150);
-      ellipse(tx + random(-3, 3), ty - 18 + random(-3, 0), 2, 2);
-    }
-  }
-
-  // Roman banners between columns (red/gold fabric)
-  for (let bi = 0; bi < 4; bi++) {
-    let ba = (bi / 4) * TWO_PI + PI / 4 + 0.3;
-    let bx = ix + cos(ba) * a.isleRX * 0.88;
-    let by = iy + sin(ba) * a.isleRY * 0.88;
-    let wave = sin(frameCount * 0.04 + bi) * 2;
-    // Pole
-    fill(120, 90, 50);
-    rect(bx - 1, by - 24, 2, 20);
-    // Banner fabric
-    fill(160, 35, 25, 200);
-    beginShape();
-    vertex(bx + 1, by - 22);
-    vertex(bx + 12 + wave, by - 20);
-    vertex(bx + 10 + wave, by - 10);
-    vertex(bx + 1, by - 12);
-    endShape(CLOSE);
-    // Gold trim
-    stroke(200, 170, 80, 150);
-    strokeWeight(0.5);
-    line(bx + 1, by - 22, bx + 12 + wave, by - 20);
-    line(bx + 1, by - 12, bx + 10 + wave, by - 10);
-    noStroke();
-  }
-
-  // Rowboat at south shore (retreat point)
-  let boatX = ix;
-  let boatY = iy + a.isleRY * 0.96;
-  // Boat shadow
-  fill(0, 0, 0, 25);
-  ellipse(boatX + 2, boatY + 3, 32, 10);
-  // Hull
-  fill(110, 72, 35);
-  ellipse(boatX, boatY, 30, 14);
-  // Deck
-  fill(140, 100, 55);
-  ellipse(boatX, boatY - 1, 26, 10);
-  // Planking lines
-  stroke(120, 85, 45, 100);
-  strokeWeight(0.5);
-  line(boatX - 10, boatY, boatX + 10, boatY);
-  line(boatX - 8, boatY - 2, boatX + 8, boatY - 2);
-  noStroke();
-  // Mast
-  fill(100, 70, 35);
-  rect(boatX - 1, boatY - 18, 2, 16);
-  // Pennant
-  let pw = sin(frameCount * 0.06) * 2;
-  fill(180, 40, 30, 180);
-  triangle(boatX + 1, boatY - 18, boatX + 10 + pw, boatY - 16, boatX + 1, boatY - 13);
-
-  pop();
-}
 
 function drawOneEnemy(e) {
   let sx = w2sX(e.x);
