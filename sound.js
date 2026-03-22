@@ -841,7 +841,7 @@ class SoundManager {
       music_necropolis: 'sounds/music_necropolis_ai.mp3',
       music_defeat: 'sounds/music_defeat_ai.mp3',
       music_lobby: 'sounds/music_lobby_ai.mp3',
-      music_raid: 'sounds/music_raid_ai.mp3',
+      music_raid: 'sounds/generated/music_raid.wav',
       // Narration voice clips
       narr_wreck_wake: 'sounds/narration/narration_wreck_wake.mp3',
       narr_wreck_fire: 'sounds/narration/narration_wreck_fire.mp3',
@@ -1219,7 +1219,7 @@ class SoundManager {
 
     // Crossfade: fade out old track
     if (this._musicFadingOut) {
-      this._musicFadeOut = max(0, this._musicFadeOut - 0.02); // ~1s at 60fps
+      this._musicFadeOut = max(0, this._musicFadeOut - 0.017); // 1s at 60fps
       let s = this._samples[this._musicFadingOut];
       if (s && s.isPlaying()) {
         s.setVolume(musicVol * this._musicFadeOut);
@@ -1231,7 +1231,7 @@ class SoundManager {
 
     // Crossfade: fade in current track
     if (this._musicFadeIn < 1) {
-      this._musicFadeIn = min(1, this._musicFadeIn + 0.02); // ~1s at 60fps
+      this._musicFadeIn = min(1, this._musicFadeIn + 0.017); // 1s at 60fps
     }
 
     // Switch track if needed

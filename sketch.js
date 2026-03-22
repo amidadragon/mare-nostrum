@@ -17,7 +17,7 @@ const KEYBIND_LABELS = {
   buildMode: 'Build Mode', demolish: 'Demolish', rotate: 'Rotate',
   inventory: 'Inventory', map: 'Map', recipeBook: 'Recipe Book', legia: 'Legion', fish: 'Fish', debug: 'Debug'
 };
-let gameSettings = { screenShake: true, fontScale: 1, lastSaveTime: 0, musicSource: 'lyre', keybinds: {} };
+let gameSettings = { screenShake: true, fontScale: 1, lastSaveTime: 0, musicSource: 'recorded', keybinds: {} };
 let _rebindingAction = null;
 let _keybindScrollOffset = 0;
 function _loadSettings() {
