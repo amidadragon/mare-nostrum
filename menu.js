@@ -370,6 +370,52 @@ function drawMenuScreen() {
   fill(255, 200, 80, floor(18 * shimmer * aF));
   rect(0, horizY - 1, w, 3);
 
+
+  // --- FLOATING FIREFLIES --- warm embers drifting up
+  if (!drawMenuScreen._fireflies) {
+    drawMenuScreen._fireflies = [];
+    for (let i = 0; i < 15; i++) drawMenuScreen._fireflies.push({ x: random(0.1, 0.9), y: random(0.5, 1.0), sp: random(0.01, 0.025), ph: random(TWO_PI), wobble: random(0.3, 0.8) });
+  }
+  for (let ff of drawMenuScreen._fireflies) {
+    ff.y -= ff.sp * 0.016;
+    if (ff.y < 0.1) { ff.y = 1.0; ff.x = random(0.1, 0.9); }
+    let ffA = sin(t0 * 1.5 + ff.ph) * 0.5 + 0.5;
+    let ffX = ff.x * w + sin(t0 * ff.wobble + ff.ph) * 8;
+    fill(255, 180, 60, floor(ffA * 120 * aF));
+    ellipse(ffX, ff.y * h, 3, 3);
+    fill(255, 200, 100, floor(ffA * 40 * aF));
+    ellipse(ffX, ff.y * h, 7, 7);
+  }
+
+  // --- CLOUD SHADOWS --- dark patches drifting across
+  if (!drawMenuScreen._cloudShadows) {
+    drawMenuScreen._cloudShadows = [];
+    for (let i = 0; i < 3; i++) drawMenuScreen._cloudShadows.push({ x: random(-0.3, 1.0), y: 0.25 + i * 0.15, sp: random(0.002, 0.004) });
+  }
+  for (let cs of drawMenuScreen._cloudShadows) {
+    cs.x += cs.sp * 0.016;
+    if (cs.x > 1.3) cs.x = -0.3;
+    fill(0, 0, 0, floor(7 * aF));
+    ellipse(cs.x * w, cs.y * h, w * 0.2, h * 0.08);
+  }
+
+  // --- LENS FLARE --- subtle horizontal streak near sun
+  let flareA = (sin(t0 * 0.4) * 0.5 + 0.5) * 18;
+  fill(255, 230, 160, floor(flareA * aF));
+  ellipse(sunX + 20, sunY + 5, w * 0.18, 4);
+
+  // --- SMOKE WISPS --- from buildings on right
+  for (let si = 0; si < 3; si++) {
+    let smX = w * (0.10 + si * 0.06);
+    for (let sy2 = 0; sy2 < 30; sy2 += 3) {
+      let smY = h * (0.35 - sy2 * 0.005) - t0 * 3 % 20;
+      let wobX = sin(t0 * 0.6 + si * 2 + sy2 * 0.2) * 4;
+      let smA = max(0, 12 - sy2 * 0.4);
+      fill(180, 170, 160, floor(smA * aF));
+      rect(floor(smX + wobX), floor(smY), 2, 3);
+    }
+  }
+
   // ═══════════════════════════════════════════════════════════════════════
   // ─── TITLE — large, centered, with golden glow ───
   // ═══════════════════════════════════════════════════════════════════════
@@ -425,7 +471,8 @@ function drawMenuScreen() {
   text('MARE NOSTRUM', w / 2 + 2, titleY + titleBob + 3);
   // Main gold text
   let goldPulse = 0.9 + sin(t0 * 1.2) * 0.1;
-  fill(244 * goldPulse, 213 * goldPulse, 141, floor(255 * titleAlpha));
+  let titleGlowA = 0.9 + sin(t0 * 1.0) * 0.1;
+  fill(244 * goldPulse, 213 * goldPulse, 141, floor(255 * titleAlpha * titleGlowA));
   text('MARE NOSTRUM', w / 2, titleY + titleBob);
   // Top highlight
   fill(255, 240, 200, floor(80 * titleAlpha));
