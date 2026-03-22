@@ -17615,26 +17615,22 @@ function drawArenaIsleDistant() {
   // Bake perspective scale directly into radii (more reliable than transform)
   let fsx = floor(sx), fsy = floor(sy);
   let rx = a.isleRX * sc, ry = a.isleRY * 0.45 * sc;
+  let ysc = sc; // scale yOffsets too so layers don't separate at small sizes
   let bright = getSkyBrightness();
   let dayMix = max(0.15, bright);
   let aLv = getArenaLevel();
 
   // --- Shallow water gradient (same layered approach as main island) ---
-  // Opaque base — blocks deep ocean from bleeding through
   fill(lerp(18, 42, dayMix), lerp(45, 130, dayMix), lerp(68, 170, dayMix));
-  drawArenaCoastShape(fsx, fsy, rx * 1.12, ry * 1.12, -4);
-  // Outermost shallow water
+  drawArenaCoastShape(fsx, fsy, rx * 1.12, ry * 1.12, -4 * ysc);
   fill(lerp(20, 48, dayMix), lerp(50, 140, dayMix), lerp(75, 180, dayMix), 180);
-  drawArenaCoastShape(fsx, fsy, rx * 1.12, ry * 1.12, -4);
-  // Mid shallow — turquoise
+  drawArenaCoastShape(fsx, fsy, rx * 1.12, ry * 1.12, -4 * ysc);
   fill(lerp(25, 60, dayMix), lerp(65, 160, dayMix), lerp(85, 190, dayMix), 200);
-  drawArenaCoastShape(fsx, fsy, rx * 1.06, ry * 1.06, -5);
-  // Inner shallow — bright warm turquoise
+  drawArenaCoastShape(fsx, fsy, rx * 1.06, ry * 1.06, -5 * ysc);
   fill(lerp(30, 80, dayMix), lerp(75, 175, dayMix), lerp(88, 192, dayMix), 210);
-  drawArenaCoastShape(fsx, fsy, rx * 1.0, ry * 1.0, -6);
-  // Near-shore — lightest aqua
+  drawArenaCoastShape(fsx, fsy, rx * 1.0, ry * 1.0, -6 * ysc);
   fill(lerp(38, 95, dayMix), lerp(85, 185, dayMix), lerp(92, 190, dayMix), 220);
-  drawArenaCoastShape(fsx, fsy, rx * 0.96, ry * 0.96, -6);
+  drawArenaCoastShape(fsx, fsy, rx * 0.96, ry * 0.96, -6 * ysc);
 
   // Foam dots at waterline
   let foamPhase = frameCount * 0.02;
@@ -17643,41 +17639,40 @@ function drawArenaIsleDistant() {
     let foamPulse = sin(foamPhase + fa * 3) * 0.008;
     let fBase = _getArenaCoastRadiusAtAngle(fa, rx * 0.93, ry * 0.93);
     let ffx = fsx + cos(fa) * (fBase.rx + foamPulse * rx);
-    let ffy = (fsy - 6 * abs(sin(fa))) + sin(fa) * (fBase.ry + foamPulse * ry);
+    let ffy = (fsy - 6 * ysc * abs(sin(fa))) + sin(fa) * (fBase.ry + foamPulse * ry);
     fill(255, 255, 255, 35 + sin(foamPhase + fa * 5) * 18);
-    ellipse(ffx, ffy, 5 + sin(fa * 2.7) * 2, 2);
+    ellipse(ffx, ffy, max(2, 5 * sc), max(1, 2 * sc));
   }
 
   // --- Cliff edge (rock band) ---
   fill(130, 115, 88);
-  drawArenaCoastShape(fsx, fsy, rx * 0.92, ry * 0.92, -3);
+  drawArenaCoastShape(fsx, fsy, rx * 0.92, ry * 0.92, -3 * ysc);
   fill(155, 140, 110);
-  drawArenaCoastShape(fsx, fsy, rx * 0.91, ry * 0.91, -4);
+  drawArenaCoastShape(fsx, fsy, rx * 0.91, ry * 0.91, -4 * ysc);
 
   // --- Beach sand layers ---
   fill(190, 170, 140);
-  drawArenaCoastShape(fsx, fsy, rx * 0.90, ry * 0.90, -5);
+  drawArenaCoastShape(fsx, fsy, rx * 0.90, ry * 0.90, -5 * ysc);
   fill(225, 205, 165);
-  drawArenaCoastShape(fsx, fsy, rx * 0.88, ry * 0.88, -6);
+  drawArenaCoastShape(fsx, fsy, rx * 0.88, ry * 0.88, -6 * ysc);
   fill(235, 218, 178);
-  drawArenaCoastShape(fsx, fsy, rx * 0.85, ry * 0.85, -7);
+  drawArenaCoastShape(fsx, fsy, rx * 0.85, ry * 0.85, -7 * ysc);
 
   // --- Grass surface ---
   let sg = typeof getSeasonGrass === 'function' ? getSeasonGrass() : { r: 90, g: 130, b: 70 };
   fill(sg.r + 15, sg.g + 15, sg.b + 15);
-  drawArenaCoastShape(fsx, fsy, rx * 0.82, ry * 0.82, -8);
+  drawArenaCoastShape(fsx, fsy, rx * 0.82, ry * 0.82, -8 * ysc);
   fill(sg.r, sg.g, sg.b);
-  drawArenaCoastShape(fsx, fsy, rx * 0.78, ry * 0.78, -9);
-  // Darker grass center
+  drawArenaCoastShape(fsx, fsy, rx * 0.78, ry * 0.78, -9 * ysc);
   fill(sg.r - 12, sg.g - 12, sg.b - 10);
-  drawArenaCoastShape(fsx, fsy, rx * 0.72, ry * 0.72, -10);
+  drawArenaCoastShape(fsx, fsy, rx * 0.72, ry * 0.72, -10 * ysc);
 
   // Arena structure by level (drawn on top of grass)
   if (aLv === 1) {
     fill(185, 170, 130);
-    ellipse(fsx, fsy - 9, rx * 1.2, ry * 1.2);
+    ellipse(fsx, fsy - 9 * ysc, rx * 1.2, ry * 1.2);
     fill(170, 155, 115);
-    ellipse(fsx, fsy - 9, rx * 0.9, ry * 0.9);
+    ellipse(fsx, fsy - 9 * ysc, rx * 0.9, ry * 0.9);
     fill(110, 80, 40);
     for (let i = 0; i < 12; i++) {
       let ang = i * TWO_PI / 12;
@@ -17687,11 +17682,11 @@ function drawArenaIsleDistant() {
     }
   } else if (aLv === 2) {
     fill(155, 145, 125);
-    ellipse(fsx, fsy - 9, rx * 1.4, ry * 1.4);
+    ellipse(fsx, fsy - 9 * ysc, rx * 1.4, ry * 1.4);
     fill(145, 135, 110);
-    ellipse(fsx, fsy - 9, rx * 1.2, ry * 1.2);
+    ellipse(fsx, fsy - 9 * ysc, rx * 1.2, ry * 1.2);
     fill(195, 180, 140);
-    ellipse(fsx, fsy - 9, rx * 0.9, ry * 0.9);
+    ellipse(fsx, fsy - 9 * ysc, rx * 0.9, ry * 0.9);
     fill(120, 110, 95);
     for (let i = 0; i < 16; i++) {
       let ang = i * TWO_PI / 16;
@@ -17701,13 +17696,13 @@ function drawArenaIsleDistant() {
     }
   } else if (aLv === 3) {
     fill(160, 150, 130);
-    ellipse(fsx, fsy - 9, rx * 1.5, ry * 1.5);
+    ellipse(fsx, fsy - 9 * ysc, rx * 1.5, ry * 1.5);
     fill(150, 140, 120);
-    ellipse(fsx, fsy - 9, rx * 1.35, ry * 1.35);
+    ellipse(fsx, fsy - 9 * ysc, rx * 1.35, ry * 1.35);
     fill(140, 130, 110);
-    ellipse(fsx, fsy - 9, rx * 1.2, ry * 1.2);
+    ellipse(fsx, fsy - 9 * ysc, rx * 1.2, ry * 1.2);
     fill(200, 185, 145);
-    ellipse(fsx, fsy - 9, rx * 0.85, ry * 0.85);
+    ellipse(fsx, fsy - 9 * ysc, rx * 0.85, ry * 0.85);
     fill(115, 105, 90);
     for (let i = 0; i < 20; i++) {
       let ang = i * TWO_PI / 20;
@@ -17723,15 +17718,15 @@ function drawArenaIsleDistant() {
     }
   } else {
     fill(165, 155, 135);
-    ellipse(fsx, fsy - 9, rx * 1.6, ry * 1.6);
+    ellipse(fsx, fsy - 9 * ysc, rx * 1.6, ry * 1.6);
     fill(155, 145, 125);
-    ellipse(fsx, fsy - 9, rx * 1.45, ry * 1.45);
+    ellipse(fsx, fsy - 9 * ysc, rx * 1.45, ry * 1.45);
     fill(145, 135, 115);
-    ellipse(fsx, fsy - 9, rx * 1.3, ry * 1.3);
+    ellipse(fsx, fsy - 9 * ysc, rx * 1.3, ry * 1.3);
     fill(135, 125, 105);
-    ellipse(fsx, fsy - 9, rx * 1.15, ry * 1.15);
+    ellipse(fsx, fsy - 9 * ysc, rx * 1.15, ry * 1.15);
     fill(205, 190, 150);
-    ellipse(fsx, fsy - 9, rx * 0.8, ry * 0.8);
+    ellipse(fsx, fsy - 9 * ysc, rx * 0.8, ry * 0.8);
     fill(110, 100, 85);
     for (let i = 0; i < 24; i++) {
       let ang = i * TWO_PI / 24;
