@@ -633,7 +633,7 @@ function updateWreckBeach(dt) {
       addFloatingText(w2sX(p.x), w2sY(p.y) - 25, msg, '#ff6644');
     }
   } else {
-    state.player.speed = 2.0;
+    state.player.speed = 3.2;
   }
 
   // ── Tide-driven shore particles ─────────────────────────────────────────

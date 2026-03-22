@@ -118,8 +118,17 @@ let menuBgImg = null;    // pre-rendered menu background image
 
 // ─── SAVE SYSTEM INDICATOR ─────────────────────────────────────────────
 let _saveIndicatorTimer = 0; // counts down from 60 (1 sec at 60fps)
-const _SAVE_KEY = 'sunlitIsles_save';
-const _BACKUP_KEY = 'sunlitIsles_backup';
+const _SAVE_KEY = 'mare_nostrum_save';
+const _BACKUP_KEY = 'mare_nostrum_backup';
+// Migrate old save keys to new ones
+try {
+  let _oldSave = localStorage.getItem('sunlitIsles_save');
+  if (_oldSave && !localStorage.getItem(_SAVE_KEY)) {
+    localStorage.setItem(_SAVE_KEY, _oldSave);
+    let _oldBackup = localStorage.getItem('sunlitIsles_backup');
+    if (_oldBackup) localStorage.setItem(_BACKUP_KEY, _oldBackup);
+  }
+} catch(e) {}
 
 // ─── FACTION SELECTION ──────────────────────────────────────────────────
 let factionSelectActive = false;  // true when showing faction choice screen
@@ -2736,7 +2745,7 @@ function startNewGame() {
 function startLoadGame() {
   initState();
   let _hasSave = false;
-  try { _hasSave = !!localStorage.getItem('sunlitIsles_save'); } catch(e) {}
+  try { _hasSave = !!localStorage.getItem(_SAVE_KEY); } catch(e) {}
   if (_hasSave) {
     loadGame();
     state.introPhase = 'done';
@@ -25590,7 +25599,7 @@ function keyPressed() {
     }
     // Menu keyboard navigation
     if (gameScreen === 'menu') {
-      let hasSave = !!localStorage.getItem('sunlitIsles_save');
+      let hasSave = !!localStorage.getItem(_SAVE_KEY);
       let btnCount = hasSave ? 5 : 4;
       if (keyCode === DOWN_ARROW || keyCode === 83) { // down or S
         menuKeyIdx = (menuKeyIdx + 1) % btnCount;

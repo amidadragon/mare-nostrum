@@ -9,8 +9,9 @@ function addFloatingText(x, y, txt, col) {
 // ─── NOTIFICATION FEED ───────────────────────────────────────────────────
 function addNotification(txt, col) {
   col = col || '#d4a040';
+  if (/cannot|warning|raid|attack/i.test(txt)) col = '#cc3333';
   notifications.push({ text: txt, col: col, timer: 300, maxTimer: 300, fadeIn: 0 });
-  if (notifications.length > 6) notifications.shift();
+  if (notifications.length > 8) notifications.shift();
 }
 
 function updateNotifications(dt) {
@@ -25,7 +26,7 @@ function updateNotifications(dt) {
 function drawNotifications() {
   if (notifications.length === 0) return;
   textSize(10);
-  let maxVisible = 3;
+  let maxVisible = 5;
   let startIdx = max(0, notifications.length - maxVisible);
   let slotY = 8;
 
@@ -61,9 +62,10 @@ function drawNotifications() {
     line(px + tw - 4, py + 1, px + tw - 4, py + th - 1);
     noStroke();
 
-    // Text in dark brown
+    // Text color (red for warnings, dark brown default)
     textAlign(CENTER, CENTER);
-    fill(60, 40, 20, 240 * alpha);
+    let nc = color(n.col);
+    fill(red(nc), green(nc), blue(nc), 240 * alpha);
     text(n.text, width / 2, py + th / 2);
     slotY += th + 4;
   }
