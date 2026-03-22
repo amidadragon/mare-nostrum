@@ -664,6 +664,9 @@ const TEMPLE_HALLS={rome:{name:'Temple of Mars',floor1:[210,205,195],floor2:[170
 const TEMPLE_JESTER_JOKES={rome:['Why did the Roman cross the road? To get to the other empire!','A senator walks into a bar. The bar wins the election.','What is a gladiators favorite season? FALL!','I told my centurion a joke. He said That is I funny.','How do Romans cut their hair? With Caesars!','What did the grape say when the legionary stepped on it? Nothing, it let out a little wine.'],carthage:['Why are Carthaginian merchants so calm? They always find a fair trade!','I asked Hannibal for directions. He took the long way over the Alps.','What is a Punic traders favorite game? Monopoly!','Our elephants never forget... especially debts.','Why did the merchant cross the sea? Profit was on the other side!','Tanit told me the moon was full. I said, so is my warehouse!'],egypt:['Why do mummies skip vacations? They are afraid to unwind!','What is a pharaohs favorite restaurant? Pizza Tut!','I tried to write in hieroglyphs but I kept drawing a blank.','Why was the pyramid jealous? The sphinx always had a riddle!','What music do mummies listen to? Wrap music!','Ra told me to lighten up. He does that every morning.'],greece:['Why did Achilles fail math? He could never solve his heel problem!','I asked Socrates a question. He answered with twelve more.','What is an Athenians favorite dessert? Baklava-nt to miss it!','Odysseus took ten years to get home. Should have asked for directions!','Why are Greek columns always tired? They have been holding things up for ages!','Diogenes found an honest man. Just kidding, he is still looking.'],seapeople:['Why do sea people make bad comedians? Their jokes are all washed up!','I told a wave joke but it did not make a splash.','What is a raiders favorite letter? Arrrr!','Our navigator got lost. Again. That is how we found this place!','Why did the fish blush? It saw the oceans bottom!','I tried anchoring a joke but it just sank.'],persia:['Why is the Persian Empire so bright? Because of Ahura Mazdas light bulb!','A satrap walks into a palace. Nice place, he says. I will take it.','What is an immortals least favorite thing? Mortality jokes!','Zoroaster said truth is sacred. My tax collector disagrees.','Why did the courier run so fast? The Royal Road was one way!','Our gardens hang. Our empire hangs on. I just hang around.'],phoenicia:['Why did the Phoenician invent the alphabet? Tired of drawing pictures!','I shipped a joke overseas but the punchline got lost at sea.','What did the sailor say to the purple dye? You are worth a fortune!','Our ships are unsinkable! ...Do not check the harbor.','Why do Phoenicians make great friends? They always stay in touch - by letter!','Melqart blessed our trade. Now even our jokes are priceless.'],gaul:['Why did the druid hug a tree? It was an oak-casion!','A boar walked into a feast. He was the main course!','What is a Gauls favorite drink? Anything fermented!','I asked the mistletoe for advice. It just hung there.','Why do druids make bad builders? They only work with natural materials!','Cernunnos told a deer joke. It was stag-gering.']};
 const TEMPLE_ACHIEVEMENTS=[{id:'first_harvest',name:'First Harvest',icon:'crop',milestone:'first_harvest'},{id:'built_temple',name:'Built Temple',icon:'temple',milestone:'first_build'},{id:'won_battle',name:'Won Battle',icon:'sword',milestone:'victory_conquest'},{id:'reached_level10',name:'Reached Lv10',icon:'star',milestone:'reached_lv10'},{id:'allied_nation',name:'Allied Nation',icon:'handshake',milestone:'visit_nation_0'},{id:'built_army',name:'Built Army',icon:'shield',milestone:'faction_chosen_rome'},{id:'explored_islands',name:'Explorer',icon:'compass',milestone:'game_complete'},{id:'tutorial_done',name:'Tutorial Done',icon:'scroll',milestone:'tutorial_complete'}];
 
+// ─── TEMPLE ROOM (engine-based interior) ────────────────────────────────
+const TEMPLE_ROOM = { cx: 600, cy: -300, hw: 180, hh: 110 };
+
 // ─── WRECK ISLAND CONFIG ────────────────────────────────────────────────
 const WRECK = {
   cx: -4800, cy: 0,       // wreck beach center (far west, separate from everything)
@@ -1841,6 +1844,16 @@ function initState() {
       resourceDeposits: [],  // { x, y, type:'iron'|'stone', hp, maxHp, depleted }
       fishingSpots: [],      // { x, y, cooldown }
       wildlife: [],          // ambient birds/rabbits { x, y, type, vx, vy, timer }
+      // V1.2 RTS barracks auto-gen
+      barracksLevel: 0,      // 0-9 (index into EXPEDITION_BARRACKS.levels)
+      barracksGenTimer: 0,   // countdown to next soldier spawn batch
+      stonePile: 0,          // local stone storage for upgrades
+      // V1.2 unit types & leveling
+      unitLevels: { swordsman: 1, archer: 1, cavalry: 1 },
+      unitXP: { swordsman: 0, archer: 0, cavalry: 0 },
+      // V1.2 tower levels per building index (keyed by "x,y")
+      towerLevels: {},
+      towerTimers: {},
     },
 
     // Imperial Bridge — connects home island to colonized Terra Nova
@@ -2705,6 +2718,10 @@ function isInShallows(wx, wy) {
 
 // Check if a point is walkable (on island, shallows, bridge, pier, or imperial bridge)
 function isWalkable(wx, wy) {
+  // Temple room — rectangular boundary
+  if (state && state.insideTemple) {
+    return abs(wx - TEMPLE_ROOM.cx) <= TEMPLE_ROOM.hw && abs(wy - TEMPLE_ROOM.cy) <= TEMPLE_ROOM.hh;
+  }
   // While diving, player can swim in wider water area around island
   if (state && state.diving && state.diving.active) {
     let dx = (wx - WORLD.islandCX) / (state.islandRX * 2.0);
@@ -2716,6 +2733,7 @@ function isWalkable(wx, wy) {
 
 // Check if a wall/fence/chest blocks movement at this point
 function isBlockedByBuilding(wx, wy) {
+  if (state && state.insideTemple) return false;
   return state.buildings.some(b => {
     if (!BLUEPRINTS[b.type] || !BLUEPRINTS[b.type].blocks) return false;
     let hw = b.w / 2 + 4;
@@ -2910,17 +2928,44 @@ function drawInner() {
     return;
   }
 
-  // === TEMPLE INTERIOR ===
+  // === TEMPLE INTERIOR (main engine) ===
   if (state.insideTemple) {
     updateDoorTransition();
     updateTime(dt);
-    drawTempleInterior(dt);
+    updatePlayer(dt);
+    updatePlayerAnim(dt);
+    updateParticles(dt);
+    updateFloatingText(dt);
+    updateShake(dt);
+    cam.x = TEMPLE_ROOM.cx; cam.y = TEMPLE_ROOM.cy - height * 0.06;
+    camSmooth.x = lerp(camSmooth.x, cam.x, 0.1);
+    camSmooth.y = lerp(camSmooth.y, cam.y, 0.1);
+    camZoom = lerp(camZoom, camZoomTarget, 0.1);
+    if (state.player.y > TEMPLE_ROOM.cy + TEMPLE_ROOM.hh - 10 && !_doorTransition) {
+      if (snd) snd.playSFX('door_close');
+      let _rx = state._templeReturnX, _ry = state._templeReturnY;
+      startDoorTransition(function() {
+        state.insideTemple = false;
+        state.player.x = _rx; state.player.y = _ry;
+        camSmooth.x = _rx; camSmooth.y = _ry - height * 0.12;
+      });
+    }
+    push();
+    translate(width / 2, height / 2);
+    scale(camZoom);
+    translate(-width / 2, -height / 2);
+    push();
+    translate(shakeX, shakeY + floatOffset);
+    drawTempleRoom();
+    drawPlayer();
+    drawParticles();
+    drawFloatingText();
+    pop();
+    pop();
     drawHUD();
+    drawTempleRoomHUD();
     if (!screenshotMode) drawCursor();
     drawGameVignette();
-    drawScreenshotFilter();
-    drawScreenshotIndicator();
-    drawPhotoModeOverlay();
     drawDoorTransition();
     drawSaveIndicator();
     return;
@@ -6608,324 +6653,334 @@ function drawVines(cx, cy, w, h) {
 
 
 // ─── PYRAMID ──────────────────────────────────────────────────────────────
-// ─── TEMPLE INTERIOR ──────────────────────────────────────────────────────
-function drawTempleInterior(dt) {
-  let tp = state.templePlayerX || width / 2;
-  let tpy = state.templePlayerY || height * 0.75;
-  let spd = 2.5;
-  if (keyIsDown(LEFT_ARROW) || keyIsDown(65)) tp -= spd;
-  if (keyIsDown(RIGHT_ARROW) || keyIsDown(68)) tp += spd;
-  if (keyIsDown(UP_ARROW) || keyIsDown(87)) tpy -= spd;
-  if (keyIsDown(DOWN_ARROW) || keyIsDown(83)) tpy += spd;
-  if (typeof _touchJoystick !== 'undefined' && _touchJoystick.active) {
-    tp += _touchJoystick.dx * spd; tpy += _touchJoystick.dy * spd;
-  }
-  tp = constrain(tp, 60, width - 60);
-  tpy = constrain(tpy, height * 0.2, height * 0.92);
-  state.templePlayerX = tp;
-  state.templePlayerY = tpy;
-
-  // Exit if player walks to bottom
-  if (tpy > height * 0.9 && !_doorTransition) {
-    if (snd) snd.playSFX('door_close');
-    startDoorTransition(function() { state.insideTemple = false; });
-    return;
-  }
-
-  var fk = state.faction || 'rome';
+// ─── TEMPLE ROOM (engine-based interior) ─────────────────────────────────
+function drawTempleRoom() {
+  var R = TEMPLE_ROOM, fk = state.faction || 'rome';
   var hall = TEMPLE_HALLS[fk] || TEMPLE_HALLS.rome;
-  var ft = frameCount;
-  var gPulse = sin(ft * 0.03) * 0.2 + 0.8;
+  var ft = frameCount, gPulse = sin(ft * 0.03) * 0.2 + 0.8;
+  var hw = R.hw, hh = R.hh;
 
-  // Pet follow logic
-  if (!state.templePetX) { state.templePetX = tp; state.templePetY = tpy + 15; }
-  var petDist = dist(state.templePetX, state.templePetY, tp, tpy + 10);
+  // Pet follow
+  if (!state.templePetX) { state.templePetX = state.player.x; state.templePetY = state.player.y + 15; }
+  var petDist = dist(state.templePetX, state.templePetY, state.player.x, state.player.y + 10);
   if (petDist > 25) {
-    state.templePetX += (tp - state.templePetX) * 0.06;
-    state.templePetY += (tpy + 10 - state.templePetY) * 0.06;
+    state.templePetX += (state.player.x - state.templePetX) * 0.06;
+    state.templePetY += (state.player.y + 10 - state.templePetY) * 0.06;
   }
-  var petBob = sin(ft * 0.08) * (petDist > 20 ? 0.5 : 1.5);
 
-  push();
-  background(hall.wall[0] * 0.4, hall.wall[1] * 0.4, hall.wall[2] * 0.4);
-
-  // Faction-themed floor
+  // Dark background behind room
   noStroke();
-  var tileS = 32;
-  for (var tx = 0; tx < width; tx += tileS) {
-    for (var ty = floor(height * 0.3); ty < height; ty += tileS) {
-      var light = (floor(tx / tileS) + floor(ty / tileS)) % 2 === 0;
+  fill(hall.wall[0] * 0.3, hall.wall[1] * 0.3, hall.wall[2] * 0.3);
+  rect(w2sX(R.cx - hw - 20), w2sY(R.cy - hh - 40), (hw + 20) * 2, (hh + 60) * 2);
+
+  // Floor tiles
+  var tileS = 24;
+  for (var tx = -hw; tx < hw; tx += tileS) {
+    for (var ty = -hh; ty < hh; ty += tileS) {
+      var light = (floor((tx + hw) / tileS) + floor((ty + hh) / tileS)) % 2 === 0;
       fill(light ? hall.floor1[0] : hall.floor2[0], light ? hall.floor1[1] : hall.floor2[1], light ? hall.floor1[2] : hall.floor2[2]);
-      rect(tx, ty, tileS, tileS);
+      rect(w2sX(R.cx + tx), w2sY(R.cy + ty), tileS, tileS);
     }
   }
+
+  // Mosaic center
+  fill(hall.accent[0], hall.accent[1], hall.accent[2], 40);
+  rect(w2sX(R.cx - 30), w2sY(R.cy - 20), 60, 40);
+  fill(hall.drape[0], hall.drape[1], hall.drape[2], 30);
+  rect(w2sX(R.cx - 20), w2sY(R.cy - 12), 40, 24);
 
   // Back wall
   fill(hall.wall[0], hall.wall[1], hall.wall[2]);
-  rect(0, 0, width, height * 0.32);
-  // Wall trim
+  rect(w2sX(R.cx - hw), w2sY(R.cy - hh - 30), hw * 2, 30);
   fill(hall.trim[0], hall.trim[1], hall.trim[2]);
-  rect(0, height * 0.30, width, height * 0.02);
-  rect(0, 0, width, 6);
+  rect(w2sX(R.cx - hw), w2sY(R.cy - hh - 2), hw * 2, 4);
 
-  // Drapes on walls
+  // Drapes
   fill(hall.drape[0], hall.drape[1], hall.drape[2], 180);
-  rect(width * 0.05, height * 0.04, 18, height * 0.25);
-  rect(width * 0.95 - 18, height * 0.04, 18, height * 0.25);
-  fill(hall.drape[0] * 0.7, hall.drape[1] * 0.7, hall.drape[2] * 0.7, 80);
-  for (var df = 0; df < 3; df++) {
-    rect(width * 0.05 + 4 + df * 5, height * 0.06 + df * 8, 2, height * 0.2 - df * 8);
-    rect(width * 0.95 - 14 + df * 5, height * 0.06 + df * 8, 2, height * 0.2 - df * 8);
+  rect(w2sX(R.cx - hw + 8), w2sY(R.cy - hh - 26), 12, 22);
+  rect(w2sX(R.cx + hw - 20), w2sY(R.cy - hh - 26), 12, 22);
+
+  // Side walls
+  fill(hall.wall[0] * 0.8, hall.wall[1] * 0.8, hall.wall[2] * 0.8);
+  rect(w2sX(R.cx - hw - 10), w2sY(R.cy - hh), 10, hh * 2);
+  rect(w2sX(R.cx + hw), w2sY(R.cy - hh), 10, hh * 2);
+
+  // === Y-SORTED OBJECTS ===
+  var items = [];
+
+  // Altar (back center)
+  var altarX = R.cx, altarY = R.cy - hh + 30;
+  items.push({ y: altarY, draw: function() {
+    var asx = w2sX(altarX), asy = w2sY(altarY);
+    fill(hall.altarColor[0] * 0.6, hall.altarColor[1] * 0.6, hall.altarColor[2] * 0.6);
+    noStroke();
+    rect(asx - 18, asy, 36, 14, 2);
+    fill(hall.altarColor[0] * 0.8, hall.altarColor[1] * 0.8, hall.altarColor[2] * 0.8);
+    rect(asx - 20, asy - 3, 40, 5, 2);
+    fill(hall.altarColor[0], hall.altarColor[1], hall.altarColor[2]);
+    _drawAltarIcon(hall, asx, asy);
+    fill(hall.altarColor[0], hall.altarColor[1], hall.altarColor[2], 15 * gPulse);
+    circle(asx, asy - 6, 60);
+    if (dist(state.player.x, state.player.y, altarX, altarY) < 45) {
+      fill(255, 220, 120, 200 + sin(ft * 0.08) * 40);
+      textSize(8); textAlign(CENTER, CENTER);
+      text(state.crystals >= 5 ? '[E] Offer 5 Crystals > +25 Solar' : '[E] Offer Crystals (need 5)', asx, asy + 24);
+    }
+  }});
+
+  // Columns (4)
+  var colOffs = [-hw * 0.6, -hw * 0.25, hw * 0.25, hw * 0.6];
+  for (var ci = 0; ci < colOffs.length; ci++) {
+    (function(cx) {
+      items.push({ y: R.cy + hh - 10, draw: function() {
+        var csx = w2sX(R.cx + cx), ctop = w2sY(R.cy - hh - 8), cbot = w2sY(R.cy + hh - 10);
+        fill(hall.trim[0], hall.trim[1], hall.trim[2]);
+        noStroke();
+        rect(csx - 5, ctop, 10, cbot - ctop);
+        fill(hall.trim[0] * 0.9, hall.trim[1] * 0.9, hall.trim[2] * 0.9);
+        rect(csx - 7, cbot, 14, 5, 1);
+        rect(csx - 7, ctop - 2, 14, 4, 1);
+      }});
+    })(colOffs[ci]);
   }
 
-  // === ALTAR (center-top) ===
-  var altarX = width / 2, altarY = height * 0.38;
-  fill(hall.altarColor[0] * 0.6, hall.altarColor[1] * 0.6, hall.altarColor[2] * 0.6);
-  rect(altarX - 22, altarY, 44, 18, 2);
-  fill(hall.altarColor[0] * 0.8, hall.altarColor[1] * 0.8, hall.altarColor[2] * 0.8);
-  rect(altarX - 24, altarY - 4, 48, 6, 2);
-  // Altar icon
-  fill(hall.altarColor[0], hall.altarColor[1], hall.altarColor[2]);
-  if (hall.altarShape === 'eagle') {
-    triangle(altarX, altarY - 18, altarX - 14, altarY - 6, altarX + 14, altarY - 6);
-    rect(altarX - 2, altarY - 22, 4, 6);
-    ellipse(altarX, altarY - 24, 6, 5);
-  } else if (hall.altarShape === 'crescent') {
-    arc(altarX, altarY - 14, 24, 24, PI + 0.4, TWO_PI - 0.4);
-    fill(hall.wall[0], hall.wall[1], hall.wall[2]);
-    ellipse(altarX + 5, altarY - 15, 16, 16);
-  } else if (hall.altarShape === 'pyramid') {
-    triangle(altarX, altarY - 26, altarX - 16, altarY - 4, altarX + 16, altarY - 4);
-    fill(hall.accent[0], hall.accent[1], hall.accent[2], 120);
-    ellipse(altarX, altarY - 14, 8, 6);
-  } else if (hall.altarShape === 'olive') {
-    stroke(hall.altarColor[0], hall.altarColor[1], hall.altarColor[2]);
-    strokeWeight(2); noFill();
-    arc(altarX, altarY - 12, 20, 24, -PI * 0.8, -PI * 0.2);
+  // Advisor NPC (right side)
+  var advX = R.cx + hw * 0.55, advY = R.cy - hh * 0.3;
+  items.push({ y: advY, draw: function() {
+    var asx = w2sX(advX), asy = w2sY(advY);
     noStroke();
-    for (var ol = 0; ol < 5; ol++) {
-      var oa = -PI * 0.8 + ol * 0.12 * PI;
-      fill(hall.altarColor[0], hall.altarColor[1], hall.altarColor[2]);
-      ellipse(altarX + cos(oa) * 10, altarY - 12 + sin(oa) * 12, 5, 3);
-    }
-  } else if (hall.altarShape === 'anchor') {
-    stroke(hall.altarColor[0], hall.altarColor[1], hall.altarColor[2]);
-    strokeWeight(2.5); noFill();
-    line(altarX, altarY - 24, altarX, altarY - 6);
-    line(altarX - 10, altarY - 22, altarX + 10, altarY - 22);
-    arc(altarX, altarY - 6, 18, 14, 0, PI);
-    noStroke();
-  } else if (hall.altarShape === 'fire') {
-    for (var f = 0; f < 3; f++) {
-      var fw = (3 - f) * 5;
-      var fh = 18 * (1 - f * 0.25);
-      var flicker = sin(ft * 0.15 + f * 1.5) * 3;
-      fill(255, 100 + f * 50, 20 + f * 20, 220 - f * 30);
-      beginShape();
-      vertex(altarX - fw + flicker, altarY - 4);
-      quadraticVertex(altarX, altarY - 4 - fh, altarX + fw + flicker, altarY - 4);
-      endShape(CLOSE);
-    }
-  } else if (hall.altarShape === 'ship') {
-    fill(hall.altarColor[0], hall.altarColor[1], hall.altarColor[2]);
-    beginShape();
-    vertex(altarX - 14, altarY - 6); vertex(altarX + 14, altarY - 6);
-    vertex(altarX + 10, altarY - 14); vertex(altarX, altarY - 22);
-    vertex(altarX - 10, altarY - 14);
-    endShape(CLOSE);
-  } else if (hall.altarShape === 'dolmen') {
-    fill(hall.altarColor[0], hall.altarColor[1], hall.altarColor[2]);
-    rect(altarX - 14, altarY - 8, 6, 12);
-    rect(altarX + 8, altarY - 8, 6, 12);
-    rect(altarX - 16, altarY - 14, 32, 6, 1);
-  }
-  noStroke();
-
-  // Altar glow
-  fill(hall.altarColor[0], hall.altarColor[1], hall.altarColor[2], 15 * gPulse);
-  circle(altarX, altarY - 8, 80);
-
-  // 4 Columns
-  var colPositions = [width * 0.18, width * 0.32, width * 0.68, width * 0.82];
-  for (var ci = 0; ci < colPositions.length; ci++) {
-    var cx = colPositions[ci];
-    var colTop2 = height * 0.08, colBot = height * 0.82;
-    fill(hall.trim[0] * 0.9, hall.trim[1] * 0.9, hall.trim[2] * 0.9);
-    rect(cx - 14, colBot, 28, 10, 2);
-    fill(hall.trim[0], hall.trim[1], hall.trim[2]);
-    rect(cx - 10, colTop2, 20, colBot - colTop2);
-    fill(hall.trim[0] * 0.85, hall.trim[1] * 0.85, hall.trim[2] * 0.85, 50);
-    for (var cf = -8; cf <= 8; cf += 4) { rect(cx + cf, colTop2 + 4, 1, colBot - colTop2 - 4); }
-    fill(hall.trim[0], hall.trim[1], hall.trim[2]);
-    rect(cx - 14, colTop2 - 4, 28, 8, 2);
+    fill(hall.drape[0] * 0.8, hall.drape[1] * 0.8, hall.drape[2] * 0.8);
+    rect(asx - 4, asy - 5, 8, 12, 2);
+    fill(196, 160, 110);
+    ellipse(asx, asy - 10, 8, 8);
+    fill(220, 215, 200);
+    arc(asx, asy - 10, 9, 6, PI, TWO_PI);
+    fill(120, 90, 50);
+    rect(asx + 5, asy - 16, 2, 22);
     fill(hall.accent[0], hall.accent[1], hall.accent[2]);
-    circle(cx - 12, colTop2, 4);
-    circle(cx + 12, colTop2, 4);
+    circle(asx + 6, asy - 16, 3);
+    if (dist(state.player.x, state.player.y, advX, advY) < 35) {
+      fill(255, 220, 120, 200 + sin(ft * 0.08) * 40);
+      textSize(7); textAlign(CENTER, CENTER);
+      text('[E] Speak to Advisor', asx, asy + 16);
+    }
+  }});
+
+  // Jester NPC (left side)
+  var jestX = R.cx - hw * 0.55, jestY = R.cy + hh * 0.3;
+  var jestBob = sin(ft * 0.06) * 2;
+  if (state.templeJesterAnimTimer > 0) {
+    state.templeJesterAnimTimer -= 1;
+    jestBob = sin(ft * 0.3) * 5;
+  }
+  items.push({ y: jestY, draw: function() {
+    var jsx = w2sX(jestX), jsy = w2sY(jestY) + jestBob;
+    noStroke();
+    fill(hall.accent[0], hall.accent[1], hall.accent[2]);
+    rect(jsx - 4, jsy - 5, 8, 12, 2);
+    fill(196, 160, 110);
+    ellipse(jsx, jsy - 10, 8, 8);
+    fill(hall.accent[0], hall.accent[1], hall.accent[2]);
+    triangle(jsx - 5, jsy - 13, jsx, jsy - 21, jsx - 1, jsy - 11);
+    triangle(jsx + 5, jsy - 13, jsx, jsy - 21, jsx + 1, jsy - 11);
+    fill(255, 230, 80);
+    circle(jsx - 5, jsy - 13, 2.5);
+    circle(jsx + 5, jsy - 13, 2.5);
+    if (dist(state.player.x, state.player.y, jestX, jestY) < 35) {
+      fill(255, 220, 120, 200 + sin(ft * 0.08) * 40);
+      textSize(7); textAlign(CENTER, CENTER);
+      text('[E] Talk to Jester', jsx, jsy + 16);
+    }
+  }});
+
+  // Pet animal
+  var petBob = sin(ft * 0.08) * (petDist > 20 ? 0.5 : 1.5);
+  items.push({ y: state.templePetY, draw: function() {
+    var px = w2sX(state.templePetX), py = w2sY(state.templePetY) + petBob;
+    noStroke();
+    _drawTemplePet(hall, px, py);
+    if (dist(state.player.x, state.player.y, state.templePetX, state.templePetY) < 25) {
+      fill(255, 220, 120, 200 + sin(ft * 0.08) * 40);
+      textSize(7); textAlign(CENTER, CENTER);
+      text('[E] Pet', px, py + 12);
+    }
+  }});
+
+  // Achievement plaques (left wall)
+  var analytics = {};
+  try { analytics = JSON.parse(localStorage.getItem('mare_nostrum_analytics')) || {}; } catch(e) {}
+  for (var ai = 0; ai < TEMPLE_ACHIEVEMENTS.length; ai++) {
+    (function(ach, idx) {
+      var ax = R.cx - hw + 10 + (idx % 2) * 22;
+      var ay = R.cy - hh * 0.3 + floor(idx / 2) * 20;
+      items.push({ y: ay, draw: function() {
+        var psx = w2sX(ax), psy = w2sY(ay);
+        var unlocked = !!analytics[ach.milestone];
+        noStroke();
+        fill(unlocked ? hall.accent[0] : 60, unlocked ? hall.accent[1] : 55, unlocked ? hall.accent[2] : 50, unlocked ? 220 : 100);
+        rect(psx, psy, 18, 16, 2);
+        fill(unlocked ? 255 : 80);
+        textSize(5); textAlign(CENTER, CENTER);
+        text(ach.name, psx + 9, psy + 8);
+      }});
+    })(TEMPLE_ACHIEVEMENTS[ai], ai);
   }
 
   // Torch sconces
-  var torchPositions = [{ x: width * 0.1, y: height * 0.18 }, { x: width * 0.9, y: height * 0.18 }];
-  for (var ti = 0; ti < torchPositions.length; ti++) {
-    var tx2 = torchPositions[ti].x, ty2 = torchPositions[ti].y;
-    fill(100, 80, 50);
-    rect(tx2 - 3, ty2, 6, 12);
-    rect(tx2 - 5, ty2 + 10, 10, 4);
-    var tFlicker = sin(ft * 0.12 + ti * 3) * 2;
-    fill(255, 140, 30, 200);
-    ellipse(tx2 + tFlicker, ty2 - 4, 10, 14);
-    fill(255, 220, 70, 160);
-    ellipse(tx2 + tFlicker * 0.6, ty2 - 7, 6, 8);
-    fill(255, 160, 50, 12);
-    circle(tx2, ty2, 120);
+  var torchPos = [{ x: R.cx - hw + 15, y: R.cy - hh + 10 }, { x: R.cx + hw - 15, y: R.cy - hh + 10 }];
+  for (var ti = 0; ti < torchPos.length; ti++) {
+    (function(tp, idx) {
+      items.push({ y: tp.y, draw: function() {
+        var tsx = w2sX(tp.x), tsy = w2sY(tp.y);
+        noStroke();
+        fill(100, 80, 50);
+        rect(tsx - 2, tsy, 4, 8);
+        var tFlicker = sin(ft * 0.12 + idx * 3) * 1.5;
+        fill(255, 140, 30, 200);
+        ellipse(tsx + tFlicker, tsy - 3, 7, 10);
+        fill(255, 220, 70, 160);
+        ellipse(tsx + tFlicker * 0.6, tsy - 5, 4, 6);
+        fill(255, 160, 50, 10);
+        circle(tsx, tsy, 80);
+      }});
+    })(torchPos[ti], ti);
   }
 
-  // === ACHIEVEMENT WALL (left side) ===
-  var achX = width * 0.08, achY = height * 0.4;
-  var analytics = {};
-  try { analytics = JSON.parse(localStorage.getItem('mare_nostrum_analytics')) || {}; } catch(e) {}
-  fill(hall.trim[0] * 0.7, hall.trim[1] * 0.7, hall.trim[2] * 0.7);
-  textSize(7); textAlign(CENTER, CENTER);
-  text('ACHIEVEMENTS', achX + 20, achY - 12);
-  for (var ai = 0; ai < TEMPLE_ACHIEVEMENTS.length; ai++) {
-    var ach = TEMPLE_ACHIEVEMENTS[ai];
-    var ax = achX + (ai % 2) * 28;
-    var ay = achY + floor(ai / 2) * 26;
-    var unlocked = !!analytics[ach.milestone];
-    fill(unlocked ? hall.accent[0] : 60, unlocked ? hall.accent[1] : 55, unlocked ? hall.accent[2] : 50, unlocked ? 220 : 100);
-    rect(ax, ay, 24, 20, 2);
-    fill(unlocked ? 255 : 80, unlocked ? 255 : 75, unlocked ? 255 : 70);
-    textSize(6);
-    var sym = ach.icon === 'crop' ? 'W' : ach.icon === 'temple' ? 'T' : ach.icon === 'sword' ? '+' : ach.icon === 'star' ? '*' : ach.icon === 'handshake' ? 'H' : ach.icon === 'shield' ? 'O' : ach.icon === 'compass' ? 'C' : 'S';
-    text(sym, ax + 12, ay + 7);
-    textSize(4);
-    text(ach.name, ax + 12, ay + 16);
-  }
+  // Door marker at bottom
+  var doorX = R.cx, doorY = R.cy + hh - 5;
+  items.push({ y: doorY + 999, draw: function() {
+    var dsx = w2sX(doorX), dsy = w2sY(doorY);
+    noStroke();
+    fill(hall.wall[0] * 0.6, hall.wall[1] * 0.6, hall.wall[2] * 0.6);
+    rect(dsx - 14, dsy - 4, 28, 8, 2);
+    fill(hall.trim[0], hall.trim[1], hall.trim[2], 160);
+    textSize(7); textAlign(CENTER, CENTER);
+    text('v Exit', dsx, dsy + 10);
+  }});
 
-  // === ADVISOR NPC (right side, near altar) ===
-  var advX = width * 0.78, advY = height * 0.42;
-  noStroke();
-  fill(hall.drape[0] * 0.8, hall.drape[1] * 0.8, hall.drape[2] * 0.8);
-  rect(advX - 5, advY - 6, 10, 14, 2);
-  fill(196, 160, 110);
-  ellipse(advX, advY - 12, 10, 10);
-  fill(220, 215, 200);
-  arc(advX, advY - 12, 11, 8, PI, TWO_PI);
-  rect(advX - 3, advY - 8, 6, 4);
-  fill(120, 90, 50);
-  rect(advX + 7, advY - 20, 2, 28);
-  fill(hall.accent[0], hall.accent[1], hall.accent[2]);
-  circle(advX + 8, advY - 20, 4);
-  fill(240, 230, 200);
-  rect(advX - 6, advY - 2, 5, 3, 1);
-
-  if (dist(tp, tpy, advX, advY) < 45) {
-    fill(255, 220, 120, 200 + sin(ft * 0.08) * 40);
-    textSize(8); textAlign(CENTER, CENTER);
-    text('[E] Speak to Advisor', advX, advY + 22);
-  }
-
-  // === JESTER NPC (left side, near entrance) ===
-  var jestX = width * 0.22, jestY = height * 0.72;
-  var jestBob = sin(ft * 0.06) * 2;
-  if (state.templeJesterAnimTimer > 0) {
-    state.templeJesterAnimTimer -= dt;
-    jestBob = sin(ft * 0.3) * 6;
-  }
-  noStroke();
-  fill(hall.accent[0], hall.accent[1], hall.accent[2]);
-  rect(jestX - 5, jestY - 6 + jestBob, 10, 14, 2);
-  fill(hall.drape[0], hall.drape[1], hall.drape[2]);
-  rect(jestX - 4, jestY - 3 + jestBob, 4, 4);
-  rect(jestX + 1, jestY + 2 + jestBob, 4, 4);
-  fill(196, 160, 110);
-  ellipse(jestX, jestY - 12 + jestBob, 10, 10);
-  fill(hall.accent[0], hall.accent[1], hall.accent[2]);
-  triangle(jestX - 6, jestY - 16 + jestBob, jestX, jestY - 26 + jestBob, jestX - 1, jestY - 14 + jestBob);
-  triangle(jestX + 6, jestY - 16 + jestBob, jestX, jestY - 26 + jestBob, jestX + 1, jestY - 14 + jestBob);
-  fill(255, 230, 80);
-  circle(jestX - 6, jestY - 16 + jestBob, 3);
-  circle(jestX + 6, jestY - 16 + jestBob, 3);
-  fill(60, 40, 30);
-  circle(jestX - 2, jestY - 13 + jestBob, 1.5);
-  circle(jestX + 2, jestY - 13 + jestBob, 1.5);
-  noFill(); stroke(60, 40, 30); strokeWeight(0.8);
-  arc(jestX, jestY - 10 + jestBob, 6, 4, 0, PI);
-  noStroke();
-
-  if (dist(tp, tpy, jestX, jestY) < 45) {
-    fill(255, 220, 120, 200 + sin(ft * 0.08) * 40);
-    textSize(8); textAlign(CENTER, CENTER);
-    text('[E] Talk to Jester', jestX, jestY + 22);
-  }
-
-  // === PET ANIMAL ===
-  var petX = state.templePetX, petY = state.templePetY + petBob;
-  noStroke();
-  if (state.templePetAnimTimer > 0) {
-    state.templePetAnimTimer -= dt;
-    var spin = state.templePetAnimTimer * 0.02;
-    push(); translate(petX, petY); rotate(spin);
-    _drawTemplePet(hall, 0, 0);
-    pop();
-  } else {
-    _drawTemplePet(hall, petX, petY);
-  }
-
-  if (dist(tp, tpy, state.templePetX, state.templePetY) < 30) {
-    fill(255, 220, 120, 200 + sin(ft * 0.08) * 40);
-    textSize(8); textAlign(CENTER, CENTER);
-    text('[E] Pet', state.templePetX, state.templePetY + 16);
-  }
+  // Sort by Y and draw
+  items.sort(function(a, b) { return a.y - b.y; });
+  for (var i = 0; i < items.length; i++) items[i].draw();
 
   // Warm ambient glow
   noStroke();
-  fill(255, 180, 80, 8);
-  rect(0, 0, width, height);
+  fill(255, 180, 80, 6);
+  rect(w2sX(R.cx - hw), w2sY(R.cy - hh), hw * 2, hh * 2);
+}
 
-  // Hall name HUD
+function drawTempleRoomHUD() {
+  var hall = TEMPLE_HALLS[state.faction || 'rome'] || TEMPLE_HALLS.rome;
   fill(hall.accent[0], hall.accent[1], hall.accent[2]);
-  textAlign(CENTER, TOP); textSize(10);
+  noStroke(); textAlign(CENTER, TOP); textSize(10);
   text(hall.name, width / 2, 14);
   fill(hall.trim[0], hall.trim[1], hall.trim[2]);
-  textSize(9);
-  var _hudRank = typeof ISLAND_RANKS !== 'undefined' ? ISLAND_RANKS[state.islandLevel] : '';
-  text('Level ' + (state.islandLevel || 1) + (_hudRank ? ' - ' + _hudRank : '') + '  |  Day ' + state.day, width / 2, 28);
+  textSize(8);
+  text('[ESC] Exit Temple', width / 2, height - 20);
+  textAlign(LEFT, TOP);
+}
 
-  // Crystal and solar
-  fill(100, 220, 180); textSize(9);
-  text('Crystals: ' + state.crystals, width / 2 - 60, 42);
-  fill(255, 200, 60);
-  text('Solar: ' + state.solar + '/' + state.maxSolar, width / 2 + 60, 42);
-
-  // Altar interaction prompt
-  if (dist(tp, tpy, altarX, altarY) < 60) {
-    fill(255, 220, 120, 200 + sin(ft * 0.08) * 40);
-    textSize(9); textAlign(CENTER, CENTER);
-    if (state.crystals >= 5) {
-      text('[E] Offer 5 Crystals  >  +25 Solar', altarX, altarY + 30);
-    } else {
-      fill(180, 120, 100);
-      text('[E] Offer Crystals (need 5)', altarX, altarY + 30);
+function _drawAltarIcon(hall, asx, asy) {
+  noStroke();
+  if (hall.altarShape === 'eagle') {
+    triangle(asx, asy - 15, asx - 11, asy - 5, asx + 11, asy - 5);
+    rect(asx - 1.5, asy - 18, 3, 5);
+    ellipse(asx, asy - 20, 5, 4);
+  } else if (hall.altarShape === 'crescent') {
+    arc(asx, asy - 11, 20, 20, PI + 0.4, TWO_PI - 0.4);
+  } else if (hall.altarShape === 'pyramid') {
+    triangle(asx, asy - 21, asx - 13, asy - 3, asx + 13, asy - 3);
+  } else if (hall.altarShape === 'olive') {
+    stroke(hall.altarColor[0], hall.altarColor[1], hall.altarColor[2]);
+    strokeWeight(1.5); noFill();
+    arc(asx, asy - 10, 16, 20, -PI * 0.8, -PI * 0.2);
+    noStroke();
+  } else if (hall.altarShape === 'anchor') {
+    stroke(hall.altarColor[0], hall.altarColor[1], hall.altarColor[2]);
+    strokeWeight(2); noFill();
+    line(asx, asy - 20, asx, asy - 5);
+    line(asx - 8, asy - 18, asx + 8, asy - 18);
+    arc(asx, asy - 5, 14, 10, 0, PI);
+    noStroke();
+  } else if (hall.altarShape === 'fire') {
+    for (var f = 0; f < 3; f++) {
+      var fw = (3 - f) * 4, fh = 14 * (1 - f * 0.25);
+      var flicker = sin(frameCount * 0.15 + f * 1.5) * 2;
+      fill(255, 100 + f * 50, 20 + f * 20, 220 - f * 30);
+      ellipse(asx + flicker, asy - 3 - fh * 0.5, fw * 2, fh);
     }
+  } else if (hall.altarShape === 'ship') {
+    beginShape();
+    vertex(asx - 11, asy - 5); vertex(asx + 11, asy - 5);
+    vertex(asx + 8, asy - 11); vertex(asx, asy - 18); vertex(asx - 8, asy - 11);
+    endShape(CLOSE);
+  } else if (hall.altarShape === 'dolmen') {
+    rect(asx - 11, asy - 7, 5, 10);
+    rect(asx + 6, asy - 7, 5, 10);
+    rect(asx - 13, asy - 11, 26, 5, 1);
+  }
+}
+
+function _templeRoomInteractE() {
+  var R = TEMPLE_ROOM, fk = state.faction || 'rome';
+  var hall = TEMPLE_HALLS[fk] || TEMPLE_HALLS.rome;
+  var altarX = R.cx, altarY = R.cy - R.hh + 30;
+
+  // Altar interaction (crystal -> solar)
+  if (dist(state.player.x, state.player.y, altarX, altarY) < 45) {
+    if (state.crystals >= 5) {
+      state.crystals -= 5;
+      state.solar = min(state.solar + 25, state.maxSolar);
+      if (snd) snd.playSFX('crystal');
+      addFloatingText(w2sX(altarX), w2sY(altarY) - 20, '+25 Solar Energy', C.solarBright);
+      spawnParticles(state.player.x, state.player.y, 'divine', 8);
+    } else {
+      addFloatingText(w2sX(altarX), w2sY(altarY) - 20, 'Need 5 Crystals', '#ff8888');
+    }
+    return true;
   }
 
-  // Player sprite
-  fill(196, 160, 110);
-  ellipse(tp, tpy - 18, 12, 12);
-  var pCol = FACTIONS[fk] ? FACTIONS[fk].player : FACTIONS.rome.player;
-  fill(pCol.tunic[0], pCol.tunic[1], pCol.tunic[2]);
-  rect(tp - 6, tpy - 12, 12, 16, 2);
-  fill(196, 160, 110);
-  rect(tp - 2, tpy + 4, 4, 8);
+  // Advisor
+  var advX = R.cx + R.hw * 0.55, advY = R.cy - R.hh * 0.3;
+  if (dist(state.player.x, state.player.y, advX, advY) < 35) {
+    var advice = 'You are prospering, leader!';
+    if (state.harvest < 20) advice = 'Your food stores are low. Build more farms.';
+    else if (state.legia && state.legia.soldiers && state.legia.soldiers.length < 5) advice = 'Our military is weak. Train more soldiers.';
+    else if (state.nations) {
+      var nk = Object.keys(state.nations);
+      var badRep = nk.find(function(k) { return state.nations[k] && state.nations[k].reputation < -20; });
+      if (badRep) advice = 'The nations grow restless. Consider diplomacy.';
+    }
+    addFloatingText(w2sX(advX), w2sY(advY) - 20, advice, '#ffd080');
+    if (snd) snd.playSFX('click');
+    return true;
+  }
 
-  // Exit hints
-  fill(hall.trim[0], hall.trim[1], hall.trim[2], 160);
-  textAlign(CENTER, CENTER); textSize(11);
-  text('[ESC] Exit Temple', width / 2, height * 0.95);
-  text('v Walk south to exit', width / 2, height * 0.88);
+  // Jester
+  var jestX = R.cx - R.hw * 0.55, jestY = R.cy + R.hh * 0.3;
+  if (dist(state.player.x, state.player.y, jestX, jestY) < 35) {
+    var jokes = TEMPLE_JESTER_JOKES[fk] || TEMPLE_JESTER_JOKES.rome;
+    var joke = jokes[floor(random(jokes.length))];
+    addFloatingText(w2sX(jestX), w2sY(jestY) - 20, joke, '#ffee88');
+    state.templeJesterAnimTimer = 60;
+    if (!state.templeJesterJokedToday) {
+      state.templeJesterJokedToday = true;
+      if (typeof state.morale !== 'undefined') state.morale = min(100, (state.morale || 50) + 5);
+      addFloatingText(w2sX(jestX), w2sY(jestY) - 30, '+5 Morale', '#aaffaa');
+    }
+    if (snd) snd.playSFX('click');
+    return true;
+  }
 
-  textAlign(LEFT, TOP);
-  pop();
+  // Pet
+  if (dist(state.player.x, state.player.y, state.templePetX || state.player.x, state.templePetY || state.player.y) < 25) {
+    state.templePetAnimTimer = 90;
+    var petSound = hall.pet === 'cat' ? 'Mrrrow!' : hall.pet === 'wolf' ? 'Awoo!' : hall.pet === 'owl' ? 'Hoo hoo!' : hall.pet === 'crab' ? '*click click*' : hall.pet === 'monkey' ? 'Ooh ooh!' : hall.pet === 'falcon' ? 'Screee!' : hall.pet === 'parrot' ? 'Squawk!' : 'Oink!';
+    addFloatingText(w2sX(state.templePetX || state.player.x), w2sY(state.templePetY || state.player.y) - 15, petSound, '#ffccaa');
+    if (snd) snd.playSFX('click');
+    return true;
+  }
+
+  return false;
 }
 
 function _drawTemplePet(hall, px, py) {
@@ -6941,42 +6996,26 @@ function _drawTemplePet(hall, px, py) {
     ellipse(px, py, 8, 8);
     fill(pa[0], pa[1], pa[2]);
     ellipse(px, py - 5, 7, 6);
-    fill(60, 40, 30);
-    circle(px - 1, py - 5, 1.5); circle(px + 1, py - 5, 1.5);
-    noFill(); stroke(pc[0], pc[1], pc[2]); strokeWeight(1);
-    arc(px + 5, py, 8, 10, -PI * 0.5, PI * 0.5);
-    noStroke();
   } else if (hall.pet === 'cat') {
     ellipse(px, py, 9, 7);
     fill(pa[0], pa[1], pa[2]);
     ellipse(px - 4, py - 2, 6, 5);
     triangle(px - 6, py - 5, px - 4, py - 9, px - 2, py - 5);
     triangle(px - 7, py - 5, px - 5, py - 9, px - 3, py - 5);
-    stroke(180); strokeWeight(0.4);
-    line(px - 7, py - 2, px - 11, py - 3);
-    line(px - 7, py - 1, px - 11, py);
-    noStroke();
   } else if (hall.pet === 'owl') {
     ellipse(px, py, 8, 10);
     fill(pa[0], pa[1], pa[2]);
     ellipse(px, py - 4, 8, 6);
     fill(60, 50, 30);
     circle(px - 2, py - 4, 2.5); circle(px + 2, py - 4, 2.5);
-    fill(220, 180, 60);
-    triangle(px, py - 3, px - 1, py - 1, px + 1, py - 1);
   } else if (hall.pet === 'crab') {
     ellipse(px, py, 10, 6);
     fill(pa[0], pa[1], pa[2]);
     circle(px - 6, py - 2, 4); circle(px + 6, py - 2, 4);
-    fill(20); circle(px - 2, py - 4, 1.5); circle(px + 2, py - 4, 1.5);
   } else if (hall.pet === 'falcon') {
     ellipse(px, py, 8, 6);
     fill(pa[0], pa[1], pa[2]);
     ellipse(px - 3, py - 1, 5, 4);
-    fill(60, 50, 30);
-    triangle(px - 6, py - 1, px - 8, py, px - 6, py + 1);
-    fill(pc[0] * 0.8, pc[1] * 0.8, pc[2] * 0.8);
-    ellipse(px + 2, py - 1, 6, 3);
   } else if (hall.pet === 'parrot') {
     fill(pc[0], pc[1], pc[2]);
     ellipse(px, py, 7, 8);
@@ -6984,84 +7023,12 @@ function _drawTemplePet(hall, px, py) {
     ellipse(px, py - 4, 6, 5);
     fill(255, 200, 60);
     triangle(px - 4, py - 4, px - 6, py - 3, px - 4, py - 2);
-    fill(60);
-    circle(px - 1, py - 5, 1.2); circle(px + 1, py - 5, 1.2);
   } else if (hall.pet === 'boar') {
     ellipse(px, py, 12, 8);
     fill(pa[0], pa[1], pa[2]);
     ellipse(px - 5, py, 5, 4);
-    fill(200, 140, 110);
-    ellipse(px - 7, py, 3, 2.5);
-    fill(240);
-    rect(px - 8, py + 1, 2, 1);
   }
 }
-
-function _templeInteractE() {
-  var tp = state.templePlayerX || width / 2;
-  var tpy = state.templePlayerY || height * 0.75;
-  var fk = state.faction || 'rome';
-  var hall = TEMPLE_HALLS[fk] || TEMPLE_HALLS.rome;
-  var altarX = width / 2, altarY = height * 0.38;
-
-  // Altar interaction (crystal -> solar)
-  if (dist(tp, tpy, altarX, altarY) < 60) {
-    if (state.crystals >= 5) {
-      state.crystals -= 5;
-      state.solar = min(state.solar + 25, state.maxSolar);
-      if (snd) snd.playSFX('crystal');
-      addFloatingText(width / 2, height * 0.25, '+25 Solar Energy', C.solarBright);
-      spawnParticles(state.player.x, state.player.y, 'divine', 8);
-    } else {
-      addFloatingText(width / 2, height * 0.25, 'Need 5 Crystals', '#ff8888');
-    }
-    return true;
-  }
-
-  // Advisor interaction
-  var advX = width * 0.78, advY = height * 0.42;
-  if (dist(tp, tpy, advX, advY) < 45) {
-    var advice = 'You are prospering, leader!';
-    if (state.harvest < 20) advice = 'Your food stores are low. Build more farms.';
-    else if (state.legia && state.legia.soldiers && state.legia.soldiers.length < 5) advice = 'Our military is weak. Train more soldiers.';
-    else if (state.nations) {
-      var nk = Object.keys(state.nations);
-      var badRep = nk.find(function(k) { return state.nations[k] && state.nations[k].reputation < -20; });
-      if (badRep) advice = 'The nations grow restless. Consider diplomacy.';
-    }
-    addFloatingText(width / 2, height * 0.25, advice, '#ffd080');
-    if (snd) snd.playSFX('click');
-    return true;
-  }
-
-  // Jester interaction
-  var jestX = width * 0.22, jestY = height * 0.72;
-  if (dist(tp, tpy, jestX, jestY) < 45) {
-    var jokes = TEMPLE_JESTER_JOKES[fk] || TEMPLE_JESTER_JOKES.rome;
-    var joke = jokes[floor(random(jokes.length))];
-    addFloatingText(width / 2, height * 0.25, joke, '#ffee88');
-    state.templeJesterAnimTimer = 60;
-    if (!state.templeJesterJokedToday) {
-      state.templeJesterJokedToday = true;
-      if (typeof state.morale !== 'undefined') state.morale = min(100, (state.morale || 50) + 5);
-      addFloatingText(width / 2, height * 0.32, '+5 Morale', '#aaffaa');
-    }
-    if (snd) snd.playSFX('click');
-    return true;
-  }
-
-  // Pet interaction
-  if (dist(tp, tpy, state.templePetX || tp, state.templePetY || tpy) < 30) {
-    state.templePetAnimTimer = 90;
-    var petSound = hall.pet === 'cat' ? 'Mrrrow!' : hall.pet === 'wolf' ? 'Awoo!' : hall.pet === 'owl' ? 'Hoo hoo!' : hall.pet === 'crab' ? '*click click*' : hall.pet === 'monkey' ? 'Ooh ooh!' : hall.pet === 'falcon' ? 'Screee!' : hall.pet === 'parrot' ? 'Squawk!' : 'Oink!';
-    addFloatingText(state.templePetX || tp, (state.templePetY || tpy) - 15, petSound, '#ffccaa');
-    if (snd) snd.playSFX('click');
-    return true;
-  }
-
-  return false;
-}
-
 
 function drawPyramid() {
   let pyr = state.pyramid;
@@ -18314,9 +18281,43 @@ const CONQUEST_BUILDINGS = {
   campfire:   { name: 'Campfire',    cost: 4,  key: '1', desc: 'Light + morale',   soldiers: 0, workerType: null },
   palisade:   { name: 'Palisade',    cost: 6,  key: '2', desc: 'Wall defense',     soldiers: 0, workerType: null },
   hut:        { name: 'Shelter',     cost: 8,  key: '3', desc: '+1 Chopper',       soldiers: 1, workerType: 'chopper' },
-  watchtower: { name: 'Watchtower',  cost: 10, key: '4', desc: 'Spot enemies',     soldiers: 0, workerType: null },
-  barracks:   { name: 'Barracks',    cost: 14, key: '5', desc: '+2 Soldiers +1 Builder', soldiers: 2, workerType: 'builder' },
+  watchtower: { name: 'Watchtower',  cost: 10, key: '4', desc: 'Auto-fire tower',  soldiers: 0, workerType: null },
+  barracks:   { name: 'Barracks',    cost: 14, key: '5', desc: 'Auto-gen soldiers', soldiers: 0, workerType: 'builder' },
 };
+
+// ─── V1.2 RTS EXPEDITION COMBAT ─────────────────────────────────────────
+
+const EXPEDITION_BARRACKS = {
+  levels: [
+    { maxSoldiers: 4,  genTime: 1800, genCount: 2, units: ['swordsman'], upgradeCost: { wood: 15, stone: 10 } },
+    { maxSoldiers: 6,  genTime: 1500, genCount: 3, units: ['swordsman'], upgradeCost: { wood: 25, stone: 20 } },
+    { maxSoldiers: 8,  genTime: 1200, genCount: 3, units: ['swordsman'], upgradeCost: { wood: 40, stone: 30, gold: 20 } },
+    { maxSoldiers: 10, genTime: 1200, genCount: 4, units: ['swordsman', 'archer'], upgradeCost: { wood: 60, stone: 40, gold: 40 } },
+    { maxSoldiers: 14, genTime: 1000, genCount: 4, units: ['swordsman', 'archer'], upgradeCost: { wood: 80, stone: 60, gold: 60 } },
+    { maxSoldiers: 18, genTime: 900,  genCount: 5, units: ['swordsman', 'archer'], upgradeCost: { wood: 100, stone: 80, gold: 80 } },
+    { maxSoldiers: 22, genTime: 900,  genCount: 5, units: ['swordsman', 'archer'], upgradeCost: { wood: 120, stone: 100, gold: 100 } },
+    { maxSoldiers: 26, genTime: 800,  genCount: 6, units: ['swordsman', 'archer'], upgradeCost: { wood: 150, stone: 120, gold: 120 } },
+    { maxSoldiers: 30, genTime: 700,  genCount: 6, units: ['swordsman', 'archer'], upgradeCost: { wood: 200, stone: 150, gold: 150 } },
+    { maxSoldiers: 36, genTime: 600,  genCount: 7, units: ['swordsman', 'archer', 'cavalry'], upgradeCost: null }
+  ]
+};
+
+const EXPEDITION_UNITS = {
+  swordsman: { hp: 25, damage: 5, speed: 1.2, range: 25, cost: 0, color: [160, 140, 120] },
+  archer:    { hp: 15, damage: 8, speed: 1.0, range: 180, cost: 0, color: [120, 160, 100] },
+  cavalry:   { hp: 40, damage: 7, speed: 2.2, range: 25, cost: 0, color: [180, 160, 100] }
+};
+
+const EXPEDITION_TOWER = {
+  levels: [
+    { damage: 5, speed: 60, range: 150, upgradeCost: { wood: 10, stone: 5 } },
+    { damage: 8, speed: 50, range: 180, upgradeCost: { wood: 20, stone: 15 } },
+    { damage: 12, speed: 40, range: 210, upgradeCost: { wood: 35, stone: 25, gold: 15 } },
+    { damage: 18, speed: 30, range: 250, upgradeCost: null }
+  ]
+};
+
+var _conquestProjectiles = [];
 
 function isOnConquestIsland(wx, wy) {
   let c = state.conquest;
@@ -18457,6 +18458,7 @@ function enterConquest() {
         vx: 0, vy: 0, hp: s.hp, maxHp: s.maxHp,
         state: 'follow', target: null,
         attackTimer: 0, facing: 1, flashTimer: 0,
+        _unitType: 'swordsman',
       });
     });
     lg.soldiers = [];
@@ -18473,6 +18475,7 @@ function enterConquest() {
         vx: 0, vy: 0, hp: soldierHP, maxHp: soldierHP,
         state: 'follow', target: null,
         attackTimer: 0, facing: 1, flashTimer: 0,
+        _unitType: 'swordsman',
       });
     }
     c.phase = 'landing';
@@ -18486,6 +18489,19 @@ function enterConquest() {
   c.rareSpawnTimer = 0;
   c.enemies = [];
   c.spawnTimer = 600; // grace period
+  _conquestProjectiles = [];
+  // V1.2: Reset barracks gen timer if barracks exists
+  if (c.barracksLevel > 0) {
+    let lvIdx = min(c.barracksLevel - 1, EXPEDITION_BARRACKS.levels.length - 1);
+    c.barracksGenTimer = EXPEDITION_BARRACKS.levels[lvIdx].genTime;
+  }
+  // V1.2: Reset tower timers
+  c.towerTimers = {};
+  // V1.2: Init missing state
+  if (!c.unitLevels) c.unitLevels = { swordsman: 1, archer: 1, cavalry: 1 };
+  if (!c.unitXP) c.unitXP = { swordsman: 0, archer: 0, cavalry: 0 };
+  if (!c.towerLevels) c.towerLevels = {};
+  if (!c.stonePile) c.stonePile = 0;
   // Purge dead/corrupted soldiers and workers
   c.soldiers = c.soldiers.filter(s => s.hp > 0);
   c.workers = c.workers.filter(w => w && w.type);
@@ -18544,6 +18560,7 @@ function exitConquest(isDeath) {
   _combatLastEnemyCount = 0;
   // Keep soldiers/buildings/trees/workers — persistent state
   c.enemies = [];
+  _conquestProjectiles = [];
   // Board the ship at Terra Nova's dock — position outside collision ellipse
   let dockX = c.isleX;
   let dockY = c.isleY + c.isleRY * 1.05;
@@ -21497,6 +21514,20 @@ function updateConquest(dt) {
       if (typeof advanceNPCQuestCounter === 'function') advanceNPCQuestCounter('nq_marcus_kills', 1);
       updateBountyProgress('kills', 1, e.type);
       dropExpeditionLoot(e.x, e.y, e.type);
+      // V1.2: Unit XP from kills
+      if (e._killedByUnitType && c.unitXP) {
+        let uType = e._killedByUnitType;
+        if (c.unitXP[uType] !== undefined) {
+          c.unitXP[uType] += 10;
+          let xpNeeded = (c.unitLevels[uType] || 1) * 50;
+          if (c.unitXP[uType] >= xpNeeded && c.unitLevels[uType] < 5) {
+            c.unitLevels[uType]++;
+            c.unitXP[uType] = 0;
+            addFloatingText(w2sX(e.x), w2sY(e.y) - 40, uType.charAt(0).toUpperCase() + uType.slice(1) + ' Lv' + c.unitLevels[uType] + '!', '#ffdd44');
+            if (snd) snd.playSFX('upgrade');
+          }
+        }
+      }
       c.enemies.splice(i, 1);
     }
   }
@@ -21511,6 +21542,15 @@ function updateConquest(dt) {
 
   // Update workers
   updateConquestWorkers(dt);
+
+  // V1.2: Barracks auto-generation
+  updateConquestBarracks(c, dt);
+  // V1.2: Tower auto-fire
+  updateConquestTowers(c, dt);
+  // V1.2: Update projectiles
+  updateConquestProjectiles(c, dt);
+  // V1.2: Enemy targeting workers
+  updateEnemyWorkerTargeting(c, dt);
 
   // Phase advancement
   advanceConquestPhase(c);
@@ -21665,13 +21705,19 @@ function updateConquestEnemy(e, dt, p, c) {
     e.state = 'chase'; e.stateTimer = 0;
   }
 
-  // Find nearest target (player or soldier)
+  // Find nearest target (player, soldier, or worker)
   let nearestD = dist(e.x, e.y, p.x, p.y);
   let targetX = p.x, targetY = p.y;
   for (let s of c.soldiers) {
     if (s.hp <= 0) continue;
     let sd = dist(e.x, e.y, s.x, s.y);
     if (sd < nearestD) { nearestD = sd; targetX = s.x; targetY = s.y; }
+  }
+  // V1.2: Workers are also targets
+  for (let w of c.workers) {
+    if (!w || w._dead) continue;
+    let wd = dist(e.x, e.y, w.x, w.y);
+    if (wd < nearestD) { nearestD = wd; targetX = w.x; targetY = w.y; }
   }
 
   // Palisade blocking — slow enemies near palisades
@@ -21764,6 +21810,11 @@ function updateConquestEnemy(e, dt, p, c) {
   }
 }
 
+function getUnitLevelMult(c, unitType) {
+  let lv = (c.unitLevels && c.unitLevels[unitType]) ? c.unitLevels[unitType] : 1;
+  return { hp: 1 + (lv - 1) * 0.10, damage: 1 + (lv - 1) * 0.10, speed: 1 + (lv - 1) * 0.05, level: lv };
+}
+
 function updateConquestSoldier(s, dt, p, c, idx, total) {
   if (!s || isNaN(s.x) || isNaN(s.y)) { if (s) s.hp = 0; return; }
   if (s.hp <= 0) { s.state = 'dead'; return; }
@@ -21772,73 +21823,118 @@ function updateConquestSoldier(s, dt, p, c, idx, total) {
   idx = idx || 0;
   total = total || 1;
 
+  let uType = s._unitType || 'swordsman';
+  let uDef = EXPEDITION_UNITS[uType] || EXPEDITION_UNITS.swordsman;
+  let lvMult = getUnitLevelMult(c, uType);
+  let attackRange = uDef.range;
+  let moveSpeed = uDef.speed * lvMult.speed;
+  let dmg = floor(uDef.damage * lvMult.damage);
+  let detectionRange = uType === 'archer' ? 200 : 140;
+
   // Find nearest enemy
-  let nearestE = null, nearestD = 140;
+  let nearestE = null, nearestD = detectionRange;
   for (let e of c.enemies) {
     if (e.state === 'dying' || e.state === 'dead') continue;
     let d = dist(s.x, s.y, e.x, e.y);
     if (d < nearestD) { nearestD = d; nearestE = e; }
   }
 
-  if (nearestE && nearestD < 120) {
-    // COMBAT — charge nearest enemy
+  if (nearestE && nearestD < detectionRange) {
     let dx = nearestE.x - s.x, dy = nearestE.y - s.y;
     let d = sqrt(dx * dx + dy * dy);
     s.facing = dx > 0 ? 1 : -1;
-    if (d > 22) {
-      s.x += (dx / d) * 2.5 * dt;
-      s.y += (dy / d) * 2.5 * dt;
-    } else if (s.attackTimer <= 0) {
-      nearestE.hp -= 10;
-      nearestE.flashTimer = 5;
-      nearestE.state = 'stagger';
-      nearestE.stateTimer = 6;
-      s.attackTimer = 30;
-      let kba = atan2(nearestE.y - s.y, nearestE.x - s.x);
-      nearestE.x += cos(kba) * 3;
-      nearestE.y += sin(kba) * 3;
-      spawnParticles(nearestE.x, nearestE.y, 'combat', 2);
+
+    if (uType === 'archer') {
+      // Archers: keep distance, fire projectiles
+      if (d < 60) {
+        s.x -= (dx / d) * moveSpeed * dt;
+        s.y -= (dy / d) * moveSpeed * dt;
+      } else if (d > attackRange) {
+        s.x += (dx / d) * moveSpeed * dt;
+        s.y += (dy / d) * moveSpeed * dt;
+      }
+      if (d <= attackRange && s.attackTimer <= 0) {
+        let ad = max(1, d);
+        _conquestProjectiles.push({
+          x: s.x, y: s.y,
+          vx: (dx / ad) * 4, vy: (dy / ad) * 4,
+          damage: dmg, life: 60, _unitType: uType
+        });
+        s.attackTimer = 40;
+      }
+    } else if (uType === 'cavalry') {
+      // Cavalry: charge with speed bonus, extra first-hit damage
+      if (d > 25) {
+        let chargeSpeed = moveSpeed * (d > 80 ? 1.8 : 1.0);
+        s.x += (dx / d) * chargeSpeed * dt;
+        s.y += (dy / d) * chargeSpeed * dt;
+      } else if (s.attackTimer <= 0) {
+        let chargeDmg = s._charging ? floor(dmg * 1.5) : dmg;
+        nearestE.hp -= chargeDmg;
+        nearestE._killedByUnitType = uType;
+        nearestE.flashTimer = 5;
+        nearestE.state = 'stagger'; nearestE.stateTimer = 6;
+        s.attackTimer = 25;
+        s._charging = false;
+        let kba = atan2(nearestE.y - s.y, nearestE.x - s.x);
+        nearestE.x += cos(kba) * 5;
+        nearestE.y += sin(kba) * 5;
+        spawnParticles(nearestE.x, nearestE.y, 'combat', 3);
+      }
+      if (d > 100) s._charging = true;
+    } else {
+      // Swordsman: melee charge
+      if (d > 22) {
+        s.x += (dx / d) * moveSpeed * 2 * dt;
+        s.y += (dy / d) * moveSpeed * 2 * dt;
+      } else if (s.attackTimer <= 0) {
+        nearestE.hp -= dmg;
+        nearestE._killedByUnitType = uType;
+        nearestE.flashTimer = 5;
+        nearestE.state = 'stagger'; nearestE.stateTimer = 6;
+        s.attackTimer = 30;
+        let kba = atan2(nearestE.y - s.y, nearestE.x - s.x);
+        nearestE.x += cos(kba) * 3;
+        nearestE.y += sin(kba) * 3;
+        spawnParticles(nearestE.x, nearestE.y, 'combat', 2);
+      }
     }
   } else {
-    // FORMATION — always form up behind player
+    // FORMATION — form up behind player
     let ftx, fty;
-    // Player facing direction (use velocity or last movement)
     let facingAngle = atan2(p.vy || 0, p.vx || 0);
     if (abs(p.vx || 0) < 0.1 && abs(p.vy || 0) < 0.1) {
       facingAngle = p.facing > 0 ? 0 : PI;
     }
-    // Formation: rows of 5, stacked behind player
     let cols = min(5, total);
     let row = floor(idx / cols);
     let col = idx % cols;
     let centerCol = (cols - 1) / 2;
-    // Perpendicular to facing direction
     let perpAngle = facingAngle + HALF_PI;
-    let backAngle = facingAngle + PI; // behind player
+    let backAngle = facingAngle + PI;
     let spacing = 28;
-    let rowDist = 35 + row * 28; // distance behind player
-    // Position: behind player, spread perpendicular
+    let rowDist = 35 + row * 28;
     let lateral = (col - centerCol) * spacing;
     ftx = p.x + cos(backAngle) * rowDist + cos(perpAngle) * lateral;
     fty = p.y + sin(backAngle) * rowDist + sin(perpAngle) * lateral;
     let dx = ftx - s.x, dy = fty - s.y;
     let d = sqrt(dx * dx + dy * dy);
-    // Move faster when far from formation slot, slower when close
     let spd = d > 60 ? 3.0 : (d > 20 ? 1.8 : 1.0);
     if (d > 6) {
       s.x += (dx / d) * spd * dt;
       s.y += (dy / d) * spd * dt;
     }
     s.facing = dx > 0 ? 1 : (dx < 0 ? -1 : s.facing);
+    if (uType === 'cavalry') s._charging = true;
   }
 
-  // Separation — push apart from other soldiers to prevent stacking
+  // Separation
   for (let i = 0; i < c.soldiers.length; i++) {
     let o = c.soldiers[i];
     if (o === s || o.hp <= 0) continue;
     let sdx = s.x - o.x, sdy = s.y - o.y;
     let sd = sdx * sdx + sdy * sdy;
-    if (sd < 400 && sd > 0) { // 20px min separation
+    if (sd < 400 && sd > 0) {
       let sdd = sqrt(sd);
       s.x += (sdx / sdd) * 0.8;
       s.y += (sdy / sdd) * 0.8;
@@ -21852,6 +21948,131 @@ function updateConquestSoldier(s, dt, p, c, idx, total) {
     let ba = atan2(s.y - c.isleY, s.x - c.isleX);
     s.x = c.isleX + cos(ba) * (c.isleRX - 17);
     s.y = c.isleY + sin(ba) * (c.isleRY - 17);
+  }
+}
+
+// ─── V1.2 RTS SYSTEM FUNCTIONS ──────────────────────────────────────────
+
+function updateConquestBarracks(c, dt) {
+  if (c.barracksLevel < 1) return;
+  let lvIdx = min(c.barracksLevel - 1, EXPEDITION_BARRACKS.levels.length - 1);
+  let lvData = EXPEDITION_BARRACKS.levels[lvIdx];
+  let aliveSoldiers = c.soldiers.filter(s => s.hp > 0).length;
+  if (aliveSoldiers >= lvData.maxSoldiers) return;
+  c.barracksGenTimer -= dt;
+  if (c.barracksGenTimer <= 0) {
+    c.barracksGenTimer = lvData.genTime;
+    let barr = c.buildings.find(b => b.type === 'barracks');
+    if (!barr) return;
+    let toSpawn = min(lvData.genCount, lvData.maxSoldiers - aliveSoldiers);
+    let unitPool = lvData.units;
+    for (let i = 0; i < toSpawn; i++) {
+      let uType = unitPool[floor(random(unitPool.length))];
+      let uDef = EXPEDITION_UNITS[uType] || EXPEDITION_UNITS.swordsman;
+      let lvMult = getUnitLevelMult(c, uType);
+      let hp = floor(uDef.hp * lvMult.hp);
+      let ang = random(TWO_PI);
+      c.soldiers.push({
+        x: barr.x + cos(ang) * 20, y: barr.y + sin(ang) * 20,
+        vx: 0, vy: 0, hp: hp, maxHp: hp,
+        state: 'follow', target: null,
+        attackTimer: 0, facing: 1, flashTimer: 0,
+        _unitType: uType, _charging: uType === 'cavalry',
+      });
+    }
+    addFloatingText(w2sX(barr.x), w2sY(barr.y) - 40, '+' + toSpawn + ' soldiers', '#88cc88');
+    if (snd) snd.playSFX('build');
+  }
+}
+
+function updateConquestTowers(c, dt) {
+  if (!c.towerLevels) c.towerLevels = {};
+  if (!c.towerTimers) c.towerTimers = {};
+  for (let b of c.buildings) {
+    if (b.type !== 'watchtower') continue;
+    let tKey = floor(b.x) + ',' + floor(b.y);
+    if (c.towerLevels[tKey] === undefined) c.towerLevels[tKey] = 0;
+    if (c.towerTimers[tKey] === undefined) c.towerTimers[tKey] = 0;
+    let tLv = c.towerLevels[tKey];
+    let tData = EXPEDITION_TOWER.levels[min(tLv, EXPEDITION_TOWER.levels.length - 1)];
+    c.towerTimers[tKey] -= dt;
+    if (c.towerTimers[tKey] > 0) continue;
+    // Find nearest enemy in range
+    let nearE = null, nearD = tData.range;
+    for (let e of c.enemies) {
+      if (e.state === 'dying' || e.state === 'dead') continue;
+      let d = dist(b.x, b.y, e.x, e.y);
+      if (d < nearD) { nearD = d; nearE = e; }
+    }
+    if (nearE) {
+      c.towerTimers[tKey] = tData.speed;
+      let dx = nearE.x - b.x, dy = nearE.y - b.y;
+      let d = max(1, sqrt(dx * dx + dy * dy));
+      _conquestProjectiles.push({
+        x: b.x, y: b.y - 30,
+        vx: (dx / d) * 5, vy: (dy / d) * 5,
+        damage: tData.damage, life: 50, _unitType: 'tower'
+      });
+    }
+  }
+}
+
+function updateConquestProjectiles(c, dt) {
+  for (let i = _conquestProjectiles.length - 1; i >= 0; i--) {
+    let pr = _conquestProjectiles[i];
+    pr.x += pr.vx * dt;
+    pr.y += pr.vy * dt;
+    pr.life -= dt;
+    if (pr.life <= 0) { _conquestProjectiles.splice(i, 1); continue; }
+    for (let e of c.enemies) {
+      if (e.state === 'dying' || e.state === 'dead') continue;
+      if (dist(pr.x, pr.y, e.x, e.y) < e.size + 8) {
+        e.hp -= pr.damage;
+        e.flashTimer = 5;
+        e._killedByUnitType = pr._unitType || 'swordsman';
+        if (e.hp > 0) { e.state = 'stagger'; e.stateTimer = 4; }
+        _conquestProjectiles.splice(i, 1);
+        spawnParticles(e.x, e.y, 'combat', 2);
+        break;
+      }
+    }
+  }
+}
+
+function updateEnemyWorkerTargeting(c, dt) {
+  for (let e of c.enemies) {
+    if (e.state !== 'chase' || e.hp <= 0) continue;
+    for (let w of c.workers) {
+      if (!w || w._dead) continue;
+      if (!w._hp) { w._hp = 20; w._maxHp = 20; }
+      if (dist(e.x, e.y, w.x, w.y) < e.size + 15) {
+        w._hp -= e.damage;
+        addFloatingText(w2sX(w.x), w2sY(w.y) - 15, '-' + e.damage, '#ff4444');
+        if (w._hp <= 0) {
+          w._dead = true;
+          w._respawnTimer = 1800; // 30s at 60fps
+          addFloatingText(w2sX(w.x), w2sY(w.y) - 25, 'Worker killed!', '#ff2222');
+        }
+        break; // one hit per frame per enemy
+      }
+    }
+  }
+  // Handle dead worker respawns
+  for (let w of c.workers) {
+    if (w && w._dead) {
+      w._respawnTimer -= dt;
+      if (w._respawnTimer <= 0) {
+        w._dead = false;
+        w._hp = w._maxHp || 20;
+        w.task = 'idle';
+        w.taskTarget = null;
+        // Respawn near barracks or island center
+        let barr = c.buildings.find(b => b.type === 'barracks');
+        w.x = barr ? barr.x + random(-20, 20) : c.isleX;
+        w.y = barr ? barr.y + random(-20, 20) : c.isleY;
+        addFloatingText(w2sX(w.x), w2sY(w.y) - 20, 'Worker respawned', '#77bbaa');
+      }
+    }
   }
 }
 
@@ -21926,19 +22147,23 @@ function completeConquestBuilding(c, wx, wy, type) {
   updateBountyProgress('build', 1);
   addFloatingText(w2sX(wx), w2sY(wy) - 25, bp.name + ' built!', '#aaddff');
 
-  // Spawn soldiers
-  let soldierHP = 60 + state.expeditionUpgrades.soldierHP * 20;
-  if (bp.soldiers > 0) {
-    for (let i = 0; i < bp.soldiers; i++) {
-      let ang = random(TWO_PI);
-      c.soldiers.push({
-        x: wx + cos(ang) * 20, y: wy + sin(ang) * 20,
-        vx: 0, vy: 0, hp: soldierHP, maxHp: soldierHP,
-        state: 'follow', target: null,
-        attackTimer: 0, facing: 1, flashTimer: 0,
-      });
+  // Barracks: initialize auto-gen (no instant soldiers)
+  if (type === 'barracks') {
+    if (c.barracksLevel < 1) {
+      c.barracksLevel = 1;
+      c.barracksGenTimer = EXPEDITION_BARRACKS.levels[0].genTime;
+      addFloatingText(w2sX(wx), w2sY(wy) - 40, 'Barracks active! Soldiers auto-generate.', '#88cc88');
     }
-    addFloatingText(w2sX(wx), w2sY(wy) - 40, '+' + bp.soldiers + ' Soldier' + (bp.soldiers > 1 ? 's' : ''), '#88cc88');
+  }
+
+  // Watchtower: initialize tower level tracking
+  if (type === 'watchtower') {
+    let tKey = floor(wx) + ',' + floor(wy);
+    if (!c.towerLevels) c.towerLevels = {};
+    if (!c.towerTimers) c.towerTimers = {};
+    c.towerLevels[tKey] = 0;
+    c.towerTimers[tKey] = 0;
+    addFloatingText(w2sX(wx), w2sY(wy) - 40, 'Tower armed!', '#88aadd');
   }
 
   // Spawn worker
@@ -21966,6 +22191,7 @@ function updateConquestWorkers(dt) {
   // Purge corrupted workers
   c.workers = c.workers.filter(w => w && !isNaN(w.x) && !isNaN(w.y) && w.type);
   for (let w of c.workers) {
+    if (w._dead) continue; // V1.2: skip dead workers awaiting respawn
     w.speed = spd;
     // Safety: unknown task state
     if (!['idle','walking','working'].includes(w.task)) w.task = 'idle';
@@ -22115,6 +22341,13 @@ function drawConquestWorker(w) {
     fill(200, 180, 130, 120); textSize(5); textAlign(CENTER);
     let label = w.task === 'walking' ? (w.type === 'chopper' ? 'to tree' : 'to site') : (w.type === 'chopper' ? 'chopping' : 'building');
     text(label, 0, -22);
+  }
+  // V1.2: Worker HP bar when damaged
+  if (w._hp !== undefined && w._hp < (w._maxHp || 20)) {
+    fill(40, 15, 15, 160);
+    rect(-8, -25, 16, 2);
+    fill(200, 80, 50);
+    rect(-8, -25, floor(16 * (w._hp / (w._maxHp || 20))), 2);
   }
   pop();
 }
@@ -22903,6 +23136,10 @@ function drawConquestSoldier(s) {
   let sy = w2sY(s.y);
   if (s.hp <= 0) return;
   let mil = getFactionMilitary();
+  let uType = s._unitType || 'swordsman';
+  let uDef = EXPEDITION_UNITS[uType] || EXPEDITION_UNITS.swordsman;
+  let c = state.conquest;
+  let uLv = (c && c.unitLevels && c.unitLevels[uType]) ? c.unitLevels[uType] : 1;
   push();
   translate(floor(sx), floor(sy));
   noStroke();
@@ -22910,35 +23147,66 @@ function drawConquestSoldier(s) {
   // Pixel shadow
   fill(0, 0, 0, 25);
   rect(-7, 6, 14, 2);
-  // Pixel legs — faction
+  // Pixel legs
   fill(f ? 255 : mil.legs[0], f ? 255 : mil.legs[1], f ? 255 : mil.legs[2]);
   let leg = floor(sin(frameCount * 0.12 + s.x) * 1.5);
   rect(-3, 4 + leg, 2, 6);
   rect(1, 4 - leg, 2, 6);
-  // Pixel body — faction tunic
-  fill(f ? 255 : mil.tunic[0], f ? 255 : mil.tunic[1], f ? 255 : mil.tunic[2]);
+  // Pixel body — tinted by unit type
+  let bc = uDef.color;
+  fill(f ? 255 : bc[0], f ? 255 : bc[1], f ? 255 : bc[2]);
   rect(-6, -6, 12, 12);
-  // Pixel armor plate — faction
+  // Pixel armor plate
   fill(f ? 255 : mil.armor[0], f ? 255 : mil.armor[1], f ? 255 : mil.armor[2]);
-  rect(-4, -5, 8, 8);
+  if (uLv >= 5) {
+    // Level 5: full armor detail
+    rect(-5, -6, 10, 10);
+    fill(f ? 255 : mil.armor[0] + 20, f ? 255 : mil.armor[1] + 20, f ? 255 : mil.armor[2] + 20);
+    rect(-3, -4, 6, 2);
+  } else {
+    rect(-4, -5, 8, 8);
+  }
   // Pixel head
   fill(f ? 255 : 200, f ? 255 : 175, f ? 255 : 135);
   rect(-4, -12, 8, 6);
-  // Pixel helmet — faction
+  // Pixel helmet — level 3+ gets extra detail
   fill(f ? 255 : mil.helm[0], f ? 255 : mil.helm[1], f ? 255 : mil.helm[2]);
   rect(-5, -14, 10, 4);
-  // Pixel plume — faction
+  if (uLv >= 3) {
+    fill(f ? 255 : mil.helm[0] - 20, f ? 255 : mil.helm[1] - 20, f ? 255 : mil.helm[2] - 20);
+    rect(-6, -15, 12, 2); // wider helmet brim
+  }
+  // Pixel plume
   fill(f ? 255 : mil.plume[0], f ? 255 : mil.plume[1], f ? 255 : mil.plume[2]);
   rect(-1, -18, 2, 4);
-  // Pixel shield — faction
-  fill(f ? 255 : mil.shield[0], f ? 255 : mil.shield[1], f ? 255 : mil.shield[2]);
-  if (mil.shieldShape === 'round') ellipse(-s.facing * 8, 0, 9, 9);
-  else rect(-s.facing * 8 - 3, -4, 6, 10);
-  fill(f ? 255 : mil.shieldBoss[0], f ? 255 : mil.shieldBoss[1], f ? 255 : mil.shieldBoss[2]);
-  rect(-s.facing * 8 - 1, -1, 2, 4);
-  // Pixel sword
-  fill(f ? 255 : 195, f ? 255 : 195, f ? 255 : 205);
-  rect(s.facing * 6, -10, 2, 12);
+
+  if (uType === 'archer') {
+    // Bow instead of shield
+    fill(f ? 255 : 120, f ? 255 : 80, f ? 255 : 40);
+    rect(-s.facing * 7, -8, 2, 14);
+    // Quiver
+    fill(f ? 255 : 100, f ? 255 : 70, f ? 255 : 35);
+    rect(s.facing * 5, -8, 3, 8);
+  } else if (uType === 'cavalry') {
+    // Horse body underneath
+    fill(f ? 255 : 140, f ? 255 : 110, f ? 255 : 70);
+    rect(-8, 2, 16, 6, 2);
+    // Horse legs
+    fill(f ? 255 : 120, f ? 255 : 90, f ? 255 : 50);
+    rect(-6, 8, 2, 4); rect(4, 8, 2, 4);
+    // Lance
+    fill(f ? 255 : 195, f ? 255 : 195, f ? 255 : 205);
+    rect(s.facing * 6, -16, 2, 18);
+  } else {
+    // Swordsman — shield + sword
+    fill(f ? 255 : mil.shield[0], f ? 255 : mil.shield[1], f ? 255 : mil.shield[2]);
+    if (mil.shieldShape === 'round') ellipse(-s.facing * 8, 0, 9, 9);
+    else rect(-s.facing * 8 - 3, -4, 6, 10);
+    fill(f ? 255 : mil.shieldBoss[0], f ? 255 : mil.shieldBoss[1], f ? 255 : mil.shieldBoss[2]);
+    rect(-s.facing * 8 - 1, -1, 2, 4);
+    fill(f ? 255 : 195, f ? 255 : 195, f ? 255 : 205);
+    rect(s.facing * 6, -10, 2, 12);
+  }
   // Pixel eyes
   fill(30);
   rect(-3, -11, 2, 2);
@@ -22949,6 +23217,13 @@ function drawConquestSoldier(s) {
     rect(-10, -20, 20, 3);
     fill(80, 180, 50);
     rect(-10, -20, floor(20 * (s.hp / s.maxHp)), 3);
+  }
+  // Level dots above head
+  if (uLv > 1) {
+    fill(255, 220, 80);
+    for (let li = 0; li < uLv - 1; li++) {
+      rect(-4 + li * 3, -22, 2, 2);
+    }
   }
   pop();
 }
@@ -22967,7 +23242,7 @@ function drawConquestEntities() {
     items.push({ y: s.y, draw: () => { try { drawConquestSoldier(s); } catch(err) { /* skip */ } } });
   }
   for (let w of (c.workers || [])) {
-    if (!w || isNaN(w.y)) continue;
+    if (!w || isNaN(w.y) || w._dead) continue;
     items.push({ y: w.y, draw: () => { try { drawConquestWorker(w); } catch(err) { /* skip */ } } });
   }
   // Centurion on conquest island
@@ -23006,6 +23281,89 @@ function drawConquestEntities() {
   items.sort((a, b) => a.y - b.y);
   for (let it of items) it.draw();
   drawSlashArc();
+
+  // V1.2: Draw projectiles (arrows)
+  push();
+  noStroke();
+  for (let pr of _conquestProjectiles) {
+    let px = w2sX(pr.x), py = w2sY(pr.y);
+    let a = atan2(pr.vy, pr.vx);
+    push();
+    translate(px, py);
+    rotate(a);
+    fill(pr._unitType === 'tower' ? color(200, 180, 100) : color(160, 140, 80));
+    rect(-6, -1, 12, 2);
+    fill(220, 200, 160);
+    triangle(6, -2, 10, 0, 6, 2);
+    pop();
+  }
+  pop();
+
+  // V1.2: Barracks progress bar
+  if (c.barracksLevel > 0) {
+    let barr = c.buildings.find(b => b.type === 'barracks');
+    if (barr) {
+      let bx = w2sX(barr.x), by = w2sY(barr.y);
+      let lvIdx = min(c.barracksLevel - 1, EXPEDITION_BARRACKS.levels.length - 1);
+      let lvData = EXPEDITION_BARRACKS.levels[lvIdx];
+      let prog = 1 - (c.barracksGenTimer / lvData.genTime);
+      push(); noStroke();
+      fill(30, 30, 30, 150);
+      rect(bx - 15, by - 28, 30, 4, 1);
+      fill(100, 200, 100);
+      rect(bx - 15, by - 28, floor(30 * prog), 4, 1);
+      // Soldier count
+      let alive = c.soldiers.filter(s => s.hp > 0).length;
+      fill(220, 200, 160); textSize(8); textAlign(CENTER);
+      text(alive + '/' + lvData.maxSoldiers, bx, by - 32);
+      pop();
+    }
+  }
+
+  // V1.2: Tower range circle when player near
+  for (let b of c.buildings) {
+    if (b.type !== 'watchtower') continue;
+    let pd = dist(state.player.x, state.player.y, b.x, b.y);
+    if (pd > 80) continue;
+    let tKey = floor(b.x) + ',' + floor(b.y);
+    let tLv = (c.towerLevels && c.towerLevels[tKey]) || 0;
+    let tData = EXPEDITION_TOWER.levels[min(tLv, EXPEDITION_TOWER.levels.length - 1)];
+    push();
+    noFill();
+    stroke(100, 180, 255, 40);
+    strokeWeight(1);
+    let bsx = w2sX(b.x), bsy = w2sY(b.y);
+    ellipse(bsx, bsy, tData.range * 2, tData.range * 2);
+    // Tower level label
+    fill(180, 200, 255, 180); noStroke(); textSize(8); textAlign(CENTER);
+    text('Lv' + (tLv + 1), bsx, bsy - 50);
+    // Upgrade prompt
+    if (pd < 45 && tData.upgradeCost) {
+      let cost = tData.upgradeCost;
+      fill(220, 220, 200, 200); textSize(9);
+      text('[E] Upgrade (' + (cost.wood || 0) + 'w ' + (cost.stone || 0) + 's' + (cost.gold ? ' ' + cost.gold + 'g' : '') + ')', bsx, bsy + 20);
+    }
+    pop();
+  }
+
+  // V1.2: Barracks upgrade prompt when player near
+  for (let b of c.buildings) {
+    if (b.type !== 'barracks') continue;
+    let pd = dist(state.player.x, state.player.y, b.x, b.y);
+    if (pd > 45) continue;
+    let lvIdx = c.barracksLevel - 1;
+    if (lvIdx < 0) lvIdx = 0;
+    if (lvIdx < EXPEDITION_BARRACKS.levels.length - 1) {
+      let lvData = EXPEDITION_BARRACKS.levels[lvIdx];
+      if (lvData.upgradeCost) {
+        let cost = lvData.upgradeCost;
+        let bsx = w2sX(b.x), bsy = w2sY(b.y);
+        push(); fill(220, 220, 200, 200); noStroke(); textSize(9); textAlign(CENTER);
+        text('[E] Upgrade Barracks (' + (cost.wood || 0) + 'w ' + (cost.stone || 0) + 's' + (cost.gold ? ' ' + cost.gold + 'g' : '') + ')', bsx, bsy + 26);
+        pop();
+      }
+    }
+  }
 }
 
 function drawConquestHUD() {
@@ -23089,38 +23447,64 @@ function drawConquestHUD() {
   // Left panel — resources
   let lx = 12, ly = 12;
   fill(20, 20, 20, 160);
-  rect(lx - 4, ly - 4, 130, 100, 5);
+  rect(lx - 4, ly - 4, 140, 140, 5);
   fill(200, 180, 130); textSize(9); textAlign(LEFT, TOP);
   // Wood
   fill(160, 120, 60); rect(lx, ly, 8, 8, 1);
   fill(220, 200, 150); text('Wood: ' + c.woodPile, lx + 12, ly);
-  // Soldiers
-  { let _fc3 = (typeof getFactionData === 'function' ) ? getFactionData() : null; let _sc = _fc3 ? _fc3.bannerColor : [180, 50, 40]; fill(_sc[0], _sc[1], _sc[2]); }; rect(lx, ly + 13, 8, 8, 1);
+  // Stone
+  fill(160, 160, 160); rect(lx, ly + 13, 8, 8, 1);
+  fill(220, 200, 150); text('Stone: ' + (c.stonePile || 0), lx + 12, ly + 13);
+  // Soldiers — show count/max
+  let maxSol = 0;
+  if (c.barracksLevel > 0) {
+    let lvIdx = min(c.barracksLevel - 1, EXPEDITION_BARRACKS.levels.length - 1);
+    maxSol = EXPEDITION_BARRACKS.levels[lvIdx].maxSoldiers;
+  }
+  { let _fc3 = (typeof getFactionData === 'function' ) ? getFactionData() : null; let _sc = _fc3 ? _fc3.bannerColor : [180, 50, 40]; fill(_sc[0], _sc[1], _sc[2]); }; rect(lx, ly + 26, 8, 8, 1);
   fill(220, 200, 150);
   let aliveSoldiers = c.soldiers.filter(s => s.hp > 0).length;
-  text('Soldiers: ' + aliveSoldiers, lx + 12, ly + 13);
+  text('Soldiers: ' + aliveSoldiers + (maxSol > 0 ? '/' + maxSol : ''), lx + 12, ly + 26);
+  // Barracks level
+  if (c.barracksLevel > 0) {
+    fill(180, 160, 120); text('Barracks Lv' + c.barracksLevel, lx + 12, ly + 39);
+  }
   // Workers
-  fill(140, 110, 70); rect(lx, ly + 26, 8, 8, 1);
+  fill(140, 110, 70); rect(lx, ly + 52, 8, 8, 1);
   fill(220, 200, 150);
-  text('Workers: ' + c.workers.length, lx + 12, ly + 26);
+  let aliveWorkers = c.workers.filter(w => !w._dead).length;
+  text('Workers: ' + aliveWorkers + '/' + c.workers.length, lx + 12, ly + 52);
   // Trees
   let livingTrees = c.trees.filter(t => t.alive).length;
-  fill(50, 100, 35); rect(lx, ly + 39, 8, 8, 1);
-  fill(220, 200, 150); text('Trees: ' + livingTrees, lx + 12, ly + 39);
+  fill(50, 100, 35); rect(lx, ly + 65, 8, 8, 1);
+  fill(220, 200, 150); text('Trees: ' + livingTrees, lx + 12, ly + 65);
   // Buildings
-  fill(140, 120, 80); rect(lx, ly + 52, 8, 8, 1);
-  fill(220, 200, 150); text('Built: ' + c.buildings.length + ' | Queue: ' + c.blueprintQueue.length, lx + 12, ly + 52);
+  fill(140, 120, 80); rect(lx, ly + 78, 8, 8, 1);
+  fill(220, 200, 150); text('Built: ' + c.buildings.length + ' | Queue: ' + c.blueprintQueue.length, lx + 12, ly + 78);
   // Gold
-  fill(200, 180, 60); rect(lx, ly + 65, 8, 8, 1);
-  fill(220, 200, 150); text('Gold: ' + state.gold, lx + 12, ly + 65);
+  fill(200, 180, 60); rect(lx, ly + 91, 8, 8, 1);
+  fill(220, 200, 150); text('Gold: ' + state.gold, lx + 12, ly + 91);
   // Loot bag count
-  fill(180, 140, 200); rect(lx, ly + 78, 8, 8, 1);
-  fill(220, 200, 150); text('Loot: ' + c.lootBag.length + ' items', lx + 12, ly + 78);
+  fill(180, 140, 200); rect(lx, ly + 104, 8, 8, 1);
+  fill(220, 200, 150); text('Loot: ' + c.lootBag.length + ' items', lx + 12, ly + 104);
+  // Unit levels
+  if (c.unitLevels) {
+    let ulY = ly + 117;
+    fill(255, 220, 80, 180); textSize(8);
+    let ulText = '';
+    for (let ut of ['swordsman', 'archer', 'cavalry']) {
+      let lv = c.unitLevels[ut] || 1;
+      if (lv > 1 || c.barracksLevel >= 4) {
+        ulText += ut.charAt(0).toUpperCase() + ':' + lv + ' ';
+      }
+    }
+    if (ulText) text(ulText.trim(), lx, ulY);
+  }
 
   // Potion
   if (p.potions > 0) {
     fill(100, 220, 100, 180); textSize(11);
-    text('Potions: ' + p.potions + ' [Q]', lx, ly + 93);
+    text('Potions: ' + p.potions + ' [Q]', lx, ly + 130);
   }
 
   // Bottom bar — equipment + controls
@@ -23898,7 +24282,13 @@ function keyPressed() {
     }
     if (state.demolishConfirm) { state.demolishConfirm = null; return; }
     if (state.buildMode) { state.buildMode = false; return; }
-    if (state.insideTemple) { state.insideTemple = false; return; }
+    if (state.insideTemple) {
+      state.insideTemple = false;
+      state.player.x = state._templeReturnX || state.pyramid.x;
+      state.player.y = state._templeReturnY || state.pyramid.y + 10;
+      camSmooth.x = state.player.x; camSmooth.y = state.player.y - height * 0.12;
+      return;
+    }
     if (wardrobeOpen) { wardrobeOpen = false; return; }
     if (dialogState.active) { dialogState.active = false; return; }
     if (state.expeditionModifierSelect) { state.expeditionModifierSelect = false; return; }
@@ -24072,6 +24462,67 @@ function keyPressed() {
       let shipY = cq.shipY || (cq.isleY + cq.isleRY * 0.92 + 15);
       let dShip = dist(state.player.x, state.player.y, shipX, shipY);
       if (dShip < 60) { exitConquest(); return; }
+      // V1.2: E key — upgrade tower
+      for (let b of cq.buildings) {
+        if (b.type === 'watchtower' && dist(state.player.x, state.player.y, b.x, b.y) < 45) {
+          let tKey = floor(b.x) + ',' + floor(b.y);
+          if (!cq.towerLevels) cq.towerLevels = {};
+          let tLv = cq.towerLevels[tKey] || 0;
+          let tData = EXPEDITION_TOWER.levels[tLv];
+          if (tData && tData.upgradeCost) {
+            let cost = tData.upgradeCost;
+            let canAfford = (cq.woodPile >= (cost.wood || 0)) && ((cq.stonePile || 0) >= (cost.stone || 0)) && (state.gold >= (cost.gold || 0));
+            if (canAfford) {
+              cq.woodPile -= cost.wood || 0;
+              cq.stonePile = (cq.stonePile || 0) - (cost.stone || 0);
+              state.gold -= cost.gold || 0;
+              cq.towerLevels[tKey] = tLv + 1;
+              addFloatingText(w2sX(b.x), w2sY(b.y) - 45, 'Tower Lv' + (tLv + 2) + '!', '#88aadd');
+              if (snd) snd.playSFX('upgrade');
+            } else {
+              let need = [];
+              if ((cost.wood || 0) > cq.woodPile) need.push((cost.wood - cq.woodPile) + ' wood');
+              if ((cost.stone || 0) > (cq.stonePile || 0)) need.push((cost.stone - (cq.stonePile || 0)) + ' stone');
+              if ((cost.gold || 0) > state.gold) need.push((cost.gold - state.gold) + ' gold');
+              addFloatingText(w2sX(b.x), w2sY(b.y) - 45, 'Need ' + need.join(', '), '#ff6644');
+            }
+          } else {
+            addFloatingText(w2sX(b.x), w2sY(b.y) - 45, 'Tower at max level!', '#aaaaaa');
+          }
+          return;
+        }
+      }
+      // V1.2: E key — upgrade barracks
+      for (let b of cq.buildings) {
+        if (b.type === 'barracks' && dist(state.player.x, state.player.y, b.x, b.y) < 45) {
+          let lvIdx = cq.barracksLevel - 1;
+          if (lvIdx < 0) lvIdx = 0;
+          if (lvIdx >= EXPEDITION_BARRACKS.levels.length - 1) {
+            addFloatingText(w2sX(b.x), w2sY(b.y) - 45, 'Barracks at max level!', '#aaaaaa');
+            return;
+          }
+          let lvData = EXPEDITION_BARRACKS.levels[lvIdx];
+          if (lvData && lvData.upgradeCost) {
+            let cost = lvData.upgradeCost;
+            let canAfford = (cq.woodPile >= (cost.wood || 0)) && ((cq.stonePile || 0) >= (cost.stone || 0)) && (state.gold >= (cost.gold || 0));
+            if (canAfford) {
+              cq.woodPile -= cost.wood || 0;
+              cq.stonePile = (cq.stonePile || 0) - (cost.stone || 0);
+              state.gold -= cost.gold || 0;
+              cq.barracksLevel++;
+              addFloatingText(w2sX(b.x), w2sY(b.y) - 45, 'Barracks Lv' + cq.barracksLevel + '!', '#88cc88');
+              if (snd) snd.playSFX('upgrade');
+            } else {
+              let need = [];
+              if ((cost.wood || 0) > cq.woodPile) need.push((cost.wood - cq.woodPile) + ' wood');
+              if ((cost.stone || 0) > (cq.stonePile || 0)) need.push((cost.stone - (cq.stonePile || 0)) + ' stone');
+              if ((cost.gold || 0) > state.gold) need.push((cost.gold - state.gold) + ' gold');
+              addFloatingText(w2sX(b.x), w2sY(b.y) - 45, 'Need ' + need.join(', '), '#ff6644');
+            }
+          }
+          return;
+        }
+      }
       // E key: chop nearest tree (same as click, but proximity-based)
       if (!cq.buildMode) {
         conquestPlayerChop();
@@ -24113,7 +24564,8 @@ function keyPressed() {
               cq.lootBag.push({ type: 'iron_ore', qty: qty });
               addFloatingText(w2sX(bestRes.x), w2sY(bestRes.y) - 14, '+' + qty + ' Iron Ore', '#aabbcc');
             } else {
-              cq.woodPile += qty;
+              if (!cq.stonePile) cq.stonePile = 0;
+              cq.stonePile += qty;
               addFloatingText(w2sX(bestRes.x), w2sY(bestRes.y) - 14, '+' + qty + ' Stone', '#bbbbbb');
             }
             if (snd) snd.playSFX('chop');
@@ -24221,7 +24673,7 @@ function keyPressed() {
   if (key === 'e' || key === 'E') {
     // Temple interior interactions (advisor, jester, pet, altar)
     if (state.insideTemple) {
-      _templeInteractE();
+      _templeRoomInteractE();
       return;
     }
     // Dive — E near water, but NOT if near the rowboat
@@ -24622,11 +25074,17 @@ function keyPressed() {
     if (!state.insideTemple && !_doorTransition && dist(state.player.x, state.player.y, state.pyramid.x, state.pyramid.y + 5) < 40) {
       if (snd) snd.playSFX('door_creak');
       state.player.vx = 0; state.player.vy = 0; state.player.moving = false;
+      state._templeReturnX = state.player.x;
+      state._templeReturnY = state.player.y;
       startDoorTransition(function() {
         state.insideTemple = true;
-        state.templePlayerX = width / 2;
-        state.templePlayerY = height * 0.75;
-        var _th = TEMPLE_HALLS[state.faction || 'rome'] || TEMPLE_HALLS.rome; addFloatingText(width / 2, height * 0.3, 'Entering ' + _th.name, '#ffd080'); state.templePetX = 0; state.templePetY = 0; state.templeJesterJokedToday = false;
+        state.player.x = TEMPLE_ROOM.cx;
+        state.player.y = TEMPLE_ROOM.cy + TEMPLE_ROOM.hh * 0.5;
+        state.player.vx = 0; state.player.vy = 0; state.player.moving = false;
+        camSmooth.x = TEMPLE_ROOM.cx; camSmooth.y = TEMPLE_ROOM.cy - height * 0.06;
+        var _th = TEMPLE_HALLS[state.faction || 'rome'] || TEMPLE_HALLS.rome;
+        addFloatingText(width / 2, height * 0.3, 'Entering ' + _th.name, '#ffd080');
+        state.templePetX = 0; state.templePetY = 0; state.templeJesterJokedToday = false;
       });
       return;
     }
@@ -25691,11 +26149,17 @@ function saveGame() {
     // Conquest persistence
     conquestPhase: state.conquest.phase,
     conquestWoodPile: state.conquest.woodPile,
+    conquestStonePile: state.conquest.stonePile || 0,
     conquestExpeditionNum: state.conquest.expeditionNum,
     conquestBuildings: state.conquest.buildings,
     conquestBlueprintQueue: state.conquest.blueprintQueue.map(b => ({ x: b.x, y: b.y, type: b.type, progress: b.progress, maxProgress: b.maxProgress })),
-    conquestSoldiers: state.conquest.soldiers.filter(s => s.hp > 0).map(s => ({ x: s.x, y: s.y, hp: s.hp, maxHp: s.maxHp })),
+    conquestSoldiers: state.conquest.soldiers.filter(s => s.hp > 0).map(s => ({ x: s.x, y: s.y, hp: s.hp, maxHp: s.maxHp, _unitType: s._unitType || 'swordsman' })),
     conquestWorkers: state.conquest.workers.map(w => ({ x: w.x, y: w.y, type: w.type })),
+    // V1.2 RTS state
+    conquestBarracksLevel: state.conquest.barracksLevel || 0,
+    conquestUnitLevels: state.conquest.unitLevels || { swordsman: 1, archer: 1, cavalry: 1 },
+    conquestUnitXP: state.conquest.unitXP || { swordsman: 0, archer: 0, cavalry: 0 },
+    conquestTowerLevels: state.conquest.towerLevels || {},
     conquestTrees: state.conquest.trees.map(t => ({ x: t.x, y: t.y, hp: t.hp, maxHp: t.maxHp, alive: t.alive, size: t.size })),
     // Colony system
     conquestColonized: state.conquest.colonized,
@@ -26158,7 +26622,15 @@ function loadGame() {
     state.conquest.buildMode = false;
     if (d.conquestPhase) state.conquest.phase = d.conquestPhase;
     state.conquest.woodPile = d.conquestWoodPile || 0;
+    state.conquest.stonePile = d.conquestStonePile || 0;
     state.conquest.expeditionNum = d.conquestExpeditionNum || 0;
+    // V1.2 RTS state
+    state.conquest.barracksLevel = d.conquestBarracksLevel || 0;
+    state.conquest.unitLevels = d.conquestUnitLevels || { swordsman: 1, archer: 1, cavalry: 1 };
+    state.conquest.unitXP = d.conquestUnitXP || { swordsman: 0, archer: 0, cavalry: 0 };
+    state.conquest.towerLevels = d.conquestTowerLevels || {};
+    state.conquest.towerTimers = {};
+    state.conquest.barracksGenTimer = 0;
     if (d.bountyBoard && typeof d.bountyBoard === 'object') state.bountyBoard = d.bountyBoard;
     if (d.cook) { state.cook.unlocked = d.cook.unlocked; state.cook.x = d.cook.x || state.cook.x; state.cook.y = d.cook.y || state.cook.y; }
     if (d.fisherman) { state.fisherman.unlocked = d.fisherman.unlocked; state.fisherman.fishCaught = d.fisherman.fishCaught || 0; }
@@ -26171,6 +26643,8 @@ function loadGame() {
       state.conquest.soldiers = d.conquestSoldiers.map(s => ({
         ...s, vx: 0, vy: 0, state: 'follow', target: null,
         attackTimer: 0, facing: 1, flashTimer: 0,
+        _unitType: s._unitType || 'swordsman',
+        _charging: (s._unitType === 'cavalry'),
       }));
     }
     if (d.conquestWorkers) {
