@@ -3199,6 +3199,13 @@ function draw() {
 
   // ─── GAME SCREEN ───
   if (!state.isInitialized) return;
+  // ─── REAL-TIME AUTOSAVE (every 5 min, skip combat) ───
+  state.autoSaveTimer++;
+  if (state.autoSaveTimer >= state.autoSaveInterval &&
+      !state.conquest.active && !state.adventure.active) {
+    state.autoSaveTimer = 0;
+    saveGame();
+  }
   try { drawInner(); } catch(err) {
     console.error('draw error:', err.message, err.stack);
     console.error('state:', (state.conquest && state.conquest.active) ? 'conquest' : (state.adventure && state.adventure.active) ? 'adventure' : 'home',
@@ -4551,11 +4558,7 @@ function updateTime(dt) {
     if (state.day > 2 && random() < 0.3 && state.bottles.filter(b => !b.collected).length < 2) {
       spawnBottle();
     }
-    // Auto-save every 2 days
-    if (state.day % 2 === 0) {
-      saveGame();
-      addFloatingText(width / 2, height * 0.35, 'Auto-saved', C.textDim);
-    }
+    // Auto-save handled by real-time timer in draw()
   }
 
   let hour = state.time / 60;
@@ -27504,6 +27507,7 @@ function saveGame() {
   gameSettings.lastSaveTime = Date.now(); _saveSettings();
   let saveData = {
     version: SAVE_VERSION,
+    savedAt: Date.now(),
     day: state.day, time: state.time,
     seeds: state.seeds, harvest: state.harvest, wood: state.wood,
     stone: state.stone, crystals: state.crystals, gold: state.gold, fish: state.fish,
