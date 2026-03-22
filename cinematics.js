@@ -62,7 +62,7 @@ function drawIntroCinematic(dt) {
   if (snd && snd.ready) {
     let masterVol = snd.vol.master * snd.vol.ambient;
     // Storm ambient during wreckage (frames 0-240): low rumble wind
-    if (t < WRECKAGE) {
+    if (t < WRECKAGE && snd._windGain && snd._waveGain) {
       let stormIntensity = min(1, t / FADE_IN);
       snd._windGain.amp(0.14 * stormIntensity * masterVol, 0.3);
       snd._windFilter.freq(40 + sin(frameCount * 0.004) * 20);
@@ -75,7 +75,7 @@ function drawIntroCinematic(dt) {
       snd.playSFX('thunder');
     }
     // Gentle wave transition after wreckage (frames 240+): calm down storm
-    if (t >= WRECKAGE && t < DONE) {
+    if (t >= WRECKAGE && t < DONE && snd._windGain && snd._waveGain) {
       let calm = min(1, (t - WRECKAGE) / 120);
       snd._windGain.amp(lerp(0.14, 0.02, calm) * masterVol, 0.5);
       snd._windFilter.freq(lerp(40, 400, calm));
@@ -689,11 +689,12 @@ function drawSailingCutscene(dt) {
     let masterVol = snd.vol.master * snd.vol.ambient;
     // Steady wind ambient (~300Hz filtered noise)
     let windAmt = min(1, t / FADE_IN);
-    snd._windGain.amp(0.08 * windAmt * masterVol, 0.3);
-    snd._windFilter.freq(300 + sin(frameCount * 0.002) * 60);
-    // Gentle waves
-    snd._waveGain.amp(0.05 * windAmt * masterVol, 0.3);
-    snd._waveFilter.freq(280 + sin(frameCount * 0.003) * 50);
+    if (snd._windGain && snd._waveGain) {
+      snd._windGain.amp(0.08 * windAmt * masterVol, 0.3);
+      snd._windFilter.freq(300 + sin(frameCount * 0.002) * 60);
+      snd._waveGain.amp(0.05 * windAmt * masterVol, 0.3);
+      snd._waveFilter.freq(280 + sin(frameCount * 0.003) * 50);
+    }
     // Oar splash every ~120 frames
     if (t > PUSH_OFF && t < DONE && floor(t) % 120 === 0 && floor(t) !== floor(t - dt)) {
       snd.playSFX('oar_splash');
