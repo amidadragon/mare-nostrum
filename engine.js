@@ -389,3 +389,34 @@ function findPath(fromX, fromY, toX, toY, callback) {
 }
 
 // Engine v0.9 loaded
+
+// ─── PERF: Canvas caching for distant islands ────────────────────────────
+let _islandGfxCache = {};
+
+function getCachedIslandGfx(key, w, h, renderFn) {
+  let c = _islandGfxCache[key];
+  if (!c || frameCount - c.frame > 60) {
+    if (!c) c = { gfx: createGraphics(w, h), frame: 0 };
+    c.gfx.clear();
+    renderFn(c.gfx);
+    c.frame = frameCount;
+    _islandGfxCache[key] = c;
+  }
+  return c.gfx;
+}
+
+function clearIslandGfxCache() {
+  for (let k in _islandGfxCache) {
+    _islandGfxCache[k].gfx.remove();
+  }
+  _islandGfxCache = {};
+}
+
+// ─── PERF: Entity update throttling by distance ──────────────────────────
+function shouldUpdateEntity(entityX, entityY) {
+  let dx = entityX - state.player.x, dy = entityY - state.player.y;
+  let dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist < 1000) return true;
+  if (dist < 2000) return frameCount % 10 === 0;
+  return frameCount % 30 === 0;
+}
