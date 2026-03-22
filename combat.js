@@ -4486,17 +4486,35 @@ function updatePlayerEscort(dt) {
     let isCav = unit.type === 'cavalry';
     let pos = formation.getPos(i, sorted.length, p.x, p.y, facingAngle);
 
-    // Initialize position
+    // Initialize position and per-soldier personality
     if (unit.x === undefined || unit.x === 0) { unit.x = pos.x; unit.y = pos.y; }
+    if (unit._speedMult === undefined) unit._speedMult = 0.9 + Math.random() * 0.2;
+    if (unit._jitterX === undefined) { unit._jitterX = 0; unit._jitterY = 0; unit._jitterTimer = floor(Math.random() * 120); }
 
-    // Smooth lerp to formation position (snappy follow)
-    let dx = pos.x - unit.x, dy = pos.y - unit.y;
+    // Refresh jitter offset every ~120 frames (soldiers fidget)
+    unit._jitterTimer = (unit._jitterTimer || 0) + dt;
+    if (unit._jitterTimer > 120) {
+      unit._jitterX = (Math.random() - 0.5) * 14;
+      unit._jitterY = (Math.random() - 0.5) * 10;
+      unit._jitterTimer = 0;
+    }
+
+    let jitteredX = pos.x + (unit._jitterX || 0);
+    let jitteredY = pos.y + (unit._jitterY || 0);
+
+    // Smooth lerp to formation position (staggered speed per soldier)
+    let dx = jitteredX - unit.x, dy = jitteredY - unit.y;
     let distToTarget = sqrt(dx * dx + dy * dy);
-    let followSpeed = 0.15 + min(0.15, 0.1 * distToTarget / 200);
-    if (distToTarget > 200) followSpeed *= 2; // sprint to catch up
+    let followSpeed = (0.15 + min(0.15, 0.1 * distToTarget / 200)) * unit._speedMult;
+    if (distToTarget > 200) followSpeed *= 2;
     followSpeed = min(followSpeed, 0.3);
     unit.x += dx * followSpeed * dt;
     unit.y += dy * followSpeed * dt;
+
+    // Walking wobble - subtle sine sway when moving
+    if (distToTarget > 5) {
+      unit.x += sin(frameCount * 0.1 + i * 2.3) * 0.5;
+    }
 
     // Auto-attack enemies within range
     let atkRange = isRanged ? 90 : (isCav ? 70 : 60);
@@ -4572,14 +4590,19 @@ function drawEscortSoldier(unit) {
   let uDef = UNIT_TYPES[unit.type] || UNIT_TYPES.legionary;
   let facing = (unit.x < state.player.x) ? 1 : -1;
 
+  // Walking bob when moving
+  let _moveDist = sqrt((unit._lastX !== undefined ? unit.x - unit._lastX : 0) ** 2 + (unit._lastY !== undefined ? unit.y - unit._lastY : 0) ** 2);
+  let _walkBob = _moveDist > 0.3 ? sin(frameCount * 0.2 + unit.x * 0.5) * 1 : 0;
+  unit._lastX = unit.x; unit._lastY = unit.y;
+
   push();
-  translate(sx, sy + floatOffset);
+  translate(sx, sy + floatOffset + _walkBob);
   scale(facing, 1);
   noStroke();
 
   // Shadow
-  fill(0, 0, 0, 30);
-  ellipse(0, 3, 10, 4);
+  fill(0, 0, 0, 35);
+  ellipse(0, 3, 10, 5);
 
   if (unit.type === 'cavalry') {
     // Horse

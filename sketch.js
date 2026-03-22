@@ -14237,6 +14237,11 @@ function updateCenturion(dt) {
       nearEnemy.y += sin(kba) * 4;
       addFloatingText(w2sX(nearEnemy.x), w2sY(nearEnemy.y) - 15, '-' + cen.attackDamage, '#ffaa44');
       spawnParticles(nearEnemy.x, nearEnemy.y, 'combat', 2);
+      // Battle shout - 20% chance
+      if (Math.random() < 0.2) {
+        let _shouts = ['FOR ROME!', 'HOLD THE LINE!', 'ADVANCE!', 'SHIELDS UP!', 'CHARGE!'];
+        addFloatingText(w2sX(cen.x), w2sY(cen.y) - 35, _shouts[floor(Math.random() * _shouts.length)], '#ffdd66');
+      }
       cen.task = 'fight';
       cen.target = nearEnemy;
       return;
@@ -14277,7 +14282,7 @@ function updateCenturion(dt) {
 
   // Default: follow player
   cen.task = 'follow';
-  let followDist = 35;
+  let followDist = 40;
   let dx = p.x - followDist * (p.facing === 'left' ? -1 : 1) - cen.x;
   let dy = p.y + 5 - cen.y;
   let d = sqrt(dx * dx + dy * dy);
@@ -14298,10 +14303,12 @@ function updateCenturion(dt) {
     cen.x = WORLD.islandCX + cos(snapA) * snapD;
     cen.y = WORLD.islandCY + sin(snapA) * snapD;
     cen.vx = 0; cen.vy = 0;
-  } else if (d > 20 && !playerNearEdge) {
-    let spd = min(cen.speed * 1.2, cen.speed + d * 0.005);
-    cen.vx = (dx / d) * spd;
-    cen.vy = (dy / d) * spd;
+  } else if (d > 25 && !playerNearEdge) {
+    // Jog to catch up - faster when further, smooth acceleration
+    let urgency = min(1, max(0, (d - 25) / 150));
+    let spd = cen.speed * (0.6 + urgency * 0.8);
+    cen.vx += ((dx / d) * spd - cen.vx) * 0.15;
+    cen.vy += ((dy / d) * spd - cen.vy) * 0.15;
     let nx = cen.x + cen.vx * dt, ny = cen.y + cen.vy * dt;
     if (isWalkable(nx, ny)) { cen.x = nx; cen.y = ny; }
     else { cen.vx = 0; cen.vy = 0; }
@@ -14309,6 +14316,30 @@ function updateCenturion(dt) {
   } else {
     cen.vx *= 0.8;
     cen.vy *= 0.8;
+    // Idle fidget: small random steps when player is stationary
+    if (!cen._idleTimer) cen._idleTimer = 0;
+    cen._idleTimer += dt;
+    if (cen._idleTimer > 300 + Math.random() * 300) {
+      cen._idleTimer = 0;
+      cen.facing = Math.random() < 0.5 ? 1 : -1;
+      let wa = Math.random() * TWO_PI;
+      let wx = cen.x + cos(wa) * (8 + Math.random() * 8);
+      let wy = cen.y + sin(wa) * (5 + Math.random() * 5);
+      if (isWalkable(wx, wy)) { cen.x = wx; cen.y = wy; }
+    }
+  }
+
+  // Reaction to nearby enemies - turn to face, show "!" indicator
+  if (!state.conquest.active) {
+    let _nearThreat = typeof _findNearestRaidEnemy === 'function' ? _findNearestRaidEnemy(cen.x, cen.y, 200) : null;
+    if (_nearThreat) {
+      cen.facing = _nearThreat.x > cen.x ? 1 : -1;
+      if (!cen._alertTimer || cen._alertTimer <= 0) {
+        cen._alertTimer = 60;
+        addFloatingText(w2sX(cen.x), w2sY(cen.y) - 30, '!', '#ff4444');
+      }
+    }
+    if (cen._alertTimer > 0) cen._alertTimer -= dt;
   }
 }
 
