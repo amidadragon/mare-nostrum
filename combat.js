@@ -4508,28 +4508,52 @@ function updatePlayerEscort(dt) {
 }
 
 function _isNearEnemies(x, y, range) {
-  if (!state.nations) return false;
-  for (let k of Object.keys(state.nations)) {
-    let rv = state.nations[k];
-    if (!rv || !rv.raidParty) continue;
-    for (let r of rv.raidParty) {
-      if (sqrt((r.x - x) * (r.x - x) + (r.y - y) * (r.y - y)) < range) return true;
-    }
-  }
-  return false;
+  return !!_findNearestRaidEnemy(x, y, range);
 }
 
 function _findNearestRaidEnemy(x, y, range) {
-  if (!state.nations) return null;
   let nearest = null, nearD = range;
-  for (let k of Object.keys(state.nations)) {
-    let rv = state.nations[k];
-    if (!rv || !rv.raidParty) continue;
-    for (let r of rv.raidParty) {
+
+  // Home island raid enemies
+  if (state.nations) {
+    for (let k of Object.keys(state.nations)) {
+      let rv = state.nations[k];
+      if (!rv || !rv.raidParty) continue;
+      for (let r of rv.raidParty) {
+        if (r.hp <= 0) continue;
+        let d = sqrt((r.x - x) * (r.x - x) + (r.y - y) * (r.y - y));
+        if (d < nearD) { nearD = d; nearest = r; }
+      }
+    }
+  }
+
+  // Sea People raiders
+  if (state._seaPeopleRaidParty) {
+    for (let r of state._seaPeopleRaidParty) {
+      if (r.hp <= 0) continue;
       let d = sqrt((r.x - x) * (r.x - x) + (r.y - y) * (r.y - y));
       if (d < nearD) { nearD = d; nearest = r; }
     }
   }
+
+  // Expedition enemies
+  if (state.conquest && state.conquest.active && state.conquest.enemies) {
+    for (let e of state.conquest.enemies) {
+      if (e.hp <= 0) continue;
+      let d = sqrt((e.x - x) * (e.x - x) + (e.y - y) * (e.y - y));
+      if (d < nearD) { nearD = d; nearest = e; }
+    }
+  }
+
+  // Arena enemies
+  if (state.adventure && state.adventure.active && state.adventure.enemies) {
+    for (let e of state.adventure.enemies) {
+      if (e.hp <= 0) continue;
+      let d = sqrt((e.x - x) * (e.x - x) + (e.y - y) * (e.y - y));
+      if (d < nearD) { nearD = d; nearest = e; }
+    }
+  }
+
   return nearest;
 }
 

@@ -3498,6 +3498,7 @@ function drawInner() {
     try { updateConquest(dt); } catch(e) { console.error('updateConquest crash:', e.message, e.stack); }
     if (typeof updateCombatSystem === 'function') updateCombatSystem(dt);
     if (typeof updateArmyBattle === 'function') updateArmyBattle(dt);
+    if (typeof updatePlayerEscort === 'function') updatePlayerEscort(dt);
     if (typeof updateEconomySystem === 'function') updateEconomySystem(dt);
     try { updateCenturion(dt); } catch(e) { console.error('updateCenturion crash:', e); }
     updateParticles(dt);
