@@ -57,13 +57,19 @@ function isKeybindDown(action) {
 _loadSettings();
 
 // ─── GLOBAL TEXT READABILITY — enforce minimum size + dark outlines ──────
-const _p5Class = (typeof Q5 !== 'undefined') ? Q5 : p5;
-const _origTextSize = _p5Class.prototype.textSize;
 const MIN_TEXT_SIZE = 10;
-_p5Class.prototype.textSize = function(s) {
-  let scaled = s * (gameSettings.fontScale || 1);
-  return _origTextSize.call(this, max(scaled, MIN_TEXT_SIZE));
-};
+// Override textSize safely for both p5.js and q5.js
+try {
+  let _p5Class = (typeof Q5 !== 'undefined' && Q5.prototype && Q5.prototype.textSize) ? Q5 :
+                 (typeof p5 !== 'undefined' && p5.prototype && p5.prototype.textSize) ? p5 : null;
+  if (_p5Class) {
+    let _origTextSize = _p5Class.prototype.textSize;
+    _p5Class.prototype.textSize = function(s) {
+      let scaled = s * (gameSettings.fontScale || 1);
+      return _origTextSize.call(this, Math.max(scaled, MIN_TEXT_SIZE));
+    };
+  }
+} catch(e) { /* q5 may not support prototype override -- use textSize normally */ }
 
 // Outlined text helper — use for important labels
 function outlinedText(str, x, y, outlineColor, mainColor) {
