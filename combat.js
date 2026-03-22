@@ -3652,10 +3652,11 @@ function factionPlayerAttack() {
       let fAngle = getFacingAngle();
       spawnPlayerProjectile(p.x, p.y, fAngle, 'solar_beam');
       _egyptAttackCounter++;
-      // Every 5 attacks costs 1 crystal
-      if (_egyptAttackCounter >= 5) {
+      // Every 15 attacks costs 1 crystal
+      if (_egyptAttackCounter >= 15) {
         _egyptAttackCounter = 0;
         if (state.crystals > 0) state.crystals--;
+        if (state.crystals < 3) addFloatingText(w2sX(p.x), w2sY(p.y) - 40, 'Low crystals! Attacks will weaken', '#ffaa00');
       }
       // Combo: 5 consecutive hits without damage = solar explosion
       _factionCombo.timer = 180;

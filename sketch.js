@@ -25575,13 +25575,13 @@ function keyPressed() {
       _rebindingAction = null; _keybindScrollOffset = 0;
       gameScreen = 'menu';
     }
-    if (keyCode === 27 && gameScreen === 'multiplayer' || gameScreen === 'howtoplay') {
+    if (keyCode === 27 && (gameScreen === 'multiplayer' || gameScreen === 'howtoplay')) {
       if (typeof _mpSubScreen !== 'undefined' && _mpSubScreen !== 'main') { _mpSubScreen = 'main'; }
       else { gameScreen = 'menu'; if (state) state._mpMenuOpen = false; }
       return;
     }
     // Multiplayer join input
-    if (gameScreen === 'multiplayer' || gameScreen === 'howtoplay' && typeof _mpSubScreen !== 'undefined' && _mpSubScreen === 'join') {
+    if ((gameScreen === 'multiplayer' || gameScreen === 'howtoplay') && typeof _mpSubScreen !== 'undefined' && _mpSubScreen === 'join') {
       if (keyCode === ENTER && typeof _mpJoinInput !== 'undefined' && _mpJoinInput.length > 0) {
         MP.join(_mpJoinInput);
         _mpSubScreen = 'host'; // reuse host screen to show waiting
