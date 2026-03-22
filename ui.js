@@ -2234,6 +2234,19 @@ function drawHUD() {
   let hudX = hudMargin + 10;
   let barW = max(100, floor(110 * uiScale));
   drawBarHUD(hudX, hudMargin + 8, barW, max(8, floor(9 * uiScale)), state.maxSolar > 0 ? state.solar / state.maxSolar : 0, C.solarBright, C.solarGold, 'SOLAR');
+  // HP bar — only show when damaged
+  if (state.player.hp < state.player.maxHp) {
+    let hpBarY = hudMargin + 8 + max(8, floor(9 * uiScale)) + 3;
+    let hpBarH = max(6, floor(7 * uiScale));
+    let hpFrac = Math.max(0, state.player.hp / state.player.maxHp);
+    noStroke();
+    fill(60, 55, 45); rect(hudX, hpBarY, barW, hpBarH, 2);
+    fill(200, 50, 40); rect(hudX, hpBarY, barW * hpFrac, hpBarH, 2);
+    fill(220, 200, 180); textSize(max(7, floor(8 * uiScale)));
+    textAlign(LEFT, CENTER);
+    text('HP: ' + Math.max(0, Math.floor(state.player.hp)) + '/' + state.player.maxHp, hudX + barW + 4, hpBarY + hpBarH / 2);
+    textAlign(LEFT, TOP);
+  }
 
   // Core resources — always show
   let resY = hudMargin + floor(26 * uiScale);
@@ -2423,6 +2436,34 @@ function drawHUD() {
   }
 
   drawingContext.globalAlpha = 1.0;
+
+  // ─── PIRATE WARNING INDICATOR ───
+  if (state._pirateWarning) {
+    let pw = state._pirateWarning;
+    let flash = Math.sin(frameCount * 0.2) > 0;
+    if (flash) {
+      let px = w2sX(pw.x), py = w2sY(pw.y);
+      let cx = width / 2, cy = height / 2;
+      let angle = Math.atan2(py - cy, px - cx);
+      let margin = 40;
+      let edgeX = cx + Math.cos(angle) * (width / 2 - margin);
+      let edgeY = cy + Math.sin(angle) * (height / 2 - margin);
+      edgeX = Math.max(margin, Math.min(width - margin, edgeX));
+      edgeY = Math.max(margin, Math.min(height - margin, edgeY));
+      push();
+      translate(edgeX, edgeY);
+      rotate(angle);
+      fill(255, 40, 40);
+      noStroke();
+      triangle(12, 0, -8, -7, -8, 7);
+      pop();
+      fill(255, 40, 40);
+      textSize(max(11, floor(13 * _uiScale)));
+      textAlign(CENTER, CENTER);
+      text('PIRATES!', edgeX, edgeY - 16);
+      textAlign(LEFT, TOP);
+    }
+  }
 
   // Storm warning
   if (stormActive) {

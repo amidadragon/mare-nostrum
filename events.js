@@ -378,6 +378,7 @@ const EVENT_DEFS = [
       state.activeEvent.data.defeated = 0;
       state.activeEvent.data.shipX = WORLD.islandCX;
       state.activeEvent.data.shipY = WORLD.islandCY + (state.islandRY || WORLD.islandRY) + 80;
+      state._pirateWarning = { x: state.activeEvent.data.shipX, y: state.activeEvent.data.shipY, timer: 600 };
       addFloatingText(width / 2, height * 0.22, 'Pirates spotted offshore!', '#ff4444');
       triggerScreenShake(4, 15);
       if (snd) snd.playSFX('visitor_arrive');
@@ -859,6 +860,7 @@ function updateActiveEvent(dt) {
         }
         addFloatingText(width / 2, height * 0.3, 'Pirates are attacking!', '#ff4444');
         triggerScreenShake(6, 20);
+        state._pirateWarning = { x: d.shipX, y: d.shipY, timer: 600 };
       }
     }
     // Update pirate enemies
@@ -898,6 +900,13 @@ function updateActiveEvent(dt) {
             }
           }
         }
+      }
+    }
+    // Update pirate warning timer
+    if (state._pirateWarning) {
+      state._pirateWarning.timer--;
+      if (state._pirateWarning.timer <= 0 || (d.pirates && d.pirates.length === 0 && d.spawned)) {
+        state._pirateWarning = null;
       }
     }
   }
