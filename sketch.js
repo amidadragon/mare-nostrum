@@ -17573,6 +17573,9 @@ function drawConquestDistantEntities() {
 // ─── ARENA DRAWING ───────────────────────────────────────────────────────
 
 function drawArenaIsleDistant() {
+  // DEBUG: bright red X at arena position to identify which blob is the arena
+  let _dbgx = w2sX(state.adventure.isleX), _dbgy = w2sY(state.adventure.isleY);
+  push(); stroke(255,0,0); strokeWeight(3); line(_dbgx-15,_dbgy-15,_dbgx+15,_dbgy+15); line(_dbgx+15,_dbgy-15,_dbgx-15,_dbgy+15); noStroke(); fill(255,0,0); textSize(12); text('ARENA',_dbgx+20,_dbgy); pop();
   // Draw the arena as a proper island with layered coastline (same technique as main island)
   if (state.adventure.active) return;
   let a = state.adventure;
