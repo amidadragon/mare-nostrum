@@ -966,6 +966,7 @@ let _juiceSpeedLines = []; // speed line particles for dashing
 let _juiceHpShakeTimer = 0; // HP bar shake on damage
 let _juiceToolArc = 0; // tool swing arc timer
 let _juicePickupMagnetism = true; // pickup magnetism enabled
+let _currentIsland = 'home'; // seamless island detection: 'home','arena','vulcan','hyperborea','plenty','necropolis','conquest','water', or nation key
 let _doorTransition = null; // {timer, duration, callback, phase: 'out'|'in'}
 let starPositions = null;
 
@@ -2902,6 +2903,49 @@ function getAllIslandPositions() {
   return islands;
 }
 
+// ═══ SEAMLESS ISLAND DETECTION (V4.0) ════════════════════════════════
+function updateCurrentIsland() {
+  if (!state || !state.player) return;
+  let px = state.player.x, py = state.player.y;
+  let prev = _currentIsland;
+  // Skip detection during cutscenes, temple, wreck, or active island modes (old system)
+  if (state.insideTemple || state.cutscene || state.introPhase !== 'done') return;
+  if (state.vulcan.active || state.hyperborea.active || state.plenty.active || state.necropolis.active) return;
+  if (state.conquest.active || state.visitingNation || state.adventure.active) return;
+  if (state.rowing && state.rowing.active) { _currentIsland = 'water'; if (prev !== 'water') onIslandTransition(prev, 'water'); return; }
+
+  if (isOnIsland(px, py)) { _currentIsland = 'home'; }
+  else if (isOnArenaIsland(px, py)) { _currentIsland = 'arena'; }
+  else {
+    let found = false;
+    for (let isle of getAllIslandPositions()) {
+      if (isle.key === 'home' || isle.key === 'arena') continue;
+      let dx = (px - isle.x) / isle.rx, dy = (py - isle.y) / isle.ry;
+      if (dx * dx + dy * dy < 1.0) { _currentIsland = isle.key; found = true; break; }
+    }
+    if (!found) _currentIsland = 'water';
+  }
+  if (prev !== _currentIsland) onIslandTransition(prev, _currentIsland);
+}
+
+function onIslandTransition(from, to) {
+  if (to === 'water' || to === from) return;
+  let name = null;
+  if (to === 'home') name = 'HOME ISLAND';
+  else if (to === 'arena') name = 'THE ARENA';
+  else if (to === 'vulcan') name = 'ISLE OF VULCAN';
+  else if (to === 'hyperborea') name = 'HYPERBOREA';
+  else if (to === 'plenty') name = 'ISLE OF PLENTY';
+  else if (to === 'necropolis') name = 'NECROPOLIS';
+  else if (to === 'conquest') name = 'TERRA NOVA';
+  else if (typeof getNationName === 'function') name = getNationName(to).toUpperCase();
+  if (name) addFloatingText(width / 2, height * 0.3, name, '#ffcc44');
+}
+
+function getCurrentIsland() { return _currentIsland; }
+function shouldDrawHomeContent() { return _currentIsland === 'home'; }
+function shouldDrawArenaContent() { return _currentIsland === 'arena'; }
+
 function isNearAnyIsland(wx, wy, range) {
   range = range || 300;
   let islands = getAllIslandPositions();
@@ -3271,6 +3315,7 @@ function drawInner() {
   }
 
   updateTime(dt);
+  updateCurrentIsland();
   updateTutorialHint(dt);
   if (snd && frameCount % 10 === 0) { snd.updateAmbient(); }
 
