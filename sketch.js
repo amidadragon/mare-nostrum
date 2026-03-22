@@ -17567,7 +17567,6 @@ function drawConquestDistantEntities() {
 // ─── ARENA DRAWING ───────────────────────────────────────────────────────
 
 function drawArenaIsleDistant() {
-  if (state.adventure.active) return;
   let a = state.adventure;
   let sx = w2sX(a.isleX), sy = w2sY(a.isleY);
 
@@ -17618,15 +17617,79 @@ function drawArenaIsleDistant() {
   fill(sg.r, sg.g, sg.b);
   ellipse(fsx, fsy - 4, rx * 1.3, ry * 1.3);
 
-  // Arena structure (simple, scales with ellipses above)
+  // Arena structure
   let aLv = (typeof getArenaLevel === 'function') ? getArenaLevel() : 1;
-  fill(170, 155, 130);
-  ellipse(fsx, fsy - 5, rx * 1.0, ry * 1.0); // arena floor
+  let inCombat = a.active;
+
+  // Outer wall / seating
   if (aLv >= 2) {
-    noFill(); stroke(140, 125, 105); strokeWeight(max(1, 2 * ((_dScale && _dScale.scale) || 1)));
-    ellipse(fsx, fsy - 5, rx * 1.1, ry * 1.1); // stone wall ring
-    noStroke();
+    // Stone seating tiers
+    fill(155, 145, 125);
+    ellipse(fsx, fsy - 5, rx * 1.25, ry * 1.25);
+    fill(145, 135, 115);
+    ellipse(fsx, fsy - 5, rx * 1.15, ry * 1.15);
   }
+  if (aLv >= 3) {
+    // Colosseum outer wall
+    fill(135, 125, 105);
+    ellipse(fsx, fsy - 5, rx * 1.3, ry * 1.3);
+    fill(155, 145, 125);
+    ellipse(fsx, fsy - 5, rx * 1.25, ry * 1.25);
+    // Arch openings (4 gates)
+    fill(60, 50, 35);
+    for (let g = 0; g < 4; g++) {
+      let ga = g * HALF_PI;
+      let gx = fsx + cos(ga) * rx * 0.62;
+      let gy = fsy - 5 + sin(ga) * ry * 0.62;
+      ellipse(gx, gy, 8, 6);
+    }
+  }
+
+  // Arena floor (sand/dirt fighting pit)
+  fill(195, 180, 145);
+  ellipse(fsx, fsy - 5, rx * 1.05, ry * 1.05);
+  fill(185, 170, 135);
+  ellipse(fsx, fsy - 5, rx * 0.9, ry * 0.9);
+
+  // Audience (when in combat, draw tiny spectator dots around the edge)
+  if (inCombat && aLv >= 2) {
+    let numSpectators = 12 + aLv * 6;
+    for (let i = 0; i < numSpectators; i++) {
+      let sa = (i / numSpectators) * TWO_PI;
+      let seatR = 0.56 + (i % 3) * 0.03;
+      let specX = fsx + cos(sa) * rx * seatR;
+      let specY = fsy - 5 + sin(sa) * ry * seatR;
+      // Colored tunic dots
+      let tc = (i % 5 === 0) ? [180, 50, 50] : (i % 3 === 0) ? [50, 80, 160] : [200, 180, 140];
+      fill(tc[0], tc[1], tc[2]);
+      rect(specX - 1, specY - 2, 3, 4);
+      // Head
+      fill(220, 190, 160);
+      rect(specX - 1, specY - 3, 2, 2);
+    }
+    // Cheering animation (random arms up)
+    if (frameCount % 20 < 10) {
+      for (let i = 0; i < 4; i++) {
+        let ca = (frameCount * 0.01 + i * 1.5) % TWO_PI;
+        let cx = fsx + cos(ca) * rx * 0.58;
+        let cy = fsy - 5 + sin(ca) * ry * 0.58;
+        fill(220, 190, 160);
+        rect(cx, cy - 5, 1, 3); // raised arm
+      }
+    }
+  }
+
+  // Wooden stakes (level 1)
+  if (aLv === 1) {
+    fill(110, 80, 40);
+    for (let i = 0; i < 8; i++) {
+      let sa = i * TWO_PI / 8;
+      let stx = fsx + cos(sa) * rx * 0.5;
+      let sty = fsy - 5 + sin(sa) * ry * 0.5;
+      rect(stx - 1, sty - 5, 2, 7);
+    }
+  }
+
   // Faction flag
   let fm = (typeof getFactionMilitary === 'function') ? getFactionMilitary() : null;
   if (fm) {
