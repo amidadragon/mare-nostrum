@@ -2929,7 +2929,22 @@ function updateCurrentIsland() {
 }
 
 function onIslandTransition(from, to) {
+  // Clear active nation when leaving any nation island
+  if (state._activeNation && from && state.nations && state.nations[from]) {
+    state._activeNation = null;
+  }
   if (to === 'water' || to === from) return;
+  // Seamless nation island entry — generate content at world coords
+  if (to && state.nations && state.nations[to] && !state.visitingNation) {
+    let rv = state.nations[to];
+    if (rv && !rv.defeated) {
+      if (!rv._nationContent) {
+        rv._nationContent = generateNationIslandContent(to);
+      }
+      state._activeNation = to;
+      trackMilestone('visit_nation_' + to);
+    }
+  }
   let name = null;
   if (to === 'home') name = 'HOME ISLAND';
   else if (to === 'arena') name = 'THE ARENA';
@@ -3632,6 +3647,7 @@ function drawInner() {
     updateFishing(dt);
     updateChickens(dt);
     if (frameCount % 5 === 0) updateFactionWildlife(dt * 5);
+    if (state._activeNation) updateActiveNationEntities(dt);
     { let _pg = state.progression;
       let _full = !_pg.gameStarted || _pg.villaCleared;
       if (_full || _pg.companionsAwakened.harvester) updateHarvester(dt);
@@ -3722,6 +3738,8 @@ function drawInner() {
     drawConquestDistantEntities();
     drawConquestDistantLabel();
     drawRivalIsleDistant();
+    // Seamless nation island content (when player is standing on a nation island)
+    if (state._activeNation) drawActiveNationContent();
     // Fog dims distant islands
     if (state.weather.type === 'fog') {
       let _fogHorizonY = max(height * 0.06, height * 0.25 - horizonOffset) + 30;
@@ -4079,6 +4097,7 @@ function drawInner() {
       drawLegiaUI();
       if (typeof drawArmyBattle === 'function') drawArmyBattle();
       drawRivalDiplomacyUI();
+      if (state._activeNation && state.nationDiplomacyOpen) drawNationDiplomacyUI();
       if (typeof drawTechTreeUI === 'function') drawTechTreeUI();
       if (typeof drawVictoryScreen === 'function') drawVictoryScreen();
       if (typeof drawVictoryProgressHUD === 'function') drawVictoryProgressHUD();
@@ -22081,6 +22100,87 @@ function handleNationIslandInteract() {
   return false;
 }
 
+// ─── SEAMLESS NATION ISLAND RENDERING (V4.0) ─────────────────────────────
+function drawActiveNationContent() {
+  let key = state._activeNation;
+  if (!key) return;
+  let rv = state.nations[key];
+  let ni = rv && rv._nationContent;
+  if (!rv || !ni) return;
+  let pal = getNationIslandPalette(key);
+  push(); noStroke();
+  // Palace
+  let psx = w2sX(ni.palace.x), psy = w2sY(ni.palace.y);
+  fill(pal.terrainDark[0], pal.terrainDark[1], pal.terrainDark[2]);
+  rect(psx - ni.palace.w / 2, psy - ni.palace.h, ni.palace.w, ni.palace.h, 2);
+  fill(pal.terrainRim[0], pal.terrainRim[1], pal.terrainRim[2]);
+  rect(psx - ni.palace.w / 2 - 2, psy - ni.palace.h - 6, ni.palace.w + 4, 6);
+  // Buildings
+  for (let b of ni.buildings) {
+    let bsx = w2sX(b.x), bsy = w2sY(b.y);
+    fill(pal.terrain[0] * 0.8, pal.terrain[1] * 0.8, pal.terrain[2] * 0.8);
+    rect(bsx - b.w / 2, bsy - b.h, b.w, b.h, 1);
+  }
+  // Trees
+  for (let t of ni.trees) {
+    let tsx = w2sX(t.x), tsy = w2sY(t.y);
+    fill(60, 90, 40); ellipse(tsx, tsy - t.size, t.size * 1.2, t.size * 1.5);
+    fill(80, 60, 40); rect(tsx - 1, tsy - 2, 2, 4);
+  }
+  // NPCs
+  let bannerCol = ni.bannerCol;
+  for (let n of ni.npcs) {
+    let sx = w2sX(n.x), sy = w2sY(n.y);
+    if (sx < -20 || sx > width + 20 || sy < -20 || sy > height + 20) continue;
+    fill(0, 0, 0, 25); ellipse(sx, sy + 2, 12, 4);
+    fill(bannerCol[0] * 0.6 + 100, bannerCol[1] * 0.6 + 100, bannerCol[2] * 0.6 + 100);
+    rect(sx - 4, sy - 8, 8, 10, 1);
+    fill(155, 120, 85); ellipse(sx, sy - 11, 7, 7);
+  }
+  // Wildlife
+  if (ni.wildlife) { for (let w of ni.wildlife) drawOneFactionCreature(w); }
+  // Flora
+  if (ni.flora) { for (let f of ni.flora) { let fsx = w2sX(f.x), fsy = w2sY(f.y); fill(f.col[0], f.col[1], f.col[2], 140); ellipse(fsx, fsy, f.w, f.h); } }
+  pop();
+  // HUD: nation name bar + proximity prompts
+  let name = getNationName(key);
+  push();
+  fill(bannerCol[0], bannerCol[1], bannerCol[2], 50); noStroke(); rect(0, 0, width, 28);
+  fill(bannerCol[0], bannerCol[1], bannerCol[2], 200); textSize(13); textAlign(CENTER, TOP);
+  text(name + '  —  Level ' + rv.level, width / 2, 6);
+  let p = state.player;
+  let dPalace = dist(p.x, p.y, ni.palace.x, ni.palace.y);
+  if (dPalace < 50) { fill(255, 255, 220, 200 + sin(frameCount * 0.08) * 40); textSize(12); textAlign(CENTER); text('[E] Enter Palace — Diplomacy', width / 2, height * 0.35); }
+  pop();
+}
+
+function updateActiveNationEntities(dt) {
+  let key = state._activeNation;
+  if (!key) return;
+  let rv = state.nations[key];
+  let ni = rv && rv._nationContent;
+  if (!ni) return;
+  for (let n of ni.npcs) {
+    n.moveTimer -= dt;
+    if (n.moveTimer <= 0) { n.vx = random(-0.3, 0.3); n.vy = random(-0.3, 0.3); n.facing = n.vx > 0 ? 1 : -1; n.moveTimer = random(80, 250); n.idleTimer = random(60, 120); }
+    if (n.idleTimer > 0) { n.idleTimer -= dt; } else { n.x += n.vx * dt; n.y += n.vy * dt; }
+  }
+  if (ni.wildlife) { for (let w of ni.wildlife) { w.timer -= dt; if (w.timer <= 0) { w.vx = (random() - 0.5) * w.speed * 2; w.vy = (random() - 0.5) * w.speed * 2; w.timer = random(80, 250); } w.x += w.vx * dt; w.y += w.vy * dt; } }
+}
+
+function handleActiveNationInteract() {
+  let key = state._activeNation;
+  if (!key) return false;
+  let rv = state.nations[key];
+  let ni = rv && rv._nationContent;
+  if (!ni) return false;
+  if (state.nationDiplomacyOpen) return false;
+  let p = state.player;
+  let dPalace = dist(p.x, p.y, ni.palace.x, ni.palace.y);
+  if (dPalace < 50) { openNationDiplomacy(key); return true; }
+  return false;
+}
+
 // ─── WORLD EVENTS — inter-nation drama ────────────────────────────────────
 
 function generateWorldEvent(keys) {
@@ -25449,6 +25549,12 @@ function keyPressed() {
     return;
   }
 
+  // Seamless nation island E-key (new system)
+  if (state._activeNation && !state.visitingNation) {
+    if (state.nationDiplomacyOpen) { handleNationDiplomacyKey(key, keyCode); return; }
+    if (key === 'e' || key === 'E') { if (handleActiveNationInteract()) return; }
+  }
+
   // ─── WRECK BEACH KEYS ───
   if (((state.progression.gameStarted && !state.progression.homeIslandReached) || state.wreck._visiting) &&
       !state.rowing.active && !state.conquest.active && !state.adventure.active) {
@@ -25991,7 +26097,18 @@ function keyPressed() {
       if (r.nearIsle === 'hyperborea') { enterHyperborea(); return; }
       if (r.nearIsle === 'plenty') { enterPlenty(); return; }
       if (r.nearIsle === 'necropolis') { enterNecropolis(); return; }
-      if (state.nations && state.nations[r.nearIsle]) { enterNationIsland(r.nearIsle); return; }
+      if (state.nations && state.nations[r.nearIsle]) {
+        // Seamless disembark — don't teleport, just step onto the island
+        let _nv = state.nations[r.nearIsle];
+        state.rowing.active = false;
+        let _dockAng = atan2(r.y - _nv.isleY, r.x - _nv.isleX);
+        state.player.x = _nv.isleX + cos(_dockAng) * _nv.isleRX * 0.6;
+        state.player.y = _nv.isleY + sin(_dockAng) * _nv.isleRY * 0.6;
+        state.player.vx = 0; state.player.vy = 0;
+        cam.x = state.player.x; cam.y = state.player.y;
+        _startCamTransition(); camZoomTarget = 1.0;
+        return;
+      }
       // Otherwise disembark — snap player back to pier
       let port = getPortPosition();
       state.rowing.active = false;
