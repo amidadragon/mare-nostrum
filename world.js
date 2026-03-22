@@ -12,26 +12,27 @@ function getCoastlineVerts() {
   _coastlineVerts = [];
   let numVerts = 128;
   let noiseSeed = 42;
+  let noiseScale = Math.min(1, ry / 450);
   for (let i = 0; i < numVerts; i++) {
     let angle = (i / numVerts) * TWO_PI;
     let noiseVal = noise(cos(angle) * 2 + noiseSeed, sin(angle) * 2 + noiseSeed);
     let noiseVal2 = noise(cos(angle) * 0.9 + noiseSeed + 100, sin(angle) * 0.9 + noiseSeed + 100);
-    let offset = (noiseVal - 0.5) * 0.14 + (noiseVal2 - 0.5) * 0.08;
+    let offset = (noiseVal - 0.5) * 0.14 * noiseScale + (noiseVal2 - 0.5) * 0.08 * noiseScale;
 
     // Angular bias: south wider (beach/port), north narrower (rocky)
     let sy = Math.sin(angle); // +1 at south (PI/2), -1 at north
-    offset += sy * 0.03; // south bulges out, north pulls in
+    offset += sy * 0.03 * noiseScale; // south bulges out, north pulls in
 
     // Fixed geographic features to break ellipse symmetry
     // West headland/peninsula (angle ~PI)
     let westDist = Math.abs(angle - Math.PI);
-    if (westDist < 0.35) offset += (0.35 - westDist) / 0.35 * 0.06;
+    if (westDist < 0.35) offset += (0.35 - westDist) / 0.35 * 0.06 * noiseScale;
     // Northeast bay/indent (angle ~5.5 rad, i.e. ~315 degrees)
     let neDist = Math.abs(angle - 0.4);
-    if (neDist < 0.3) offset -= (0.3 - neDist) / 0.3 * 0.05;
+    if (neDist < 0.3) offset -= (0.3 - neDist) / 0.3 * 0.05 * noiseScale;
     // South beach — wider flatter area (angle ~PI/2)
     let southDist = Math.abs(angle - Math.PI * 0.5);
-    if (southDist < 0.5) offset += (0.5 - southDist) / 0.5 * 0.03;
+    if (southDist < 0.5) offset += (0.5 - southDist) / 0.5 * 0.03 * noiseScale;
 
     _coastlineVerts.push({ angle: angle, offset: offset });
   }
@@ -51,6 +52,20 @@ function drawCoastlineShape(screenCX, screenCY, radiusX, radiusY, yOffset) {
     vertex(vx, vy);
   }
   endShape(CLOSE);
+}
+
+function _getCoastlineRadiusAtAngle(angle, baseRX, baseRY) {
+  let verts = getCoastlineVerts();
+  // Find the two closest verts and interpolate
+  let numVerts = verts.length;
+  let normAngle = ((angle % TWO_PI) + TWO_PI) % TWO_PI;
+  let idx = (normAngle / TWO_PI) * numVerts;
+  let i0 = Math.floor(idx) % numVerts;
+  let i1 = (i0 + 1) % numVerts;
+  let t = idx - Math.floor(idx);
+  let offset = verts[i0].offset * (1 - t) + verts[i1].offset * t;
+  let r = 1 + offset;
+  return { rx: baseRX * r, ry: baseRY * r };
 }
 
 // ─── SEASON COLORS ────────────────────────────────────────────────────────
@@ -800,8 +815,9 @@ function drawIsland() {
   let _foamStep = _fpsSmooth < 40 ? 0.5 : 0.3;
   for (let fa = 0; fa < TWO_PI; fa += _foamStep) {
     let foamPulse = sin(foamPhase + fa * 3) * 0.01 + 0.005;
-    let foamRX = iw * (0.465 + foamPulse);
-    let foamRY = ih * (0.196 + foamPulse * 0.4);
+    let foamBase = _getCoastlineRadiusAtAngle(fa, iw * 0.465, ih * 0.196);
+    let foamRX = foamBase.rx + foamPulse * iw;
+    let foamRY = foamBase.ry + foamPulse * ih * 0.4;
     let ffx = ix + cos(fa) * foamRX;
     let ffy = (iy - 14) + sin(fa) * foamRY;
     fill(255, 255, 255, 40 + sin(foamPhase + fa * 5) * 20);
@@ -815,15 +831,17 @@ function drawIsland() {
     let wave = sin(reflPhase + ra * 4) * 0.5 + 0.5;
     let wave2 = sin(reflPhase * 1.3 + ra * 6) * 0.5 + 0.5;
     // Outer shimmer ring — light bouncing off shallow water
-    let refRX = iw * (0.49 + sin(reflPhase + ra * 2) * 0.005);
-    let refRY = ih * (0.205 + sin(reflPhase + ra * 2) * 0.002);
+    let refBase = _getCoastlineRadiusAtAngle(ra, iw * 0.49, ih * 0.205);
+    let refRX = refBase.rx + sin(reflPhase + ra * 2) * 0.005 * iw;
+    let refRY = refBase.ry + sin(reflPhase + ra * 2) * 0.002 * ih;
     let rx2 = ix + cos(ra) * refRX;
     let ry2 = (iy - 12) + sin(ra) * refRY;
     fill(200, 230, 255, 18 * wave * dayMix);
     rect(floor(rx2) - 3, floor(ry2), 6 + floor(wave2 * 4), 2);
     // Inner shimmer — closer to shore, brighter
-    let refRX2 = iw * (0.475 + sin(reflPhase * 0.8 + ra * 3) * 0.004);
-    let refRY2 = ih * (0.198 + sin(reflPhase * 0.8 + ra * 3) * 0.002);
+    let refBase2 = _getCoastlineRadiusAtAngle(ra, iw * 0.475, ih * 0.198);
+    let refRX2 = refBase2.rx + sin(reflPhase * 0.8 + ra * 3) * 0.004 * iw;
+    let refRY2 = refBase2.ry + sin(reflPhase * 0.8 + ra * 3) * 0.002 * ih;
     let rx3 = ix + cos(ra) * refRX2;
     let ry3 = (iy - 13) + sin(ra) * refRY2;
     fill(220, 240, 255, 22 * wave2 * dayMix);
@@ -869,6 +887,20 @@ function drawIsland() {
     }
   }
 
+  // ─── CLIFF EDGE — rocky band between water and beach ───
+  // Bottom rock band — outermost, darkest
+  fill(70, 58, 40);
+  drawCoastlineShape(ix, iy, iw * 0.482, ih * 0.208, -7);
+  // Lighter rock/sandstone
+  fill(120, 100, 72);
+  drawCoastlineShape(ix, iy, iw * 0.480, ih * 0.206, -9);
+  // Mid brown dirt
+  fill(95, 72, 48);
+  drawCoastlineShape(ix, iy, iw * 0.478, ih * 0.204, -11);
+  // Dark earth band (innermost cliff layer, transitions to sand)
+  fill(82, 62, 42);
+  drawCoastlineShape(ix, iy, iw * 0.476, ih * 0.202, -13);
+
   // ─── BEACH — layered sand strip between water and cliff ───
   // Wet sand at waterline (darkest, simulates wave-lapped sand)
   fill(190, 170, 140);
@@ -890,18 +922,19 @@ function drawIsland() {
   // South beach widening — extra sand arc on the south side (port side)
   fill(230, 212, 172, 180);
   for (let ba = PI * 0.3; ba < PI * 0.7; ba += 0.15) {
-    let bx = ix + cos(ba) * iw * 0.478;
-    let by = (iy - 12) + sin(ba) * ih * 0.210;
+    let bCoast = _getCoastlineRadiusAtAngle(ba, iw * 0.478, ih * 0.210);
+    let bx = ix + cos(ba) * bCoast.rx;
+    let by = (iy - 12) + sin(ba) * bCoast.ry;
     ellipse(bx, by, 12 + sin(ba * 3.7) * 4, 5);
   }
 
   // Pebbles scattered along beach (sparse)
   {
     let pebSeeds = [0.3, 1.2, 2.5, 3.8, 5.1];
-    let pRX = iw * 0.468, pRY = ih * 0.198;
     pebSeeds.forEach(pa => {
-      let px2 = floor(ix + cos(pa) * pRX + sin(pa * 7.3) * 3);
-      let py2 = floor((iy - 14) + sin(pa) * pRY + cos(pa * 5.1) * 2);
+      let pCoast = _getCoastlineRadiusAtAngle(pa, iw * 0.468, ih * 0.198);
+      let px2 = floor(ix + cos(pa) * pCoast.rx + sin(pa * 7.3) * 3);
+      let py2 = floor((iy - 14) + sin(pa) * pCoast.ry + cos(pa * 5.1) * 2);
       fill(120, 108, 88, 70 + sin(pa * 11) * 20);
       rect(px2, py2, 2, 1);
     });
@@ -910,11 +943,10 @@ function drawIsland() {
   // ─── COASTAL VARIETY ───
   // North rocky headland (angle PI+0.3 to TWO_PI-0.3)
   {
-    let hRX = iw * 0.462;
-    let hRY = ih * 0.193;
     for (let ha = PI + 0.3; ha < TWO_PI - 0.3; ha += 0.18) {
-      let hx = floor(ix + cos(ha) * hRX + sin(ha * 3.1) * 4);
-      let hy = floor((iy - 14) + sin(ha) * hRY + cos(ha * 2.7) * 2);
+      let hCoast = _getCoastlineRadiusAtAngle(ha, iw * 0.462, ih * 0.193);
+      let hx = floor(ix + cos(ha) * hCoast.rx + sin(ha * 3.1) * 4);
+      let hy = floor((iy - 14) + sin(ha) * hCoast.ry + cos(ha * 2.7) * 2);
       fill(88, 78, 62);
       rect(hx - 3, hy - 2, 5 + floor(sin(ha * 5.3) * 2), 3);
       rect(hx, hy - 4, 3, 2);
@@ -928,11 +960,10 @@ function drawIsland() {
   }
   // East tide pools (angle -0.3 to PI/4) — expanded with organisms
   {
-    let tRX = iw * 0.455;
-    let tRY = ih * 0.190;
     for (let ta = -0.3; ta < PI / 4; ta += 0.18) {
-      let tx = ix + cos(ta) * tRX + sin(ta * 4.1) * 3;
-      let ty = (iy - 14) + sin(ta) * tRY + cos(ta * 3.3) * 2;
+      let tCoast = _getCoastlineRadiusAtAngle(ta, iw * 0.455, ih * 0.190);
+      let tx = ix + cos(ta) * tCoast.rx + sin(ta * 4.1) * 3;
+      let ty = (iy - 14) + sin(ta) * tCoast.ry + cos(ta * 3.3) * 2;
       // Pool water — animated shimmer
       let poolShimmer = sin(frameCount * 0.04 + ta * 5) * 0.3 + 0.7;
       fill(35, 90, 105, 80 * poolShimmer);
@@ -953,13 +984,12 @@ function drawIsland() {
   }
   // South beach — sea foam patches (animated wash)
   {
-    let sfRX = iw * 0.468;
-    let sfRY = ih * 0.198;
     let foamT = frameCount * 0.015;
     for (let sa = PI * 0.3; sa < PI * 0.8; sa += 0.12) {
+      let sfCoast = _getCoastlineRadiusAtAngle(sa, iw * 0.468, ih * 0.198);
       let wave = sin(foamT + sa * 6) * 0.5 + 0.5;
-      let sfx = ix + cos(sa) * (sfRX + wave * 4);
-      let sfy = (iy - 14) + sin(sa) * (sfRY + wave * 2);
+      let sfx = ix + cos(sa) * (sfCoast.rx + wave * 4);
+      let sfy = (iy - 14) + sin(sa) * (sfCoast.ry + wave * 2);
       fill(255, 255, 255, 20 + wave * 25);
       ellipse(sfx, sfy, 6 + wave * 4, 2);
       // Bubble dots in foam
@@ -985,11 +1015,10 @@ function drawIsland() {
       { a: PI * 1.3, type: 'shell' },
       { a: PI * 1.6, type: 'pebble' },
     ];
-    let dRX = iw * 0.466;
-    let dRY = ih * 0.197;
     debrisSeeds.forEach(d => {
-      let dx = floor(ix + cos(d.a) * dRX + sin(d.a * 5.3) * 3);
-      let dy = floor((iy - 15) + sin(d.a) * dRY);
+      let dCoast = _getCoastlineRadiusAtAngle(d.a, iw * 0.466, ih * 0.197);
+      let dx = floor(ix + cos(d.a) * dCoast.rx + sin(d.a * 5.3) * 3);
+      let dy = floor((iy - 15) + sin(d.a) * dCoast.ry);
       if (d.type === 'driftwood') {
         fill(130, 105, 70, 90);
         rect(dx - 5, dy, 10, 2, 1);
@@ -1014,20 +1043,6 @@ function drawIsland() {
       }
     });
   }
-
-  // ─── CLIFF EDGE — layered bands below grass surface ───
-  // Dark earth band (topmost cliff layer, just below grass)
-  fill(82, 62, 42);
-  drawCoastlineShape(ix, iy, iw * 0.455, ih * 0.185, -13);
-  // Mid brown dirt
-  fill(95, 72, 48);
-  drawCoastlineShape(ix, iy, iw * 0.458, ih * 0.188, -11);
-  // Lighter rock/sandstone
-  fill(120, 100, 72);
-  drawCoastlineShape(ix, iy, iw * 0.46, ih * 0.19, -9);
-  // Bottom rock band — darkest, blends toward sand/water
-  fill(70, 58, 40);
-  drawCoastlineShape(ix, iy, iw * 0.462, ih * 0.192, -7);
 
   // Grass top — seasonal colors with terrain variation
   let sg = getSeasonGrass();
