@@ -2344,18 +2344,19 @@ function drawDistrictGrounds(ix, iy) {
 
   // Clip district paving to the walkable island ellipse
   push();
+  noStroke(); // ensure no stroke leaks into clip
   let _clipRX = getSurfaceRX() * 0.85;
   let _clipRY = getSurfaceRY() * 0.85;
-  // drawDistrictGrounds is called within a translate context, so use ix/iy directly
   drawingContext.save();
   drawingContext.beginPath();
   drawingContext.ellipse(ix, iy - 18, _clipRX, _clipRY, 0, 0, Math.PI * 2);
   drawingContext.clip();
 
-  // Faction ground tint overlay — stronger to show faction identity
+  // Subtle faction ground tint (reduced from 65 to 30 alpha)
   let _fgt = (typeof getFactionBuildingColors === 'function') ? getFactionBuildingColors().groundTint : null;
   if (_fgt) {
-    fill(_fgt[0], _fgt[1], _fgt[2], 65);
+    noStroke();
+    fill(_fgt[0], _fgt[1], _fgt[2], 30);
     ellipse(ix, iy - 18, _clipRX * 2, _clipRY * 2);
   }
 
