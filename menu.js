@@ -439,11 +439,11 @@ function drawMenuScreen() {
   textSize(subSize);
   // Shadow
   fill(10, 5, 0, floor(150 * subAlpha));
-  text('Shipwrecked.  Sunlit.  Reborn.', w / 2 + 1, subY + 1);
+  text('Cozy Roman Survival', w / 2 + 1, subY + 1);
   // Text with pulsing brightness
   let subPulse = 0.85 + sin(t0 * 0.7 + 1) * 0.15;
   fill(212 * subPulse, 169 * subPulse, 106, floor(255 * subAlpha));
-  text('Shipwrecked.  Sunlit.  Reborn.', w / 2, subY);
+  text('Cozy Roman Survival', w / 2, subY);
 
   // Ornamental line below subtitle
   let ornY2 = subY + subSize * 0.8;
@@ -465,12 +465,9 @@ function drawMenuScreen() {
   let hasSave = false;
   if (_rs) { try { let _d = JSON.parse(_rs); hasSave = _d && _d.version >= 8; } catch(e) {} }
   if (!hasSave && _rs) { try { localStorage.removeItem('sunlitIsles_save'); } catch(e) {} }
-  let items = [];
-  if (hasSave) items.push('CONTINUE VOYAGE');
-  items.push('NEW VOYAGE');
-  items.push('MULTIPLAYER');
-  items.push('HOW TO PLAY');
-  items.push('SETTINGS', 'CREDITS');
+  let items = ['NEW VOYAGE'];
+  if (hasSave) items.splice(1, 0, 'CONTINUE');
+  items.push('MULTIPLAYER', 'SETTINGS', 'CREDITS');
   let itemCount = items.length;
 
   let menuStartY = floor(h * 0.68);
@@ -486,43 +483,55 @@ function drawMenuScreen() {
 
     let iy = menuStartY + i * itemGap;
     let iw = textWidth(items[i]);
-    let hitPad = 20;
-    let textTop = iy - itemSize * 0.8;
-    let hovered = mouseX > w / 2 - iw / 2 - hitPad && mouseX < w / 2 + iw / 2 + hitPad &&
-                  mouseY > textTop - 8 && mouseY < textTop + itemSize + 8;
+    let btnW = max(iw + 60, 160);
+    let btnH = itemSize * 1.6;
+    let btnX = w / 2 - btnW / 2;
+    let btnY = iy - btnH * 0.45;
+    let hitPad = 4;
+    let hovered = mouseX > btnX - hitPad && mouseX < btnX + btnW + hitPad &&
+                  mouseY > btnY - hitPad && mouseY < btnY + btnH + hitPad;
     if (hovered) { menuHover = i; menuKeyIdx = -1; isCursorPointer = true; }
     let selected = hovered || menuKeyIdx === i;
 
     // Slide-in offset (items slide in from right, eased)
-    let slideEase = 1 - pow(1 - slideProgress, 3); // cubic ease-out
+    let slideEase = 1 - pow(1 - slideProgress, 3);
     let slideX = (1 - slideEase) * 60;
+    let bScale = selected ? 1.04 : 1.0;
+    let bw = btnW * bScale, bh = btnH * bScale;
+    let bx = w / 2 - bw / 2 + slideX, by = iy - bh * 0.45;
+
+    // Parchment button background
+    fill(selected ? 58 : 38, selected ? 48 : 32, selected ? 35 : 22, floor(230 * itemAlpha));
+    rect(bx, by, bw, bh, 3);
+    // Dark border
+    stroke(20, 15, 8, floor(180 * itemAlpha));
+    strokeWeight(1);
+    noFill();
+    rect(bx, by, bw, bh, 3);
+    // Gold border on selected
+    if (selected) {
+      let gA = floor((120 + sin(t0 * 2) * 40) * itemAlpha);
+      stroke(220, 190, 80, gA);
+      rect(bx - 1, by - 1, bw + 2, bh + 2, 4);
+    }
+    noStroke();
 
     if (selected) {
-      // Highlight bar behind text
-      let barW = iw + 60;
-      fill(200, 170, 80, floor(25 * itemAlpha));
-      rect(w / 2 - barW / 2 + slideX, iy - itemSize * 0.55, barW, itemSize * 1.2, 3);
-
-      // Left ornament — animated laurel/arrow
-      let arrowX = w / 2 - iw / 2 - 22 + slideX;
-      let arrowBob = sin(t0 * 3) * 1.5;
-      fill(244, 213, 141, floor(255 * itemAlpha));
-      // Roman chevron >>>
-      triangle(arrowX + arrowBob, iy - 4, arrowX + arrowBob, iy + 4, arrowX + 8 + arrowBob, iy);
-      triangle(arrowX + 6 + arrowBob, iy - 3, arrowX + 6 + arrowBob, iy + 3, arrowX + 12 + arrowBob, iy);
-
-      // Right ornament — mirrored
-      let arrowX2 = w / 2 + iw / 2 + 10 + slideX;
-      triangle(arrowX2 - arrowBob, iy - 4, arrowX2 - arrowBob, iy + 4, arrowX2 - 8 - arrowBob, iy);
-      triangle(arrowX2 - 6 - arrowBob, iy - 3, arrowX2 - 6 - arrowBob, iy + 3, arrowX2 - 12 - arrowBob, iy);
-
       // Bright gold text
       fill(10, 5, 0, floor(160 * itemAlpha));
       text(items[i], w / 2 + 1 + slideX, iy + 1);
       fill(255, 230, 160, floor(255 * itemAlpha));
       text(items[i], w / 2 + slideX, iy);
+      // Faction hint on NEW VOYAGE hover
+      if (items[i] === 'NEW VOYAGE') {
+        textSize(max(8, floor(itemSize * 0.6)));
+        textStyle(ITALIC);
+        fill(180, 160, 110, floor(160 * itemAlpha));
+        text('Choose your faction...', w / 2 + slideX, by + bh + 10);
+        textStyle(BOLD);
+        textSize(itemSize);
+      }
     } else {
-      // Dim text with subtle shadow
       fill(10, 5, 0, floor(80 * itemAlpha));
       text(items[i], w / 2 + 1 + slideX, iy + 1);
       fill(170, 150, 120, floor(200 * itemAlpha));
@@ -542,14 +551,14 @@ function drawMenuScreen() {
   rect(w / 2 - 120, h - 28, 240, 20, 2);
   // Version number — prominent
   fill(170, 145, 100, floor(160 * botAlpha));
-  text('v1.0.0', w / 2 - 85, h - 18);
+  text('v1.0', w / 2 - 85, h - 18);
   // Tagline
   fill(130, 115, 85, floor(100 * botAlpha));
-  text('Shipwrecked.  Sunlit.  Reborn.', w / 2 + 10, h - 18);
+  text('Cozy Roman Survival', w / 2 + 10, h - 18);
   // Copyright line
   fill(90, 80, 60, floor(70 * botAlpha));
   textSize(7);
-  text('Aurelian Forge Studio  2025', w / 2, h - 8);
+  text('Aurelian Forge Studio  2026', w / 2, h - 8);
 
   // ─── FADES ───
   if (aF < 1) { fill(0, 0, 0, floor(255 * (1 - aF))); rect(0, 0, w, h); }
@@ -1280,12 +1289,11 @@ function handleMenuClick() {
   let hasSave = false;
   if (_rs) { try { let _d = JSON.parse(_rs); hasSave = _d && _d.version >= 8; } catch(e) {} }
   if (!hasSave && _rs) { try { localStorage.removeItem('sunlitIsles_save'); } catch(e) {} }
-  let btns = [];
-  if (hasSave) btns.push('load');
-  btns.push('new', 'multiplayer', 'howtoplay', 'settings', 'credits');
+  let btns = ['new'];
+  if (hasSave) btns.splice(1, 0, 'load');
+  btns.push('multiplayer', 'settings', 'credits');
   let action = btns[menuHover];
   if (action === 'multiplayer') { gameScreen = 'multiplayer'; state._mpMenuOpen = true; return; }
-  if (action === 'howtoplay') { gameScreen = 'howtoplay'; return; }
   if (action === 'settings') { gameScreen = 'settings'; return; }
   if (action === 'credits') { gameScreen = 'credits'; return; }
   // Fade to black, then execute action
