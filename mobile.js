@@ -7,6 +7,7 @@ let _touchButtons = [];
 let _touchActionQueue = [];
 let _joystickDeadzone = 12;
 let _joystickMaxR = 55;
+let _pinch = { active: false, dist0: 0, zoom0: 1 };
 
 function _initTouchButtons() {
   let sz = 52, pad = 10;
@@ -153,6 +154,15 @@ window.addEventListener('DOMContentLoaded', function() {
           continue;
         }
       }
+      // Pinch-to-zoom: detect 2 fingers
+      if (e.touches.length >= 2) {
+        let t0 = e.touches[0], t1 = e.touches[1];
+        let dx = t1.clientX - t0.clientX, dy = t1.clientY - t0.clientY;
+        _pinch.dist0 = Math.sqrt(dx * dx + dy * dy);
+        _pinch.zoom0 = typeof camZoomTarget !== 'undefined' ? camZoomTarget : 1;
+        _pinch.active = true;
+        e.preventDefault();
+      }
     }, { passive: false });
 
     cvs.addEventListener('touchmove', function(e) {
@@ -178,6 +188,19 @@ window.addEventListener('DOMContentLoaded', function() {
           e.preventDefault();
         }
       }
+      // Pinch-to-zoom move
+      if (_pinch.active && e.touches.length >= 2) {
+        let t0 = e.touches[0], t1 = e.touches[1];
+        let dx = t1.clientX - t0.clientX, dy = t1.clientY - t0.clientY;
+        let dist = Math.sqrt(dx * dx + dy * dy);
+        if (_pinch.dist0 > 0) {
+          let scale = dist / _pinch.dist0;
+          let zMin = (typeof CAM_ZOOM_MIN_SAILING !== 'undefined' && state && state.rowing && state.rowing.active) ? CAM_ZOOM_MIN_SAILING : (typeof CAM_ZOOM_MIN !== 'undefined' ? CAM_ZOOM_MIN : 0.4);
+          let zMax = typeof CAM_ZOOM_MAX !== 'undefined' ? CAM_ZOOM_MAX : 2.0;
+          camZoomTarget = Math.min(zMax, Math.max(zMin, _pinch.zoom0 * scale));
+        }
+        e.preventDefault();
+      }
     }, { passive: false });
 
     cvs.addEventListener('touchend', function(e) {
@@ -190,6 +213,7 @@ window.addEventListener('DOMContentLoaded', function() {
           _touchJoystick.dy = 0;
         }
       }
+      if (_pinch.active && e.touches.length < 2) _pinch.active = false;
     }, { passive: false });
 
     cvs.addEventListener('touchcancel', function(e) {
@@ -197,6 +221,7 @@ window.addEventListener('DOMContentLoaded', function() {
       _touchJoystick.id = null;
       _touchJoystick.dx = 0;
       _touchJoystick.dy = 0;
+      _pinch.active = false;
     }, { passive: false });
   }, 200);
 });
