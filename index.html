@@ -10,6 +10,9 @@
   <title>MARE NOSTRUM — Cozy Roman Survival</title>
   <link rel="icon" type="image/x-icon" href="favicon.ico" />
   <link rel="manifest" href="manifest.json" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
   <style>
     @font-face {
       font-family: 'Cinzel';
@@ -152,11 +155,6 @@
     }, 1500);
   </script>
   <script>
-    // DEV MODE: nuke everything stale
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister()));
-      if (window.caches) caches.keys().then(k => k.forEach(n => caches.delete(n)));
-    }
     // Auto-delete incompatible saves (version < 8)
     try {
       let raw = localStorage.getItem('sunlitIsles_save');
@@ -177,8 +175,16 @@
       localStorage.removeItem('sunlitIsles_backup');
     }
     sessionStorage.clear();
-    // Re-enable this line for production/itch.io release:
-    // if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+    // PWA: register service worker for offline play
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
+    // PWA: capture install prompt for in-game install button
+    let _deferredInstallPrompt = null;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      _deferredInstallPrompt = e;
+    });
   </script>
 </body>
 </html>

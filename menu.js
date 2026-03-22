@@ -542,6 +542,31 @@ function drawMenuScreen() {
   // Set cursor style
   if (isCursorPointer) cursor(HAND);
 
+  // ─── PWA INSTALL BUTTON ───
+  if (typeof _deferredInstallPrompt !== 'undefined' && _deferredInstallPrompt) {
+    let instSize = max(9, floor(itemSize * 0.65));
+    textSize(instSize);
+    let instY = menuStartY + itemCount * itemGap + floor(itemGap * 0.6);
+    let instW = 100, instH = instSize * 1.8;
+    let instX = w / 2 - instW / 2;
+    let instHov = mouseX > instX && mouseX < instX + instW &&
+                  mouseY > instY - instH * 0.45 && mouseY < instY + instH * 0.55;
+    if (instHov) isCursorPointer = true;
+    let instA = constrain((menuFadeIn - 220) / 55, 0, 1);
+    fill(instHov ? 50 : 30, instHov ? 42 : 28, instHov ? 30 : 18, floor(180 * instA));
+    rect(instX, instY - instH * 0.45, instW, instH, 3);
+    if (instHov) {
+      stroke(180, 160, 60, floor(100 * instA));
+      strokeWeight(1);
+      noFill();
+      rect(instX - 1, instY - instH * 0.45 - 1, instW + 2, instH + 2, 4);
+      noStroke();
+    }
+    fill(instHov ? 220 : 150, instHov ? 200 : 140, instHov ? 140 : 100, floor(200 * instA));
+    text('INSTALL APP', w / 2, instY);
+    if (instHov) cursor(HAND);
+  }
+
   // ─── VERSION + HINT at bottom ───
   let botAlpha = constrain((menuFadeIn - 200) / 55, 0, 1);
   textStyle(NORMAL);
@@ -1282,6 +1307,29 @@ function handleMenuClick() {
   if (gameScreen === 'multiplayer') {
     handleMultiplayerClick();
     return;
+  }
+  // PWA install button
+  if (typeof _deferredInstallPrompt !== 'undefined' && _deferredInstallPrompt) {
+    let _rs2 = null;
+    try { _rs2 = localStorage.getItem('sunlitIsles_save'); } catch(e) {}
+    let hs2 = false;
+    if (_rs2) { try { let _d2 = JSON.parse(_rs2); hs2 = _d2 && _d2.version >= 8; } catch(e) {} }
+    let items2 = ['NEW VOYAGE'];
+    if (hs2) items2.splice(1, 0, 'CONTINUE');
+    items2.push('MULTIPLAYER', 'SETTINGS', 'CREDITS');
+    let itemSize2 = max(13, floor(min(width * 0.02, height * 0.028)));
+    let menuStartY2 = floor(height * 0.68);
+    let itemGap2 = max(28, floor(height * 0.048));
+    let instSize2 = max(9, floor(itemSize2 * 0.65));
+    let instY2 = menuStartY2 + items2.length * itemGap2 + floor(itemGap2 * 0.6);
+    let instW2 = 100, instH2 = instSize2 * 1.8;
+    let instX2 = width / 2 - instW2 / 2;
+    if (mouseX > instX2 && mouseX < instX2 + instW2 &&
+        mouseY > instY2 - instH2 * 0.45 && mouseY < instY2 + instH2 * 0.55) {
+      _deferredInstallPrompt.prompt();
+      _deferredInstallPrompt = null;
+      return;
+    }
   }
   if (menuHover < 0 || menuFadeOut > 0) return;
   let _rs = null;
