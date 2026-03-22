@@ -12874,22 +12874,25 @@ function drawHomeIslandDistant() {
   }
   let bright = getSkyBrightness();
   let bs = min(1, _ds.dist / 3500) * 0.4;
-  fill(140, 165, 190, 15 * bright);
-  ellipse(ix, iy, homeRX * 2.5, homeRY * 1.2);
-  fill(20, 60, 80, 40);
-  ellipse(ix + 4, iy + 6, homeRX * 2.15, homeRY * 0.95);
+  // Water shadow
+  fill(20, 60, 80, 35);
+  ellipse(ix + 4, iy + 6, homeRX * 2.15, homeRY * 2.15);
+  // Shallow water ring
   fill(lerp(55, 100, bs), lerp(145, 155, bs), lerp(165, 185, bs), 55);
-  ellipse(ix, iy, homeRX * 2.12, homeRY * 0.92);
+  ellipse(ix, iy, homeRX * 2.1, homeRY * 2.1);
+  // Shore wave animation
   stroke(200, 220, 255, 20 + sin(frameCount * 0.04) * 10);
   strokeWeight(1.5); noFill();
-  ellipse(ix, iy, homeRX * 2.08 + sin(frameCount * 0.025) * 3, homeRY * 0.90 + sin(frameCount * 0.025) * 2);
+  ellipse(ix, iy, homeRX * 2.05 + sin(frameCount * 0.025) * 3, homeRY * 2.05 + sin(frameCount * 0.025) * 2);
   noStroke();
+  // Beach
   fill(lerp(195, 180, bs), lerp(180, 185, bs), lerp(135, 160, bs));
-  ellipse(ix, iy, homeRX * 2, homeRY * 0.86);
+  ellipse(ix, iy, homeRX * 2.0, homeRY * 2.0);
+  // Grass
   fill(lerp(60, 80, bs), lerp(105, 120, bs), lerp(42, 75, bs));
-  ellipse(ix, iy, homeRX * 1.85, homeRY * 0.80);
+  ellipse(ix, iy, homeRX * 1.85, homeRY * 1.85);
   fill(lerp(70, 90, bs), lerp(120, 130, bs), lerp(48, 80, bs), 60);
-  ellipse(ix, iy + homeRY * 0.05, homeRX * 0.9, homeRY * 0.4);
+  ellipse(ix, iy + homeRY * 0.05, homeRX * 0.9, homeRY * 0.65);
   let fac = getFactionData();
   let wallC = fac.style ? fac.style.wall : [218, 198, 168];
   let roofC = fac.style ? fac.style.roof : [185, 100, 58];
@@ -12939,11 +12942,11 @@ function drawHomeIslandDistant() {
   rect(floor(ix - 6), floor(iy + homeRY * 0.37), 12, 3);
   if (_ds.haze > 5) {
     fill(160, 185, 210, _ds.haze * 0.5 * bright);
-    ellipse(ix, iy, homeRX * 2.2, homeRY * 1.0);
+    ellipse(ix, iy, homeRX * 2.2, homeRY * 2.2);
   }
   fill(200, 185, 150, 80 + (1 - bs) * 80);
   textSize(10); textAlign(CENTER); textStyle(ITALIC);
-  text('Home Island', ix, iy + homeRY * 0.52);
+  text('Home Island', ix, iy + homeRY * 1.1);
   textStyle(NORMAL);
   pop();
 }
@@ -17597,7 +17600,7 @@ function drawArenaIsleDistant() {
   }
   let bright = getSkyBrightness();
   let fsx = floor(sx), fsy = floor(sy);
-  let rx = a.isleRX, ry = a.isleRY * 0.45; // isometric squash
+  let rx = a.isleRX, ry = a.isleRY; // isleRY already smaller than isleRX (80 vs 120)
 
   // Water shadow
   fill(20, 60, 80, 35);
@@ -23815,11 +23818,6 @@ function drawConquestIsleDistant() {
     translate(sx, sy); scale(_dScale.scale); translate(-sx, -sy);
   }
   let _cBright = getSkyBrightness();
-
-  // Atmospheric perspective — blue-grey haze between viewer and island
-  let _hazeW = max(c.isleRX, c.isleRY) * 2.5;
-  fill(140, 165, 190, 15 * _cBright);
-  ellipse(sx, sy, _hazeW, _hazeW * 0.5);
 
   if (c.colonized) {
     // Colonized: proper island terrain — blue-shifted with distance

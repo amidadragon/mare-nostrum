@@ -73,11 +73,18 @@ function drawNationMediumLOD(sx, sy, rx, ry, key, nation, dScale) {
     translate(fsx, fsy); scale(dScale.scale); translate(-fsx, -fsy);
   }
 
-  // Island shape
-  fill(20, 60, 80, 30); ellipse(fsx + 2, fsy + 3, rx * 2.05, ry * 2.05);
-  fill(terrainCol[0], terrainCol[1], terrainCol[2]); ellipse(fsx, fsy, rx * 1.9, ry * 1.9);
+  // Water shadow
+  fill(20, 60, 80, 30); ellipse(fsx + 2, fsy + 3, rx * 2.1, ry * 2.1);
+  // Shallow water ring
+  fill(55, 140, 160, 45); ellipse(fsx, fsy, rx * 2.05, ry * 2.05);
+  // Beach ring
+  let beachCol = _getNationTerrainColor(key);
+  fill(beachCol[0] + 30, beachCol[1] + 30, beachCol[2] + 40);
+  ellipse(fsx, fsy, rx * 1.95, ry * 1.95);
+  // Main terrain
+  fill(terrainCol[0], terrainCol[1], terrainCol[2]); ellipse(fsx, fsy, rx * 1.78, ry * 1.78);
   fill(terrainCol[0] - 15, terrainCol[1] - 10, terrainCol[2] - 10);
-  ellipse(fsx, fsy, rx * 1.7, ry * 1.7);
+  ellipse(fsx, fsy, rx * 1.6, ry * 1.6);
 
   // Building silhouettes (small rects)
   let numB = min(3 + floor(lv * 0.5), 6);
