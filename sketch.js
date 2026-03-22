@@ -26094,6 +26094,8 @@ function saveGame() {
     meals: state.meals, wine: state.wine, oil: state.oil,
     stew: state.stew, garum: state.garum, honeyedFigs: state.honeyedFigs, ambrosia: state.ambrosia,
     foodShortage: state.foodShortage || 0,
+    seaPeopleRaidCooldown: state.seaPeopleRaidCooldown || 0,
+    templeCourt: { visitors: [], lastSpawn: state.templeCourt ? state.templeCourt.lastSpawn : 0 },
     weather: state.weather, daysSinceRain: state.daysSinceRain || 0, heartRewards: state.heartRewards,
     marcusHearts: state.marcus ? state.marcus.hearts : 0,
     vestaHearts: state.vesta ? state.vesta.hearts : 0,
@@ -26555,6 +26557,8 @@ function loadGame() {
     state.meals = d.meals || 0; state.wine = d.wine || 0; state.oil = d.oil || 0;
     state.stew = d.stew || 0; state.garum = d.garum || 0; state.honeyedFigs = d.honeyedFigs || 0; state.ambrosia = d.ambrosia || 0;
     state.foodShortage = d.foodShortage || 0;
+    state.seaPeopleRaidCooldown = d.seaPeopleRaidCooldown || 0;
+    if (d.templeCourt) { state.templeCourt.lastSpawn = d.templeCourt.lastSpawn || 0; }
     state.heartRewards = Array.isArray(d.heartRewards) ? d.heartRewards : [];
     if (d.weather && typeof d.weather === 'object') state.weather = { type: d.weather.type || 'clear', timer: d.weather.timer || 0, intensity: d.weather.intensity || 0 };
     state.daysSinceRain = d.daysSinceRain || 0;
