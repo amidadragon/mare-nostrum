@@ -2878,12 +2878,11 @@ function isInShallows(wx, wy) {
   return d > 1.0 && d <= 1.15; // ~15% beyond island edge
 }
 
-function isInSwimCorridor(wx, wy) {
+function isInArenaSwimZone(wx, wy) {
   let a = state.adventure;
-  let swimCX = WORLD.islandCX;
-  let swimTopY = a.isleY + a.isleRY;
-  let swimBotY = WORLD.islandCY - getSurfaceRY() * 0.7;
-  return abs(wx - swimCX) < 50 && wy > swimTopY && wy < swimBotY;
+  let homeNorthEdge = WORLD.islandCY - getSurfaceRY();
+  let arenaSouthEdge = a.isleY + a.isleRY;
+  return wy < homeNorthEdge && wy > arenaSouthEdge && abs(wx - WORLD.islandCX) < 120;
 }
 
 // Check if a point is walkable (on island, shallows, bridge, pier, or imperial bridge)
@@ -2902,11 +2901,12 @@ function isWalkable(wx, wy) {
     let dy = (wy - WORLD.islandCY) / (state.islandRY * 0.8);
     return dx * dx + dy * dy < 1;
   }
-  if (isOnIsland(wx, wy) || isInShallows(wx, wy) || isOnBridge(wx, wy) || isOnPier(wx, wy) || isOnImperialBridge(wx, wy) || isOnArenaBridge(wx, wy)) return true;
-  // When bridge built, arena island is walkable from home island context
-  if (state.adventure.bridgeBuilt && !state.adventure.active && isOnArenaIsland(wx, wy)) return true;
-  // Swim corridor to arena
-  if (!state.adventure.active && !state.rowing.active && isInSwimCorridor(wx, wy)) return true;
+  if (isOnIsland(wx, wy) || isInShallows(wx, wy) || isOnBridge(wx, wy) || isOnPier(wx, wy) || isOnImperialBridge(wx, wy)) return true;
+  // Arena island + swim zone always walkable (outside combat/rowing)
+  if (!state.adventure.active && !state.rowing.active) {
+    if (isOnArenaIsland(wx, wy)) return true;
+    if (isInArenaSwimZone(wx, wy)) return true;
+  }
   return false;
 }
 
@@ -3775,22 +3775,15 @@ function drawInner() {
         text('[E] Shipyard', _sysx, _sysy);
       }
     }
-    // Arena swim/walk prompt at north shore
+    // Arena prompt — on arena island or swimming toward it
     if (!state.rowing.active && !state.adventure.active && !state.conquest.active) {
       let _ap = state.player;
-      let _northY = WORLD.islandCY - getSurfaceRY() * 0.85;
-      let _nearNorth = _ap.y < _northY && abs(_ap.x - WORLD.islandCX) < 80;
-      let _onArenaIsle = state.adventure.bridgeBuilt && isOnArenaIsland(_ap.x, _ap.y);
-      if (_nearNorth || _onArenaIsle) {
+      let _onArenaIsle = isOnArenaIsland(_ap.x, _ap.y);
+      if (_onArenaIsle) {
         let _apx = w2sX(_ap.x), _apy = w2sY(_ap.y) - 30 + floatOffset;
         fill(255, 220, 150, 200 + sin(frameCount * 0.06) * 30);
         noStroke(); textAlign(CENTER, CENTER); textSize(11);
-        if (state.adventure.bridgeBuilt) {
-          text(_onArenaIsle ? '[E] Enter Arena' : '[E] Walk to Arena', _apx, _apy);
-        } else {
-          text('[E] Swim to Arena', _apx, _apy);
-        }
-        // Show wave record
+        text('[E] Enter Arena', _apx, _apy);
         if (state.arenaHighWave > 0) {
           fill(180, 160, 120, 160); textSize(9);
           text('\u2694 Best: Wave ' + state.arenaHighWave, _apx, _apy + 14);
@@ -17068,14 +17061,9 @@ function exitAdventure() {
   a.active = false;
   a.enemies = [];
   a.loot = [];
-  // Return to north shore if bridge exists, else home center
-  if (a.bridgeBuilt) {
-    p.x = WORLD.islandCX;
-    p.y = WORLD.islandCY - getSurfaceRY() * 0.7;
-  } else {
-    p.x = WORLD.islandCX;
-    p.y = WORLD.islandCY;
-  }
+  // Return to arena island (player swims back home)
+  p.x = a.isleX;
+  p.y = a.isleY;
   p.vx = 0; p.vy = 0;
   p.attackTimer = 0;
   p.slashPhase = 0;
@@ -17511,11 +17499,7 @@ function drawArenaDistantLabel() {
   let accessY = baseY + (highWave > 0 ? 46 : 35) * sc;
   fill(160, 180, 140, floor(120 * _labelFade));
   textSize(max(6, floor(8 * sc)));
-  if (a.bridgeBuilt) {
-    text('Walk north across the bridge', sx, accessY);
-  } else {
-    text('Walk to north shore to swim', sx, accessY);
-  }
+  text('Swim north to enter', sx, accessY);
   pop();
 }
 
@@ -17848,92 +17832,7 @@ function _drawArenaIsleDistant_DELETED() { // placeholder to maintain line numbe
   drawArenaBridge();
 }
 
-function drawArenaBridge() {
-  let a = state.adventure;
-  if (!a.bridgeBuilt) return;
-
-  let bright = getSkyBrightness();
-  let homeNorthY = WORLD.islandCY - getSurfaceRY() * 0.95;
-  let arenaSouthY = a.isleY + a.isleRY * 0.85;
-  let bridgeCX = WORLD.islandCX;
-
-  // Bridge spans from home north shore to arena south shore
-  let numArches = 4;
-  let totalLen = homeNorthY - arenaSouthY;
-  let segLen = totalLen / numArches;
-
-  push();
-  noStroke();
-
-  // Draw stone causeway
-  for (let i = 0; i <= numArches; i++) {
-    let t = i / numArches;
-    let segY = arenaSouthY + t * totalLen;
-    let sx = w2sX(bridgeCX);
-    let sy = w2sY(segY);
-
-    // Stone deck
-    let deckCol = lerpColor(color(130, 120, 105), color(180, 170, 150), bright);
-    fill(deckCol);
-    rect(sx - 18, sy - 4, 36, 8, 1);
-
-    // Railings
-    fill(lerpColor(color(100, 92, 80), color(155, 145, 130), bright));
-    rect(sx - 20, sy - 8, 4, 12, 1);
-    rect(sx + 16, sy - 8, 4, 12, 1);
-  }
-
-  // Stone arches (between supports)
-  for (let i = 0; i < numArches; i++) {
-    let t = (i + 0.5) / numArches;
-    let archY = arenaSouthY + t * totalLen;
-    let sx = w2sX(bridgeCX);
-    let sy = w2sY(archY);
-
-    // Arch support pillar going into water
-    fill(lerpColor(color(90, 82, 72), color(140, 130, 115), bright));
-    rect(sx - 4, sy - 2, 8, 18);
-    // Pillar base reflection
-    fill(60, 80, 100, 30);
-    ellipse(sx, sy + 16, 12, 5);
-
-    // Stone connection between supports
-    fill(lerpColor(color(125, 115, 100), color(170, 160, 140), bright));
-    rect(sx - 16, sy - 3, 32, 6, 1);
-  }
-
-  // Faction-colored banners on bridge posts
-  let fc = typeof getFactionColors === 'function' ? getFactionColors() : { accent: [160, 35, 25] };
-  let ac = fc.accent || [160, 35, 25];
-  for (let bi = 0; bi < 2; bi++) {
-    let bpy = arenaSouthY + (bi + 0.5) * totalLen * 0.5;
-    let sx = w2sX(bridgeCX);
-    let sy = w2sY(bpy);
-    let wave = sin(frameCount * 0.04 + bi) * 1.5;
-    // Left banner
-    fill(100, 80, 45);
-    rect(sx - 22, sy - 14, 2, 12);
-    fill(ac[0], ac[1], ac[2], 200);
-    beginShape();
-    vertex(sx - 20, sy - 14);
-    vertex(sx - 12 + wave, sy - 12);
-    vertex(sx - 13 + wave, sy - 6);
-    vertex(sx - 20, sy - 8);
-    endShape(CLOSE);
-    // Right banner
-    fill(100, 80, 45);
-    rect(sx + 20, sy - 14, 2, 12);
-    fill(ac[0], ac[1], ac[2], 200);
-    beginShape();
-    vertex(sx + 22, sy - 14);
-    vertex(sx + 30 - wave, sy - 12);
-    vertex(sx + 29 - wave, sy - 6);
-    vertex(sx + 22, sy - 8);
-    endShape(CLOSE);
-  }
-
-  pop();
-}
+function drawArenaBridge() { } // deprecated — swimming replaced bridge
 
 // drawArena DELETED -- replaced by drawArenaIsleDistant with proper coastline rendering
 function drawArena() { return; /* old arena renderer completely disabled */
@@ -22687,17 +22586,7 @@ function isOnImperialBridge(wx, wy) {
 
 // ─── ARENA BRIDGE — connects home island north shore to arena island ──────
 
-function isOnArenaBridge(wx, wy) {
-  let a = state.adventure;
-  if (!a.bridgeBuilt) return false;
-  // Bridge runs from home island north edge to arena island south edge
-  let homeNorthY = WORLD.islandCY - getSurfaceRY() * 0.95;
-  let arenaSouthY = a.isleY + a.isleRY * 0.85;
-  let bridgeCX = WORLD.islandCX;
-  if (abs(wx - bridgeCX) > 18) return false;
-  if (wy > homeNorthY + 5 || wy < arenaSouthY - 5) return false;
-  return true;
-}
+function isOnArenaBridge() { return false; } // deprecated — swimming replaced bridge
 
 function isOnArenaIsland(wx, wy) {
   let a = state.adventure;
@@ -22714,16 +22603,7 @@ function getArenaLevel() {
   return 1;               // Simple fighting pit
 }
 
-function checkArenaBridgeUnlock() {
-  if (state.adventure.bridgeBuilt) return;
-  if ((state.islandLevel || 1) >= 10) {
-    state.adventure.bridgeBuilt = true;
-    addFloatingText(width / 2, height * 0.25, 'STONE BRIDGE TO ARENA BUILT!', '#ffcc44');
-    addFloatingText(width / 2, height * 0.32, 'Walk north to the arena!', '#aaddff');
-    if (snd) snd.playSFX('fanfare');
-    triggerScreenShake(8, 20);
-  }
-}
+function checkArenaBridgeUnlock() { } // deprecated — arena always reachable by swimming
 
 function drawImperialBridge() {
   let b = state.imperialBridge;
@@ -26176,7 +26056,7 @@ function keyPressed() {
         !(state.plenty && state.plenty.active) && !(state.necropolis && state.necropolis.active)) {
       let _port = typeof getPortPosition === 'function' ? getPortPosition() : { x: 0, y: 0 };
       let _nearBoat = dist(state.player.x, state.player.y, _port.x - 80, _port.y + 20) < 70;
-      if (!_nearBoat) {
+      if (!_nearBoat && !isInArenaSwimZone(state.player.x, state.player.y) && !isOnArenaIsland(state.player.x, state.player.y)) {
         let inWater = isInShallows(state.player.x, state.player.y) ||
                       !isOnIsland(state.player.x, state.player.y);
         if (inWater) { startDive(); return; }
@@ -26334,20 +26214,9 @@ function keyPressed() {
       }
     }
 
-    // Walk/swim to arena from north shore (or walk across bridge)
+    // Enter arena — player must be on the arena island
     if (!state.rowing.active && !state.adventure.active && !state.conquest.active) {
-      let px = state.player.x, py = state.player.y;
-      let a = state.adventure;
-      // Check if on arena island (walked across bridge)
-      if (a.bridgeBuilt && isOnArenaIsland(px, py)) {
-        enterAdventure();
-        return;
-      }
-      // Check if near north shore of home island
-      let northShoreY = WORLD.islandCY - getSurfaceRY() * 0.85;
-      let nearNorthShore = py < northShoreY && abs(px - WORLD.islandCX) < 80;
-      if (nearNorthShore) {
-        // Swim or walk to arena
+      if (isOnArenaIsland(state.player.x, state.player.y)) {
         enterAdventure();
         return;
       }

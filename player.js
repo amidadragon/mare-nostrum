@@ -76,7 +76,8 @@ function updatePlayer(dt) {
   }
   if (inShallows) spd *= (state.diving && state.diving.active) ? 0.7 : 0.55;
   // Swimming to arena: slow speed in deep water
-  if (typeof isInSwimCorridor === 'function' && isInSwimCorridor(p.x, p.y)) spd *= 0.4;
+  let _inSwimZone = typeof isInArenaSwimZone === 'function' && isInArenaSwimZone(p.x, p.y);
+  if (_inSwimZone) spd *= 0.4;
 
   // Sprint: hold SHIFT to run 1.6x faster
   if (isKeybindDown('sprint')) spd *= 1.6;
@@ -137,13 +138,22 @@ function updatePlayer(dt) {
   // Idle frames counter for breathing animation
   if (p.moving) { p._idleFrames = 0; } else { p._idleFrames = (p._idleFrames || 0) + dt; }
 
-  // Footstep dust
-  if (p.moving && frameCount % 8 === 0) {
+  // Footstep dust (not while swimming)
+  if (p.moving && !_inSwimZone && frameCount % 8 === 0) {
     particles.push({
       x: p.x + random(-4, 4), y: p.y + 8,
       vx: random(-0.3, 0.3), vy: random(-0.5, 0),
       life: 15, maxLife: 15, type: 'burst',
       r: 140, g: 120, b: 80, size: random(2, 4), world: true,
+    });
+  }
+  // Swim zone ripple particles
+  if (_inSwimZone && p.moving && frameCount % 6 === 0) {
+    particles.push({
+      x: p.x + random(-8, 8), y: p.y + random(2, 6),
+      vx: random(-0.5, 0.5), vy: random(-0.3, 0.1),
+      life: 20, maxLife: 20, type: 'burst', size: random(2, 4),
+      r: 140, g: 200, b: 240, world: true,
     });
   }
 
@@ -268,7 +278,7 @@ function updatePlayerAnim(dt) {
       a.walkTimer = 0; a.walkFrame = (a.walkFrame + 1) % 4;
       // Footstep sound on frames 1 and 3 (feet hitting ground)
       if ((a.walkFrame === 1 || a.walkFrame === 3) && snd && frameCount % 2 === 0) {
-        snd.playSFX(isInShallows(p.x, p.y) ? 'water' : 'step_sand');
+        snd.playSFX((isInShallows(p.x, p.y) || (typeof isInArenaSwimZone === 'function' && isInArenaSwimZone(p.x, p.y))) ? 'water' : 'step_sand');
       }
     }
   } else {
@@ -565,7 +575,31 @@ function drawPlayer() {
   }
 
   let inWater = isInShallows(p.x, p.y);
+  let _swimming = typeof isInArenaSwimZone === 'function' && isInArenaSwimZone(p.x, p.y);
   let isDiving = state.diving && state.diving.active;
+
+  if (_swimming && !isDiving) {
+    // Swimming to arena — only head + arms visible, body submerged
+    let bob = sin(frameCount * 0.08) * 2;
+    translate(0, 4 + bob);
+    // Water surface around player
+    noStroke();
+    fill(80, 150, 200, 60);
+    ellipse(0, 4, 28, 10);
+    // Head
+    fill(220, 185, 150);
+    ellipse(0, -6, 9, 9);
+    // Hair
+    fill(p.hair ? p.hair[0] || 80 : 80, p.hair ? p.hair[1] || 55 : 55, p.hair ? p.hair[2] || 30 : 30);
+    arc(0, -8, 9, 6, PI, TWO_PI);
+    // Arms — stroke animation
+    let armT = sin(frameCount * 0.12) * 4;
+    fill(220, 185, 150);
+    ellipse(-6 - armT, 0, 5, 3);
+    ellipse(6 + armT, 0, 5, 3);
+    pop();
+    return;
+  }
 
   if (isDiving) {
     // Underwater swimming — tilted body, fluid arm/leg motion
