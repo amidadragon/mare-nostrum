@@ -2429,6 +2429,8 @@ function setup() {
       state.player.vx = 0; state.player.vy = 0; state.player.moving = false;
     }
   });
+  // Load sprite sheets (falls back gracefully if PNGs missing)
+  SpriteManager.loadAll();
   // Hide loading screen now that everything is initialized
   let loadEl = document.getElementById('loading');
   if (loadEl) { loadEl.style.opacity = '0'; setTimeout(() => loadEl.remove(), 800); }
@@ -9308,6 +9310,8 @@ function drawOneBuilding(b) {
     let sy = w2sY(b.y);
     // Cull offscreen buildings
     if (sx < -80 || sx > width + 80 || sy < -80 || sy > height + 80) return;
+    // Try sprite first, fall back to rect-based drawing
+    if (typeof SpriteManager !== 'undefined' && drawBuildingSprite(sx, sy, b.type, state.faction)) return;
     let bw = b.w;
     let bh = b.h;
     let ep = getEraPalette();

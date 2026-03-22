@@ -498,6 +498,13 @@ function drawPlayerPreview() {
 
 function drawPlayer() {
   if (state.rowing.active) return;
+  // Try sprite first, fall back to rect-based drawing
+  if (typeof SpriteManager !== 'undefined' && drawPlayerSprite(
+    w2sX(state.player.x), w2sY(state.player.y),
+    state.faction, state.player.facing,
+    state.player.moving ? 'walk' : 'idle',
+    Math.floor(frameCount / 8) % 4
+  )) return;
   let p = state.player;
   let a = p.anim;
   let sx = w2sX(p.x);
