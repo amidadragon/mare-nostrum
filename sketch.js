@@ -1120,6 +1120,43 @@ const BLUEPRINTS = {
   shipyard: { name: 'Shipyard', w: 60, h: 50, cost: { wood: 30, stone: 20, ironOre: 10, gold: 80 }, key: '', blocks: true, minLevel: 8, upkeep: 2, desc: 'Upgrade your ship: hull, cannons, sails' },
 };
 
+// ─── ADJACENCY BONUSES ──────────────────────────────────────────────────────────
+const ADJACENCY_BONUSES = {
+  bakery:      { near: 'windmill',    bonus: '+50% bread',          range: 80,  mult: 1.5 },
+  bakery2:     { type: 'bakery', near: 'granary', bonus: '+25% bread', range: 80, mult: 1.25 },
+  market:      { near: 'bakery',      bonus: '+2 gold/day',         range: 100, goldBonus: 2 },
+  house:       { near: 'well',        bonus: '+1 citizen cap',      range: 60,  popBonus: 1 },
+  house2:      { type: 'house', near: 'bath', bonus: '+1 citizen cap', range: 80, popBonus: 1 },
+  watchtower:  { near: 'wall',        bonus: '+20% damage',         range: 60,  dmgMult: 1.2 },
+  castrum:     { near: 'watchtower',  bonus: '+10% recruit speed',  range: 100, recruitMult: 0.9 },
+  temple:      { near: 'shrine',      bonus: '+20% crystal income', range: 80,  crystalMult: 1.2 },
+  vineyard:    { near: 'bakery',      bonus: '+30% wine output',    range: 80,  mult: 1.3 },
+  library:     { near: 'temple',      bonus: '+25% research speed', range: 100, researchMult: 1.25 },
+};
+
+function getAdjacencyBonuses(building) {
+  let bonuses = [];
+  let bType = building.type;
+  for (let key in ADJACENCY_BONUSES) {
+    let ab = ADJACENCY_BONUSES[key];
+    let matchType = ab.type || key;
+    if (bType !== matchType) continue;
+    let found = state.buildings.some(b2 => b2 !== building && !b2.ruined &&
+      b2.type === ab.near && dist(building.x, building.y, b2.x, b2.y) < ab.range);
+    if (found) bonuses.push(ab);
+  }
+  return bonuses;
+}
+
+function hasAdjacencyBonus(building, bonusKey) {
+  let ab = ADJACENCY_BONUSES[bonusKey];
+  if (!ab) return false;
+  let matchType = ab.type || bonusKey;
+  if (building.type !== matchType) return false;
+  return state.buildings.some(b2 => b2 !== building && !b2.ruined &&
+    b2.type === ab.near && dist(building.x, building.y, b2.x, b2.y) < ab.range);
+}
+
 const ROTATABLE_TYPES = ['wall', 'door', 'fence', 'bridge', 'aqueduct', 'arch'];
 
 // ─── BUILDING MAINTENANCE ────────────────────────────────────────────────────────
@@ -1241,6 +1278,11 @@ function getResearchRate() {
   if (state.marcus && state.marcus.hearts >= maxH) rate += 5;
   if (state.vesta && state.vesta.hearts >= maxH) rate += 5;
   if (state.felix && state.felix.hearts >= maxH) rate += 5;
+  // Adjacency: library near temple = +25% research speed
+  let libs = (state.buildings || []).filter(b => b.type === 'library' && !b.ruined);
+  for (let lib of libs) {
+    if (hasAdjacencyBonus(lib, 'library')) { rate = floor(rate * 1.25); break; }
+  }
   return rate;
 }
 function startResearch(techId) {
@@ -3559,6 +3601,7 @@ function drawInner() {
       drawPlayerTrail();
       drawNightLighting();
       drawFishing();
+      if (typeof drawTidalHUD === 'function') drawTidalHUD();
       drawParticles();
       drawSeasonalEffects();
       drawAmbientWildlife();
@@ -4013,6 +4056,8 @@ function updateTime(dt) {
     } else {
       state.daysSinceRain = (state.daysSinceRain || 0) + 1;
     }
+    // Fallow recovery: empty plots regain fertility daily
+    if (typeof updateFallowRecovery === 'function') updateFallowRecovery();
     let newSeason = getSeason();
     if (newSeason !== prevSeason) {
       // Season transition fanfare (non-festival days)
@@ -4067,7 +4112,11 @@ function updateTime(dt) {
       let goldFromBakery = 0;
       for (let bk of bakeries) {
         let tier = bk.tier || 1;
-        breadAmt += tier === 3 ? 6 : tier === 2 ? 4 : 2;
+        let base = tier === 3 ? 6 : tier === 2 ? 4 : 2;
+        // Adjacency: bakery near windmill +50%, near granary +25%
+        let adjBonuses = getAdjacencyBonuses(bk);
+        for (let ab of adjBonuses) { if (ab.mult) base = floor(base * ab.mult); }
+        breadAmt += base;
         if (tier === 3) goldFromBakery += 2;
       }
       // Windmill bonus: doubles bakery bread output
@@ -4081,6 +4130,17 @@ function updateTime(dt) {
         state.gold += goldFromBakery;
         addFloatingText(width / 2, height * 0.35, 'Grand Bakery: +' + goldFromBakery + 'g sales', '#eedd55');
       }
+    }
+    // Adjacency: market near bakery = +2 gold/day
+    let markets = state.buildings.filter(b2 => (b2.type === 'market' || b2.type === 'marketplace') && !b2.ruined);
+    let adjMarketGold = 0;
+    for (let mk of markets) {
+      if (state.buildings.some(b2 => b2.type === 'bakery' && !b2.ruined && dist(mk.x, mk.y, b2.x, b2.y) < 100))
+        adjMarketGold += 2;
+    }
+    if (adjMarketGold > 0) {
+      state.gold += adjMarketGold;
+      addFloatingText(width / 2, height * 0.38, 'Market adjacency: +' + adjMarketGold + 'g', '#ddcc44');
     }
     // Food consumption — citizens and soldiers eat daily
     updateFoodConsumption();
@@ -4267,6 +4327,10 @@ function updateTime(dt) {
         return dx * dx + dy * dy < 80 * 80;
       });
       if (hasAqueduct) growRate *= 2;
+      // Adjacency: crops near well = +15% growth
+      let nearWell = state.buildings.some(b => b.type === 'well' && !b.ruined &&
+        dist(b.x, b.y, p.x, p.y) < 80);
+      if (nearWell) growRate *= 1.15;
       if (state.blessing.type === 'crops') growRate *= 2;
       // Event multiplier: harvest_moon = 2x growth speed
       if (state.activeEvent && state.activeEvent.id === 'harvest_moon') growRate *= 2;
@@ -4277,12 +4341,18 @@ function updateTime(dt) {
       // First crop grows 2x faster so player sees full cycle quickly
       if (typeof getFirstCropGrowthMultiplier === 'function') growRate *= getFirstCropGrowthMultiplier();
       growRate *= (getFactionData().cropGrowthMult || 1);
+      // Soil fertility affects growth speed
+      if (typeof getFertilityGrowthMult === 'function') growRate *= getFertilityGrowthMult(p);
       p.timer += growRate * dt;
       let oldStage = p.stage;
       p.stage = min(3, floor(p.timer / 40));
       // Check for blessed mutation at stage 2
       if (p.stage >= 2 && oldStage < 2) checkCropMutation(p);
-      if (p.timer >= 120) { p.ripe = true; p.glowing = true; }
+      // Crops wither at 0% fertility
+      if (typeof getFertilityGrowthMult === 'function' && getFertilityGrowthMult(p) <= 0) {
+        p.planted = false; p.ripe = false; p.stage = 0; p.timer = 0;
+        addFloatingText(w2sX(p.x), w2sY(p.y) - 20, 'Crop withered!', '#cc6644');
+      } else if (p.timer >= 120) { p.ripe = true; p.glowing = true; }
     }
   });
 }
@@ -9304,6 +9374,21 @@ function drawWorldObjectsSorted() {
 // ─── BUILDINGS (BLUEPRINTS) ──────────────────────────────────────────────
 function drawBuildings() {
   state.buildings.forEach(b => drawOneBuilding(b));
+  // Adjacency bonus "+" icons
+  if (!state.buildMode) {
+    for (let b of state.buildings) {
+      if (b.ruined) continue;
+      let bonuses = getAdjacencyBonuses(b);
+      if (bonuses.length > 0) {
+        let bsx = w2sX(b.x), bsy = w2sY(b.y);
+        if (bsx < -40 || bsx > width + 40 || bsy < -40 || bsy > height + 40) continue;
+        let pulse = 0.7 + sin(frameCount * 0.06) * 0.3;
+        push(); fill(100, 255, 100, floor(180 * pulse)); noStroke();
+        textSize(10); textAlign(CENTER, CENTER);
+        text('+', bsx, bsy - b.h / 2 - 8); pop();
+      }
+    }
+  }
 }
 function drawOneBuilding(b) {
     let sx = w2sX(b.x);
@@ -12119,6 +12204,25 @@ function drawBuildGhost() {
   drawOneBuilding(ghostBuilding);
   drawingContext.globalAlpha = 1.0;
   pop();
+
+  // Adjacency bonus preview — highlight nearby buildings that would create a bonus
+  if (valid) {
+    for (let key in ADJACENCY_BONUSES) {
+      let ab = ADJACENCY_BONUSES[key];
+      let matchType = ab.type || key;
+      let targets = [];
+      if (state.buildType === matchType) targets = state.buildings.filter(b2 => !b2.ruined && b2.type === ab.near && dist(wx, wy, b2.x, b2.y) < ab.range);
+      if (state.buildType === ab.near) targets = targets.concat(state.buildings.filter(b2 => !b2.ruined && b2.type === matchType && dist(wx, wy, b2.x, b2.y) < ab.range));
+      for (let b2 of targets) {
+        let bsx = w2sX(b2.x), bsy = w2sY(b2.y);
+        push(); translate(bsx, bsy);
+        noStroke(); fill(0, 255, 100, floor(40 + sin(frameCount * 0.1) * 20));
+        rect(-b2.w / 2 - 2, -b2.h / 2 - 2, b2.w + 4, b2.h + 4, 3);
+        fill(0, 255, 100); textSize(8); textAlign(CENTER, BOTTOM);
+        text(ab.bonus, 0, -b2.h / 2 - 4); pop();
+      }
+    }
+  }
 
   // Anchor crosshair — gold "+" at exact placement point
   push();
@@ -16479,6 +16583,7 @@ function doTrade(offerIdx) {
     if (state.gold >= finalPrice) {
       state.gold = max(0, state.gold - finalPrice);
       state[offer.item] += offer.qty;
+      if (typeof recordMarketBuy === 'function') recordMarketBuy(offer.item, offer.qty);
       if (snd) snd.playSFX('coin_clink');
       addFloatingText(width / 2, height * 0.5, '+' + offer.qty + ' ' + offer.item + '!', C.crystalGlow);
     } else {
@@ -24634,6 +24739,11 @@ function mousePressed() {
         harvestAmt = floor(harvestAmt * getEventHarvestMult());
         // Harvest combo
         harvestAmt = onHarvestCombo(p, harvestAmt);
+        // Crop rotation & soil fertility
+        if (typeof onPlotHarvest === 'function') {
+          let _rotBonus = onPlotHarvest(p);
+          if (_rotBonus) { harvestAmt = floor(harvestAmt * 1.1); addFloatingText(w2sX(p.x), w2sY(p.y) - 65, 'Rotation Bonus! +10%', '#44cc88'); }
+        }
         // Tech: selective_breeding — 25% chance 2x harvest
         if (typeof hasTech === 'function' && hasTech('selective_breeding') && random() < 0.25) {
           harvestAmt *= 2;
@@ -24698,6 +24808,7 @@ function mousePressed() {
         }
         else if (state.seeds > 0) { state.seeds--; canPlant = true; cropType = 'grain'; }
         if (canPlant) {
+          if (typeof onPlotPlant === 'function') onPlotPlant(p, cropType);
           p.planted = true; p.stage = 0; p.timer = 0; p.cropType = cropType;
           if (typeof advanceNPCQuestCounter === 'function') advanceNPCQuestCounter('nq_livia_planted', 1);
           if (snd) snd.playSFX('build');
@@ -25735,6 +25846,11 @@ function keyPressed() {
         if (typeof getHarvestSkillBonus === 'function') harvestAmt = floor(harvestAmt * getHarvestSkillBonus());
         harvestAmt = floor(harvestAmt * getEventHarvestMult());
         harvestAmt = onHarvestCombo(p, harvestAmt);
+        // Crop rotation & soil fertility
+        if (typeof onPlotHarvest === 'function') {
+          let _rotBonus = onPlotHarvest(p);
+          if (_rotBonus) { harvestAmt = floor(harvestAmt * 1.1); addFloatingText(w2sX(p.x), w2sY(p.y) - 65, 'Rotation Bonus! +10%', '#44cc88'); }
+        }
         if (typeof hasTech === 'function' && hasTech('selective_breeding') && random() < 0.25) {
           harvestAmt *= 2;
           addFloatingText(w2sX(p.x), w2sY(p.y) - 20, '2x BREED!', '#88cc44');
@@ -26906,7 +27022,7 @@ function saveGame() {
     cropSelect: state.cropSelect,
     cats: state.cats ? state.cats.map(c => ({ x: c.x, y: c.y, facing: c.facing, color: c.color })) : [],
     citizens: state.citizens ? state.citizens.map(c => ({ x: c.x, y: c.y, variant: c.variant, facing: c.facing, speed: c.speed })) : [],
-    plots: (state.plots || []).map(p => ({ x: p.x, y: p.y, w: p.w, h: p.h, planted: p.planted, stage: p.stage, timer: p.timer, ripe: p.ripe, cropType: p.cropType || 'grain' })),
+    plots: (state.plots || []).map(p => ({ x: p.x, y: p.y, w: p.w, h: p.h, planted: p.planted, stage: p.stage, timer: p.timer, ripe: p.ripe, cropType: p.cropType || 'grain', fertility: p.fertility, lastCrop: p.lastCrop, cropHistory: p.cropHistory, lastHarvestDay: p.lastHarvestDay })),
     buildings: (state.buildings || []).map(b => ({ x: b.x, y: b.y, w: b.w, h: b.h, type: b.type, rot: b.rot, tier: b.tier || undefined })),
     trees: (state.trees || []).map(t => ({ x: t.x, y: t.y, health: t.health, maxHealth: t.maxHealth, alive: t.alive, size: t.size, type: t.type })),
     crystalShrine: state.crystalShrine ? { x: state.crystalShrine.x, y: state.crystalShrine.y } : null,
@@ -26924,6 +27040,9 @@ function saveGame() {
     steel: state.steel || 0, marble: state.marble || 0, perfume: state.perfume || 0, scrolls: state.scrolls || 0,
     expeditionUpgrades: state.expeditionUpgrades,
     expeditionLog: state.expeditionLog,
+    // Market supply/demand
+    marketSupply: state.marketSupply || null,
+    marketDemand: state.marketDemand || null,
     // Conquest persistence
     conquestPhase: state.conquest.phase,
     conquestWoodPile: state.conquest.woodPile,
@@ -27390,6 +27509,9 @@ function loadGame() {
       };
     }
     if (d.expeditionLog) state.expeditionLog = d.expeditionLog;
+    // Market supply/demand
+    if (d.marketSupply) state.marketSupply = d.marketSupply;
+    if (d.marketDemand) state.marketDemand = d.marketDemand;
     // Conquest persistence — always load to inactive (player starts on home island)
     state.conquest.active = false;
     state.conquest.enemies = [];
@@ -27751,6 +27873,10 @@ function loadGame() {
           state.plots[i].ripe = sp.ripe;
           state.plots[i].glowing = sp.ripe || false;
           state.plots[i].cropType = sp.cropType || 'grain';
+          if (sp.fertility !== undefined) state.plots[i].fertility = sp.fertility;
+          if (sp.lastCrop) state.plots[i].lastCrop = sp.lastCrop;
+          if (sp.cropHistory) state.plots[i].cropHistory = sp.cropHistory;
+          if (sp.lastHarvestDay) state.plots[i].lastHarvestDay = sp.lastHarvestDay;
         }
       });
     }

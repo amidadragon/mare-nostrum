@@ -212,6 +212,10 @@ function startFishing() {
     addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 30, 'Casting line...', '#66ccff');
     if (isGoldenHour()) addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 48, 'Golden hour!', '#ffcc33');
     if (state.weather && state.weather.type === 'rain') addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 60, 'Rain bonus!', '#88bbdd');
+    // Tidal zone indicator
+    let _tb = getTidalBonus(state.player.x, state.player.y);
+    if (_tb >= 2.0) addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 72, 'Peak Tide! 2x fish', '#44ddff');
+    else if (_tb >= 1.3) addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 72, 'Rising Tide 1.3x', '#88bbcc');
   } else {
     addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 30, 'Go to island edge to fish!', C.buildInvalid);
   }
@@ -232,6 +236,9 @@ function reelFish() {
       amt *= 2;
     }
 
+    // Tidal zone bonus
+    let _tidalMult = getTidalBonus(state.player.x, state.player.y);
+    if (_tidalMult > 1) amt = floor(amt * _tidalMult);
     // Storm fishing bonus: double yield
     if (stormActive || (state.weather && (state.weather.type === 'storm' || state.weather.type === 'rain'))) amt *= 2;
     // Event fish multiplier (whale sighting = 2x)
@@ -272,6 +279,8 @@ function reelFish() {
     unlockJournal('first_fish');
     let _fishSx = w2sX(state.player.x), _fishSy = w2sY(state.player.y);
     addFloatingText(_fishSx, _fishSy - 40, '+' + amt + ' ' + fishType.name + '!', fishType.color);
+    if (_tidalMult >= 2.0) addFloatingText(_fishSx, _fishSy - 88, 'Tide Bonus! 2x', '#44ddff');
+    else if (_tidalMult >= 1.3) addFloatingText(_fishSx, _fishSy - 88, 'Tide +30%', '#88bbcc');
     if (isPerfect) {
       addFloatingText(_fishSx, _fishSy - 72, 'PERFECT CATCH!', '#ffee00');
       triggerScreenShake(5, 8);
@@ -449,4 +458,74 @@ function drawFishing() {
     }
   }
   noStroke();
+}
+
+// ─── TIDAL FISHING ZONES ────────────────────────────────────────────────
+// Fishing yield changes based on time of day and shore location around the island.
+function getPlayerShore(px, py) {
+  let angle = atan2(py - WORLD.islandCY, px - WORLD.islandCX);
+  if (angle < -PI / 4 && angle > -3 * PI / 4) return 'north';
+  if (angle >= -PI / 4 && angle < PI / 4) return 'east';
+  if (angle >= PI / 4 && angle < 3 * PI / 4) return 'south';
+  return 'west';
+}
+
+function getTidalBonus(px, py) {
+  let shore = getPlayerShore(px, py);
+  let hour = state.time / 60;
+  if (shore === 'north' && hour >= 6 && hour <= 8) return 2.0;
+  if (shore === 'east' && hour >= 11 && hour <= 13) return 2.0;
+  if (shore === 'south' && hour >= 17 && hour <= 19) return 2.0;
+  if (shore === 'west' && (hour >= 22 || hour <= 2)) return 2.0;
+  // Partial bonus when 1 hour outside peak
+  if (shore === 'north' && (hour >= 5 && hour <= 9)) return 1.3;
+  if (shore === 'east' && (hour >= 10 && hour <= 14)) return 1.3;
+  if (shore === 'south' && (hour >= 16 && hour <= 20)) return 1.3;
+  if (shore === 'west' && (hour >= 21 || hour <= 3)) return 1.3;
+  return 1.0;
+}
+
+function getTidalLabel(px, py) {
+  let shore = getPlayerShore(px, py);
+  let bonus = getTidalBonus(px, py);
+  let shoreNames = { north: 'North Shore', east: 'East Shore', south: 'South Shore', west: 'West Shore' };
+  let peakTimes = { north: 'Dawn', east: 'Noon', south: 'Dusk', west: 'Night' };
+  let name = shoreNames[shore];
+  if (bonus >= 2.0) return name + ' - ' + peakTimes[shore] + ' Tide (2x)';
+  if (bonus >= 1.3) return name + ' - Rising Tide (1.3x)';
+  return name + ' - Low Tide';
+}
+
+function getTidalColor(bonus) {
+  if (bonus >= 2.0) return '#44ddff';
+  if (bonus >= 1.3) return '#88bbcc';
+  return '#667788';
+}
+
+function drawTidalHUD() {
+  let edgeDist = islandEdgeDist(state.player.x, state.player.y);
+  if (edgeDist > -0.15) {
+    let bonus = getTidalBonus(state.player.x, state.player.y);
+    let label = getTidalLabel(state.player.x, state.player.y);
+    let col = getTidalColor(bonus);
+    fill(col);
+    textSize(8);
+    textAlign(CENTER, BOTTOM);
+    text(label, width / 2, height - 24);
+    // Wave icon
+    if (bonus >= 2.0) {
+      let waveX = width / 2 - textWidth(label) / 2 - 12;
+      let waveY = height - 30;
+      stroke(col);
+      strokeWeight(1);
+      noFill();
+      for (let i = 0; i < 3; i++) {
+        let wx = waveX + i * 5;
+        let wy = waveY + sin(frameCount * 0.1 + i) * 2;
+        line(wx, wy, wx + 3, wy - 2);
+        line(wx + 3, wy - 2, wx + 5, wy);
+      }
+      noStroke();
+    }
+  }
 }

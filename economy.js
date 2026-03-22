@@ -909,10 +909,23 @@ const MARKET_BASE_PRICES = {
   lotusSeeds: { base: 5, min: 3, max: 8 },
 };
 
-// Track what player sold yesterday — drives next-day price drop
-let _marketSellHistory = {}; // { resource: qtySold }
+// ─── SUPPLY & DEMAND MARKET SYSTEM ──────────────────────────────────────
+// Supply tracks market saturation per good. Selling increases supply (lowers price),
+// buying decreases supply (raises price). Supply drifts toward 50 daily.
 let _marketPrices = {};      // { resource: { price, trend } } trend: -1, 0, +1
 let _marketPriceDay = -1;
+let _demandEvents = [];      // [{ good, amount, daysLeft }]
+
+function _initMarketSupply() {
+  if (!state.marketSupply) {
+    state.marketSupply = {};
+    for (let res in MARKET_BASE_PRICES) state.marketSupply[res] = 50;
+  }
+  if (!state.marketDemand) {
+    state.marketDemand = {};
+    for (let res in MARKET_BASE_PRICES) state.marketDemand[res] = 50;
+  }
+}
 
 function updateMarketPrices() {
   let day = state.day || 0;
@@ -920,30 +933,67 @@ function updateMarketPrices() {
   let prevPrices = {};
   for (let k in _marketPrices) prevPrices[k] = _marketPrices[k].price;
   _marketPriceDay = day;
+  _initMarketSupply();
   let mDay = isMarketDay(day);
   let prestige = state.prestige ? state.prestige.count : 0;
+
+  // Daily supply decay toward 50 by 10%
+  for (let res in state.marketSupply) {
+    state.marketSupply[res] += (50 - state.marketSupply[res]) * 0.1;
+  }
+  // Tick demand events
+  for (let i = _demandEvents.length - 1; i >= 0; i--) {
+    _demandEvents[i].daysLeft--;
+    if (_demandEvents[i].daysLeft <= 0) _demandEvents.splice(i, 1);
+  }
+  // Daily demand decay toward 50
+  for (let res in state.marketDemand) {
+    state.marketDemand[res] += (50 - state.marketDemand[res]) * 0.1;
+  }
+  // Apply active demand events
+  for (let ev of _demandEvents) {
+    if (state.marketDemand[ev.good] !== undefined) state.marketDemand[ev.good] += ev.amount;
+  }
+  // Random daily demand event (~20% chance)
+  let rand0 = _hannoSeededRandom(day * 97 + 41);
+  if (rand0 < 0.2) {
+    let goods = ['harvest', 'wood', 'fish', 'wine', 'crystals', 'stone'];
+    let pick = goods[Math.floor(_hannoSeededRandom(day * 53 + 7) * goods.length)];
+    let amt = 15 + Math.floor(_hannoSeededRandom(day * 19 + 3) * 20);
+    _demandEvents.push({ good: pick, amount: amt, daysLeft: 3 });
+    let gName = MARKET_BASE_PRICES[pick] ? pick : pick;
+    if (typeof addNotification === 'function') addNotification('Market buzz: High demand for ' + gName + '!', '#ddaa44');
+  }
+  // Festival demand boosts
+  if (typeof getFestival === 'function') {
+    let fest = getFestival();
+    if (fest) {
+      if (fest.name === 'Saturnalia') { state.marketDemand.harvest = (state.marketDemand.harvest || 50) + 20; state.marketDemand.wine = (state.marketDemand.wine || 50) + 15; }
+      if (fest.name === 'Neptunalia') state.marketDemand.fish = (state.marketDemand.fish || 50) + 25;
+    }
+  }
 
   for (let res in MARKET_BASE_PRICES) {
     let mb = MARKET_BASE_PRICES[res];
     let base = mb.base;
-    // Prestige makes prices slightly higher (economy inflates)
     base = Math.floor(base * (1 + prestige * 0.1));
-    // Random daily modifier: -20% to +30%
+    // Supply/demand ratio drives price
+    let supply = state.marketSupply[res] || 50;
+    let demand = state.marketDemand[res] || 50;
+    let ratio = demand / Math.max(10, supply);
+    // Clamp ratio to 0.3x - 3.0x range
+    ratio = Math.max(0.3, Math.min(3.0, ratio));
+    let modifier = ratio;
+    // Random daily jitter: +/- 10%
     let rand = _hannoSeededRandom(day * 31 + res.length * 7 + 13);
-    let modifier = 0.8 + rand * 0.5; // 0.8 to 1.3
-    // Market day bonus: +20% sell, -15% buy
+    modifier *= (0.9 + rand * 0.2);
+    // Market day bonus
     if (mDay) {
       if (['seeds','grapeSeeds','oliveSeeds','flaxSeeds','pomegranateSeeds','lotusSeeds'].includes(res)) {
-        modifier *= 0.85; // cheaper to buy
+        modifier *= 0.85;
       } else {
-        modifier *= 1.2; // better sell price
+        modifier *= 1.2;
       }
-    }
-    // Supply/demand: if player sold a lot yesterday, price drops
-    let sold = _marketSellHistory[res] || 0;
-    if (sold > 0) {
-      let dropPct = Math.min(0.3, sold * 0.05); // -5% per unit sold, max -30%
-      modifier *= (1 - dropPct);
     }
     let finalPrice = Math.max(mb.min, Math.min(mb.max, Math.round(base * modifier)));
     let trend = 0;
@@ -953,8 +1003,6 @@ function updateMarketPrices() {
     }
     _marketPrices[res] = { price: finalPrice, trend: trend };
   }
-  // Reset sell history for tomorrow
-  _marketSellHistory = {};
 }
 
 function getMarketPrice(resource) {
@@ -968,8 +1016,21 @@ function getMarketTrend(resource) {
   return 0;
 }
 
+// Returns true if price is above base (good time to sell)
+function isPriceAboveBase(resource) {
+  let mb = MARKET_BASE_PRICES[resource];
+  if (!mb) return false;
+  return getMarketPrice(resource) > mb.base;
+}
+
 function recordMarketSell(resource, qty) {
-  _marketSellHistory[resource] = (_marketSellHistory[resource] || 0) + qty;
+  _initMarketSupply();
+  state.marketSupply[resource] = (state.marketSupply[resource] || 50) + qty * 5;
+}
+
+function recordMarketBuy(resource, qty) {
+  _initMarketSupply();
+  state.marketSupply[resource] = Math.max(5, (state.marketSupply[resource] || 50) - qty * 5);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1119,7 +1180,7 @@ function doPrestige() {
   let arenaHigh = state.arenaHighWave || 0;
 
   // Reset game state
-  initState(); _demandDay = -1; _marketPriceDay = -1; _prestigeInited = false;
+  initState(); _demandDay = -1; _marketPriceDay = -1; _prestigeInited = false; _demandEvents = [];
 
   // NG+ skips wreck beach — start on home island directly
   state.introPhase = 'done';

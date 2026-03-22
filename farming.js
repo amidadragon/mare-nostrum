@@ -432,6 +432,8 @@ function drawOnePlot(p) {
         rect(px - 6 + di * 6, py - 3 + di * 2, 2, 1);
       }
     }
+    // Fertility overlay — depleted soil shows pale/cracked
+    if (typeof drawPlotFertilityOverlay === 'function') drawPlotFertilityOverlay(p, px, py);
 
     if (p.planted) {
       let cropDraw = drawGrainSprite;
@@ -922,6 +924,90 @@ function rebuildFarmGrid(lvl) {
 // Legacy wrapper — expansion calls this
 function addFarmPlots(farmCX, farmCY, lvl) {
   rebuildFarmGrid(lvl);
+}
+
+// ─── CROP ROTATION & SOIL FERTILITY ─────────────────────────────────────
+// Each plot tracks fertility (0-100) and crop history. Rotating crops maintains soil health.
+const ROTATION_CROPS = ['grain', 'olive', 'grape', 'flax', 'pomegranate', 'lotus'];
+
+function ensurePlotFertility(p) {
+  if (p.fertility === undefined) p.fertility = 100;
+  if (!p.lastCrop) p.lastCrop = null;
+  if (!p.cropHistory) p.cropHistory = [];
+  if (!p.lastHarvestDay) p.lastHarvestDay = 0;
+}
+
+function getFertilityGrowthMult(p) {
+  ensurePlotFertility(p);
+  if (p.fertility <= 0) return 0; // crops wither at 0
+  return p.fertility / 100;
+}
+
+function getFertilityColor(p) {
+  ensurePlotFertility(p);
+  if (p.fertility >= 80) return { r: 88, g: 68, b: 45 };    // rich dark brown
+  if (p.fertility >= 40) return { r: 110, g: 90, b: 60 };   // medium brown
+  return { r: 160, g: 140, b: 110 };                         // pale sandy
+}
+
+function onPlotHarvest(p) {
+  ensurePlotFertility(p);
+  let cropType = p.cropType || 'grain';
+  let sameCrop = (p.lastCrop === cropType);
+  p.fertility = max(0, p.fertility - (sameCrop ? 15 : 5));
+  // Check rotation bonus: 3 different crops in sequence
+  p.cropHistory.push(cropType);
+  if (p.cropHistory.length > 3) p.cropHistory.shift();
+  let rotationBonus = false;
+  if (p.cropHistory.length >= 3) {
+    let unique = new Set(p.cropHistory);
+    if (unique.size >= 3 && p.cropHistory.every(c => ROTATION_CROPS.includes(c))) {
+      p.fertility = min(100, p.fertility + 10);
+      rotationBonus = true;
+    }
+  }
+  p.lastCrop = cropType;
+  p.lastHarvestDay = state.day;
+  return rotationBonus;
+}
+
+function onPlotPlant(p, cropType) {
+  ensurePlotFertility(p);
+  // Fallow bonus: plot was empty for 1+ days since last harvest
+  if (p.lastHarvestDay > 0 && (state.day - p.lastHarvestDay) >= 1 && !p.planted) {
+    p.fertility = min(100, p.fertility + 20);
+    addFloatingText(w2sX(p.x), w2sY(p.y) - 45, 'Fallow Bonus! +20', '#88cc44');
+  }
+  let sx = w2sX(p.x), sy = w2sY(p.y);
+  addFloatingText(sx, sy - 55, 'Fertility: ' + floor(p.fertility) + '%', p.fertility >= 80 ? '#88cc44' : p.fertility >= 40 ? '#ccaa44' : '#cc4444');
+}
+
+function updateFallowRecovery(dt) {
+  // Empty plots recover +10 fertility per day (called from daily tick)
+  state.plots.forEach(p => {
+    ensurePlotFertility(p);
+    if (!p.planted) p.fertility = min(100, p.fertility + 10);
+  });
+}
+
+function drawPlotFertilityOverlay(p, px, py) {
+  ensurePlotFertility(p);
+  if (p.fertility >= 80) return; // no overlay needed for healthy soil
+  // Depleted soil: pale overlay + crack pattern
+  let fc = getFertilityColor(p);
+  if (p.fertility < 40) {
+    fill(fc.r, fc.g, fc.b, 60);
+    rect(px - p.w / 2, py - p.h / 2, p.w, p.h);
+    // Crack lines
+    stroke(fc.r + 20, fc.g + 10, fc.b, 80);
+    strokeWeight(0.6);
+    line(px - 6, py - 3, px + 4, py + 2);
+    line(px + 2, py - 4, px - 3, py + 3);
+    noStroke();
+  } else {
+    fill(fc.r, fc.g, fc.b, 30);
+    rect(px - p.w / 2, py - p.h / 2, p.w, p.h);
+  }
 }
 
 // ─── HARVESTER NPC ───────────────────────────────────────────────────────

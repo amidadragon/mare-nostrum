@@ -855,13 +855,20 @@ function drawShopUI() {
     // Row background
     fill(canDo ? color(60, 50, 35, 150) : color(40, 30, 25, 100));
     rect(panX + 12, oy, panW - 24, 24, 3);
-    // Left accent bar
+    // Left accent bar — color-coded by supply/demand
     let accentCol = tab === 'buy' ? [80, 160, 80] : tab === 'sell' ? [180, 150, 60] : [100, 140, 200];
+    if (tab === 'sell' && offer.item && typeof isPriceAboveBase === 'function') {
+      accentCol = isPriceAboveBase(offer.item) ? [80, 200, 80] : [200, 80, 80];
+    }
     fill(canDo ? color(accentCol[0], accentCol[1], accentCol[2]) : color(80, 60, 40));
     rect(panX + 12, oy, 3, 24, 3, 0, 0, 3);
 
-    // Label
-    fill(canDo ? color(220, 200, 150) : color(100, 85, 65));
+    // Label — green if above base, red if below
+    let labelCol = canDo ? color(220, 200, 150) : color(100, 85, 65);
+    if (tab === 'sell' && offer.item && typeof isPriceAboveBase === 'function') {
+      labelCol = isPriceAboveBase(offer.item) ? (canDo ? color(140, 220, 140) : color(80, 120, 80)) : (canDo ? color(220, 140, 140) : color(120, 80, 80));
+    }
+    fill(labelCol);
     textSize(9);
     text(offer.label, panX + 22, oy + 8);
 

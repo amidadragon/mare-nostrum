@@ -2395,6 +2395,9 @@ function startIslandDefense(raidSize, nationKey) {
   // Add watchtower bonus damage
   let towers = (state.buildings || []).filter(b => b.type === 'watchtower' || b.type === 'guardtower');
   let towerDmg = towers.length * 3;
+  // Adjacency: watchtower near wall = +20% tower damage
+  let hasWallAdj = towers.some(t => typeof hasAdjacencyBonus === 'function' && hasAdjacencyBonus(t, 'watchtower'));
+  if (hasWallAdj) towerDmg = floor(towerDmg * 1.2);
 
   // Buff garrison with defense mult
   let defenderUnits = garrison.map(u => ({
