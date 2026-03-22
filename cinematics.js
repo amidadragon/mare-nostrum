@@ -374,6 +374,8 @@ function drawIntroCinematic(dt) {
       // Snap camera to player (wreck beach or home)
       cam.x = state.player.x; cam.y = state.player.y;
       camSmooth.x = cam.x; camSmooth.y = cam.y;
+      // Play wreck wake narration
+      if (snd && snd.playNarration && !state.progression.homeIslandReached) snd.playNarration('wreck_wake');
       // First-minute tutorial hint
       showTutorialHint('Gather materials — walk to glowing nodes and press [E]', state.player.x, state.player.y - 40);
     }

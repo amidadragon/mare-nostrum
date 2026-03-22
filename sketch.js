@@ -17,7 +17,7 @@ const KEYBIND_LABELS = {
   buildMode: 'Build Mode', demolish: 'Demolish', rotate: 'Rotate',
   inventory: 'Inventory', map: 'Map', recipeBook: 'Recipe Book', legia: 'Legion', fish: 'Fish', debug: 'Debug'
 };
-let gameSettings = { screenShake: true, fontScale: 1, lastSaveTime: 0, musicSource: 'lyre', keybinds: {} };
+let gameSettings = { screenShake: true, fontScale: 1, lastSaveTime: 0, musicSource: 'recorded', keybinds: {} };
 let _rebindingAction = null;
 let _keybindScrollOffset = 0;
 function _loadSettings() {
@@ -918,7 +918,13 @@ const NARRATION_TEXTS = {
   first_harvest: 'The first grain falls. The land provides for those who tend it.',
   first_build: 'Stone upon stone. A home rises where there was nothing.',
   first_fish: 'The sea gives freely to those with patience.',
-  first_combat: 'Steel rings against steel. You will not fall so easily.'
+  first_combat: 'Steel rings against steel. You will not fall so easily.',
+  first_steps: 'The first steps of a long journey. This land will remember you.',
+  victory: 'From exile to legend. The Mediterranean is yours. Mare Nostrum.',
+  defeat: 'The sea claims another. But legends never truly die.',
+  vulcan: 'Heat rises from the earth. The forge-god stirs beneath your feet.',
+  necropolis: 'The dead do not rest here. Tread carefully among the tombs.',
+  hyperborea: 'Ice and silence. The frozen north holds secrets older than Rome.'
 };
 function _showNarrationSubtitle(key) {
   let txt = NARRATION_TEXTS[key];
@@ -1398,6 +1404,7 @@ function checkResearchVictory() {
   if (done) {
     state.victoryAchieved = 'research';
     state.victoryScreen = { type: 'research', day: state.day, timer: 0 };
+    if (snd && snd.playNarration) snd.playNarration('victory');
   }
 }
 // Victory condition checks for all 4 types
@@ -1409,6 +1416,7 @@ function checkAllVictoryConditions() {
     if (nationKeys.length >= 3 && nationKeys.every(k => state.nations[k] && (state.nations[k].military <= 0 || state.nations[k].vassal))) {
       state.victoryAchieved = 'domination';
       state.victoryScreen = { type: 'domination', day: state.day, timer: 0 };
+      if (snd && snd.playNarration) snd.playNarration('victory');
       return;
     }
   }
@@ -1418,6 +1426,7 @@ function checkAllVictoryConditions() {
     if (nationKeys.length >= 3 && nationKeys.every(k => state.nations[k] && state.nations[k].reputation >= 50)) {
       state.victoryAchieved = 'diplomatic';
       state.victoryScreen = { type: 'diplomatic', day: state.day, timer: 0 };
+      if (snd && snd.playNarration) snd.playNarration('victory');
       return;
     }
   }
@@ -1427,6 +1436,7 @@ function checkAllVictoryConditions() {
     if (nationKeys.length >= 3 && nationKeys.every(k => state.nations[k] && state.nations[k].tradeActive)) {
       state.victoryAchieved = 'economic';
       state.victoryScreen = { type: 'economic', day: state.day, timer: 0 };
+      if (snd && snd.playNarration) snd.playNarration('victory');
       return;
     }
   }
@@ -2946,6 +2956,12 @@ function onIslandTransition(from, to) {
     }
     if (!isle.frozenObelisk && to === 'hyperborea') isle.frozenObelisk = { x: isle.isleX, y: isle.isleY };
     if (state.narrativeFlags) state.narrativeFlags['discover_' + to] = true;
+    // Play island-specific narration on first visit
+    if (snd && snd.playNarration) {
+      if (to === 'vulcan') snd.playNarration('vulcan');
+      else if (to === 'necropolis') snd.playNarration('necropolis');
+      else if (to === 'hyperborea') snd.playNarration('hyperborea');
+    }
     trackMilestone('first_island');
     state._activeExploration = to;
   }
@@ -17328,6 +17344,7 @@ function updateAdventure(dt) {
     p.hp = floor(p.maxHp * 0.5);
     addFloatingText(width / 2, height * 0.35, 'Retreat!', '#ff6644');
     triggerScreenShake(8, 20);
+    if (snd && snd.playNarration) snd.playNarration('defeat');
     if (typeof showArenaSummary === 'function') showArenaSummary(a, false);
     exitAdventure();
   }
@@ -27068,11 +27085,16 @@ function updateTutorialGoals() {
   if (s.id === 'expand')  { if (state.crystalShrine) { tx = state.crystalShrine.x; ty = state.crystalShrine.y; } }
   state.tutorialGoal = { text: s.text, targetWX: tx, targetWY: ty, stepId: s.id };
   if (s.check()) {
+    // Tutorial step narration triggers
+    if (s.id === 'chop' && snd) snd.playSFX('ding'); // brief congratulatory chime
+    if (s.id === 'farm' && snd && snd.playNarration) snd.playNarration('first_steps');
+    if (s.id === 'build' && snd && snd.playNarration) snd.playNarration('first_build');
     state.tutorialGoalStep = step + 1;
     if (step + 1 >= TUTORIAL_STEPS.length) {
       state.tutorialGoalComplete = true;
       state.tutorialGoal = null;
       addNotification('Tutorial complete! Explore freely.', '#44ffaa');
+      if (snd) snd.playSFX('fanfare'); // fanfare on tutorial complete
       trackMilestone('tutorial_complete');
     }
   }
