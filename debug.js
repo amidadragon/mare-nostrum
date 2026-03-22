@@ -6,7 +6,7 @@
 document.addEventListener('keydown', function(e) {
   if (typeof Debug === 'undefined') return;
   // Toggle console
-  if (e.code === 'Backquote' || e.key === '`' || e.key === '~' || e.key === '§' || e.keyCode === 192) {
+  if (e.code === 'Backquote' || e.key === '`' || e.key === '~' || e.key === '§' || e.keyCode === 192 || e.code === 'F3' || e.key === 'F3') {
     e.preventDefault();
     e.stopPropagation();
     Debug.toggle();
