@@ -551,7 +551,7 @@ function drawSky() {
   }
 
   if ((bright > 0.1 || (h >= 5 && h < 7)) && !stormActive && !(typeof _frameBudget !== 'undefined' && _frameBudget.throttled)) {
-    drawDriftClouds(max(bright, 0.15));
+    // Clouds disabled -- they render as dark blobs
   }
 
   if (bright > 0.25) { // only draw sun when actually visible (was 0.05 = ghost at night)

@@ -3390,6 +3390,15 @@ function drawInner() {
 
   updateTime(dt);
   updateCurrentIsland();
+  // Safety: if player is lost in deep ocean (not near any island, not rowing), teleport home
+  if (state.player && !state.rowing.active && typeof isNearAnyIsland === 'function' &&
+      !isNearAnyIsland(state.player.x, state.player.y, 500) && !state.insideTemple && !state.insideCastrum) {
+    state.player.x = WORLD.islandCX;
+    state.player.y = WORLD.islandCY;
+    cam.x = state.player.x; cam.y = state.player.y;
+    camSmooth.x = cam.x; camSmooth.y = cam.y;
+    addNotification('Washed ashore on your island...', '#88ddff');
+  }
   updateTutorialHint(dt);
   if (snd && frameCount % 10 === 0) { snd.updateAmbient(); }
 
