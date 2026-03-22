@@ -1471,10 +1471,10 @@ function initState() {
     maxSolar: 100,
     seeds: 3,
     harvest: 0,
-    crystals: 2,
+    crystals: 5,
     wood: 5,
-    stone: 3,
-    gold: 0,
+    stone: 5,
+    gold: 10,
     fish: 0,
 
     // Fishing
@@ -12645,7 +12645,7 @@ function placeBuilding(wx, wy) {
   addFloatingText(w2sX(wx), w2sY(wy) - 30, '+' + bp.name, C.crystalGlow);
   spawnBuildingComplete(wx, wy);
   // First building celebration burst
-  if (typeof isFirstBuilding === 'function' && isFirstBuilding()) { for (let _ci = 0; _ci < 20; _ci++) { let _ca = random(TWO_PI); particles.push({ x: wx, y: wy, vx: cos(_ca) * random(1, 3), vy: sin(_ca) * random(1, 3) - 2, life: 50, maxLife: 50, type: 'sparkle', size: random(2, 5), r: 255, g: random(180, 255), b: random(40, 120), world: true }); } addFloatingText(w2sX(wx), w2sY(wy) - 50, 'First structure built!', '#44ffaa'); }
+  if (typeof isFirstBuilding === 'function' && isFirstBuilding()) { for (let _ci = 0; _ci < 20; _ci++) { let _ca = random(TWO_PI); particles.push({ x: wx, y: wy, vx: cos(_ca) * random(1, 3), vy: sin(_ca) * random(1, 3) - 2, life: 50, maxLife: 50, type: 'sparkle', size: random(2, 5), r: 255, g: random(180, 255), b: random(40, 120), world: true }); } addFloatingText(w2sX(wx), w2sY(wy) - 50, 'Your settlement grows!', '#44ffaa'); }
   triggerScreenShake(2, 6);
   state.dailyActivities.built++;
   checkQuestProgress('build', 1);
@@ -16453,6 +16453,7 @@ function chopTree(tree) {
     if (typeof checkDailyQuestProgress === 'function') checkDailyQuestProgress('chop', 1);
     checkQuestProgress('chop', 1);
     addFloatingText(w2sX(tree.x), w2sY(tree.y) - 40, '+' + woodDrop + ' Wood', '#8B6914');
+    if (state.dailyActivities.chopped === 1 && state.day <= 2) { addFloatingText(w2sX(tree.x), w2sY(tree.y) - 60, 'Great start!', '#44ffaa'); if (snd) snd.playSFX('build'); }
     // Chance for bonus
     if (random() < 0.3) {
       state.seeds += 1;
@@ -25216,6 +25217,7 @@ function mousePressed() {
           if (snd) snd.playSFX('build');
           let label = cropType === 'grain' ? 'Planted' : 'Planted ' + cropType;
           addFloatingText(px, py - 20, label, C.vineLight);
+          if (state.plots && state.plots.filter(function(pl) { return pl.planted; }).length === 1) { addFloatingText(px, py - 40, 'It will grow over time!', '#88cc44'); }
         }
       }
     }
@@ -26256,6 +26258,7 @@ function keyPressed() {
         nearCrystal.respawnTimer = state.tools.steelPick ? 400 : 800;
         let csx = w2sX(nearCrystal.x), csy = w2sY(nearCrystal.y);
         addFloatingText(csx, csy - 15, '+' + amt + ' Crystal', C.crystalGlow);
+        if (state.dailyActivities.crystal === amt && state.day <= 2) { addFloatingText(csx, csy - 35, 'These power island expansion!', '#88ddff'); }
         spawnCrystalPulse(nearCrystal.x, nearCrystal.y);
         triggerScreenShake(2, 4);
         return;
@@ -26982,8 +26985,8 @@ function showTutorialHintOnce(key, text, wx, wy) {
 // ─── TUTORIAL GOAL SYSTEM — 6-step onboarding ──────────────────────────
 const TUTORIAL_STEPS = [
   { id: 'move',    text: 'Use WASD to move around your island',                check: function() { return state.player.moving; } },
-  { id: 'chop',    text: 'Walk to a tree and press E to chop wood',            check: function() { return state.wood > 0; } },
-  { id: 'crystal', text: 'Walk to the glowing crystals and press E to mine',   check: function() { return state.crystals > 0; } },
+  { id: 'chop',    text: 'Walk to a tree and press E to chop wood',            check: function() { return state.dailyActivities.chopped > 0 || state.playerStats.treesChopped > 0; } },
+  { id: 'crystal', text: 'Walk to the glowing crystals and press E to mine',   check: function() { return state.dailyActivities.crystal > 0 || state.playerStats.crystalsCollected > 0; } },
   { id: 'farm',    text: 'Walk to the farm plots and press E to plant seeds',  check: function() { return state.plots && state.plots.some(function(p) { return p.planted; }); } },
   { id: 'build',   text: 'Press B to open Build Mode and place a building',    check: function() { return state.buildings.length > 0; } },
   { id: 'expand',  text: 'Visit the Crystal Shrine to expand your island!',    check: function() { return state.islandLevel > 1; } },
