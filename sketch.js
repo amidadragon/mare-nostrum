@@ -17568,18 +17568,33 @@ function drawConquestDistantEntities() {
 
 function drawArenaIsleDistant() {
   if (state.adventure.active) return;
-  // Use the SAME rendering as nation islands -- simple, proven, works with perspective
   let a = state.adventure;
   let sx = w2sX(a.isleX), sy = w2sY(a.isleY);
-  let _horizY = max(height * 0.06, height * 0.25 - horizonOffset) + 5;
-  sy = max(sy, _horizY);
-  let _dScale = (typeof _getDistantScale === 'function') ? _getDistantScale(a.isleX, a.isleY, a.isleRX) : null;
-  if (_dScale && _dScale.dist > (typeof _getMaxViewDist === 'function' ? _getMaxViewDist() : 4000)) return;
+
+  // Check if player is swimming toward arena or near it
+  let playerSwimming = typeof isInArenaSwimZone === 'function' &&
+    state.player && isInArenaSwimZone(state.player.x, state.player.y);
+  let playerOnArena = typeof isOnArenaIsland === 'function' &&
+    state.player && isOnArenaIsland(state.player.x, state.player.y);
+  let playerNear = playerSwimming || playerOnArena;
+
+  // Only clamp to horizon and apply distance scale when viewing from far away
+  if (!playerNear) {
+    let _horizY = max(height * 0.06, height * 0.25 - horizonOffset) + 5;
+    sy = max(sy, _horizY);
+    let _dScale = (typeof _getDistantScale === 'function') ? _getDistantScale(a.isleX, a.isleY, a.isleRX) : null;
+    if (_dScale && _dScale.dist > (typeof _getMaxViewDist === 'function' ? _getMaxViewDist() : 4000)) return;
+  }
   if (sx < -400 || sx > width + 400) return;
+  if (sy < -400 || sy > height + 400) return;
 
   push(); noStroke();
-  if (_dScale && _dScale.scale < 0.98) {
-    translate(sx, sy); scale(_dScale.scale); translate(-sx, -sy);
+  // Only apply distance scaling when far away, not when swimming nearby
+  if (!playerNear) {
+    let _dScale = (typeof _getDistantScale === 'function') ? _getDistantScale(a.isleX, a.isleY, a.isleRX) : null;
+    if (_dScale && _dScale.scale < 0.98) {
+      translate(sx, sy); scale(_dScale.scale); translate(-sx, -sy);
+    }
   }
   let bright = getSkyBrightness();
   let fsx = floor(sx), fsy = floor(sy);
