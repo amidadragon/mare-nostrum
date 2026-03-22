@@ -4810,18 +4810,18 @@ function drawSkyBirds() {
   noStroke();
 }
 
+const _stormCloudData = [
+  { x: 0.0, y: 0.04, r: 140 }, { x: 0.12, y: 0.08, r: 130 },
+  { x: 0.25, y: 0.03, r: 150 }, { x: 0.35, y: 0.10, r: 120 },
+  { x: 0.45, y: 0.05, r: 160 }, { x: 0.55, y: 0.12, r: 135 },
+  { x: 0.65, y: 0.04, r: 145 }, { x: 0.75, y: 0.09, r: 130 },
+  { x: 0.85, y: 0.06, r: 155 }, { x: 0.95, y: 0.11, r: 125 },
+  { x: 0.20, y: 0.18, r: 140 }, { x: 0.50, y: 0.20, r: 150 },
+];
 function drawStormClouds() {
   let intensity = stormActive ? 1 : map(stormTimer, 0, 600, 0, 0.5);
   noStroke();
-  let cloudData = [
-    { x: 0.0, y: 0.04, r: 140 }, { x: 0.12, y: 0.08, r: 130 },
-    { x: 0.25, y: 0.03, r: 150 }, { x: 0.35, y: 0.10, r: 120 },
-    { x: 0.45, y: 0.05, r: 160 }, { x: 0.55, y: 0.12, r: 135 },
-    { x: 0.65, y: 0.04, r: 145 }, { x: 0.75, y: 0.09, r: 130 },
-    { x: 0.85, y: 0.06, r: 155 }, { x: 0.95, y: 0.11, r: 125 },
-    { x: 0.20, y: 0.18, r: 140 }, { x: 0.50, y: 0.20, r: 150 },
-  ];
-  cloudData.forEach((c, i) => {
+  _stormCloudData.forEach((c, i) => {
     let cx = floor(c.x * width + sin(frameCount * 0.003 + i * 0.8) * 25);
     let cy = floor(c.y * height);
     let r = c.r;
@@ -6981,13 +6981,15 @@ function drawSeasonalEffects() {
       });
     }
     noStroke();
-    for (let i = seasonLeaves.length - 1; i >= 0; i--) {
+    let _slW = 0;
+    for (let i = 0; i < seasonLeaves.length; i++) {
       let l = seasonLeaves[i];
       l.x += l.vx + sin(frameCount * 0.015 + i * 0.7) * 0.4;
       l.y += l.vy + cos(frameCount * 0.02 + i) * 0.1;
       l.rot += l.rotV;
       l.life--;
-      if (l.life <= 0) { seasonLeaves.splice(i, 1); continue; }
+      if (l.life <= 0) continue;
+      seasonLeaves[_slW++] = l;
       let fadeA = min(1, l.life / 30);
 
       if (l.type === 'butterfly') {
@@ -7013,6 +7015,7 @@ function drawSeasonalEffects() {
         pop();
       }
     }
+    seasonLeaves.length = _slW;
     // Floating pollen motes (fewer, supplemental)
     if (frameCount % 60 === 0 && bright > 0.3) {
       particles.push({
@@ -7061,12 +7064,14 @@ function drawSeasonalEffects() {
         });
       }
       noStroke();
-      for (let i = seasonLeaves.length - 1; i >= 0; i--) {
+      let _sfW = 0;
+      for (let i = 0; i < seasonLeaves.length; i++) {
         let l = seasonLeaves[i];
         l.x += l.vx + sin(frameCount * 0.01 + i * 1.3) * 0.4;
         l.y += l.vy + cos(frameCount * 0.012 + i * 0.9) * 0.3;
         l.life--;
-        if (l.life <= 0) { seasonLeaves.splice(i, 1); continue; }
+        if (l.life <= 0) continue;
+        seasonLeaves[_sfW++] = l;
         let glow = (sin(frameCount * 0.08 + (l.phase || 0)) + 1) * 0.5;
         fill(180, 255, 100, 40 * glow);
         circle(l.x, l.y, l.size * 4);
@@ -7077,6 +7082,7 @@ function drawSeasonalEffects() {
         rect(floor(l.x) - 1, floor(l.y), 2, 6);
         rect(floor(l.x), floor(l.y) - 1, 6, 2);
       }
+      seasonLeaves.length = _sfW;
     } else {
       // Clear fireflies during day
       if (seasonLeaves.some(l => l.type === 'firefly')) seasonLeaves = seasonLeaves.filter(l => l.type !== 'firefly');
@@ -7101,13 +7107,15 @@ function drawSeasonalEffects() {
       });
     }
     noStroke();
-    for (let i = seasonLeaves.length - 1; i >= 0; i--) {
+    let _alW = 0;
+    for (let i = 0; i < seasonLeaves.length; i++) {
       let l = seasonLeaves[i];
       l.x += l.vx + sin(frameCount * 0.025 + i) * 0.35;
       l.y += l.vy;
       l.rot += l.rotV;
       l.life--;
-      if (l.life <= 0) { seasonLeaves.splice(i, 1); continue; }
+      if (l.life <= 0) continue;
+      seasonLeaves[_alW++] = l;
       push();
       translate(l.x, l.y);
       rotate(l.rot);
@@ -7119,6 +7127,7 @@ function drawSeasonalEffects() {
       rect(-1, -l.size * 0.2, 2, l.size * 0.4);
       pop();
     }
+    seasonLeaves.length = _alW;
     // Morning mist (early hours)
     let hour = state.time / 60;
     if (hour >= 5 && hour < 9) {
@@ -7144,12 +7153,14 @@ function drawSeasonalEffects() {
       });
     }
     noStroke();
-    for (let i = seasonLeaves.length - 1; i >= 0; i--) {
+    let _wlW = 0;
+    for (let i = 0; i < seasonLeaves.length; i++) {
       let l = seasonLeaves[i];
       l.x += l.vx + sin(frameCount * 0.018 + i * 0.5) * 0.45;
       l.y += l.vy;
       l.life--;
-      if (l.life <= 0) { seasonLeaves.splice(i, 1); continue; }
+      if (l.life <= 0) continue;
+      seasonLeaves[_wlW++] = l;
       fill(l.c);
       circle(l.x, l.y, l.size);
       // Subtle sparkle on larger flakes
@@ -7159,6 +7170,7 @@ function drawSeasonalEffects() {
         rect(floor(l.x) - 1, floor(l.y), 3, 1);
       }
     }
+    seasonLeaves.length = _wlW;
     // Frost on buildings — light blue pixel rects on tops
     if (bright > 0.2) {
       state.buildings.forEach((b, bi) => {
@@ -9429,49 +9441,33 @@ function drawForumBanner() {
   });
 }
 
+const _windowGlowTypes = { forum:1, temple:1, granary:1, market:1, shrine:1, villa:1, arch:1, bakery:1, bathhouse:1, sculptor:1, marketplace:1, windmill:1 };
+const _groundGlowTypes = { torch:1, lantern:1, campfire:1, villa:1, temple:1, forum:1, shrine:1, granary:1, market:1, altar:1, bakery:1, lighthouse:1, guardtower:1, bathhouse:1, sculptor:1, windmill:1 };
 function drawWindowGlow() {
   let bright = getSkyBrightness();
   if (bright >= 0.35) return;
   let nightStr = map(bright, 0, 0.35, 1, 0);
+  noStroke();
 
-  state.buildings.forEach(b => {
-    if (b.type === 'forum' || b.type === 'temple' || b.type === 'granary' ||
-        b.type === 'market' || b.type === 'shrine' || b.type === 'villa' ||
-        b.type === 'arch' || b.type === 'bakery' || b.type === 'bathhouse' ||
-        b.type === 'sculptor' || b.type === 'marketplace' || b.type === 'windmill') {
-      let sx5 = w2sX(b.x);
-      let sy5 = w2sY(b.y);
-      if (sx5 < -30 || sx5 > width + 30 || sy5 < -30 || sy5 > height + 30) return;
-      noStroke();
-      // 2-3 small warm rectangles per building — windows/doorways
+  for (let _gi = 0; _gi < state.buildings.length; _gi++) {
+    let b = state.buildings[_gi];
+    let sx5 = w2sX(b.x);
+    let sy5 = w2sY(b.y);
+    if (sx5 < -30 || sx5 > width + 30 || sy5 < -30 || sy5 > height + 30) continue;
+    if (_windowGlowTypes[b.type]) {
       fill(255, 195, 80, 70 * nightStr);
       rect(floor(sx5 - b.w * 0.15), floor(sy5 - b.h * 0.25), 5, 4);
       rect(floor(sx5 + b.w * 0.1), floor(sy5 - b.h * 0.25), 5, 4);
-      // Soft bloom
       fill(255, 175, 60, 30 * nightStr);
       ellipse(sx5, sy5 - b.h * 0.1, b.w * 0.7, b.h * 0.45);
     }
-  });
-
-  // Night building glow pools — warm orange circles on ground beneath lit buildings
-  state.buildings.forEach(b => {
-    if (b.type === 'torch' || b.type === 'lantern' || b.type === 'campfire' ||
-        b.type === 'villa' || b.type === 'temple' || b.type === 'forum' ||
-        b.type === 'shrine' || b.type === 'granary' || b.type === 'market' ||
-        b.type === 'altar' || b.type === 'bakery' || b.type === 'lighthouse' ||
-        b.type === 'guardtower' || b.type === 'bathhouse' || b.type === 'sculptor' || b.type === 'windmill') {
-      let gx = w2sX(b.x);
-      let gy = w2sY(b.y);
-      if (gx < -30 || gx > width + 30 || gy < -30 || gy > height + 30) return;
-      noStroke();
-      // Outer soft falloff
+    if (_groundGlowTypes[b.type]) {
       fill(255, 160, 50, 18 * nightStr);
-      ellipse(gx, gy + 2, 30, 15);
-      // Inner warm core
+      ellipse(sx5, sy5 + 2, 30, 15);
       fill(255, 180, 70, 35 * nightStr);
-      ellipse(gx, gy + 2, 14, 7);
+      ellipse(sx5, sy5 + 2, 14, 7);
     }
-  });
+  }
 }
 
 // ─── AMBIENT BACKGROUND HOUSES + MARKET CLUTTER ─────────────────────────
@@ -9760,7 +9756,14 @@ function drawWorldObjectsSorted() {
   if (state.legia && state.legia.soldiers) state.legia.soldiers.forEach(s => { if (isOnScreen(s.x, s.y, 40)) _sortItems.push({ y: s.y, draw: () => drawLegionAmbientSoldier(s) }); });
   // Army escort following player — cull offscreen
   if (state.legia && state.legia.army && typeof drawEscortSoldier === 'function') {
-    state.legia.army.filter(u => !u._assignedOfficer && u.x).slice(0, 20).forEach(u => { if (isOnScreen(u.x, u.y, 40)) _sortItems.push({ y: u.y, draw: () => drawEscortSoldier(u) }); });
+    let _escortCount = 0;
+    for (let _ei = 0; _ei < state.legia.army.length && _escortCount < 20; _ei++) {
+      let u = state.legia.army[_ei];
+      if (!u._assignedOfficer && u.x) {
+        _escortCount++;
+        if (isOnScreen(u.x, u.y, 40)) _sortItems.push({ y: u.y, draw: () => drawEscortSoldier(u) });
+      }
+    }
   }
   // Characters — gated by progression
   if (fullyUnlocked || prog.companionsAwakened.lares)
