@@ -3520,7 +3520,7 @@ function drawUniversalIslandDistant(islandData, _dScale) {
   if (!_dScale) {
     _dScale = _getDistantScale(d.cx, d.cy, rx);
   }
-  if (_dScale.dist > 4000) return;
+  if (_dScale.dist > (typeof _getMaxViewDist === 'function' ? _getMaxViewDist() : 4000)) return;
   if (ix < -400 || ix > width + 400 || iy < -400 || iy > height + 400) return;
 
   push(); noStroke();

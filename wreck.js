@@ -1593,7 +1593,7 @@ function drawWreckIsland() {
     let horizMinY = max(height * 0.06, height * 0.25 - (typeof horizonOffset !== 'undefined' ? horizonOffset : 0)) + 10;
     sy = max(sy, horizMinY);
     _dScale = _getDistantScale(cx, cy, rx);
-    if (_dScale.dist > 4000) return;
+    if (_dScale.dist > (typeof _getMaxViewDist === 'function' ? _getMaxViewDist() : 4000)) return;
   }
 
   if (sx + rx < -400 || sx - rx > width + 400 || sy + ry < -300 || sy - ry > height + 300) return;

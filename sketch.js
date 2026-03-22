@@ -862,6 +862,7 @@ let camSmooth = { x: 600, y: 400 };
 let camZoom = 1.0;
 let camZoomTarget = 1.0;
 const CAM_ZOOM_MIN = 1.0;
+const CAM_ZOOM_MIN_SAILING = 0.4;
 const CAM_ZOOM_MAX = 2.0;
 let particles = [];
 let lightningBolts = [];
@@ -2588,12 +2589,16 @@ function windowResized() {
 
 // ─── CAMERA ───────────────────────────────────────────────────────────────
 let _camIdleFrames = 0;
+let _camTransitionFrames = 0; // fast lerp during dock/undock
+function _startCamTransition() { _camTransitionFrames = 30; }
 function updateCamera() {
   // Smooth follow player — bias upward so horizon stays visible
   cam.x = state.player.x;
   cam.y = state.player.y - height * 0.12; // player sits in lower 60% of screen
-  camSmooth.x = lerp(camSmooth.x, cam.x, 0.08);
-  camSmooth.y = lerp(camSmooth.y, cam.y, 0.08);
+  let _camLerp = 0.08;
+  if (_camTransitionFrames > 0) { _camLerp = lerp(0.08, 0.25, _camTransitionFrames / 30); _camTransitionFrames--; }
+  camSmooth.x = lerp(camSmooth.x, cam.x, _camLerp);
+  camSmooth.y = lerp(camSmooth.y, cam.y, _camLerp);
 
   // Island expansion visual lerp (Feature 2)
   if (state._expandFrames > 0) {
@@ -2643,6 +2648,10 @@ function updateCamera() {
     camSmooth.y += sin(frameCount * 0.011) * 0.2;
   }
 
+  // When not sailing, ensure zoom doesn't stay below 1.0
+  if (!state.rowing || !state.rowing.active) {
+    if (camZoomTarget < CAM_ZOOM_MIN) camZoomTarget = CAM_ZOOM_MIN;
+  }
   // Smooth zoom interpolation
   camZoom = lerp(camZoom, camZoomTarget, 0.1);
 }
@@ -3397,7 +3406,8 @@ function drawInner() {
       let _wreckHorizY = max(height * 0.06, height * 0.25 - horizonOffset) + 10;
       wsy = max(wsy, _wreckHorizY);
       let _wreckDS = typeof _getDistantScale === 'function' ? _getDistantScale(WRECK.cx, WRECK.cy, WRECK.rx) : null;
-      if (_wreckDS && _wreckDS.dist > 4000) {} // skip label if too far
+      let _maxVD = typeof _getMaxViewDist === 'function' ? _getMaxViewDist() : 4000;
+      if (_wreckDS && _wreckDS.dist > _maxVD) {} // skip label if too far
       else if (wsx > -100 && wsx < width + 100 && wsy > -100 && wsy < height + 100) {
         let _wLabelAlpha = _wreckDS ? lerp(120, 40, constrain((_wreckDS.dist - 500) / 3000, 0, 1)) : 120;
         fill(200, 180, 120, _wLabelAlpha);
@@ -12009,7 +12019,8 @@ function drawHomeIslandDistant() {
   let homeRY = state.islandRY || WORLD.islandRY;
   let _ds = _getDistantScale(WORLD.islandCX, WORLD.islandCY, homeRX);
   if (_ds.dist < 300) return;
-  if (_ds.dist > 4500) return;
+  let _maxVD2 = typeof _getMaxViewDist === 'function' ? _getMaxViewDist() : 4500;
+  if (_ds.dist > _maxVD2) return;
   if (ix < -500 || ix > width + 500) return;
   push(); noStroke();
   if (_ds.scale < 0.98) {
@@ -16673,7 +16684,7 @@ function drawArenaIsleDistant() {
   let _dScale = null;
   if (typeof _getDistantScale === 'function') {
     _dScale = _getDistantScale(a.isleX, a.isleY, a.isleRX);
-    if (_dScale.dist > 4000) return;
+    if (_dScale.dist > (typeof _getMaxViewDist === 'function' ? _getMaxViewDist() : 4000)) return;
   }
   if (sx < -200 || sx > width + 200) return;
   push();
@@ -20195,7 +20206,33 @@ function handleNationDiplomacyKey(k, kCode) {
 
 function drawNationIslesDistant() {
   let keys = Object.keys(state.nations);
-  for (let k of keys) drawSingleNationIsleDistant(k);
+  let isSailing = state.rowing && state.rowing.active;
+  for (let k of keys) {
+    if (!isSailing || typeof getIslandLOD !== 'function') {
+      drawSingleNationIsleDistant(k);
+      continue;
+    }
+    let rv = state.nations[k];
+    if (!rv || rv.defeated) continue;
+    let ds = _getDistantScale(rv.isleX, rv.isleY, rv.isleRX);
+    if (ds.dist > (typeof _getMaxViewDist === 'function' ? _getMaxViewDist() : 4000)) continue;
+    let lod = getIslandLOD(ds.dist);
+    let sx = w2sX(rv.isleX), sy = w2sY(rv.isleY);
+    let horizY = max(height * 0.06, height * 0.25 - horizonOffset) + 10;
+    sy = max(sy, horizY);
+    // Viewport culling
+    let viewW = width / camZoom, viewH = height / camZoom;
+    if (sx < -viewW * 0.6 || sx > width + viewW * 0.6 || sy < -viewH * 0.5 || sy > height + viewH * 0.5) continue;
+    // FPS throttle: downgrade close -> medium if FPS < 30
+    if (lod === 'close' && typeof _fpsSmooth !== 'undefined' && _fpsSmooth < 30) lod = 'medium';
+    if (lod === 'close') {
+      drawNationCloseLOD(sx, sy, rv.isleRX, rv.isleRY, k, rv, ds);
+    } else if (lod === 'medium') {
+      drawNationMediumLOD(sx, sy, rv.isleRX, rv.isleRY, k, rv, ds);
+    } else {
+      drawSingleNationIsleDistant(k);
+    }
+  }
 }
 
 function drawSingleNationIsleDistant(key) {
@@ -20211,7 +20248,7 @@ function drawSingleNationIsleDistant(key) {
   let _dScale = null;
   if (typeof _getDistantScale === 'function') {
     _dScale = _getDistantScale(rv.isleX, rv.isleY, rv.isleRX);
-    if (_dScale.dist > 4000) return;
+    if (_dScale.dist > (typeof _getMaxViewDist === 'function' ? _getMaxViewDist() : 4000)) return;
   }
   if (sx < -400 || sx > width + 400 || sy < -400 || sy > height + 400) return;
   push(); noStroke();
@@ -20564,7 +20601,7 @@ function enterNationIsland(key) {
   p.vx = 0; p.vy = 0;
   if (p.invincTimer !== undefined) p.invincTimer = 60;
   cam.x = p.x; cam.y = p.y;
-  camSmooth.x = p.x; camSmooth.y = p.y;
+  _startCamTransition(); camZoomTarget = 1.0;
   addFloatingText(width / 2, height * 0.25, getNationName(key).toUpperCase(), FACTIONS[key] ? FACTIONS[key].accentColorHex : '#ddaa44');
   addFloatingText(width / 2, height * 0.3, 'E near Palace for diplomacy  |  E near dock to sail home', '#ccbb88');
   trackMilestone('visit_nation_' + key);
@@ -20588,7 +20625,7 @@ function exitNationIsland() {
   p.x = state.rowing.x; p.y = state.rowing.y;
   p.vx = 0; p.vy = 0;
   cam.x = p.x; cam.y = p.y;
-  camSmooth.x = p.x; camSmooth.y = p.y;
+  _startCamTransition();
   addFloatingText(width / 2, height * 0.35, 'Departing ' + getNationName(key), '#ccbb88');
 }
 
@@ -22433,7 +22470,7 @@ function drawConquestIsleDistant() {
   let _dScale = null;
   if (typeof _getDistantScale === 'function') {
     _dScale = _getDistantScale(c.isleX, c.isleY, c.isleRX);
-    if (_dScale.dist > 4000) return;
+    if (_dScale.dist > (typeof _getMaxViewDist === 'function' ? _getMaxViewDist() : 4000)) return;
   }
   if (sx < -350 || sx > width + 350 || sy < -350 || sy > height + 350) return;
   push();
@@ -23611,7 +23648,8 @@ function mouseWheel(event) {
   // Zoom camera with scroll wheel during gameplay
   if (gameScreen === 'game' && state && state.isInitialized) {
     let delta = -event.delta * 0.001;
-    camZoomTarget = constrain(camZoomTarget + delta, CAM_ZOOM_MIN, CAM_ZOOM_MAX);
+    let zMin = (state.rowing && state.rowing.active) ? CAM_ZOOM_MIN_SAILING : CAM_ZOOM_MIN;
+    camZoomTarget = constrain(camZoomTarget + delta, zMin, CAM_ZOOM_MAX);
     return false;
   }
   let dir = event.delta > 0 ? 1 : -1;
@@ -24900,7 +24938,7 @@ function keyPressed() {
         state.player.y = WRECK.cy + 10;
         state.player.vx = 0; state.player.vy = 0;
         cam.x = state.player.x; cam.y = state.player.y;
-        camSmooth.x = cam.x; camSmooth.y = cam.y;
+        _startCamTransition(); camZoomTarget = 1.0;
         addFloatingText(width / 2, height * 0.35, 'Wreck Beach', C.sand);
         return;
       }

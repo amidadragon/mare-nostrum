@@ -18,13 +18,186 @@ function _getDistantScale(isleX, isleY, isleRX) {
   if (state.rowing && state.rowing.active) { px = state.rowing.x; py = state.rowing.y; }
   else { px = WORLD.islandCX; py = WORLD.islandCY; }
   let d = sqrt((isleX - px) * (isleX - px) + (isleY - py) * (isleY - py));
-  // Full size when within ~1.5x island radius, shrinks to 0.08 at ~3500 units
-  let nearDist = isleRX * 2.5;  // fully visible range
-  let farDist = 3500;            // maximum viewing distance
+  // Full size when within ~1.5x island radius, shrinks to 0.08 at far distance
+  let nearDist = isleRX * 2.5;
+  // Expand view range when zoomed out
+  let zoomMult = (typeof camZoom !== 'undefined' && camZoom < 1) ? 1 / camZoom : 1;
+  let farDist = 3500 * zoomMult;
   let t = constrain((d - nearDist) / (farDist - nearDist), 0, 1);
-  let s = lerp(1.0, 0.08, t * t); // quadratic falloff — shrinks faster at distance
-  let haze = lerp(0, 180, t);     // atmospheric blue-grey haze alpha
+  let s = lerp(1.0, 0.08, t * t);
+  let haze = lerp(0, 180, t);
   return { scale: s, haze: haze, dist: d };
+}
+
+// Max view distance — expanded when zoomed out during sailing
+function _getMaxViewDist() {
+  let base = 4000;
+  if (typeof camZoom !== 'undefined' && camZoom < 1) return base / camZoom;
+  return base;
+}
+
+// ─── LOD SYSTEM — Level of Detail for sailing world rendering ────────
+function getIslandLOD(dist) {
+  if (dist < 200) return 'full';
+  if (dist < 800) return 'close';
+  if (dist < 2000) return 'medium';
+  return 'far';
+}
+
+// Cache for nation building silhouettes (avoid recalc every frame)
+let _nationLODCache = {};
+let _lodActivityFrame = 0;
+
+// Draw a nation island at medium LOD — silhouette + building outlines + activity
+function drawNationMediumLOD(sx, sy, rx, ry, key, nation, dScale) {
+  let fac = typeof FACTIONS !== 'undefined' ? FACTIONS[key] : null;
+  let bannerCol = fac ? fac.bannerColor : [150, 100, 60];
+  let accentCol = fac ? fac.accentColor : [180, 140, 100];
+  let terrainCol = _getNationTerrainColor(key);
+  let bright = (typeof getSkyBrightness === 'function') ? getSkyBrightness() : 0.7;
+  let fsx = floor(sx), fsy = floor(sy);
+  let lv = nation.level || 1;
+
+  push(); noStroke();
+  if (dScale && dScale.scale < 0.98) {
+    translate(fsx, fsy); scale(dScale.scale); translate(-fsx, -fsy);
+  }
+
+  // Island shape
+  fill(20, 60, 80, 30); ellipse(fsx + 2, fsy + 3, rx * 2.05, ry * 2.05);
+  fill(terrainCol[0], terrainCol[1], terrainCol[2]); ellipse(fsx, fsy, rx * 1.9, ry * 1.9);
+  fill(terrainCol[0] - 15, terrainCol[1] - 10, terrainCol[2] - 10);
+  ellipse(fsx, fsy, rx * 1.7, ry * 1.7);
+
+  // Building silhouettes (small rects)
+  let numB = min(3 + floor(lv * 0.5), 6);
+  fill(100, 90, 75, 120);
+  for (let i = 0; i < numB; i++) {
+    let ba = (i / numB) * PI + 0.3;
+    let br = rx * 0.25 + (i % 3) * rx * 0.1;
+    let bx = fsx + cos(ba) * br - rx * 0.1;
+    let by = fsy + sin(ba) * br * 0.5 - ry * 0.12;
+    rect(floor(bx), floor(by - 4 - lv * 0.3), 5 + (i % 2) * 2, 4 + floor(lv * 0.3));
+  }
+
+  // Smoke wisps (1-2 animated)
+  if (lv >= 2) {
+    fill(180, 180, 170, 20 + sin(frameCount * 0.03) * 8);
+    let smX = fsx - 5, smY = fsy - ry * 0.2 - 8 - sin(frameCount * 0.02) * 3;
+    ellipse(smX, smY, 5, 3);
+    if (lv >= 4) ellipse(smX + 10, smY - 2, 4, 2);
+  }
+
+  // War effects — fire/smoke
+  if (nation.wars && nation.wars.length > 0) {
+    let warPulse = sin(frameCount * 0.08) * 0.3 + 0.7;
+    fill(200, 60, 20, 30 * warPulse); ellipse(fsx, fsy - ry * 0.1, rx * 0.6, ry * 0.4);
+    fill(80, 80, 80, 20 * warPulse); ellipse(fsx + 5, fsy - ry * 0.3, rx * 0.4, ry * 0.2);
+  }
+
+  // Flag
+  let flagY = fsy - ry * 0.55;
+  fill(accentCol[0], accentCol[1], accentCol[2], 140);
+  rect(fsx, flagY - 2, 1, 12);
+  fill(bannerCol[0], bannerCol[1], bannerCol[2], 160);
+  beginShape();
+  vertex(fsx + 1, flagY - 2); vertex(fsx + 8, flagY + 1); vertex(fsx + 1, flagY + 4);
+  endShape(CLOSE);
+
+  // Tiny docked ship if trading
+  if (lv >= 3) {
+    fill(90, 65, 30, 100);
+    let dsy = fsy + ry * 0.8;
+    beginShape();
+    vertex(fsx - 4, dsy); vertex(fsx - 2, dsy + 2); vertex(fsx + 2, dsy + 2); vertex(fsx + 4, dsy);
+    endShape(CLOSE);
+  }
+
+  // Distance haze
+  if (dScale && dScale.haze > 5) {
+    fill(140 + 30 * bright, 165 + 20 * bright, 195 + 10 * bright, floor(dScale.haze * 0.4));
+    ellipse(fsx, fsy, rx * 2.1, ry * 2.1);
+  }
+
+  // Name label
+  fill(getNationStanceColor(nation)); textSize(max(8, floor(10 * (dScale ? dScale.scale : 1))));
+  textAlign(CENTER); textStyle(ITALIC);
+  text(getNationName(key), fsx, fsy + ry + 10 * (dScale ? dScale.scale : 1));
+  textStyle(NORMAL); textAlign(LEFT, TOP);
+  pop();
+}
+
+// Draw a nation island at close LOD — detailed terrain, buildings, soldiers, NPCs
+function drawNationCloseLOD(sx, sy, rx, ry, key, nation, dScale) {
+  // Close LOD reuses the full distant draw — it already has all the detail we need
+  // Just add activity overlays on top
+  drawSingleNationIsleDistant(key);
+
+  // Soldier patrol dots (animated)
+  let fsx = floor(sx), fsy = floor(sy);
+  let soldiers = min(nation.military || 0, 8);
+  let fac = typeof FACTIONS !== 'undefined' ? FACTIONS[key] : null;
+  let soldierCol = fac ? fac.bannerColor : [150, 100, 60];
+
+  push(); noStroke();
+  // Only update positions every 5 frames for perf
+  if (soldiers > 0) {
+    for (let i = 0; i < soldiers; i++) {
+      let angle = (frameCount * 0.01 + i * TWO_PI / soldiers) % TWO_PI;
+      let px = fsx + cos(angle) * rx * 0.55;
+      let py = fsy + sin(angle) * ry * 0.3;
+      fill(soldierCol[0], soldierCol[1], soldierCol[2], 180);
+      rect(floor(px) - 1, floor(py) - 1, 2, 3);
+    }
+  }
+
+  // Population dots (near buildings) — only on close LOD
+  let popCount = min(nation.population || 0, 6);
+  for (let i = 0; i < popCount; i++) {
+    let pa = (i * 2.39996 + frameCount * 0.003) % TWO_PI;
+    let pr = rx * (0.15 + (i % 3) * 0.12);
+    let px = fsx + cos(pa) * pr;
+    let py = fsy + sin(pa) * pr * 0.55;
+    fill(200, 180, 150, 140);
+    rect(floor(px), floor(py), 2, 2);
+  }
+
+  // Recently built buildings — sparkle
+  if (nation._lastBuildFrame && frameCount - nation._lastBuildFrame < 120) {
+    let sparkle = sin(frameCount * 0.2) * 0.5 + 0.5;
+    fill(255, 255, 200, 60 * sparkle);
+    ellipse(fsx, fsy, rx * 0.4, ry * 0.3);
+  }
+
+  // War fire particles
+  if (nation.wars && nation.wars.length > 0) {
+    for (let i = 0; i < 3; i++) {
+      let fx = fsx + random(-rx * 0.3, rx * 0.3);
+      let fy = fsy + random(-ry * 0.2, ry * 0.2);
+      fill(255, 100 + random(80), 20, 40 + sin(frameCount * 0.1 + i) * 20);
+      ellipse(fx, fy, 4, 4);
+    }
+  }
+
+  // Farm fields as green patches
+  if (nation.level >= 2) {
+    fill(80, 140, 50, 40);
+    ellipse(fsx + rx * 0.3, fsy + ry * 0.2, rx * 0.25, ry * 0.15);
+    if (nation.level >= 4) {
+      ellipse(fsx - rx * 0.35, fsy + ry * 0.15, rx * 0.2, ry * 0.12);
+    }
+  }
+  pop();
+}
+
+// Helper: get terrain color for a nation key (reused across LODs)
+function _getNationTerrainColor(key) {
+  let colors = {
+    carthage: [185, 155, 95], egypt: [200, 175, 110], greece: [155, 170, 130],
+    seapeople: [100, 105, 115], persia: [195, 165, 95], phoenicia: [170, 130, 110],
+    gaul: [95, 135, 80], rome: [140, 130, 95]
+  };
+  return colors[key] || colors.rome;
 }
 
 // ======================================================================
@@ -37,7 +210,7 @@ function enterVulcan() {
   state.rowing.active = false;
   p.x = v.isleX; p.y = v.isleY + v.isleRY * 0.85 - 20;
   p.vx = 0; p.vy = 0; p.hp = p.maxHp; p.invincTimer = 60;
-  cam.x = p.x; cam.y = p.y; camSmooth.x = p.x; camSmooth.y = p.y;
+  cam.x = p.x; cam.y = p.y; if (typeof _startCamTransition === 'function') _startCamTransition(); else { camSmooth.x = p.x; camSmooth.y = p.y; }
   if (v.phase === 'unexplored') {
     v.phase = 'explored';
     for (let i = 0; i < 5; i++) { let a = (i / 5) * TWO_PI + random(-0.3, 0.3), r = random(0.3, 0.6) * v.isleRX; v.lavaPools.push({ x: v.isleX + cos(a) * r, y: v.isleY + sin(a) * r * 0.7, r: random(18, 35), phase: random(TWO_PI) }); }
@@ -53,7 +226,7 @@ function exitVulcan() {
   let v = state.vulcan, p = state.player; v.active = false;
   p.x = v.isleX; p.y = v.isleY + v.isleRY * 1.05; p.vx = 0; p.vy = 0;
   state.rowing.active = true; state.rowing.docked = false; state.rowing.x = p.x; state.rowing.y = p.y; state.rowing.speed = 0; state.rowing.angle = HALF_PI;
-  cam.x = p.x; cam.y = p.y; camSmooth.x = p.x; camSmooth.y = p.y;
+  cam.x = p.x; cam.y = p.y; if (typeof _startCamTransition === 'function') _startCamTransition(); else { camSmooth.x = p.x; camSmooth.y = p.y; }
 }
 function updateVulcanIsland(dt) {
   let v = state.vulcan, p = state.player, dx = 0, dy = 0;
@@ -77,7 +250,7 @@ function drawVulcanIsland() {
     let horizMinY = max(height * 0.06, height * 0.25 - (typeof horizonOffset !== 'undefined' ? horizonOffset : 0)) + 10;
     iy = max(iy, horizMinY);
     _dScale = _getDistantScale(v.isleX, v.isleY, v.isleRX);
-    if (_dScale.dist > 4000) return; // too far to see
+    if (_dScale.dist > _getMaxViewDist()) return; // too far to see
   }
   if (ix < -500 || ix > width + 500 || iy < -500 || iy > height + 500) return;
   push(); noStroke();
@@ -269,7 +442,7 @@ function drawVulcanDistantLabel() {
   let minY = max(height * 0.06, height * 0.25 - horizonOffset) + 10; sy = max(sy, minY);
   if (sx < -400 || sx > width + 400 || sy < -400 || sy > height + 400) return;
   let _ds = _getDistantScale(v.isleX, v.isleY, v.isleRX);
-  if (_ds.dist > 4000) return;
+  if (_ds.dist > _getMaxViewDist()) return;
   let _labelFade = constrain(1 - _ds.haze / 200, 0.15, 1);
   let baseY = sy + v.isleRY * _ds.scale + 12;
   push(); noStroke(); textAlign(CENTER);
@@ -301,7 +474,7 @@ function isOnHyperboreIsland(wx, wy) { let h = state.hyperborea; let ex = (wx - 
 function enterHyperborea() {
   let h = state.hyperborea, p = state.player; h.active = true; h.returnX = p.x; h.returnY = p.y;
   state.rowing.active = false; p.x = h.isleX; p.y = h.isleY + h.isleRY * 0.85 - 20; p.vx = 0; p.vy = 0; p.hp = p.maxHp; p.invincTimer = 60;
-  cam.x = p.x; cam.y = p.y; camSmooth.x = p.x; camSmooth.y = p.y;
+  cam.x = p.x; cam.y = p.y; if (typeof _startCamTransition === 'function') _startCamTransition(); else { camSmooth.x = p.x; camSmooth.y = p.y; }
   // Migration: add obelisk for existing saves where island is already explored
   if (!h.frozenObelisk) h.frozenObelisk = { x: h.isleX, y: h.isleY };
   if (h.phase === 'unexplored') { h.phase = 'explored';
@@ -319,7 +492,7 @@ function exitHyperborea() {
   let h = state.hyperborea, p = state.player; h.active = false;
   p.x = h.isleX; p.y = h.isleY + h.isleRY * 1.05; p.vx = 0; p.vy = 0;
   state.rowing.active = true; state.rowing.docked = false; state.rowing.x = p.x; state.rowing.y = p.y; state.rowing.speed = 0; state.rowing.angle = HALF_PI;
-  cam.x = p.x; cam.y = p.y; camSmooth.x = p.x; camSmooth.y = p.y;
+  cam.x = p.x; cam.y = p.y; if (typeof _startCamTransition === 'function') _startCamTransition(); else { camSmooth.x = p.x; camSmooth.y = p.y; }
 }
 function updateHyperboreIsland(dt) {
   let h = state.hyperborea, p = state.player, dx = 0, dy = 0;
@@ -342,7 +515,7 @@ function drawHyperboreIsland() {
     let horizMinY = max(height * 0.06, height * 0.25 - (typeof horizonOffset !== 'undefined' ? horizonOffset : 0)) + 10;
     iy = max(iy, horizMinY);
     _dScale = _getDistantScale(h.isleX, h.isleY, h.isleRX);
-    if (_dScale.dist > 4000) return;
+    if (_dScale.dist > _getMaxViewDist()) return;
   }
   if (ix < -500 || ix > width + 500 || iy < -500 || iy > height + 500) return;
   push(); noStroke();
@@ -533,7 +706,7 @@ function drawHyperboreDistantLabel() {
   if (state.hyperborea.active) return; let h = state.hyperborea, sx = w2sX(h.isleX), sy = w2sY(h.isleY); let minY = max(height * 0.06, height * 0.25 - horizonOffset) + 10; sy = max(sy, minY);
   if (sx < -400 || sx > width + 400 || sy < -400 || sy > height + 400) return;
   let _ds = _getDistantScale(h.isleX, h.isleY, h.isleRX);
-  if (_ds.dist > 4000) return;
+  if (_ds.dist > _getMaxViewDist()) return;
   let _labelFade = constrain(1 - _ds.haze / 200, 0.15, 1);
   let baseY = sy + h.isleRY * _ds.scale + 12;
   push(); noStroke(); textAlign(CENTER);
@@ -565,7 +738,7 @@ function isOnPlentyIsland(wx, wy) { let pl = state.plenty; let ex = (wx - pl.isl
 function enterPlenty() {
   let pl = state.plenty, p = state.player; pl.active = true; pl.returnX = p.x; pl.returnY = p.y;
   state.rowing.active = false; p.x = pl.isleX; p.y = pl.isleY + pl.isleRY * 0.85 - 20; p.vx = 0; p.vy = 0; p.hp = p.maxHp; p.invincTimer = 60;
-  cam.x = p.x; cam.y = p.y; camSmooth.x = p.x; camSmooth.y = p.y;
+  cam.x = p.x; cam.y = p.y; if (typeof _startCamTransition === 'function') _startCamTransition(); else { camSmooth.x = p.x; camSmooth.y = p.y; }
   if (pl.phase === 'unexplored') { pl.phase = 'explored';
     let treeTypes = ['mango', 'banana', 'coconut', 'fig'];
     for (let i = 0; i < 12; i++) { let a = random(TWO_PI), r = random(0.15, 0.65) * pl.isleRX; pl.fruitTrees.push({ x: pl.isleX + cos(a) * r, y: pl.isleY + sin(a) * r * 0.7, type: treeTypes[i % 4], fruit: true, timer: 0 }); }
@@ -582,7 +755,7 @@ function exitPlenty() {
   let pl = state.plenty, p = state.player; pl.active = false;
   p.x = pl.isleX; p.y = pl.isleY + pl.isleRY * 1.05; p.vx = 0; p.vy = 0;
   state.rowing.active = true; state.rowing.docked = false; state.rowing.x = p.x; state.rowing.y = p.y; state.rowing.speed = 0; state.rowing.angle = HALF_PI;
-  cam.x = p.x; cam.y = p.y; camSmooth.x = p.x; camSmooth.y = p.y;
+  cam.x = p.x; cam.y = p.y; if (typeof _startCamTransition === 'function') _startCamTransition(); else { camSmooth.x = p.x; camSmooth.y = p.y; }
 }
 function updatePlentyIsland(dt) {
   let pl = state.plenty, p = state.player, dx = 0, dy = 0;
@@ -605,7 +778,7 @@ function drawPlentyIsland() {
     let horizMinY = max(height * 0.06, height * 0.25 - (typeof horizonOffset !== 'undefined' ? horizonOffset : 0)) + 10;
     iy = max(iy, horizMinY);
     _dScale = _getDistantScale(pl.isleX, pl.isleY, pl.isleRX);
-    if (_dScale.dist > 4000) return;
+    if (_dScale.dist > _getMaxViewDist()) return;
   }
   if (ix < -500 || ix > width + 500 || iy < -500 || iy > height + 500) return;
   push(); noStroke();
@@ -743,7 +916,7 @@ function drawPlentyDistantLabel() {
   if (state.plenty.active) return; let pl = state.plenty, sx = w2sX(pl.isleX), sy = w2sY(pl.isleY); let minY = max(height * 0.06, height * 0.25 - horizonOffset) + 10; sy = max(sy, minY);
   if (sx < -400 || sx > width + 400 || sy < -400 || sy > height + 400) return;
   let _ds = _getDistantScale(pl.isleX, pl.isleY, pl.isleRX);
-  if (_ds.dist > 4000) return;
+  if (_ds.dist > _getMaxViewDist()) return;
   let _labelFade = constrain(1 - _ds.haze / 200, 0.15, 1);
   let baseY = sy + pl.isleRY * _ds.scale + 12;
   push(); noStroke(); textAlign(CENTER);
@@ -775,7 +948,7 @@ function isOnNecropolisIsland(wx, wy) { let n = state.necropolis; let ex = (wx -
 function enterNecropolis() {
   let n = state.necropolis, p = state.player; n.active = true; n.returnX = p.x; n.returnY = p.y;
   state.rowing.active = false; p.x = n.isleX; p.y = n.isleY + n.isleRY * 0.85 - 20; p.vx = 0; p.vy = 0; p.hp = p.maxHp; p.invincTimer = 90;
-  cam.x = p.x; cam.y = p.y; camSmooth.x = p.x; camSmooth.y = p.y;
+  cam.x = p.x; cam.y = p.y; if (typeof _startCamTransition === 'function') _startCamTransition(); else { camSmooth.x = p.x; camSmooth.y = p.y; }
   if (n.phase === 'unexplored') { n.phase = 'explored';
     for (let i = 0; i < 6; i++) { let a = (i / 6) * TWO_PI + random(-0.3, 0.3), r = random(0.2, 0.6) * n.isleRX; n.tombs.push({ x: n.isleX + cos(a) * r, y: n.isleY + sin(a) * r * 0.7, looted: false, trapped: random() < 0.3 }); }
     for (let i = 0; i < 4; i++) { let a = random(TWO_PI), r = random(0.15, 0.5) * n.isleRX; n.skeletons.push({ x: n.isleX + cos(a) * r, y: n.isleY + sin(a) * r * 0.7, vx: 0, vy: 0, hp: 40, maxHp: 40, attackTimer: 0, facing: 1, flashTimer: 0, state: 'patrol', patrolAngle: random(TWO_PI) }); }
@@ -791,7 +964,7 @@ function exitNecropolis() {
   let n = state.necropolis, p = state.player; n.active = false; n.skeletons = n.skeletons.filter(s => s.hp > 0);
   p.x = n.isleX; p.y = n.isleY + n.isleRY * 1.05; p.vx = 0; p.vy = 0;
   state.rowing.active = true; state.rowing.docked = false; state.rowing.x = p.x; state.rowing.y = p.y; state.rowing.speed = 0; state.rowing.angle = HALF_PI;
-  cam.x = p.x; cam.y = p.y; camSmooth.x = p.x; camSmooth.y = p.y;
+  cam.x = p.x; cam.y = p.y; if (typeof _startCamTransition === 'function') _startCamTransition(); else { camSmooth.x = p.x; camSmooth.y = p.y; }
 }
 function updateNecropolisIsland(dt) {
   let n = state.necropolis, p = state.player, dx = 0, dy = 0;
@@ -821,7 +994,7 @@ function drawNecropolisIsland() {
     let horizMinY = max(height * 0.06, height * 0.25 - (typeof horizonOffset !== 'undefined' ? horizonOffset : 0)) + 10;
     iy = max(iy, horizMinY);
     _dScale = _getDistantScale(n.isleX, n.isleY, n.isleRX);
-    if (_dScale.dist > 4000) return;
+    if (_dScale.dist > _getMaxViewDist()) return;
   }
   if (ix < -500 || ix > width + 500 || iy < -500 || iy > height + 500) return;
   push(); noStroke();
@@ -982,7 +1155,7 @@ function drawNecropolisDistantLabel() {
   if (state.necropolis.active) return; let n = state.necropolis, sx = w2sX(n.isleX), sy = w2sY(n.isleY); let minY = max(height * 0.06, height * 0.25 - horizonOffset) + 10; sy = max(sy, minY);
   if (sx < -400 || sx > width + 400 || sy < -400 || sy > height + 400) return;
   let _ds = _getDistantScale(n.isleX, n.isleY, n.isleRX);
-  if (_ds.dist > 4000) return;
+  if (_ds.dist > _getMaxViewDist()) return;
   let _labelFade = constrain(1 - _ds.haze / 200, 0.15, 1);
   let baseY = sy + n.isleRY * _ds.scale + 12;
   push(); noStroke(); textAlign(CENTER);
