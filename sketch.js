@@ -908,6 +908,9 @@ const CITY_SLOTS = [
   { id: 'well_center',     x: 630, y: 440, w: 24, h: 24, type: 'well',        level: 4,  district: 'center' },
   { id: 'well_sw',         x: 570, y: 450, w: 24, h: 24, type: 'well',        level: 5,  district: 'center' },
 
+  // --- WINDMILL (farm district, near granary) ---
+  { id: 'windmill_farm',   x: 310, y: 420, w: 50, h: 45, type: 'windmill',    level: 6,  district: 'farm' },
+
   // --- RESIDENTIAL (center-left, x:400-550) ---
   { id: 'house_res1',      x: 420, y: 360, w: 44, h: 34, type: 'house',       level: 6,  district: 'residential' },
   { id: 'house_res2',      x: 480, y: 360, w: 44, h: 34, type: 'house',       level: 6,  district: 'residential' },
@@ -1088,7 +1091,7 @@ const BLUEPRINTS = {
   castrum: { name: 'Castrum',  w: 130, h: 100, cost: { stone: 10, wood: 8, ironOre: 5, gold: 50 }, key: '', blocks: true, minLevel: 8, upkeep: 2 },
   // ─── NEW BUILDING TYPES ───────────────────────────────────────────────
   altar:      { name: 'Altar',      w: 28, h: 24, cost: { gold: 20, stone: 5 },                      key: '', blocks: true,  minLevel: 2, upkeep: 1 },
-  bakery:     { name: 'Pistrinum',  w: 44, h: 36, cost: { gold: 40, wood: 10 },                      key: '', blocks: true,  minLevel: 3, upkeep: 1 },
+  bakery:     { name: 'Pistrinum',  w: 44, h: 36, cost: { gold: 40, wood: 10 },                      key: '', blocks: true,  minLevel: 3, upkeep: 1, desc: 'Bakes bread from grain. Upgradeable (3 tiers).' },
   marketplace:{ name: 'Emporium',   w: 52, h: 38, cost: { gold: 50, wood: 10 },                      key: '', blocks: true,  minLevel: 4, upkeep: 2 },
   vineyard:   { name: 'Vinea',      w: 60, h: 40, cost: { gold: 60, wood: 15 },                      key: '', blocks: true,  minLevel: 5, upkeep: 1 },
   bathhouse:  { name: 'Thermae',    w: 64, h: 48, cost: { gold: 80, stone: 20 },                     key: '', blocks: true,  minLevel: 6, upkeep: 2 },
@@ -1096,6 +1099,7 @@ const BLUEPRINTS = {
   lighthouse: { name: 'Pharos',     w: 26, h: 60, cost: { gold: 100, stone: 30 },                    key: '', blocks: true,  minLevel: 8, upkeep: 4 },
   sculptor:   { name: 'Sculptor',   w: 50, h: 40, cost: { gold: 120, stone: 40, ironOre: 10 },       key: '', blocks: true,  minLevel: 9, upkeep: 4 },
   crystal_collector: { name: 'Crystal Collector', w: 40, h: 30, cost: { stone: 15, gold: 30 }, key: '', blocks: true, minLevel: 5, desc: 'Automatically harvests nearby crystal nodes', upkeep: 1 },
+  windmill: { name: 'Windmill', w: 50, h: 45, cost: { wood: 20, stone: 15, gold: 40 }, key: '', blocks: true, minLevel: 6, upkeep: 1, desc: 'Grinds grain into flour. Doubles bakery output.' },
 };
 
 const ROTATABLE_TYPES = ['wall', 'door', 'fence', 'bridge', 'aqueduct', 'arch'];
@@ -1833,6 +1837,10 @@ function initState() {
       colonyGrassTufts: [], // decorative grass on colony
       boss: null,            // active boss object or null
       bossDefeated: [],      // list of defeated boss types
+      crystalNodes: [],      // { x, y, collected }
+      resourceDeposits: [],  // { x, y, type:'iron'|'stone', hp, maxHp, depleted }
+      fishingSpots: [],      // { x, y, cooldown }
+      wildlife: [],          // ambient birds/rabbits { x, y, type, vx, vy, timer }
     },
 
     // Imperial Bridge — connects home island to colonized Terra Nova
@@ -3708,9 +3716,14 @@ function updateFoodConsumption() {
 
   let foodNeeded = totalMouths; // 1 food per person per day
 
-  // Bakery reduces consumption by 20% per bakery (max 60%)
-  let bakeryCount = state.buildings.filter(b => b.type === 'bakery').length;
-  let reduction = min(bakeryCount * 0.2, 0.6);
+  // Bakery reduces consumption based on tier: T1=0%, T2=20%, T3=40% (max 60%)
+  let bakeryReduction = 0;
+  for (let bk of state.buildings.filter(b => b.type === 'bakery' && !b.ruined)) {
+    let tier = bk.tier || 1;
+    if (tier >= 3) bakeryReduction += 0.4;
+    else if (tier >= 2) bakeryReduction += 0.2;
+  }
+  let reduction = min(bakeryReduction, 0.6);
   foodNeeded = max(1, Math.ceil(foodNeeded * (1 - reduction)));
 
   // Consume from harvest first, then fish, then meals
@@ -3867,12 +3880,27 @@ function updateTime(dt) {
       state.god.blessingTimer = max(0, state.god.blessingTimer - 1440);
       if (state.god.blessingTimer <= 0) state.god.blessingActive = null;
     }
-    // Bakery: +2 food (harvest) per bakery (skip ruined)
+    // Bakery: bread per bakery based on tier (skip ruined)
     let bakeries = state.buildings.filter(b2 => b2.type === 'bakery' && !b2.ruined);
     if (bakeries.length > 0) {
-      let breadAmt = bakeries.length * 2;
+      let breadAmt = 0;
+      let goldFromBakery = 0;
+      for (let bk of bakeries) {
+        let tier = bk.tier || 1;
+        breadAmt += tier === 3 ? 6 : tier === 2 ? 4 : 2;
+        if (tier === 3) goldFromBakery += 2;
+      }
+      // Windmill bonus: doubles bakery bread output
+      let hasWindmill = state.buildings.some(b2 => b2.type === 'windmill' && !b2.ruined);
+      if (hasWindmill) breadAmt *= 2;
       state.harvest += breadAmt;
-      addFloatingText(width / 2, height * 0.32, 'Bakery: +' + breadAmt + ' bread', '#dda844');
+      let breadMsg = 'Bakery: +' + breadAmt + ' bread';
+      if (hasWindmill) breadMsg += ' (Windmill 2x)';
+      addFloatingText(width / 2, height * 0.32, breadMsg, '#dda844');
+      if (goldFromBakery > 0) {
+        state.gold += goldFromBakery;
+        addFloatingText(width / 2, height * 0.35, 'Grand Bakery: +' + goldFromBakery + 'g sales', '#eedd55');
+      }
     }
     // Food consumption — citizens and soldiers eat daily
     updateFoodConsumption();
@@ -8311,7 +8339,7 @@ function drawWindowGlow() {
     if (b.type === 'forum' || b.type === 'temple' || b.type === 'granary' ||
         b.type === 'market' || b.type === 'shrine' || b.type === 'villa' ||
         b.type === 'arch' || b.type === 'bakery' || b.type === 'bathhouse' ||
-        b.type === 'sculptor' || b.type === 'marketplace') {
+        b.type === 'sculptor' || b.type === 'marketplace' || b.type === 'windmill') {
       let sx5 = w2sX(b.x);
       let sy5 = w2sY(b.y);
       if (sx5 < -30 || sx5 > width + 30 || sy5 < -30 || sy5 > height + 30) return;
@@ -8332,7 +8360,7 @@ function drawWindowGlow() {
         b.type === 'villa' || b.type === 'temple' || b.type === 'forum' ||
         b.type === 'shrine' || b.type === 'granary' || b.type === 'market' ||
         b.type === 'altar' || b.type === 'bakery' || b.type === 'lighthouse' ||
-        b.type === 'guardtower' || b.type === 'bathhouse' || b.type === 'sculptor') {
+        b.type === 'guardtower' || b.type === 'bathhouse' || b.type === 'sculptor' || b.type === 'windmill') {
       let gx = w2sX(b.x);
       let gy = w2sY(b.y);
       if (gx < -30 || gx > width + 30 || gy < -30 || gy > height + 30) return;
@@ -10865,6 +10893,156 @@ function drawOneBuilding(b) {
           rect(-4, -bh / 2 + 20, 8, 10);
           fill(255, 160, 60, 10 * bkNight);
           ellipse(0, 0, bw + 10, bh + 6);
+        }
+        // Upgrade prompt when player is near
+        if ((b.tier || 1) < 3 && !state.buildMode && dist(state.player.x, state.player.y, b.x, b.y) < 50) {
+          let tierLabel = (b.tier || 1) === 1 ? 'Stone Oven' : 'Grand Bakery';
+          fill(255, 220, 120, 200 + sin(frameCount * 0.08) * 40);
+          textAlign(CENTER, CENTER); textSize(9);
+          noStroke();
+          text('[E] Upgrade to ' + tierLabel, 0, -bh / 2 - 18);
+          textAlign(LEFT, TOP);
+        }
+        // Tier 2+: extra chimney with smoke
+        if ((b.tier || 1) >= 2) {
+          noStroke();
+          fill(fc.wall[0] - 30, fc.wall[1] - 28, fc.wall[2] - 22);
+          rect(-bw / 4 - 3, -bh / 2 - 10, 6, 12);
+          fill(fc.wall[0] - 20, fc.wall[1] - 18, fc.wall[2] - 14);
+          rect(-bw / 4 - 4, -bh / 2 - 12, 8, 3, 1);
+          // Extra smoke from second chimney
+          let t2Smoke = map(getSkyBrightness(), 0.2, 1.0, 45, 18);
+          for (let si7 = 0; si7 < 2; si7++) {
+            let sP7 = frameCount * 0.012 + si7 * 3 + b.x * 0.01;
+            for (let sp7 = 0; sp7 < 3; sp7++) {
+              let sF7 = sp7 / 2;
+              let sx7 = -bw / 4 + floor(sin(sP7 + sp7 * 0.5) * (1 + sp7));
+              let sy7 = -bh / 2 - 14 - floor(sp7 * 6 + (frameCount * 0.4 + si7 * 15) % 20);
+              fill(180, 175, 165, t2Smoke * (1 - sF7 * 0.7));
+              noStroke();
+              rect(sx7, sy7, 2 + floor(sF7), 2 + floor(sF7));
+            }
+          }
+        }
+        // Tier 3: awning over entrance
+        if ((b.tier || 1) >= 3) {
+          noStroke();
+          // Striped awning
+          let awnC1 = [fc.roof[0], fc.roof[1], fc.roof[2]];
+          let awnC2 = [fc.roof[0] + 30, fc.roof[1] + 25, fc.roof[2] + 15];
+          for (let awi = 0; awi < 4; awi++) {
+            let awc = awi % 2 === 0 ? awnC1 : awnC2;
+            fill(awc[0], awc[1], awc[2], 210);
+            rect(-8 + awi * 4, -bh / 2 + 28, 4, 6);
+          }
+          fill(fc.roof[0], fc.roof[1], fc.roof[2], 220);
+          beginShape();
+          vertex(-10, -bh / 2 + 28);
+          vertex(10, -bh / 2 + 28);
+          vertex(12, -bh / 2 + 30);
+          vertex(-12, -bh / 2 + 30);
+          endShape(CLOSE);
+          // Gold coin symbol on wall (bakery sales)
+          fill(220, 190, 50, 150);
+          ellipse(bw / 2 - 6, -bh / 2 + 22, 5, 5);
+          fill(200, 170, 30, 100);
+          textSize(3);
+          textAlign(CENTER, CENTER);
+          text('G', bw / 2 - 6, -bh / 2 + 22);
+        }
+        break;
+      }
+
+      case 'windmill': {
+        noStroke();
+        // Shadow
+        fill(0, 0, 0, 25);
+        ellipse(0, bh / 2 - 2, bw * 0.7, 8);
+        // Stone tower base (tapered cylinder)
+        fill(fc.wall[0] - 5, fc.wall[1] - 5, fc.wall[2] - 5);
+        beginShape();
+        vertex(-12, bh / 2);
+        vertex(-10, -bh / 2 + 14);
+        vertex(10, -bh / 2 + 14);
+        vertex(12, bh / 2);
+        endShape(CLOSE);
+        // Stone mortar lines
+        stroke(fc.wall[0] - 25, fc.wall[1] - 25, fc.wall[2] - 20, 50);
+        strokeWeight(0.4);
+        for (let wmy = -bh / 2 + 18; wmy < bh / 2; wmy += 5) {
+          let taper = map(wmy, -bh / 2 + 14, bh / 2, 10, 12);
+          line(-taper, wmy, taper, wmy);
+        }
+        noStroke();
+        // Highlight on left side
+        fill(fc.wall[0] + 8, fc.wall[1] + 8, fc.wall[2] + 5, 40);
+        beginShape();
+        vertex(-12, bh / 2);
+        vertex(-10, -bh / 2 + 14);
+        vertex(-5, -bh / 2 + 14);
+        vertex(-7, bh / 2);
+        endShape(CLOSE);
+        // Faction-colored roof cap
+        fill(fc.roof[0], fc.roof[1], fc.roof[2]);
+        beginShape();
+        vertex(-11, -bh / 2 + 15);
+        vertex(0, -bh / 2 + 4);
+        vertex(11, -bh / 2 + 15);
+        endShape(CLOSE);
+        fill(fc.roof[0] + 10, fc.roof[1] + 12, fc.roof[2] + 8);
+        beginShape();
+        vertex(-8, -bh / 2 + 14);
+        vertex(0, -bh / 2 + 6);
+        vertex(8, -bh / 2 + 14);
+        endShape(CLOSE);
+        // Rotating blades (4 blades using sin/cos with frameCount)
+        let wmAngle = frameCount * 0.02 + b.x * 0.1;
+        let wmHubX = 0, wmHubY = -bh / 2 + 10;
+        let bladeLen = 20;
+        stroke(105, 80, 45);
+        strokeWeight(1.5);
+        for (let bi = 0; bi < 4; bi++) {
+          let ba = wmAngle + bi * HALF_PI;
+          let bex = wmHubX + cos(ba) * bladeLen;
+          let bey = wmHubY + sin(ba) * bladeLen;
+          line(wmHubX, wmHubY, bex, bey);
+          // Sail cloth on each blade
+          noStroke();
+          fill(230, 220, 200, 180);
+          beginShape();
+          vertex(wmHubX + cos(ba) * 4, wmHubY + sin(ba) * 4);
+          vertex(bex, bey);
+          vertex(bex + cos(ba + 0.4) * 5, bey + sin(ba + 0.4) * 5);
+          vertex(wmHubX + cos(ba + 0.3) * 5, wmHubY + sin(ba + 0.3) * 5);
+          endShape(CLOSE);
+          stroke(105, 80, 45);
+          strokeWeight(1.5);
+        }
+        // Hub
+        noStroke();
+        fill(90, 70, 40);
+        ellipse(wmHubX, wmHubY, 5, 5);
+        // Window halfway up
+        fill(40, 35, 25, 180);
+        rect(-3, -2, 6, 5, 1);
+        fill(140, 170, 200, 60);
+        rect(-2, -1, 4, 3);
+        // Door at base
+        fill(fc.door[0], fc.door[1], fc.door[2]);
+        rect(-4, bh / 2 - 12, 8, 12, 1);
+        fill(fc.door[0] - 15, fc.door[1] - 10, fc.door[2] - 5, 80);
+        rect(-2, bh / 2 - 10, 1, 8);
+        rect(1, bh / 2 - 10, 1, 8);
+        // Foundation
+        fill(fc.wall[0] - 20, fc.wall[1] - 18, fc.wall[2] - 12);
+        rect(-13, bh / 2 - 2, 26, 3, 1);
+        // Night glow from window
+        if (getSkyBrightness() < 0.4) {
+          let wmNight = map(getSkyBrightness(), 0, 0.4, 1, 0);
+          fill(255, 180, 70, 35 * wmNight);
+          rect(-4, -3, 8, 7);
+          fill(255, 160, 50, 15 * wmNight);
+          ellipse(0, bh / 2 - 6, 16, 10);
         }
         break;
       }
@@ -18174,6 +18352,43 @@ function initConquestIsland() {
     if (landDist < 70) continue;
     c.trees.push({ x: tx, y: ty, hp: 3, maxHp: 3, alive: true, size: random(0.8, 1.2) });
   }
+  // Crystal nodes — scattered across the island
+  c.crystalNodes = [];
+  for (let i = 0; i < 4; i++) {
+    let angle = random(TWO_PI);
+    let r = random(0.3, 0.75);
+    let cx = c.isleX + cos(angle) * c.isleRX * r;
+    let cy = c.isleY + sin(angle) * c.isleRY * r;
+    c.crystalNodes.push({ x: cx, y: cy, collected: false });
+  }
+  // Resource deposits — iron ore and stone
+  c.resourceDeposits = [];
+  for (let i = 0; i < 5; i++) {
+    let angle = random(TWO_PI);
+    let r = random(0.25, 0.8);
+    let rx = c.isleX + cos(angle) * c.isleRX * r;
+    let ry = c.isleY + sin(angle) * c.isleRY * r;
+    let landDist = dist(rx, ry, c.isleX, c.isleY + c.isleRY * 0.5);
+    if (landDist < 60) continue;
+    c.resourceDeposits.push({ x: rx, y: ry, type: random() < 0.6 ? 'iron' : 'stone', hp: 3, maxHp: 3, depleted: false });
+  }
+  // Fishing spots — along the coast edges
+  c.fishingSpots = [];
+  let fishAngles = [PI * 0.2, PI * 0.8, PI * 1.3, PI * 1.7];
+  for (let fa of fishAngles) {
+    let fx = c.isleX + cos(fa) * c.isleRX * 0.92;
+    let fy = c.isleY + sin(fa) * c.isleRY * 0.92;
+    c.fishingSpots.push({ x: fx, y: fy, cooldown: 0 });
+  }
+  // Wildlife — ambient birds and rabbits
+  c.wildlife = [];
+  for (let i = 0; i < 8; i++) {
+    let angle = random(TWO_PI);
+    let r = random(0.15, 0.7);
+    let wx = c.isleX + cos(angle) * c.isleRX * r;
+    let wy = c.isleY + sin(angle) * c.isleRY * r;
+    c.wildlife.push({ x: wx, y: wy, type: random() < 0.5 ? 'bird' : 'rabbit', vx: 0, vy: 0, timer: floor(random(60, 300)), facing: random() > 0.5 ? 1 : -1 });
+  }
 }
 
 function enterConquest() {
@@ -18284,6 +18499,20 @@ function enterConquest() {
     for (let i = 0; i < regrow && i < dead.length; i++) {
       dead[i].alive = true;
       dead[i].hp = dead[i].maxHp;
+    }
+  }
+  // Reset crystal nodes between expeditions
+  if (c.crystalNodes) for (let cn of c.crystalNodes) cn.collected = false;
+  // Reset resource deposits between expeditions
+  if (c.resourceDeposits) for (let rd of c.resourceDeposits) { rd.depleted = false; rd.hp = rd.maxHp; }
+  // Reset fishing spot cooldowns
+  if (c.fishingSpots) for (let fs of c.fishingSpots) fs.cooldown = 0;
+  // Respawn wildlife
+  if (c.wildlife) {
+    for (let w of c.wildlife) {
+      w.timer = floor(random(60, 300));
+      w.x = c.isleX + cos(random(TWO_PI)) * c.isleRX * random(0.15, 0.7);
+      w.y = c.isleY + sin(random(TWO_PI)) * c.isleRY * random(0.15, 0.7);
     }
   }
 
@@ -21298,6 +21527,41 @@ function updateConquest(dt) {
     }
   }
 
+  // Update fishing spot cooldowns
+  if (c.fishingSpots) for (let fs of c.fishingSpots) { if (fs.cooldown > 0) fs.cooldown -= dt; }
+
+  // Update wildlife (ambient movement)
+  if (c.wildlife) {
+    for (let w of c.wildlife) {
+      w.timer -= dt;
+      if (w.timer <= 0) {
+        w.timer = floor(random(120, 400));
+        let angle = random(TWO_PI);
+        w.vx = cos(angle) * (w.type === 'bird' ? 1.2 : 0.6);
+        w.vy = sin(angle) * (w.type === 'bird' ? 1.2 : 0.6);
+        w.facing = w.vx > 0 ? 1 : -1;
+      }
+      w.x += w.vx * dt * 0.3;
+      w.y += w.vy * dt * 0.3;
+      // Slow down
+      w.vx *= 0.98; w.vy *= 0.98;
+      // Flee from player
+      let dw = dist(p.x, p.y, w.x, w.y);
+      if (dw < 60) {
+        let fa = atan2(w.y - p.y, w.x - p.x);
+        w.vx += cos(fa) * 0.8;
+        w.vy += sin(fa) * 0.8;
+        w.facing = w.vx > 0 ? 1 : -1;
+      }
+      // Keep on island
+      if (!isOnConquestIsland(w.x, w.y)) {
+        let toCenter = atan2(c.isleY - w.y, c.isleX - w.x);
+        w.vx = cos(toCenter) * 1.5;
+        w.vy = sin(toCenter) * 1.5;
+      }
+    }
+  }
+
   // Player death — retreat with 50% loot
   if (p.hp <= 0) {
     p.hp = floor(p.maxHp * 0.5);
@@ -22113,7 +22377,24 @@ function drawConquestIsland() {
     ellipse(ix + cos(ga) * gr, iy + sin(ga) * gr * 0.69, 7, 3);
   }
 
-  // Y-sorted: trees + buildings
+  // Crystal nodes ground glow
+  for (let cn of (c.crystalNodes || [])) {
+    if (cn.collected) continue;
+    let csx = w2sX(cn.x), csy = w2sY(cn.y);
+    fill(80, 180, 220, 30 + sin(frameCount * 0.06 + cn.x) * 15);
+    ellipse(csx, csy, 20, 10);
+  }
+  // Fishing spots water ripples
+  for (let fs of (c.fishingSpots || [])) {
+    let fsx = w2sX(fs.x), fsy = w2sY(fs.y);
+    let rp = sin(frameCount * 0.04 + fs.x) * 3;
+    noFill(); stroke(180, 220, 240, fs.cooldown > 0 ? 40 : 80); strokeWeight(1);
+    ellipse(fsx, fsy, 18 + rp, 10 + rp * 0.5);
+    noStroke();
+    if (fs.cooldown <= 0) { fill(200, 230, 250, 60 + sin(frameCount * 0.08) * 20); ellipse(fsx, fsy, 6, 4); }
+  }
+
+  // Y-sorted: trees + buildings + resources + wildlife
   let sortItems = [];
   for (let t of (c.trees || [])) {
     if (!t || isNaN(t.y)) continue;
@@ -22122,6 +22403,67 @@ function drawConquestIsland() {
   for (let b of (c.buildings || [])) {
     if (!b || isNaN(b.y)) continue;
     sortItems.push({ y: b.y + 8, draw: () => { try { drawConquestBuilding(b); } catch(e) { /* skip */ } } });
+  }
+  for (let cn of (c.crystalNodes || [])) {
+    if (cn.collected) continue;
+    sortItems.push({ y: cn.y, draw: () => {
+      let sx2 = w2sX(cn.x), sy2 = w2sY(cn.y);
+      push(); noStroke();
+      fill(60, 80, 100); ellipse(sx2, sy2 + 2, 10, 5);
+      let sh = sin(frameCount * 0.08 + cn.x * 0.1) * 20;
+      fill(100+sh, 190+sh, 230); triangle(sx2-4, sy2, sx2-2, sy2-12, sx2, sy2);
+      fill(120+sh, 200+sh, 240); triangle(sx2-1, sy2, sx2+1, sy2-16, sx2+3, sy2);
+      fill(90+sh, 170+sh, 220); triangle(sx2+2, sy2, sx2+4, sy2-10, sx2+6, sy2);
+      if (frameCount % 30 < 5) { fill(255,255,255,200); ellipse(sx2+1, sy2-14, 3, 3); }
+      let dp = dist(state.player.x, state.player.y, cn.x, cn.y);
+      if (dp < 50) { fill(200,230,255,180); textSize(9); textAlign(CENTER); text('[E] Mine', sx2, sy2-20); }
+      pop();
+    }});
+  }
+  for (let rd of (c.resourceDeposits || [])) {
+    if (rd.depleted) continue;
+    sortItems.push({ y: rd.y, draw: () => {
+      let rx2 = w2sX(rd.x), ry2 = w2sY(rd.y);
+      push(); noStroke();
+      if (rd.type === 'iron') {
+        fill(90,80,70); ellipse(rx2, ry2+2, 14, 8);
+        beginShape(); vertex(rx2-7, ry2+1); vertex(rx2-4, ry2-7); vertex(rx2+2, ry2-9); vertex(rx2+7, ry2-4); vertex(rx2+6, ry2+1); endShape(CLOSE);
+        stroke(160,140,100,150); strokeWeight(0.8); line(rx2-3, ry2-4, rx2+1, ry2-6); line(rx2+2, ry2-2, rx2+5, ry2-5); noStroke();
+      } else {
+        fill(130,125,115); ellipse(rx2, ry2+2, 14, 8);
+        fill(120,115,105); ellipse(rx2-3, ry2-2, 10, 8);
+        fill(140,135,125); ellipse(rx2+3, ry2-1, 8, 7);
+      }
+      if (rd.hp < rd.maxHp) { let pr = rd.hp / rd.maxHp; fill(40,40,40,140); rect(rx2-8, ry2+6, 16, 2, 1); fill(200,160,60); rect(rx2-8, ry2+6, 16*pr, 2, 1); }
+      let dp = dist(state.player.x, state.player.y, rd.x, rd.y);
+      if (dp < 50) { fill(200,200,180,180); textSize(9); textAlign(CENTER); text('[E] Mine ' + (rd.type === 'iron' ? 'Iron' : 'Stone'), rx2, ry2-14); }
+      pop();
+    }});
+  }
+  for (let fs of (c.fishingSpots || [])) {
+    sortItems.push({ y: fs.y, draw: () => {
+      let fx2 = w2sX(fs.x), fy2 = w2sY(fs.y);
+      let dp = dist(state.player.x, state.player.y, fs.x, fs.y);
+      if (dp < 60) { push(); fill(fs.cooldown > 0 ? color(150,150,150,140) : color(100,200,230,200)); textSize(9); textAlign(CENTER); text(fs.cooldown > 0 ? 'Fished recently...' : '[E] Fish', fx2, fy2-12); pop(); }
+    }});
+  }
+  for (let wl of (c.wildlife || [])) {
+    sortItems.push({ y: wl.y, draw: () => {
+      let wx2 = w2sX(wl.x), wy2 = w2sY(wl.y);
+      push(); noStroke();
+      if (wl.type === 'bird') {
+        let fl = sin(frameCount * 0.15 + wl.x) * 3;
+        fill(80,70,50); ellipse(wx2, wy2, 6, 4);
+        fill(100,90,65); ellipse(wx2 - 3*wl.facing, wy2-1+fl, 5, 2);
+        fill(200,150,50); ellipse(wx2 + 3*wl.facing, wy2-1, 2, 1.5);
+      } else {
+        fill(170,150,120); ellipse(wx2, wy2, 7, 5);
+        fill(180,160,130); ellipse(wx2 + 3*wl.facing, wy2-2, 5, 4);
+        fill(190,170,140); ellipse(wx2 + 3*wl.facing-1, wy2-5, 2, 4); ellipse(wx2 + 3*wl.facing+1, wy2-5, 2, 4);
+        fill(210,200,180); ellipse(wx2 - 3*wl.facing, wy2, 3, 3);
+      }
+      pop();
+    }});
   }
   sortItems.sort((a, b) => a.y - b.y);
   for (let it of sortItems) it.draw();
@@ -22329,6 +22671,11 @@ function drawConquestTree(t) {
       rect(sx - 10, sy + 8, 20, 3, 1);
       fill(200, 160, 60);
       rect(sx - 10, sy + 8, 20 * prog, 3, 1);
+    }
+    // E key prompt when nearby
+    if (!isTarget) {
+      let dp = dist(state.player.x, state.player.y, t.x, t.y);
+      if (dp < 40) { fill(200, 180, 130, 180); textSize(9); textAlign(CENTER); text('[E] Chop', sx, sy - 38 * sz); }
     }
   } else {
     // Stump
@@ -22782,7 +23129,7 @@ function drawConquestHUD() {
   fill(160, 150, 130, 140); textSize(11); textAlign(RIGHT, BOTTOM);
   text(WEAPONS[p.weapon].name + ' | ' + ARMORS[p.armor].name, width - 10, height - 14);
   fill(130, 120, 100, 120);
-  text('WASD move | SPACE attack | SHIFT sprint | ALT dodge | B build | Q potion | E board ship (near dock)', width - 10, height - 3);
+  text('WASD move | SPACE attack | SHIFT sprint | ALT dodge | B build | Q potion | E interact/chop/mine/fish/board', width - 10, height - 3);
 
   // Build mode UI
   if (c.buildMode) drawConquestBuildUI();
@@ -23725,6 +24072,77 @@ function keyPressed() {
       let shipY = cq.shipY || (cq.isleY + cq.isleRY * 0.92 + 15);
       let dShip = dist(state.player.x, state.player.y, shipX, shipY);
       if (dShip < 60) { exitConquest(); return; }
+      // E key: chop nearest tree (same as click, but proximity-based)
+      if (!cq.buildMode) {
+        conquestPlayerChop();
+        if (cq.chopTarget) return;
+      }
+      // E key: mine crystal nodes
+      if (cq.crystalNodes) {
+        let bestCrystal = null, bestCD = 40;
+        for (let cn of cq.crystalNodes) {
+          if (cn.collected) continue;
+          let d = dist(state.player.x, state.player.y, cn.x, cn.y);
+          if (d < bestCD) { bestCrystal = cn; bestCD = d; }
+        }
+        if (bestCrystal) {
+          bestCrystal.collected = true;
+          state.gold += floor(random(15, 30));
+          cq.lootBag.push({ type: 'iron_ore', qty: floor(random(2, 4)) });
+          addFloatingText(w2sX(bestCrystal.x), w2sY(bestCrystal.y) - 14, '+Crystal!', '#88ddff');
+          spawnParticles(bestCrystal.x, bestCrystal.y, 'crystal', 8);
+          if (snd) snd.playSFX('chop');
+          return;
+        }
+      }
+      // E key: mine resource deposits (iron ore, stone)
+      if (cq.resourceDeposits) {
+        let bestRes = null, bestRD = 40;
+        for (let rd of cq.resourceDeposits) {
+          if (rd.depleted) continue;
+          let d = dist(state.player.x, state.player.y, rd.x, rd.y);
+          if (d < bestRD) { bestRes = rd; bestRD = d; }
+        }
+        if (bestRes) {
+          bestRes.hp--;
+          spawnParticles(bestRes.x, bestRes.y, 'chop', 3);
+          if (bestRes.hp <= 0) {
+            bestRes.depleted = true;
+            let qty = floor(random(2, 5));
+            if (bestRes.type === 'iron') {
+              cq.lootBag.push({ type: 'iron_ore', qty: qty });
+              addFloatingText(w2sX(bestRes.x), w2sY(bestRes.y) - 14, '+' + qty + ' Iron Ore', '#aabbcc');
+            } else {
+              cq.woodPile += qty;
+              addFloatingText(w2sX(bestRes.x), w2sY(bestRes.y) - 14, '+' + qty + ' Stone', '#bbbbbb');
+            }
+            if (snd) snd.playSFX('chop');
+          } else {
+            addFloatingText(w2sX(bestRes.x), w2sY(bestRes.y) - 14, 'Mining... (' + bestRes.hp + '/' + bestRes.maxHp + ')', '#cccccc');
+          }
+          return;
+        }
+      }
+      // E key: fishing spot at coast
+      if (cq.fishingSpots) {
+        let bestFish = null, bestFD = 50;
+        for (let fs of cq.fishingSpots) {
+          if (fs.cooldown > 0) continue;
+          let d = dist(state.player.x, state.player.y, fs.x, fs.y);
+          if (d < bestFD) { bestFish = fs; bestFD = d; }
+        }
+        if (bestFish) {
+          bestFish.cooldown = 600; // 10s cooldown
+          let fishTypes = ['Perch', 'Bass', 'Trout', 'Eel'];
+          let caught = fishTypes[floor(random(fishTypes.length))];
+          state.gold += floor(random(8, 18));
+          cq.lootBag.push({ type: 'rare_hide', qty: 1 });
+          addFloatingText(w2sX(bestFish.x), w2sY(bestFish.y) - 20, 'Caught a ' + caught + '!', '#44bbdd');
+          spawnParticles(bestFish.x, bestFish.y, 'water', 5);
+          if (snd) snd.playSFX('water');
+          return;
+        }
+      }
     }
     // Faction abilities Q/R (take priority in combat)
     if (!cq.buildMode && typeof handleFactionAbilityKey === 'function') {
@@ -23882,6 +24300,52 @@ function keyPressed() {
           addFloatingText(width / 2, height * 0.3, 'Already prayed today', '#998866');
         }
         return;
+      }
+    }
+
+    // Bakery upgrade: E near bakery shows tier upgrade dialog
+    {
+      let nearBakery = state.buildings.find(b => b.type === 'bakery' && !b.ruined &&
+        dist(state.player.x, state.player.y, b.x, b.y) < 50);
+      if (nearBakery) {
+        let tier = nearBakery.tier || 1;
+        if (tier < 3) {
+          let nextTier = tier + 1;
+          let tierNames = { 2: 'Stone Oven Bakery', 3: 'Grand Bakery' };
+          let tierDescs = { 2: '4 bread/day, -20% food use', 3: '6 bread/day, -40% food use, +2g/day' };
+          let tierCosts = { 2: { gold: 80, stone: 15 }, 3: { gold: 150, stone: 30, ironOre: 5 } };
+          let cost = tierCosts[nextTier];
+          let canAfford = (state.gold >= (cost.gold || 0)) && (state.stone >= (cost.stone || 0)) && (state.ironOre >= (cost.ironOre || 0));
+          let costStr = Object.entries(cost).map(([k, v]) => v + ' ' + k).join(', ');
+          dialogState.active = true;
+          dialogState.speaker = 'Pistrinum';
+          dialogState.portrait = null;
+          dialogState.text = 'Upgrade to ' + tierNames[nextTier] + '?\n' + tierDescs[nextTier] + '\nCost: ' + costStr;
+          dialogState.displayLen = 999;
+          dialogState.choices = [
+            {
+              text: canAfford ? 'Upgrade (Tier ' + nextTier + ')' : 'Cannot afford',
+              action: function() {
+                if (canAfford) {
+                  state.gold -= cost.gold || 0;
+                  state.stone -= cost.stone || 0;
+                  state.ironOre -= cost.ironOre || 0;
+                  nearBakery.tier = nextTier;
+                  addFloatingText(width / 2, height * 0.3, tierNames[nextTier] + ' built!', '#dda844');
+                  spawnParticles(nearBakery.x, nearBakery.y, 'build', 10);
+                  if (snd) snd.playSFX('upgrade');
+                }
+                dialogState.active = false;
+              }
+            },
+            { text: 'Cancel', action: function() { dialogState.active = false; } }
+          ];
+          dialogState.onComplete = null;
+          return;
+        } else {
+          addFloatingText(width / 2, height * 0.3, 'Grand Bakery — fully upgraded!', '#dda844');
+          return;
+        }
       }
     }
 
@@ -25207,7 +25671,7 @@ function saveGame() {
     cats: state.cats ? state.cats.map(c => ({ x: c.x, y: c.y, facing: c.facing, color: c.color })) : [],
     citizens: state.citizens ? state.citizens.map(c => ({ x: c.x, y: c.y, variant: c.variant, facing: c.facing, speed: c.speed })) : [],
     plots: (state.plots || []).map(p => ({ x: p.x, y: p.y, w: p.w, h: p.h, planted: p.planted, stage: p.stage, timer: p.timer, ripe: p.ripe, cropType: p.cropType || 'grain' })),
-    buildings: (state.buildings || []).map(b => ({ x: b.x, y: b.y, w: b.w, h: b.h, type: b.type, rot: b.rot })),
+    buildings: (state.buildings || []).map(b => ({ x: b.x, y: b.y, w: b.w, h: b.h, type: b.type, rot: b.rot, tier: b.tier || undefined })),
     trees: (state.trees || []).map(t => ({ x: t.x, y: t.y, health: t.health, maxHealth: t.maxHealth, alive: t.alive, size: t.size, type: t.type })),
     crystalShrine: state.crystalShrine ? { x: state.crystalShrine.x, y: state.crystalShrine.y } : null,
     crystalNodes: state.crystalNodes.map(c => ({ x: c.x, y: c.y, size: c.size, phase: c.phase, charge: c.charge })),
@@ -27464,8 +27928,9 @@ function placeEraBuildings(lvl) {
   if (lvl === 6) {
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
     addFarmPlots(farmCX, farmCY, lvl);
-    addFloatingText(width / 2, height * 0.3, 'Citizens settle — first Domus built!', '#aaddff');
+    addFloatingText(width / 2, height * 0.3, 'Citizens settle — Domus and Windmill built!', '#aaddff');
     spawnParticles(465, 330, 'build', 10);
+    spawnParticles(310, 420, 'build', 8);
   }
 
   if (lvl === 7) {

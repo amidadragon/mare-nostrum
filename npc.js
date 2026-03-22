@@ -1234,7 +1234,10 @@ function updateCitizens(dt) {
   state.citizens.forEach(c => {
     c.timer -= dt;
     if (c.state === 'idle') {
+      if (c._citizenActTimer > 0) c._citizenActTimer -= dt;
+      if (c._citizenActTimer <= 0) c._citizenAct = null;
       if (c.timer <= 0) {
+        c._citizenAct = null;
         let target = pickCitizenTarget(c);
         c.targetX = target.x;
         c.targetY = target.y;
@@ -1248,6 +1251,12 @@ function updateCitizens(dt) {
         c.state = 'idle';
         c.timer = floor(random(60, 180));  // pause at destination
         c.vx = 0; c.vy = 0;
+        // 30% chance of idle animation at waypoint
+        if (random() < 0.3) {
+          let anims = ['sweep', 'sit', 'chat'];
+          c._citizenAct = anims[floor(random(anims.length))];
+          c._citizenActTimer = floor(random(90, 180));
+        } else { c._citizenAct = null; }
       } else {
         c.vx = (dx / d) * c.speed;
         c.vy = (dy / d) * c.speed;
@@ -1298,6 +1307,7 @@ function drawOneCitizen(c) {
   let bob = walking ? abs(sin(frameCount * 0.15 + phase)) * 0.5 : 0;
 
   // Idle animation variety
+  let cAct = c._citizenAct;
   if (!walking && c.idleAnim !== undefined) {
     if (c.idleAnim === 1) {
       // Look around — subtle head turn
@@ -1306,6 +1316,13 @@ function drawOneCitizen(c) {
     } else if (c.idleAnim === 2) {
       // Arms crossed — handled in arm drawing below via flag
     }
+  }
+  // Sit: lower body position
+  if (cAct === 'sit') translate(0, 3);
+  // Chat: face nearest citizen direction
+  if (cAct === 'chat') {
+    let lookDir = sin(frameCount * 0.025 + phase) > 0 ? 1 : -1;
+    scale(lookDir * c.facing, 1); // override facing briefly
   }
 
   // Shadow
@@ -1346,7 +1363,12 @@ function drawOneCitizen(c) {
   // Arms — skin, with simple swing when walking
   fill(colors.skin[0], colors.skin[1], colors.skin[2]);
   let armSwing = walking ? floor(sin(frameCount * 0.15 + (c.walkBobPhase || 0)) * 1.5) : 0;
-  if (!walking && c.idleAnim === 2) {
+  if (!walking && cAct === 'sweep') {
+    // Sweeping motion — one arm swings forward
+    let sw = floor(sin(frameCount * 0.12 + phase) * 2);
+    rect(-5, -7, 1, 4);
+    rect(4 + sw, -5 + abs(sw), 1, 4);
+  } else if (!walking && c.idleAnim === 2) {
     // Arms crossed pose
     rect(-4, -6, 1, 3);
     rect(3, -6, 1, 3);
@@ -1608,15 +1630,24 @@ function drawNewNPC(npc, type) {
   let blinking = a.blinkFrame > 0;
   let pDist = dist(state.player.x, state.player.y, npc.x, npc.y);
   let npcFace = (pDist < 100 && state.player.x < npc.x) ? -1 : 1;
+  // Use schedule/patrol facing when player is far
+  if (pDist >= 100 && npc._schedFacing) npcFace = npc._schedFacing;
+  // Activity look-around override
+  let act = npc._activity;
+  if (act === 'look' && pDist >= 80) {
+    npcFace = sin(frameCount * 0.03 + npc.x * 0.1) > 0 ? 1 : -1;
+  }
+  // Activity vertical offset (kneeling for pray)
+  let actYOff = (act === 'pray') ? 4 : 0;
 
   push();
-  translate(floor(sx), floor(sy + bob));
+  translate(floor(sx), floor(sy + bob + actYOff));
   if (npcFace < 0) scale(-1, 1);
   noStroke();
 
   // Elliptical shadow — natural
   fill(0, 0, 0, 30);
-  ellipse(0, 13, 20, 5);
+  ellipse(0, 13 - actYOff, 20, 5);
 
   // Hover glow when player is near — warm aura
   let pd = dist2(state.player.x, state.player.y, npc.x, npc.y);
@@ -3385,6 +3416,20 @@ function drawNewNPC(npc, type) {
     }
   }
 
+  // Activity animation overlays
+  if (act === 'water' || act === 'hammer') {
+    // Arm pumping motion (up/down)
+    let armY = floor(sin(frameCount * 0.15) * 3);
+    fill(180, 145, 100);
+    rect(7, -4 + armY, 2, 5);
+    if (act === 'hammer') { fill(140, 140, 150); rect(8, -6 + armY, 1, 3); }
+  } else if (act === 'goods') {
+    // Examining gesture — hand out
+    let reach = floor(sin(frameCount * 0.06) * 2);
+    fill(180, 145, 100);
+    rect(8 + reach, -3, 2, 3);
+  }
+
   // Undo facing flip for UI text (so text always reads left-to-right)
   if (npcFace < 0) scale(-1, 1);
 
@@ -3489,20 +3534,87 @@ function getNPCSchedulePos(npcName, hour) {
   return { x: last.x, y: last.y };
 }
 
+// Micro-patrol offsets per NPC (relative to schedule position)
+const NPC_PATROL_OFFSETS = {
+  livia:  [{ dx: 0, dy: 0, act: 'idle' }, { dx: -40, dy: 10, act: 'water' }, { dx: 30, dy: -15, act: 'look' }, { dx: -20, dy: 20, act: 'look' }],
+  marcus: [{ dx: 0, dy: 0, act: 'look' }, { dx: 50, dy: 5, act: 'goods' }, { dx: -35, dy: 10, act: 'idle' }, { dx: 25, dy: -15, act: 'look' }],
+  vesta:  [{ dx: 0, dy: 0, act: 'pray' }, { dx: -30, dy: 15, act: 'idle' }, { dx: 40, dy: -10, act: 'pray' }, { dx: -15, dy: -20, act: 'look' }],
+  felix:  [{ dx: 0, dy: 0, act: 'look' }, { dx: 35, dy: 10, act: 'goods' }, { dx: -45, dy: -5, act: 'idle' }, { dx: 20, dy: 20, act: 'look' }],
+};
+
+// Idle activities: 'idle'=stand, 'look'=turn head, 'water'=arm pump, 'goods'=examine, 'pray'=kneel, 'hammer'=arm swing
+const NPC_ACTIVITY_DURATION = { idle: 180, look: 120, water: 90, goods: 100, pray: 120, hammer: 90 };
+
 function updateNPCSchedule(npc, npcName, dt) {
   let hour = (typeof state !== 'undefined' && state.time != null) ? state.time / 60 : 12;
   let target = getNPCSchedulePos(npcName, hour);
   if (!target) return;
+
+  // Player proximity — freeze patrol and face player
+  let pDist = Math.sqrt((state.player.x - npc.x) ** 2 + (state.player.y - npc.y) ** 2);
+  if (pDist < 80) {
+    if (!npc._patrolPaused) npc._patrolPaused = true;
+    npc._activity = null;
+    return;
+  }
+  if (npc._patrolPaused) {
+    npc._patrolPaused = false;
+    npc._patrolResume = 120; // 2-second resume delay
+  }
+  if (npc._patrolResume > 0) { npc._patrolResume -= dt; return; }
+
   let dx = target.x - npc.x;
   let dy = target.y - npc.y;
   let d = Math.sqrt(dx * dx + dy * dy);
-  if (d < 3) return;
-  let speed = 0.5;
-  let step = speed * dt;
-  if (step > d) step = d;
-  npc.x += (dx / d) * step;
-  npc.y += (dy / d) * step;
-  if (Math.abs(dx) > 1) npc._schedFacing = dx > 0 ? 1 : -1;
+
+  // Far from schedule target — walk there first
+  if (d > 60) {
+    npc._patrolWP = 0;
+    npc._patrolWait = 0;
+    npc._activity = null;
+    let speed = 0.5, step = Math.min(speed * dt, d);
+    npc.x += (dx / d) * step;
+    npc.y += (dy / d) * step;
+    if (Math.abs(dx) > 1) npc._schedFacing = dx > 0 ? 1 : -1;
+    return;
+  }
+
+  // Micro-patrol around schedule position
+  let offsets = NPC_PATROL_OFFSETS[npcName];
+  if (!offsets) return;
+  if (npc._patrolWP === undefined) npc._patrolWP = 0;
+  if (npc._patrolWait === undefined) npc._patrolWait = 0;
+
+  // Currently doing an activity at waypoint
+  if (npc._activity) {
+    npc._activityTimer = (npc._activityTimer || 0) - dt;
+    if (npc._activityTimer <= 0) {
+      npc._activity = null;
+      npc._patrolWP = (npc._patrolWP + 1) % offsets.length;
+    }
+    return;
+  }
+
+  // Walk toward current patrol waypoint
+  let wp = offsets[npc._patrolWP];
+  let wx = target.x + wp.dx, wy = target.y + wp.dy;
+  let wdx = wx - npc.x, wdy = wy - npc.y;
+  let wd = Math.sqrt(wdx * wdx + wdy * wdy);
+
+  if (wd < 4) {
+    // Arrived — wait then do activity
+    npc._patrolWait = (npc._patrolWait || 0) - dt;
+    if (npc._patrolWait <= 0) {
+      npc._activity = wp.act;
+      npc._activityTimer = (NPC_ACTIVITY_DURATION[wp.act] || 120) + Math.floor(Math.random() * 120);
+      npc._patrolWait = 180 + Math.floor(Math.random() * 300); // 3-8s next wait
+    }
+  } else {
+    let speed = 0.3, step = Math.min(speed * dt, wd);
+    npc.x += (wdx / wd) * step;
+    npc.y += (wdy / wd) * step;
+    if (Math.abs(wdx) > 1) npc._schedFacing = wdx > 0 ? 1 : -1;
+  }
 }
 
 function updateAllNPCSchedules(dt) {

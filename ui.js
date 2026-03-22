@@ -2252,7 +2252,10 @@ function drawHUD() {
     let daysLeft = needed > 0 ? floor(totalFood / needed) : 99;
     let foodCol = daysLeft >= 5 ? color(80, 180, 80) : daysLeft >= 2 ? color(220, 180, 40) : color(255, 80, 60);
     fill(foodCol); textSize(hudTextSize);
-    text('FOOD -' + needed + '/day (' + daysLeft + 'd)', hudX, resY); resY += hudLineH;
+    let foodLine = 'FOOD -' + needed + '/day (' + daysLeft + 'd)';
+    let hasWM = state.buildings && state.buildings.some(b => b.type === 'windmill' && !b.ruined);
+    if (hasWM) foodLine += ' [Mill 2x]';
+    text(foodLine, hudX, resY); resY += hudLineH;
   }
   // Expedition resources
   let expResY = resY;
