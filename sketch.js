@@ -3456,10 +3456,12 @@ function drawInner() {
     if (typeof drawAtmosphericHaze === 'function') drawAtmosphericHaze();
     pop();
 
-    // Arena
+    // Arena (combat mode -- island already rendered by drawArenaIsleDistant)
     push();
     translate(shakeX, shakeY);
-    drawArena();
+    // drawArena() is the old full-island renderer -- SKIP IT
+    // The new drawArenaIsleDistant() handles island rendering with proper perspective
+    // Only draw combat entities when adventure is active
     drawAdventureEntities();
     drawParticles();
     drawFloatingText();
