@@ -17923,6 +17923,8 @@ function drawArenaIsleDistant() {
   }
 
   let sx = w2sX(a.isleX), sy = w2sY(a.isleY);
+  let _horizY = max(height * 0.06, height * 0.25 - horizonOffset) + 5;
+  if (!playerOnArena) sy = max(sy, _horizY);
   if (sx < -400 || sx > width + 400) return;
   if (sy < -400 || sy > height + 400) return;
 
@@ -17952,6 +17954,12 @@ function drawArenaIsleDistant() {
   // Arena structure (fits INSIDE the grass surface)
   let aLv = (typeof getArenaLevel === 'function') ? getArenaLevel() : 1;
   let inCombat = a.active;
+
+  // Atmospheric horizon haze for distant arena
+  if (!playerOnArena) {
+    let _hazeAlpha = max(0, 1 - (sy - _horizY) / 200) * 40;
+    if (_hazeAlpha > 0) { fill(180, 200, 220, _hazeAlpha); ellipse(fsx, fsy, rx * 2, ry * 2); }
+  }
 
   // Arena details only when close
   if (!a.active && !playerSwimming && !playerOnArena) { pop(); return; }
@@ -21640,6 +21648,9 @@ function drawSingleNationIsleDistant(key) {
 
   // Atmospheric distance haze overlay
   let _hazeAlpha = _dScale ? max(20, floor(_dScale.haze * 0.5)) : 20;
+  // Extra haze when clamped near horizon
+  let _horizHaze = max(0, 1 - (sy - _horizY) / 200) * 25;
+  _hazeAlpha = min(120, _hazeAlpha + _horizHaze);
   fill(140 + 30 * bright, 165 + 20 * bright, 195 + 10 * bright, _hazeAlpha);
   ellipse(fsx, fsy, rx * 2.2, ry * 2.2);
 
@@ -23911,7 +23922,8 @@ function drawConquestIsleDistant() {
   }
   // Final atmospheric wash over entire island — stronger with distance
   let _cRX = c.isleRX, _cRY = c.isleRY;
-  let _cHazeA = _dScale ? max(10, floor(_dScale.haze * 0.5)) : floor(10 * _cBright);
+  let _horizHaze = max(0, 1 - (sy - _horizY) / 200) * 25;
+  let _cHazeA = _dScale ? max(10, floor(_dScale.haze * 0.5 + _horizHaze)) : floor(10 * _cBright + _horizHaze);
   fill(160, 185, 210, _cHazeA);
   ellipse(sx, sy, _cRX * 2.2, _cRY * 2.2);
   pop();
