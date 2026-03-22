@@ -25604,6 +25604,16 @@ function keyPressed() {
     if (key === 'n' || key === 'N') { state.victoryScreen = null; return; }
   }
 
+  // F2 = instant screenshot
+  if (keyCode === 113) {
+    let d = new Date();
+    let ts = d.getFullYear() + '-' + nf(d.getMonth()+1,2) + '-' + nf(d.getDate(),2) + '_' + nf(d.getHours(),2) + '-' + nf(d.getMinutes(),2) + '-' + nf(d.getSeconds(),2);
+    saveCanvas('screenshot_' + ts, 'png');
+    addFloatingText(width / 2, height * 0.1, 'Screenshot saved!', '#ffffff');
+    if (snd) snd.playSFX('shutter_click');
+    return;
+  }
+
   // F9 = toggle screenshot mode
   if (keyCode === 120) {
     screenshotMode = !screenshotMode;

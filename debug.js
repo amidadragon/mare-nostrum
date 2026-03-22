@@ -510,6 +510,28 @@ const Debug = {
           else this.addLog('Not connected', '#ff8888');
           break;
 
+        case '/screenshots': {
+          let times = [
+            { name: 'dawn', t: 5 * 60 },
+            { name: 'golden_hour', t: 7 * 60 },
+            { name: 'noon', t: 12 * 60 },
+            { name: 'sunset', t: 19 * 60 },
+            { name: 'night', t: 23 * 60 }
+          ];
+          this.addLog('Auto-capturing 5 store screenshots...', '#ffcc44');
+          times.forEach((entry, i) => {
+            setTimeout(() => {
+              state.time = entry.t;
+              Debug.addLog('Set time: ' + entry.name, '#88ccff');
+              setTimeout(() => {
+                saveCanvas('store_' + entry.name, 'png');
+                Debug.addLog('Captured: store_' + entry.name + '.png', '#aaffaa');
+              }, 1000);
+            }, i * 2000);
+          });
+          break;
+        }
+
         case '/attack':
           if (typeof MP !== 'undefined' && MP.connected) { MP.attackRemote(parseInt(args[0]) || 5); this.addLog('Attacking with ' + (parseInt(args[0]) || 5) + ' troops', '#ff8844'); }
           else this.addLog('Not connected', '#ff8888');
