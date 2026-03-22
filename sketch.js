@@ -1086,11 +1086,7 @@ const CITY_SLOTS = [
   // ERA 3: ATLANTIS (Lv 18-25)
   // ===============================================================
 
-  // --- ARENA (military zone, x:870-960) ---
-  { id: 'arena',           x: 910, y: 510, w: 84, h: 64, type: 'arena',       level: 18, district: 'military' },
-  { id: 'torch_arena_l',   x: 865, y: 525, w:  8, h: 16, type: 'torch',       level: 18, district: 'military' },
-  { id: 'torch_arena_r',   x: 955, y: 525, w:  8, h: 16, type: 'torch',       level: 18, district: 'military' },
-  { id: 'mosaic_arena',    x: 910, y: 550, w: 48, h: 22, type: 'mosaic',      level: 19, district: 'military' },
+  // --- ARENA removed from main island (now its own island to the north) ---
 
   // --- MILITARY houses (x:820-870) ---
   { id: 'house_mil1',      x: 830, y: 430, w: 44, h: 34, type: 'house',       level: 19, district: 'military' },
