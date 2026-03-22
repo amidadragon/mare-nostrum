@@ -17573,9 +17573,7 @@ function drawConquestDistantEntities() {
 // ─── ARENA DRAWING ───────────────────────────────────────────────────────
 
 function drawArenaIsleDistant() {
-  // DEBUG: bright red X at arena position to identify which blob is the arena
-  let _dbgx = w2sX(state.adventure.isleX), _dbgy = w2sY(state.adventure.isleY);
-  push(); stroke(255,0,0); strokeWeight(3); line(_dbgx-15,_dbgy-15,_dbgx+15,_dbgy+15); line(_dbgx+15,_dbgy-15,_dbgx-15,_dbgy+15); noStroke(); fill(255,0,0); textSize(12); text('ARENA',_dbgx+20,_dbgy); pop();
+  // DEBUG removed
   // Draw the arena as a proper island with layered coastline (same technique as main island)
   if (state.adventure.active) return;
   let a = state.adventure;
@@ -17604,9 +17602,9 @@ function drawArenaIsleDistant() {
   let distScale = (_dScale && _dScale.scale < 0.98) ? _dScale.scale : 1;
   let sc = min(perspScale, distScale);
 
-  if (sc < 0.98) { translate(sx, sy); scale(sc); translate(-sx, -sy); }
+  // Bake perspective scale directly into radii (more reliable than transform)
   let fsx = floor(sx), fsy = floor(sy);
-  let rx = a.isleRX, ry = a.isleRY * 0.45; // isometric vertical squash
+  let rx = a.isleRX * sc, ry = a.isleRY * 0.45 * sc;
   let bright = getSkyBrightness();
   let dayMix = max(0.15, bright);
   let aLv = getArenaLevel();
