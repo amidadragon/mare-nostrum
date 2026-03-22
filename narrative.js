@@ -864,6 +864,7 @@ function updateMainQuest() {
     state.mainQuest.chapter = ch + 1;
     state.mainQuest.step = 0;
     if (state.score) state.score.questsCompleted++;
+    if (typeof adjustReputation === 'function') adjustReputation(3);
     // Quest completion grants research points
     if (typeof grantResearchPoints === 'function') {
       let rpBonus = 5 + ch * 3; // 5-20 RP scaling with chapter

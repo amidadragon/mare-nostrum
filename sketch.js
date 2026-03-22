@@ -887,6 +887,66 @@ let horizonOffset = 0;
 let energyArcs = [];
 let floatingText = [];
 let shakeX = 0, shakeY = 0;
+
+// ─── NARRATION SUBTITLE SYSTEM ───
+let _narrationSub = null; // { text, timer, maxTimer }
+const NARRATION_TEXTS = {
+  wreck_wake: 'You open your eyes to salt and sand. The ship is broken. You are alone.',
+  wreck_fire: 'The fire crackles against the dark. Warmth returns, and with it, hope.',
+  wreck_sail: 'The makeshift sail catches wind. The sea stretches endlessly before you.',
+  first_sail: 'The horizon beckons. For the first time since the wreck, you chart your own course.',
+  first_raid: 'Longships on the horizon! The Sea People have come. Defend your island!',
+  level_3: 'The settlement grows. What was wreckage is becoming a village.',
+  level_5: 'Word of your colony spreads across the waters. Traders take notice.',
+  level_8: 'A true town rises from nothing. The gods themselves must be watching.',
+  level_10: 'From exile to empire. Your name will echo through the ages.',
+  rome_intro: 'Roma Aeterna. The eternal city guides your hand. Build with order and discipline.',
+  carthage_intro: 'Carthage rises again. Let gold flow like water through your markets.',
+  egypt_intro: 'By the light of Ra, your dynasty begins anew upon these shores.',
+  greece_intro: 'Wisdom and beauty shall be your foundation. Athens lives in you.',
+  seapeople_intro: 'The sea is your homeland. Take what you need. Fear nothing.',
+  persia_intro: 'The King of Kings builds not just walls, but an empire of splendor.',
+  phoenicia_intro: 'Every shore is a market. Every wave, a road. Navigate wisely.',
+  gaul_intro: 'The forest remembers. The druids whisper. Strength flows from the earth.',
+  first_harvest: 'The first grain falls. The land provides for those who tend it.',
+  first_build: 'Stone upon stone. A home rises where there was nothing.',
+  first_fish: 'The sea gives freely to those with patience.',
+  first_combat: 'Steel rings against steel. You will not fall so easily.'
+};
+function _showNarrationSubtitle(key) {
+  let txt = NARRATION_TEXTS[key];
+  if (!txt) return;
+  _narrationSub = { text: txt, timer: 0, maxTimer: 300 }; // ~5s at 60fps
+}
+function _drawNarrationSubtitle() {
+  if (!_narrationSub) return;
+  _narrationSub.timer++;
+  if (_narrationSub.timer >= _narrationSub.maxTimer) { _narrationSub = null; return; }
+  let t = _narrationSub.timer, mx = _narrationSub.maxTimer;
+  let fadeIn = min(1, t / 30), fadeOut = min(1, (mx - t) / 30);
+  let al = min(fadeIn, fadeOut);
+  push(); noStroke();
+  fill(0, 0, 0, 160 * al);
+  rect(0, height - 70, width, 70);
+  fill(255, 255, 245, 255 * al);
+  textAlign(CENTER, CENTER); textFont('Cinzel, serif'); textSize(15);
+  text(_narrationSub.text, width / 2, height - 35);
+  textAlign(LEFT, TOP);
+  pop();
+}
+
+// ─── WEATHER IMPACT SYSTEM ───
+function getWeatherEffects() {
+  let w = (state.weather && state.weather.type) || 'clear';
+  return {
+    clear:    { farmMult: 1.0, fishMult: 1.0, sailMult: 1.0, combatMult: 1.0, desc: '' },
+    cloudy:   { farmMult: 0.9, fishMult: 1.1, sailMult: 1.0, combatMult: 1.0, desc: 'Overcast' },
+    rain:     { farmMult: 1.3, fishMult: 0.8, sailMult: 0.8, combatMult: 0.9, desc: 'Rain +30% crops, -20% fishing' },
+    storm:    { farmMult: 1.5, fishMult: 0.3, sailMult: 0.5, combatMult: 0.7, desc: 'Storm — dangerous seas!' },
+    heatwave: { farmMult: 0.5, fishMult: 1.0, sailMult: 1.0, combatMult: 1.0, desc: 'Heatwave -50% crops' },
+    fog:      { farmMult: 0.8, fishMult: 0.6, sailMult: 0.6, combatMult: 0.8, desc: 'Fog — reduced visibility' }
+  }[w] || { farmMult: 1.0, fishMult: 1.0, sailMult: 1.0, combatMult: 1.0, desc: '' };
+}
 let shakeTimer = 0;
 // HUD resource pop animation
 let hudFlash = {}; // { key: { timer, delta } } — tracks resource changes for pop effect
@@ -2129,6 +2189,15 @@ function initState() {
       isleRX: 280,
       isleRY: 190,
     },
+
+    // ─── PERSONAL RIVAL (recurring nemesis NPC) ────────────────────────
+    personalRival: {
+      name: null, faction: null, level: 1, reputation: 0,
+      lastEncounter: 0, defeated: 0, encounters: 0,
+      alliance: false, tradePartner: false, invading: false,
+    },
+    globalReputation: 50, // 0-100: Outlaw/Distrusted/Neutral/Respected/Legendary
+    rivalEncounter: null, // active encounter state or null
 
     // ─── NATIONS (AI rivals — all factions except player's) ─────────────
     nations: {}, // populated by initNations() after faction selection
@@ -3826,6 +3895,12 @@ function drawInner() {
       drawNightOverlay();
       drawColorGrading();
       if (typeof drawFestivalOverlay === 'function') drawFestivalOverlay();
+      // Fog overlay — lifts by midday
+      if (state.weather && state.weather.type === 'fog') {
+        let fogHour = (state.time || 0) / 60;
+        let fogAlpha = fogHour < 12 ? lerp(120, 0, constrain((fogHour - 6) / 6, 0, 1)) : 0;
+        if (fogAlpha > 1) { noStroke(); fill(210, 210, 220, fogAlpha); rect(0, 0, width, height); }
+      }
       drawGameVignette();
     }
 
@@ -3852,6 +3927,7 @@ function drawInner() {
       if (typeof drawLoreTabletPopup === 'function') drawLoreTabletPopup();
       if (typeof drawNarrativeDialogue === 'function') drawNarrativeDialogue();
       drawDiscoveryEvent();
+      if (typeof _drawNarrationSubtitle === 'function') _drawNarrationSubtitle();
       drawTutorialHintUI();
       if (typeof drawCurrentGoalHUD === 'function') drawCurrentGoalHUD();
       drawScreenFlash();
@@ -3983,6 +4059,7 @@ function updateFoodConsumption() {
     state.foodShortage = (state.foodShortage || 0) + 1;
     addFloatingText(width / 2, height * 0.26, 'Food shortage! Citizens hungry.', '#ff6644');
     addNotification('Day ' + state.day + ': Not enough food! (' + consumed + '/' + foodNeeded + ')', '#ff6644');
+    if (typeof adjustReputation === 'function') adjustReputation(-5);
 
     // After 5 consecutive days of shortage, citizens start leaving
     if (state.foodShortage >= 5 && pop > 2) {
@@ -3996,10 +4073,11 @@ function updateFoodConsumption() {
     }
   } else {
     state.foodShortage = 0;
-    // Well-fed bonus: +1 morale
+    // Well-fed bonus: +1 morale, +2 reputation (feeding citizens)
     if (state.legia && state.legia.recruits > 0) {
       state.legia.morale = min(100, state.legia.morale + 1);
     }
+    if (pop >= 5 && typeof adjustReputation === 'function') adjustReputation(2);
   }
 }
 
@@ -4193,6 +4271,12 @@ function updateTime(dt) {
     if (state.nations && Object.keys(state.nations).length > 0) updateNationsDaily();
     // Sea People raid check (daily)
     checkSeaPeopleRaid();
+    // Personal rival encounter check (every 10-15 days)
+    if (typeof checkRivalEncounter === 'function') checkRivalEncounter();
+    // Rival trade partner daily income
+    if (state.personalRival && state.personalRival.tradePartner && !state.personalRival.invading) {
+      state.gold += 3;
+    }
     // Random event roll — 20% chance per day
     checkRandomEvent();
     // Daily island resource refresh — nodes respawn each day for revisit incentive
@@ -4307,8 +4391,7 @@ function updateTime(dt) {
       if (state.weather.type === 'storm') return;
       let growRate = (hour >= 6 && hour <= 18) ? 0.08 : 0.02;
       if (stormActive) growRate *= 1.8;
-      if (state.weather.type === 'rain') growRate *= (1.5 + state.weather.intensity * 0.5);
-      if (state.weather.type === 'heatwave') growRate *= 0.5;
+      growRate *= getWeatherEffects().farmMult;
       // Drought slows crop growth
       let _dsr = state.daysSinceRain || 0;
       if (_dsr >= 7) growRate *= 0.3;
@@ -8923,8 +9006,11 @@ function selectFaction(faction) {
     for (var slot in gear) { if (gear[slot]) equipItem(gear[slot]); }
   }
   trackMilestone('faction_chosen_' + faction);
+  if (snd && snd.playNarration) snd.playNarration(faction + '_intro');
   // Initialize all rival nations (everyone except player's faction)
   initNations();
+  // Initialize personal rival
+  initPersonalRival(faction);
   // Sea People special start — skip wreck, start on ship
   if (faction === 'seapeople') {
     state.progression.triremeRepaired = true;
@@ -12610,6 +12696,7 @@ function updateRowing(dt) {
 
   let rowSpeed = 3.5 * getFactionData().sailSpeedMult;
   if (typeof hasTech === 'function' && hasTech('celestial_navigation')) rowSpeed *= 1.15;
+  rowSpeed *= getWeatherEffects().sailMult;
   if (state.naval) {
     let _windMult = 0.5 + cos(r.angle - (state.naval.wind ? state.naval.wind.angle : 0)) * 0.5;
     rowSpeed *= (1 + (state.naval.sailLevel || 0) * 0.15);
@@ -15471,6 +15558,13 @@ function triggerIslandMilestone(lvl) {
   state.islandMilestone = { level: lvl, rank: rank, unlocks: unlocks, timer: 300 };
   _juiceLevelUpFlash = 1.0; // white screen flash on level up
   if (snd) snd.playSFX('level_up');
+  // Narration at milestone levels
+  if (snd && snd.playNarration) {
+    if (lvl === 3) snd.playNarration('level_3');
+    else if (lvl === 5) snd.playNarration('level_5');
+    else if (lvl === 8) snd.playNarration('level_8');
+    else if (lvl === 10) snd.playNarration('level_10');
+  }
   // Golden particle burst from island center
   for (let i = 0; i < 30; i++) {
     let a = random(TWO_PI), spd = random(1.5, 5);
@@ -16979,6 +17073,7 @@ function updateAdventure(dt) {
       a.goldEarned = (a.goldEarned || 0) + waveGold;
       if (a.wave % 5 === 0) { state.crystals += 2; }
       addFloatingText(width / 2, height * 0.3, 'Wave ' + a.wave + ' Clear! +' + waveGold + ' Gold', '#aaddff');
+      if (typeof adjustReputation === 'function') adjustReputation(5);
       a.waveState = 'intermission';
       a.waveTimer = 180; // 3 seconds rest between waves
     }
@@ -19895,6 +19990,130 @@ function makeNation(key) {
   };
 }
 
+// ─── PERSONAL RIVAL SYSTEM ──────────────────────────────────────────────
+var RIVAL_FACTIONS = {
+  rome: 'carthage', carthage: 'rome', egypt: 'persia', greece: 'persia',
+  seapeople: 'rome', persia: 'greece', phoenicia: 'carthage', gaul: 'rome',
+};
+var RIVAL_NAMES = {
+  rome: ['Scipio', 'Brutus', 'Cassius', 'Tiberius'], carthage: ['Hannibal', 'Hamilcar', 'Mago', 'Hasdrubal'],
+  egypt: ['Ptolemy', 'Neferu', 'Khufu', 'Amenhotep'], greece: ['Leonidas', 'Themistocles', 'Ajax', 'Pericles'],
+  seapeople: ['Ekwesh', 'Lukka', 'Shekelesh', 'Denyen'], persia: ['Darius', 'Xerxes', 'Cyrus', 'Artaxerxes'],
+  phoenicia: ['Hiram', 'Elissa', 'Abibaal', 'Baal'], gaul: ['Vercingetorix', 'Ambiorix', 'Brennus', 'Diviciacus'],
+};
+
+function initPersonalRival(playerFaction) {
+  let rivalFac = RIVAL_FACTIONS[playerFaction] || 'carthage';
+  let names = RIVAL_NAMES[rivalFac] || RIVAL_NAMES.carthage;
+  state.personalRival = {
+    name: names[floor(random(names.length))], faction: rivalFac, level: 1, reputation: 0,
+    lastEncounter: 0, defeated: 0, encounters: 0, alliance: false, tradePartner: false, invading: false,
+  };
+  state.globalReputation = 50;
+}
+
+function checkRivalEncounter() {
+  let r = state.personalRival;
+  if (!r || !r.name || r.alliance) return;
+  let daysSince = state.day - r.lastEncounter;
+  if (daysSince < 10 || (daysSince < 15 && random() > 0.4)) return;
+  if (state.rivalEncounter || dialogState.active) return;
+  let pLevel = state.player.level || 1;
+  if (r.level < pLevel) r.level = max(r.level, pLevel - 1);
+  r.encounters++;
+  r.lastEncounter = state.day;
+  let fName = getNationName(r.faction);
+  addFloatingText(width / 2, height * 0.2, 'A familiar sail appears on the horizon...', '#ffcc44');
+  addFloatingText(width / 2, height * 0.28, r.name + ' of ' + fName + ' approaches!', FACTIONS[r.faction] ? FACTIONS[r.faction].accentColorHex : '#cc8844');
+  if (r.defeated >= 3 && !r.alliance) {
+    openDialog(r.name, null, r.name + ' raises a white flag. "Enough! I offer alliance. Together we share enemies and profits."',
+      [{ text: 'Accept Alliance', action: function() { r.alliance = true; r.tradePartner = true; addFloatingText(width/2, height*0.3, r.name+' is now your ally!', '#88ff88'); adjustReputation(10); dialogState.active = false; } },
+       { text: 'Refuse', action: function() { r.reputation -= 10; addFloatingText(width/2, height*0.3, 'The rivalry continues.', '#ff8844'); dialogState.active = false; } }]);
+    return;
+  }
+  if (r.reputation <= -50 && !r.invading) {
+    r.invading = true;
+    openDialog(r.name, null, r.name + ' screams across the water: "I will destroy everything you\'ve built!" A full war fleet approaches!',
+      [{ text: 'Defend! (Battle)', action: function() { rivalCombat(true); dialogState.active = false; } }]);
+    return;
+  }
+  let costNeg = 30;
+  openDialog(r.name, null, r.name + ' of ' + fName + ' blocks your path. Their ship bristles with weapons.',
+    [{ text: 'Challenge (Fight)', action: function() { rivalCombat(false); dialogState.active = false; } },
+     { text: 'Negotiate (-' + costNeg + 'g)', action: function() { rivalNegotiate(costNeg); dialogState.active = false; } },
+     { text: 'Ignore', action: function() { rivalIgnore(); dialogState.active = false; } }]);
+}
+
+function rivalCombat(isInvasion) {
+  let r = state.personalRival;
+  let rivalPower = r.level * 10 + r.defeated * 10;
+  let playerPower = (state.player.level || 1) * 12 + (state.player.weapon || 0) * 5 + (state.player.armor || 0) * 3;
+  let win = playerPower + random(-10, 15) > rivalPower;
+  if (win) {
+    r.defeated++;
+    let goldReward = 20 + r.level * 5;
+    state.gold += goldReward;
+    r.reputation += 5; r.invading = false;
+    adjustReputation(5);
+    addFloatingText(width/2, height*0.3, r.name + ' retreats! +' + goldReward + ' gold', '#88ff88');
+    if (state.score) state.score.enemiesDefeated++;
+  } else {
+    let goldLoss = min(state.gold, 15);
+    state.gold -= goldLoss;
+    r.reputation -= 10;
+    adjustReputation(-3);
+    addFloatingText(width/2, height*0.3, r.name + ' wins! -' + goldLoss + ' gold', '#ff6644');
+    state.player.hp = max(1, state.player.hp - 20);
+  }
+}
+
+function rivalNegotiate(cost) {
+  let r = state.personalRival;
+  if (state.gold < cost) {
+    addFloatingText(width/2, height*0.3, 'Not enough gold! ' + r.name + ' laughs and raids you.', '#ff6644');
+    rivalIgnore(); return;
+  }
+  state.gold -= cost;
+  r.reputation += 10;
+  adjustReputation(1);
+  addFloatingText(width/2, height*0.3, r.name + ' accepts payment and departs. (-' + cost + 'g, +rep)', '#aaddff');
+  if (r.reputation >= 50 && !r.tradePartner) {
+    r.tradePartner = true;
+    addFloatingText(width/2, height*0.36, r.name + ' respects you — trade partner unlocked! +3g/day', '#ffdd44');
+  }
+}
+
+function rivalIgnore() {
+  let r = state.personalRival;
+  r.reputation -= 5;
+  let stolen = floor(random(3, 8));
+  let resource = random() < 0.5 ? 'gold' : (random() < 0.5 ? 'wood' : 'fish');
+  let loss = min(state[resource] || 0, stolen);
+  if (resource === 'gold') state.gold -= loss;
+  else if (resource === 'wood') state.wood -= loss;
+  else state.fish -= loss;
+  adjustReputation(-2);
+  addFloatingText(width/2, height*0.3, r.name + ' raids your routes! -' + loss + ' ' + resource, '#ff8844');
+}
+
+// ─── GLOBAL REPUTATION SYSTEM ───────────────────────────────────────────
+function adjustReputation(amount) {
+  state.globalReputation = constrain((state.globalReputation || 50) + amount, 0, 100);
+}
+function getReputationTitle() {
+  let r = state.globalReputation || 50;
+  if (r >= 81) return 'Legendary'; if (r >= 61) return 'Respected';
+  if (r >= 41) return 'Citizen'; if (r >= 21) return 'Distrusted'; return 'Outlaw';
+}
+function getReputationColor() {
+  let r = state.globalReputation || 50;
+  if (r >= 81) return '#ffdd44'; if (r >= 61) return '#88cc44';
+  if (r >= 41) return '#aabbcc'; if (r >= 21) return '#cc8844'; return '#ff4444';
+}
+function getReputationPriceMult() {
+  return 1.5 - (state.globalReputation || 50) / 100;
+}
+
 function initNations() {
   let playerFaction = state.faction || 'rome';
   let allKeys = ['carthage', 'egypt', 'greece', 'rome', 'seapeople', 'persia', 'phoenicia', 'gaul'];
@@ -20400,6 +20619,7 @@ function startSeaPeopleRaid(tier) {
   addNotification('Sea People longships spotted on the horizon!', '#ff4444');
   addFloatingText(width / 2, height * 0.2, title.toUpperCase() + '!', '#ff4444');
   if (snd) snd.playSFX('war_horn');
+  if (snd && snd.playNarration) snd.playNarration('first_raid');
   if (typeof triggerPlayerAlert === 'function') triggerPlayerAlert();
 
   // Spawn 1-3 visual longships
@@ -24440,6 +24660,23 @@ function mousePressed() {
     return;
   }
   if (state.cutscene) { skipCutscene(); return; }
+  // Dialog choice click handling
+  if (dialogState.active && dialogState.choices && dialogState.displayLen >= dialogState.text.length) {
+    let d = dialogState, boxW = min(width - 40, 440), boxH = 90;
+    let bx = (width - boxW) / 2, by = height - boxH - 20, portW = 56;
+    let choiceY = by + boxH + 4, choiceX = bx + portW + 16;
+    for (let i = 0; i < d.choices.length; i++) {
+      let ch = d.choices[i];
+      let cbw = textWidth(ch.text) + 24;
+      let cbx = choiceX;
+      for (let j = 0; j < i; j++) cbx += textWidth(d.choices[j].text) + 24 + 8;
+      if (mouseX > cbx && mouseX < cbx + cbw && mouseY > choiceY && mouseY < choiceY + 22) {
+        if (typeof ch.action === 'function') ch.action();
+        return;
+      }
+    }
+    return; // block other clicks while dialog choices visible
+  }
   // Multiplayer clicks (rival panel + trade offer)
   if (typeof MP !== 'undefined' && MP.connected) {
     if (state._mpTradeOffer && MP.handleTradeOfferClick(mouseX, mouseY)) return;
@@ -25770,6 +26007,7 @@ function keyPressed() {
       state.rowing.oarPhase = 0;
       state.rowing.wakeTrail = [];
       addFloatingText(width / 2, height * 0.35, 'Rowing the Navis Parva! WASD to sail, E to dock', C.solarBright);
+      if (snd && snd.playNarration) snd.playNarration('first_sail');
       return;
     }
     // Visitor trade
@@ -27093,6 +27331,9 @@ function saveGame() {
     colonies: (function() { var saved = {}; for (var ck of Object.keys(state.colonies || {})) { var cc = state.colonies[ck]; saved[ck] = { level: cc.level, buildings: cc.buildings, population: cc.population, gold: cc.gold, income: cc.income, military: cc.military, resources: cc.resources, governor: cc.governor, autoHarvest: cc.autoHarvest, autoTrade: cc.autoTrade, name: cc.name, isleX: cc.isleX, isleY: cc.isleY, isleRX: cc.isleRX, isleRY: cc.isleRY, uniqueResource: cc.uniqueResource, daysOwned: cc.daysOwned || 0, troopsStationed: cc.troopsStationed || 0 }; } return saved; })(),
     worldEvents: state.worldEvents || [],
     victoryAchieved: state.victoryAchieved || null,
+    // Personal rival & reputation
+    personalRival: state.personalRival || null,
+    globalReputation: state.globalReputation || 50,
     // Imperial Bridge
     imperialBridge: state.imperialBridge,
     bountyBoard: state.bountyBoard,
@@ -27178,6 +27419,7 @@ function saveGame() {
     npcMemory: state.npcMemory || null,
     loreTablets: state.loreTablets || null,
     narrativeFlags: state.narrativeFlags || null,
+    _narrationsPlayed: state._narrationsPlayed || [],
     // Diving resources & upgrades
     diving: {
       pearls: state.diving.pearls,
@@ -27637,6 +27879,14 @@ function loadGame() {
     }
     state.worldEvents = Array.isArray(d.worldEvents) ? d.worldEvents : [];
     state.victoryAchieved = d.victoryAchieved || null;
+    // Personal rival & reputation
+    if (d.personalRival) {
+      state.personalRival = d.personalRival;
+    } else if (state.faction) {
+      initPersonalRival(state.faction);
+    }
+    state.globalReputation = d.globalReputation || 50;
+    state.rivalEncounter = null;
     state.nationDiplomacyOpen = null;
     state.visitingNation = null;
     state.nationIsland = null;
@@ -27768,6 +28018,7 @@ function loadGame() {
     if (d.npcMemory && typeof d.npcMemory === 'object') state.npcMemory = d.npcMemory;
     if (d.loreTablets && typeof d.loreTablets === 'object') state.loreTablets = d.loreTablets;
     if (d.narrativeFlags && typeof d.narrativeFlags === 'object') state.narrativeFlags = d.narrativeFlags;
+    state._narrationsPlayed = Array.isArray(d._narrationsPlayed) ? d._narrationsPlayed : [];
     // Load wreck state
     if (d.wreck && typeof d.wreck === 'object') {
       state.wreck = d.wreck;

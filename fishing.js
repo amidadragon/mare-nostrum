@@ -239,8 +239,8 @@ function reelFish() {
     // Tidal zone bonus
     let _tidalMult = getTidalBonus(state.player.x, state.player.y);
     if (_tidalMult > 1) amt = floor(amt * _tidalMult);
-    // Storm fishing bonus: double yield
-    if (stormActive || (state.weather && (state.weather.type === 'storm' || state.weather.type === 'rain'))) amt *= 2;
+    // Weather fishing multiplier
+    if (typeof getWeatherEffects === 'function') amt = floor(amt * getWeatherEffects().fishMult);
     // Event fish multiplier (whale sighting = 2x)
     if (typeof getEventFishMult === 'function') amt = floor(amt * getEventFishMult());
     if (state.heartRewards && state.heartRewards.includes('golden')) amt *= 2;

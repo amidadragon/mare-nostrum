@@ -2300,6 +2300,13 @@ function drawHUD() {
   textSize(hudTextSize);
   let rankTitle = state.islandLevel >= 25 ? 'IMPERATOR' : state.islandLevel >= 20 ? 'CONSUL' : state.islandLevel >= 15 ? 'SENATOR' : state.islandLevel >= 10 ? 'GOVERNOR' : 'CITIZEN';
   text(rankTitle + ' — LV.' + state.islandLevel, hudX, cookedY + barBlockH + qOff);
+  // Global reputation title
+  if (typeof getReputationTitle === 'function') {
+    let repTitle = getReputationTitle();
+    let repCol = typeof getReputationColor === 'function' ? getReputationColor() : '#aabbcc';
+    fill(color(repCol)); textSize(hudSmallText);
+    text(repTitle.toUpperCase() + ' (' + (state.globalReputation || 50) + ')', hudX + barW + 10, cookedY + barBlockH + qOff + 2);
+  }
   textFont('monospace');
   // Player combat level + XP bar
   let _plvl = state.player.level || 1;
@@ -2383,6 +2390,11 @@ function drawHUD() {
     let wSec = floor((state.weather.timer || 0) / 60);
     text('WEATHER: ' + state.weather.type.toUpperCase() + ' (' + wSec + 's)', hudX, hudY);
     hudY += hudLineH;
+    // Weather gameplay effect description
+    if (typeof getWeatherEffects === 'function') {
+      let wfx = getWeatherEffects();
+      if (wfx.desc) { fill(180, 200, 220, 180); textSize(hudSmallText || 10); text(wfx.desc, hudX, hudY); hudY += hudLineH; }
+    }
   }
 
   // Tech: natural_philosophy — predict tomorrow's weather

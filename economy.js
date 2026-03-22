@@ -167,8 +167,11 @@ function updateTradeRoutes(dt) {
           // Demand bonus: +50% if this good is in demand
           let demandMult = getDemandBonus(route.good);
           goldGain = floor(goldGain * demandMult);
+          // Reputation price modifier
+          if (typeof getReputationPriceMult === 'function') goldGain = floor(goldGain * (2 - getReputationPriceMult()));
           state.gold += goldGain;
           route.goldEarned += goldGain;
+          if (typeof adjustReputation === 'function') adjustReputation(1);
           let demandTag = demandMult > 1 ? ' (DEMAND!)' : '';
           addFloatingText(width / 2, height * 0.35, '+' + goldGain + 'g from ' + TRADE_GOODS[route.good].name + ' trade' + demandTag, demandMult > 1 ? '#ffdd44' : '#ddcc44');
         }

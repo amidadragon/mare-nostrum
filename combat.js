@@ -100,7 +100,9 @@ function getPlayerAttackDamage() {
   let base = p.attackDamage || 15;
   let lvlBonus = p.levelAtk || 0;
   let equipBonus = (typeof getEquipBonus === 'function') ? getEquipBonus('atk') : 0;
-  return base + lvlBonus + equipBonus;
+  let total = base + lvlBonus + equipBonus;
+  if (typeof getWeatherEffects === 'function') total = floor(total * getWeatherEffects().combatMult);
+  return total;
 }
 
 // Recalculate centurion combat stats from companion level (called on any centurion level-up)

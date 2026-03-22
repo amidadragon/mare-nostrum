@@ -833,7 +833,29 @@ class SoundManager {
       music_sad: 'sounds/music_sad.ogg',
       music_sailing: 'sounds/music_sailing.ogg',
       music_temple: 'sounds/music_temple.mp3',
-      music_victory: 'sounds/music_victory.wav'
+      music_victory: 'sounds/music_victory.wav',
+      // Narration voice clips
+      narr_wreck_wake: 'sounds/narration/narration_wreck_wake.mp3',
+      narr_wreck_fire: 'sounds/narration/narration_wreck_fire.mp3',
+      narr_wreck_sail: 'sounds/narration/narration_wreck_sail.mp3',
+      narr_first_sail: 'sounds/narration/narration_first_sail.mp3',
+      narr_first_raid: 'sounds/narration/narration_first_raid.mp3',
+      narr_level_3: 'sounds/narration/narration_level_3.mp3',
+      narr_level_5: 'sounds/narration/narration_level_5.mp3',
+      narr_level_8: 'sounds/narration/narration_level_8.mp3',
+      narr_level_10: 'sounds/narration/narration_level_10.mp3',
+      narr_rome_intro: 'sounds/narration/narration_rome_intro.mp3',
+      narr_carthage_intro: 'sounds/narration/narration_carthage_intro.mp3',
+      narr_egypt_intro: 'sounds/narration/narration_egypt_intro.mp3',
+      narr_greece_intro: 'sounds/narration/narration_greece_intro.mp3',
+      narr_seapeople_intro: 'sounds/narration/narration_seapeople_intro.mp3',
+      narr_persia_intro: 'sounds/narration/narration_persia_intro.mp3',
+      narr_phoenicia_intro: 'sounds/narration/narration_phoenicia_intro.mp3',
+      narr_gaul_intro: 'sounds/narration/narration_gaul_intro.mp3',
+      narr_first_harvest: 'sounds/narration/narration_first_harvest.mp3',
+      narr_first_build: 'sounds/narration/narration_first_build.mp3',
+      narr_first_fish: 'sounds/narration/narration_first_fish.mp3',
+      narr_first_combat: 'sounds/narration/narration_first_combat.mp3'
     };
     let loaded = 0;
     const total = Object.keys(files).length;
@@ -2646,6 +2668,28 @@ class SoundManager {
     s._peak = vol;
     s.gain.amp(vol, 0.005);
     setTimeout(() => { s.gain.amp(0, 0.015); }, 30);
+  }
+
+  // ─── NARRATION PLAYBACK ───
+  playNarration(key) {
+    if (!this.ready) return;
+    let sampleKey = 'narr_' + key;
+    if (!this._samples[sampleKey]) return;
+    if (!state._narrationsPlayed) state._narrationsPlayed = [];
+    if (state._narrationsPlayed.includes(key)) return;
+    state._narrationsPlayed.push(key);
+    // Duck music volume
+    let musicKey = this._musicTrack;
+    let musicSample = musicKey ? this._samples[musicKey] : null;
+    if (musicSample && musicSample.isPlaying()) musicSample.setVolume(this.vol.master * this.vol.music * 0.25);
+    // Play narration
+    this._playSample(sampleKey, 1.2);
+    // Show subtitle
+    if (typeof _showNarrationSubtitle === 'function') _showNarrationSubtitle(key);
+    // Restore music after ~5 seconds
+    setTimeout(() => {
+      if (musicSample && musicSample.isPlaying()) musicSample.setVolume(this.vol.master * this.vol.music);
+    }, 5000);
   }
 
   // Resume AudioContext on user gesture (required by browsers)
