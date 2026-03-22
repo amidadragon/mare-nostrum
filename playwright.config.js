@@ -12,6 +12,6 @@ module.exports = defineConfig({
     command: 'npx http-server -p 8090 -c-1 --silent',
     port: 8090,
     reuseExistingServer: true,
-    timeout: 10000,
+    timeout: 30000,
   },
 });

@@ -600,13 +600,15 @@ function drawPlayer() {
     rect(-4, 17 + kickL * 0.5, 4, 2);
     rect(1, 17 + kickR * 0.5, 4, 2);
 
-    // Tunic body
+    // Tunic body — faction-colored when on home island
     let _dtc = TUNIC_COLORS[state.wardrobe ? state.wardrobe.tunicColor || 0 : 0].rgb;
     let _dHas = state.wardrobe && state.wardrobe.tunicColor > 0;
-    fill(_dHas ? _dtc[0] : 180, _dHas ? _dtc[1] : 50, _dHas ? _dtc[2] : 40);
+    let _dIsRoman = state.progression && state.progression.homeIslandReached;
+    let _dft = (_dIsRoman && typeof getFactionData === 'function') ? (getFactionData().player || {}).tunic || [180, 50, 40] : [180, 50, 40];
+    fill(_dHas ? _dtc[0] : _dft[0], _dHas ? _dtc[1] : _dft[1], _dHas ? _dtc[2] : _dft[2]);
     rect(-7, -4, 14, 14, 2);
     // Tunic ripple in water
-    fill(_dHas ? _dtc[0] - 20 : 160, _dHas ? _dtc[1] - 10 : 40, _dHas ? _dtc[2] - 5 : 35, 150);
+    fill(_dHas ? _dtc[0] - 20 : _dft[0] - 20, _dHas ? _dtc[1] - 10 : _dft[1] - 10, _dHas ? _dtc[2] - 5 : _dft[2] - 5, 150);
     let ripple = sin(t * 0.06) * 1.5;
     rect(-8 + ripple, 2, 16, 3);
     // Belt
@@ -652,7 +654,8 @@ function drawPlayer() {
     }
 
     // Head
-    drawPlayerHead(fDir, facingUp, a);
+    let isRomanDive = state.progression && state.progression.homeIslandReached;
+    drawPlayerHead(fDir, facingUp, a, isRomanDive);
 
     pop();
 
@@ -667,9 +670,10 @@ function drawPlayer() {
     }
   } else if (inWater) {
     // Swimming mode — only draw upper body, add water line
-    drawPlayerBody();
+    let isRomanSwim = state.progression && state.progression.homeIslandReached;
+    drawPlayerBody(isRomanSwim);
     drawPlayerArms(p.moving ? floor(sin(frameCount * 0.15) * 2) : 0); // swim stroke
-    drawPlayerHead(fDir, facingUp, a);
+    drawPlayerHead(fDir, facingUp, a, isRomanSwim);
     // Water surface line over legs
     fill(60, 140, 180, 100);
     ellipse(0, 6, 28 + sin(frameCount * 0.08) * 4, 8);
