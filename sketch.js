@@ -2105,6 +2105,8 @@ function initState() {
       isleY: WORLD.islandCY - 400,
       isleRX: 55,
       isleRY: 35,
+      combatRX: 200,  // bigger when actually fighting
+      combatRY: 140,
       bridgeBuilt: false,  // stone bridge at level 10+
       returnX: 0, returnY: 0, // saved player pos on home island
     },
@@ -16997,7 +16999,7 @@ function spawnWave(n) {
       let scaledHp = floor(stats.hp * hpMult);
       let eObj = {
         type: def.type,
-        x: a.isleX + cos(angle) * (a.isleRX - 20),
+        x: a.isleX + cos(angle) * (((a.combatRX||200)) - 20),
         y: a.isleY + sin(angle) * (a.isleRY - 20),
         vx: 0, vy: 0,
         hp: scaledHp, maxHp: scaledHp,
@@ -17300,8 +17302,8 @@ function updateEnemyAI(e, dt, p, a) {
         if (typeof _killCombo !== 'undefined') _killCombo = 0;
       }
       // Arena boundary
-      let bx = (e.x - a.isleX) / (a.isleRX - 10);
-      let by = (e.y - a.isleY) / (a.isleRY - 10);
+      let bx = (e.x - a.isleX) / ((a.combatRX||200) - 10);
+      let by = (e.y - a.isleY) / ((a.combatRY||140) - 10);
       if (bx * bx + by * by > 1 || e.stateTimer <= 0) {
         // Boss: brief stun after charge (1 second)
         if (e.behavior === 'boss') {
@@ -17375,12 +17377,12 @@ function updateEnemyAI(e, dt, p, a) {
   }
 
   // Clamp to arena
-  let bex = (e.x - a.isleX) / (a.isleRX - 10);
-  let bey = (e.y - a.isleY) / (a.isleRY - 10);
+  let bex = (e.x - a.isleX) / ((a.combatRX||200) - 10);
+  let bey = (e.y - a.isleY) / ((a.combatRY||140) - 10);
   if (bex * bex + bey * bey > 1) {
     let ba = atan2(e.y - a.isleY, e.x - a.isleX);
-    e.x = a.isleX + cos(ba) * (a.isleRX - 12);
-    e.y = a.isleY + sin(ba) * (a.isleRY - 12);
+    e.x = a.isleX + cos(ba) * ((a.combatRX||200) - 12);
+    e.y = a.isleY + sin(ba) * ((a.combatRY||140) - 12);
   }
 }
 
@@ -17600,7 +17602,9 @@ function drawArenaIsleDistant() {
   }
   let bright = getSkyBrightness();
   let fsx = floor(sx), fsy = floor(sy);
-  let rx = a.isleRX, ry = a.isleRY; // isleRY already smaller than isleRX (80 vs 120)
+  // Use combat size when fighting, small size when viewing from distance
+  let rx = a.active ? (a.combatRX || 200) : a.isleRX;
+  let ry = a.active ? (a.combatRY || 140) : a.isleRY;
 
   // Water shadow
   fill(20, 60, 80, 35);
