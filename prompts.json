@@ -1,0 +1,177 @@
+{
+  "characters": {
+    "rome_player": {
+      "prompt": "low-poly ancient Roman legionary soldier, red tunic, segmented lorica armor, gladius sword in hand, galea helmet with red horsehair plume, standing idle pose, game character, clean geometry",
+      "size": 64,
+      "directions": 8
+    },
+    "carthage_player": {
+      "prompt": "low-poly Carthaginian warrior, purple cloak, bronze cuirass chest armor, curved falcata sword, crescent moon shield, standing idle pose, game character, clean geometry",
+      "size": 64,
+      "directions": 8
+    },
+    "egypt_player": {
+      "prompt": "low-poly ancient Egyptian warrior, white linen kilt, gold collar necklace, khopesh curved sword, blue-gold nemes headdress, standing idle pose, game character, clean geometry",
+      "size": 64,
+      "directions": 8
+    },
+    "greece_player": {
+      "prompt": "low-poly ancient Greek hoplite warrior, blue cloak, bronze muscled cuirass, corinthian helmet with blue crest, round aspis shield, spear, standing idle pose, game character",
+      "size": 64,
+      "directions": 8
+    },
+    "gaul_player": {
+      "prompt": "low-poly ancient Gallic Celtic warrior, plaid checkered tunic, gold torque necklace, iron helmet with small wings, longsword, long mustache, standing idle pose, game character",
+      "size": 64,
+      "directions": 8
+    },
+    "persia_player": {
+      "prompt": "low-poly ancient Persian Immortal warrior, ornate blue-gold scale armor, tall tiara crown hat, curved scimitar sword, standing idle pose, game character, clean geometry",
+      "size": 64,
+      "directions": 8
+    },
+    "phoenicia_player": {
+      "prompt": "low-poly ancient Phoenician sailor merchant warrior, purple Tyrian dye tunic, naval cap, short sword, merchant belt sash, standing idle pose, game character",
+      "size": 64,
+      "directions": 8
+    },
+    "sea_people_player": {
+      "prompt": "low-poly ancient sea raider barbarian warrior, bare muscular chest with tribal tattoos, horned helmet, battle axe, fur pants, standing idle pose, game character",
+      "size": 64,
+      "directions": 8
+    }
+  },
+  "buildings": {
+    "roman_temple": {
+      "prompt": "low-poly ancient Roman temple building, white marble, six tall columns, triangular pediment roof, wide stone steps, red terracotta accents, isometric game asset",
+      "size": 128,
+      "directions": 4
+    },
+    "egyptian_temple": {
+      "prompt": "low-poly ancient Egyptian temple of Ra, two obelisks at entrance, sloped pylon walls, gold sun disk symbol, papyrus columns, hieroglyphs, isometric game asset",
+      "size": 128,
+      "directions": 4
+    },
+    "greek_parthenon": {
+      "prompt": "low-poly ancient Greek Parthenon temple, eight ionic marble columns, white stone, blue painted accents, olive wreath decoration, isometric game asset",
+      "size": 128,
+      "directions": 4
+    },
+    "roman_villa": {
+      "prompt": "low-poly ancient Roman villa house, red terracotta tile roof, white plastered walls, inner garden courtyard, small fountain, isometric game asset",
+      "size": 128,
+      "directions": 4
+    },
+    "market_stall": {
+      "prompt": "low-poly ancient Mediterranean market stall, wooden frame structure, colored cloth awning, goods on display table, amphora clay jars, isometric game asset",
+      "size": 64,
+      "directions": 4
+    },
+    "harbor_dock": {
+      "prompt": "low-poly ancient wooden harbor dock pier, mooring posts, thick ropes, wooden crates and barrels, water edge, planks, isometric game asset",
+      "size": 128,
+      "directions": 4
+    },
+    "roman_bathhouse": {
+      "prompt": "low-poly ancient Roman bathhouse thermae, domed roof, white marble, steam vents, arched entrance, mosaic floor visible, isometric game asset",
+      "size": 128,
+      "directions": 4
+    },
+    "roman_forum": {
+      "prompt": "low-poly ancient Roman forum public square, marble columns, speaking platform rostrum, stone benches, triumphal arch, isometric game asset",
+      "size": 128,
+      "directions": 4
+    }
+  },
+  "military": {
+    "roman_legionary": {
+      "prompt": "low-poly Roman legionary infantry soldier, lorica segmentata armor, large rectangular red scutum shield, gladius sword, galea helmet, battle stance, game unit",
+      "size": 48,
+      "directions": 8
+    },
+    "carthaginian_soldier": {
+      "prompt": "low-poly Carthaginian infantry soldier, bronze scale armor, round shield with crescent, curved sword, purple cape, battle stance, game unit",
+      "size": 48,
+      "directions": 8
+    },
+    "war_elephant": {
+      "prompt": "low-poly Carthaginian war elephant, armored howdah tower on back, trunk raised, tusks with metal caps, cloth draping, battle ready, game unit",
+      "size": 96,
+      "directions": 8
+    },
+    "greek_phalanx": {
+      "prompt": "low-poly Greek phalanx hoplite soldier, overlapping round shields wall, long sarissa spear, bronze muscled armor, corinthian helmet, battle stance, game unit",
+      "size": 48,
+      "directions": 8
+    },
+    "egyptian_chariot": {
+      "prompt": "low-poly ancient Egyptian war chariot, two horses, archer warrior standing, golden decorations, spinning wheels, battle ready, game unit",
+      "size": 96,
+      "directions": 8
+    },
+    "trireme_ship": {
+      "prompt": "low-poly ancient Mediterranean trireme warship, three rows of oars, bronze ram bow, square sail, painted eye on hull, game unit",
+      "size": 128,
+      "directions": 8
+    }
+  },
+  "props": {
+    "amphora": {
+      "prompt": "low-poly ancient clay amphora jar, two handles, pointed bottom, terracotta color, painted band decoration, game prop",
+      "size": 32,
+      "directions": 1
+    },
+    "olive_tree": {
+      "prompt": "low-poly Mediterranean olive tree, gnarled twisted trunk, silver-green leaf canopy, small olives, game prop vegetation",
+      "size": 64,
+      "directions": 1
+    },
+    "cypress_tree": {
+      "prompt": "low-poly tall Mediterranean cypress tree, narrow columnar shape, dark green foliage, game prop vegetation",
+      "size": 64,
+      "directions": 1
+    },
+    "palm_tree": {
+      "prompt": "low-poly date palm tree, tall curved trunk, large fan palm fronds, hanging date clusters, game prop vegetation",
+      "size": 64,
+      "directions": 1
+    },
+    "marble_column": {
+      "prompt": "low-poly ancient Roman marble column, fluted shaft, corinthian capital with acanthus leaves, stone base, game prop",
+      "size": 64,
+      "directions": 1
+    },
+    "wooden_cart": {
+      "prompt": "low-poly ancient wooden ox cart, two large wheels, wooden planks, cargo area, yoke for oxen, game prop",
+      "size": 64,
+      "directions": 4
+    },
+    "fountain": {
+      "prompt": "low-poly ancient Roman stone fountain, circular basin, central water spout, decorative lion head, marble, game prop",
+      "size": 64,
+      "directions": 1
+    },
+    "market_goods": {
+      "prompt": "low-poly ancient trade goods pile, wine amphora, grain sacks, olive oil jars, gold coins, silk cloth bolts, game prop",
+      "size": 48,
+      "directions": 1
+    }
+  },
+  "environment": {
+    "roman_wall_gate": {
+      "prompt": "low-poly ancient Roman city wall section with arched gate, stone blocks, crenellations on top, wooden gate doors, game environment",
+      "size": 128,
+      "directions": 4
+    },
+    "roman_aqueduct": {
+      "prompt": "low-poly ancient Roman aqueduct section, two-tier stone arches, water channel on top, weathered stone, game environment",
+      "size": 128,
+      "directions": 4
+    },
+    "stone_bridge": {
+      "prompt": "low-poly ancient Roman stone bridge, single arch over water, stone railing, paved road surface, game environment",
+      "size": 128,
+      "directions": 4
+    }
+  }
+}

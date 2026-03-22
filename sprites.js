@@ -126,3 +126,18 @@ function drawBuildingSprite(x, y, type, faction) {
   SpriteManager.drawFrame(sheetName, 0, 0, x, y);
   return true;
 }
+
+// Props & Items (64x64 per frame, generated from 3D pipeline)
+SpriteManager.register('item_olive_tree', 'sprites/items/olive_tree.png', 64, 64);
+SpriteManager.register('item_cypress_tree', 'sprites/items/cypress_tree.png', 64, 64);
+SpriteManager.register('item_palm_tree', 'sprites/items/palm_tree.png', 64, 64);
+SpriteManager.register('item_marble_column', 'sprites/items/marble_column.png', 64, 64);
+SpriteManager.register('item_fountain', 'sprites/items/fountain.png', 64, 64);
+SpriteManager.register('item_amphora', 'sprites/items/amphora.png', 32, 32);
+SpriteManager.register('item_wooden_cart', 'sprites/items/wooden_cart.png', 64, 64);
+
+// Buildings - additional (64x64 per frame)
+SpriteManager.register('building_harbor', 'sprites/buildings/harbor_dock.png', 64, 64);
+
+// Environment (64x64 per frame)
+SpriteManager.register('env_harbor_dock', 'sprites/environment/harbor_dock.png', 64, 64);
