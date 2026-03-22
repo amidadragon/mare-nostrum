@@ -626,6 +626,8 @@ class SoundManager {
     this._musicFadingOut = null; // track being faded out
     this._musicFadeIn = 1; // 0→1 fade-in progress for current track
     this._musicFadeOut = 0; // 1→0 fade-out progress for old track
+    this._musicPlayTime = 0; // frames of continuous music playback
+    this._musicVolFade = 1.0; // gradual volume reduction after extended play
   }
 
   init() {
@@ -1161,7 +1163,7 @@ class SoundManager {
   updateMusic() {
     if (!this.ready || !this._samplesLoaded) return;
     // Initialize music state for silence gaps / variation
-    if (!this._musicState) this._musicState = { silenceTimer: 0, lastTrack: null, loopCount: 0 };
+    if (!this._musicState) this._musicState = { silenceTimer: 0, lastTrack: null, loopCount: 0, trackStartFrame: 0 };
     let useRecorded = typeof gameSettings !== 'undefined' && gameSettings.musicSource === 'recorded';
     if (!useRecorded) {
       if (this._musicTrack) {
@@ -1177,6 +1179,8 @@ class SoundManager {
       this._musicFadeIn = 1;
       this._musicState.silenceTimer = 0;
       this._musicState.loopCount = 0;
+      this._musicPlayTime = 0;
+      this._musicVolFade = 1.0;
       return;
     }
     let musicVol = this.vol.master * this.vol.music;
@@ -1187,6 +1191,15 @@ class SoundManager {
         this._musicTrack = null;
       }
       return;
+    }
+
+    // Track continuous music playback time
+    this._musicPlayTime++;
+    // After 10 min (36000 frames @60fps), reduce volume by 20%
+    if (this._musicPlayTime > 36000) {
+      this._musicVolFade = Math.max(0.8, 1.0 - (this._musicPlayTime - 36000) / 18000);
+    } else {
+      this._musicVolFade = 1.0;
     }
 
     // Initialize crossfade state
@@ -1202,7 +1215,7 @@ class SoundManager {
         this._musicFadeOut = max(0, this._musicFadeOut - 0.02);
         let s = this._samples[this._musicFadingOut];
         if (s && s.isPlaying()) {
-          s.setVolume(musicVol * this._musicFadeOut);
+          s.setVolume(musicVol * this._musicFadeOut * this._musicVolFade);
           if (this._musicFadeOut <= 0) { s.stop(); this._musicFadingOut = null; }
         } else { this._musicFadingOut = null; }
       }
@@ -1241,7 +1254,7 @@ class SoundManager {
       this._musicFadeOut = max(0, this._musicFadeOut - 0.017); // 1s at 60fps
       let s = this._samples[this._musicFadingOut];
       if (s && s.isPlaying()) {
-        s.setVolume(musicVol * this._musicFadeOut);
+        s.setVolume(musicVol * this._musicFadeOut * this._musicVolFade);
         if (this._musicFadeOut <= 0) { s.stop(); this._musicFadingOut = null; }
       } else {
         this._musicFadingOut = null;
@@ -1273,42 +1286,52 @@ class SoundManager {
         s.play();
         this._musicTrack = target;
         this._musicState.loopCount = 0;
+        this._musicState.trackStartFrame = this._musicPlayTime;
       }
     } else {
       let s = this._samples[this._musicTrack];
       if (s) {
-        // Detect track ended (not playing + no silence timer = track finished)
+        // Force variety after 3 min (10800 frames) of same track
+        if (s.isPlaying() && this._musicPlayTime - (this._musicState.trackStartFrame || 0) > 10800) {
+          let alt = this._pickAlternateMusicTrack(this._musicTrack);
+          if (alt && alt !== this._musicTrack) {
+            let as = this._samples[alt];
+            if (as) {
+              this._musicFadingOut = this._musicTrack;
+              this._musicFadeOut = this._musicFadeIn;
+              as.setVolume(0);
+              as.play();
+              this._musicTrack = alt;
+              this._musicFadeIn = 0;
+              this._musicState.loopCount = 0;
+              this._musicState.trackStartFrame = this._musicPlayTime;
+              return;
+            }
+          }
+          // No alternate: insert silence gap
+          this._musicState.silenceTimer = Math.floor(Math.random() * 1800 + 1800);
+          this._musicState.lastTrack = this._musicTrack;
+          this._musicState.trackStartFrame = this._musicPlayTime;
+          return;
+        }
+        // Detect track ended — always insert silence gap (30-60s)
         if (!s.isPlaying() && this._musicFadeIn >= 1 && this._musicState.silenceTimer <= 0) {
           this._musicState.loopCount++;
-          let roll = Math.random();
-          if (this._musicState.loopCount > 2 && roll < 0.3) {
-            // 30% chance: silence gap (15-30 sec = 900-1800 frames at 60fps)
-            this._musicState.silenceTimer = Math.floor(Math.random() * 900 + 900);
-            this._musicState.lastTrack = this._musicTrack;
-            return;
-          } else if (roll < 0.5) {
-            // 20% chance: switch to different track in same mood
+          this._musicState.silenceTimer = Math.floor(Math.random() * 1800 + 1800);
+          this._musicState.lastTrack = this._musicTrack;
+          // 50% chance to switch track in same mood after gap
+          if (Math.random() < 0.5) {
             let alt = this._pickAlternateMusicTrack(target);
-            if (alt && alt !== target) {
-              let as = this._samples[alt];
-              if (as) {
-                as.setVolume(0);
-                as.play();
-                this._musicTrack = alt;
-                this._musicFadeIn = 0;
-                this._musicState.loopCount = 0;
-                return;
-              }
+            if (alt && alt !== target && this._samples[alt]) {
+              this._musicTrack = alt;
+              this._musicState.loopCount = 0;
             }
-            // Fallback: just replay same track
-            s.play();
-          } else {
-            // 50% chance: continue looping normally
-            s.play();
           }
+          this._musicState.trackStartFrame = this._musicPlayTime;
+          return;
         }
-        // Update volume with fade-in
-        s.setVolume(musicVol * this._musicFadeIn);
+        // Update volume with fade-in and gradual volume fade
+        s.setVolume(musicVol * this._musicFadeIn * this._musicVolFade);
       }
     }
   }
