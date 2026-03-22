@@ -780,18 +780,20 @@ function drawIsland() {
   let dayMix = max(0.15, bright);
 
   // --- Shallow water gradient (warm lagoon) ---
+  // Use drawCoastlineShape so water follows the same organic coastline as the beach
+  // This prevents ocean peeking through where noise offsets push the beach outward
   // Outermost: warm medium blue
   fill(lerp(20, 48, dayMix), lerp(50, 140, dayMix), lerp(75, 180, dayMix), 180);
-  ellipse(ix, iy - 10, iw * 1.12, ih * 0.50);
+  drawCoastlineShape(ix, iy, iw * 0.56, ih * 0.25, -10);
   // Mid shallow — turquoise
   fill(lerp(25, 60, dayMix), lerp(65, 160, dayMix), lerp(85, 190, dayMix), 200);
-  ellipse(ix, iy - 12, iw * 1.06, ih * 0.46);
+  drawCoastlineShape(ix, iy, iw * 0.53, ih * 0.23, -12);
   // Inner shallow — bright warm turquoise
   fill(lerp(30, 80, dayMix), lerp(75, 175, dayMix), lerp(88, 192, dayMix), 210);
-  ellipse(ix, iy - 13, iw * 1.00, ih * 0.43);
+  drawCoastlineShape(ix, iy, iw * 0.50, ih * 0.215, -13);
   // Near-shore — lightest aqua
   fill(lerp(38, 95, dayMix), lerp(85, 185, dayMix), lerp(92, 190, dayMix), 220);
-  ellipse(ix, iy - 14, iw * 0.96, ih * 0.41);
+  drawCoastlineShape(ix, iy, iw * 0.48, ih * 0.205, -14);
 
   // Foam waves — animated white froth at water's edge
   let foamPhase = frameCount * 0.02;

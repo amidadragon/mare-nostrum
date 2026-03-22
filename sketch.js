@@ -4365,6 +4365,35 @@ function drawStormClouds() {
 
 // ─── OCEAN ────────────────────────────────────────────────────────────────
 // Full ocean background — the sea surrounds the island on all sides
+// Shore fish state
+let _shoreFish = null;
+function _initShoreFish() {
+  _shoreFish = [];
+  let cx = WORLD.islandCX, cy = WORLD.islandCY;
+  let srx = getSurfaceRX(), sry = getSurfaceRY();
+  let fishColors = [
+    { r: 180, g: 195, b: 210 }, // silver
+    { r: 210, g: 140, b: 60 },  // orange
+    { r: 50, g: 70, b: 120 },   // dark blue
+    { r: 140, g: 180, b: 160 }, // pale green
+    { r: 195, g: 170, b: 120 }, // sandy gold
+  ];
+  for (let i = 0; i < 5; i++) {
+    let angle = random(0, TWO_PI);
+    let dist = 1.08 + random(0, 0.08);
+    _shoreFish.push({
+      x: cx + cos(angle) * srx * dist,
+      y: cy + sin(angle) * sry * dist,
+      angle: angle,
+      baseAngle: angle,
+      swimPhase: random(0, TWO_PI),
+      speed: 0.3 + random(0, 0.3),
+      col: fishColors[i % fishColors.length],
+      scatterTimer: 0,
+    });
+  }
+}
+
 function drawOcean() {
   let bright = getSkyBrightness();
   let dayMix = bright;
@@ -4373,64 +4402,99 @@ function drawOcean() {
   noStroke();
 
   let oceanTop = max(height * 0.06, height * 0.25 - horizonOffset);
+  let oceanH = height - oceanTop;
 
   // Deep ocean gradient — time-of-day tinted
   let tintR = 0, tintG = 0, tintB = 0;
-  if (h >= 5 && h < 7) { tintR = 20; tintG = 5; tintB = -10; } // dawn warm
-  else if (h >= 16 && h < 19) { tintR = 25; tintG = 8; tintB = -15; } // dusk warm
-  else if (h >= 21 || h < 5) { tintR = -5; tintG = -5; tintB = 8; } // night cool
+  if (h >= 5 && h < 7) { tintR = 20; tintG = 5; tintB = -10; }
+  else if (h >= 16 && h < 19) { tintR = 25; tintG = 8; tintB = -15; }
+  else if (h >= 21 || h < 5) { tintR = -5; tintG = -5; tintB = 8; }
 
-  for (let band = 0; band < 8; band++) {
-    let oceanH = height - oceanTop;
-    let y0 = oceanTop + band * oceanH / 8;
-    let d = band / 7;
+  // 10-band gradient for smoother deep ocean
+  for (let band = 0; band < 10; band++) {
+    let y0 = oceanTop + band * oceanH / 10;
+    let d = band / 9;
     let r = lerp(lerp(18, 50, dayMix), lerp(8, 22, dayMix), d) + tintR * (1 - d);
     let g = lerp(lerp(40, 140, dayMix), lerp(20, 65, dayMix), d) + tintG * (1 - d);
     let b = lerp(lerp(60, 175, dayMix), lerp(40, 100, dayMix), d) + tintB * (1 - d);
     fill(max(0, min(255, r)), max(0, min(255, g)), max(0, min(255, b)));
-    rect(0, y0, width, oceanH / 8 + 2);
+    rect(0, y0, width, oceanH / 10 + 2);
   }
 
   // Subtle horizon line where sea meets sky
   {
     let hLineY = floor(oceanTop);
     let hBright = dayMix;
-    // Light horizon band — brighter where sky meets water
     fill(lerp(80, 180, hBright), lerp(110, 210, hBright), lerp(140, 235, hBright), 35 + 25 * hBright);
     rect(0, hLineY - 1, width, 3);
-    // Thin bright edge
     fill(lerp(120, 220, hBright), lerp(150, 230, hBright), lerp(170, 245, hBright), 20 + 15 * hBright);
     rect(0, hLineY, width, 1);
-    // Very subtle atmospheric glow above horizon
     fill(lerp(100, 200, hBright), lerp(130, 215, hBright), lerp(160, 235, hBright), 10 + 8 * hBright);
     rect(0, hLineY - 4, width, 4);
   }
 
-  // Animated sine wave scan-lines — stepped pixel art (larger step, fewer rects)
-  let waveStep = floor(t * 0.8);
-  let _waveRowStep = _fpsSmooth < 40 ? 40 : 28;
+  // ── DEEP OCEAN WAVES — rolling rows with sin-based horizontal movement ──
+  let _waveRowStep = _fpsSmooth < 40 ? 44 : 26;
   for (let wy = oceanTop + 4; wy < height; wy += _waveRowStep) {
-    let depthFade = 1 - (wy - oceanTop) / (height - oceanTop) * 0.6;
-    let waveAlpha = (25 + 22 * dayMix) * depthFade;
-    let offsetX = floor(sin(t * 0.5 + wy * 0.03) * 12);
-    // Primary wave highlight — wider segments, bigger spacing
+    let depthNorm = (wy - oceanTop) / oceanH;
+    let depthFade = 1 - depthNorm * 0.6;
+    let waveAlpha = (28 + 24 * dayMix) * depthFade;
+    // Each row has its own speed and frequency for variety
+    let rowSpeed = 0.4 + depthNorm * 0.3;
+    let rowFreq = 0.025 + depthNorm * 0.015;
+    let offsetX = floor(sin(t * rowSpeed + wy * rowFreq) * (14 + depthNorm * 6));
+
+    // Primary wave crest — lighter highlight
     fill(120 + 70 * dayMix, 175 + 50 * dayMix, 210 + 30 * dayMix, waveAlpha);
-    for (let wx = offsetX % 72; wx < width; wx += 72) {
-      let segW = 28 + floor(sin(wy * 0.07 + wx * 0.04 + waveStep * 0.1) * 8);
+    let spacing = 60 + floor(depthNorm * 20);
+    for (let wx = ((offsetX % spacing) + spacing) % spacing; wx < width; wx += spacing) {
+      let segW = 24 + floor(sin(wy * 0.07 + wx * 0.04 + t * 0.8) * 10);
       rect(wx, wy, segW, 3);
     }
-    // Secondary sine wave (counter-phase for depth) — every other row
+
+    // Foam caps on wave peaks (deep ocean — sparse white dashes)
+    if (depthNorm < 0.5 && dayMix > 0.2) {
+      let foamCapAlpha = waveAlpha * 0.6 * (1 - depthNorm * 2);
+      fill(230, 242, 250, foamCapAlpha);
+      for (let wx = ((offsetX + 30) % spacing + spacing) % spacing; wx < width; wx += spacing) {
+        let capPhase = sin(t * 1.5 + wx * 0.06 + wy * 0.04);
+        if (capPhase > 0.3) {
+          let cw = 4 + floor(capPhase * 6);
+          rect(wx, wy - 1, cw, 1);
+        }
+      }
+    }
+
+    // Secondary wave (counter-phase) — every other frame for perf
     if (frameCount % 2 === 0) {
-    let off2 = floor(sin(t * 0.35 + wy * 0.05 + 2) * 8);
-    fill(90 + 50 * dayMix, 150 + 40 * dayMix, 195 + 25 * dayMix, waveAlpha * 0.5);
-    for (let wx = off2 % 90; wx < width; wx += 90) {
-      rect(wx, wy + 5, 18 + floor(sin(wy * 0.05 + wx * 0.03) * 6), 2);
+      let off2 = floor(sin(t * 0.35 + wy * 0.05 + 2) * 8);
+      fill(90 + 50 * dayMix, 150 + 40 * dayMix, 195 + 25 * dayMix, waveAlpha * 0.5);
+      for (let wx = ((off2 % 90) + 90) % 90; wx < width; wx += 90) {
+        rect(wx, wy + 5, 18 + floor(sin(wy * 0.05 + wx * 0.03) * 6), 2);
+      }
+      // Dark trough between waves
+      fill(10 + 20 * dayMix, 25 + 50 * dayMix, 50 + 70 * dayMix, waveAlpha * 0.5);
+      for (let wx = ((offsetX + 14) % 90 + 90) % 90; wx < width; wx += 90) {
+        rect(wx, wy + 8, 14, 2);
+      }
     }
-    // Dark dither trough
-    fill(10 + 20 * dayMix, 25 + 50 * dayMix, 50 + 70 * dayMix, waveAlpha * 0.6);
-    for (let wx = (offsetX + 14) % 72; wx < width; wx += 90) {
-      rect(wx, wy + 7, 16, 2);
-    }
+  }
+
+  // ── MID OCEAN — lighter waves closer to island center ──
+  {
+    let midTop = oceanTop + oceanH * 0.25;
+    let midBot = oceanTop + oceanH * 0.65;
+    let midStep = _fpsSmooth < 40 ? 32 : 20;
+    for (let wy = midTop; wy < midBot; wy += midStep) {
+      let midNorm = (wy - midTop) / (midBot - midTop);
+      let midAlpha = 12 * dayMix * (1 - abs(midNorm - 0.5) * 2);
+      let midOff = floor(sin(t * 0.7 + wy * 0.04) * 10);
+      // Reflection highlight — lighter blue-white bands
+      fill(150 + 80 * dayMix, 200 + 40 * dayMix, 230 + 20 * dayMix, midAlpha);
+      for (let wx = ((midOff % 80) + 80) % 80; wx < width; wx += 80) {
+        let sw = 16 + floor(sin(wy * 0.06 + wx * 0.05 + t) * 6);
+        rect(wx, wy, sw, 2);
+      }
     }
   }
 
@@ -4439,48 +4503,62 @@ function drawOcean() {
     let causticA = (dayMix - 0.3) * 25;
     for (let ci = 0; ci < 5; ci++) {
       let cx = floor(noise(ci * 7.3 + frameCount * 0.004) * width);
-      let cy = floor(oceanTop + noise(ci * 11.1 + frameCount * 0.003) * (height - oceanTop) * 0.4);
+      let cy = floor(oceanTop + noise(ci * 11.1 + frameCount * 0.003) * oceanH * 0.4);
       let cSize = 4 + floor(sin(frameCount * 0.06 + ci * 2.1) * 3);
       let cAlpha = causticA * (sin(frameCount * 0.05 + ci * 1.7) * 0.5 + 0.5);
       fill(180 + 60 * dayMix, 220 + 20 * dayMix, 240, cAlpha);
-      // Diamond-shaped caustic
       rect(cx, cy - 1, cSize, 1);
       rect(cx - 1, cy, cSize + 2, 1);
       rect(cx, cy + 1, cSize, 1);
     }
   }
 
-  // Pixel foam whitecaps
-  if (frameCount % 2 === 0)
-  for (let fy = oceanTop + 12; fy < height; fy += 36) {
-    let depthFade = 1 - (fy - oceanTop) / (height - oceanTop) * 0.5;
-    for (let fx = 0; fx < width; fx += 64) {
-      let foamPhase = sin(t * 1.2 + fx * 0.05 + fy * 0.06);
-      if (foamPhase > 0.45) {
-        let foamAlpha = (foamPhase - 0.45) * 65 * depthFade * max(0.3, dayMix);
-        fill(225, 238, 248, foamAlpha);
-        let fw = floor(6 + foamPhase * 6);
-        let foamX = floor(fx + sin(t * 0.8 + fx * 0.03) * 4);
-        rect(foamX, fy, fw, 2);
-        if (foamPhase > 0.6) {
-          rect(foamX + fw + 3, fy + 1, floor(fw * 0.5), 1);
+  // ── FOAM WHITECAPS — pixel art foam on wave peaks ──
+  if (frameCount % 2 === 0) {
+    for (let fy = oceanTop + 12; fy < height; fy += 34) {
+      let depthFade = 1 - (fy - oceanTop) / oceanH * 0.5;
+      for (let fx = 0; fx < width; fx += 58) {
+        let foamPhase = sin(t * 1.2 + fx * 0.05 + fy * 0.06);
+        if (foamPhase > 0.4) {
+          let foamAlpha = (foamPhase - 0.4) * 70 * depthFade * max(0.3, dayMix);
+          fill(225, 238, 248, foamAlpha);
+          let fw = floor(6 + foamPhase * 7);
+          let foamX = floor(fx + sin(t * 0.8 + fx * 0.03) * 5);
+          rect(foamX, fy, fw, 2);
+          // Trailing foam spray
+          if (foamPhase > 0.55) {
+            fill(235, 245, 252, foamAlpha * 0.6);
+            rect(foamX + fw + 2, fy + 1, floor(fw * 0.4), 1);
+            rect(foamX - 3, fy + 1, 2, 1);
+          }
         }
       }
     }
   }
 
-  // Sun sparkles on water (only when FPS is healthy)
-  if (dayMix > 0.5 && _fpsSmooth > 45) {
-    let sparkleAlpha = (dayMix - 0.5) * 2;
-    for (let i = 0; i < 10; i++) {
+  // ── SUN SPARKLES — glittering diamonds on water surface ──
+  // More sparkles at midday, fewer at dawn/dusk, none at night
+  if (dayMix > 0.35 && _fpsSmooth > 30) {
+    let isMidDay = h >= 10 && h <= 14;
+    let sparkleCount = isMidDay ? 10 : 6;
+    let sparkleAlpha = (dayMix - 0.35) * 2.5;
+    if (isMidDay) sparkleAlpha *= 1.4;
+    for (let i = 0; i < sparkleCount; i++) {
       let sx2 = floor(noise(i * 10 + frameCount * 0.003) * width);
-      let sy2 = floor(oceanTop + noise(i * 20 + frameCount * 0.002) * (height - oceanTop) * 0.6);
-      let sparkle = sin(frameCount * 0.1 + i * 2.5);
-      if (sparkle > 0.65) {
-        let sa = (sparkle - 0.65) * 500 * sparkleAlpha;
-        fill(255, 248, 220, sa);
+      let sy2 = floor(oceanTop + noise(i * 20 + frameCount * 0.002) * oceanH * 0.65);
+      let sparkle = sin(frameCount * 0.12 + i * 2.3);
+      if (sparkle > 0.6) {
+        let sa = (sparkle - 0.6) * 450 * sparkleAlpha;
+        fill(255, 250, 225, sa);
+        // Cross sparkle shape
         rect(sx2, sy2 - 1, 2, 4);
         rect(sx2 - 1, sy2, 4, 2);
+        // Extra glint at midday
+        if (isMidDay && sparkle > 0.8) {
+          fill(255, 255, 240, sa * 0.4);
+          rect(sx2 - 1, sy2 - 2, 4, 6);
+          rect(sx2 - 2, sy2 - 1, 6, 4);
+        }
       }
     }
   }
@@ -4506,29 +4584,72 @@ function drawOcean() {
     let bioAlpha = map(dayMix, 0, 0.3, 1, 0);
     for (let bi = 0; bi < 6; bi++) {
       let bx = floor(noise(bi * 13.7 + frameCount * 0.002) * width);
-      let by = floor(oceanTop + 15 + noise(bi * 9.3 + frameCount * 0.0015) * (height - oceanTop - 30));
+      let by = floor(oceanTop + 15 + noise(bi * 9.3 + frameCount * 0.0015) * (oceanH - 30));
       let pulse = sin(frameCount * 0.04 + bi * 2.3) * 0.5 + 0.5;
       if (pulse > 0.4) {
         let ba = (pulse - 0.4) * 150 * bioAlpha;
-        // Outer glow
         fill(60, 200, 220, ba * 0.3);
         rect(bx - 2, by - 2, 5, 5);
-        // Core
         fill(100, 240, 255, ba);
         rect(bx, by, 2, 2);
-        // Tiny trail
         fill(60, 200, 220, ba * 0.15);
         rect(bx - 3, by, 2, 1);
       }
     }
   }
 
-  // Jumping fish
+  // ── SHORE FISH — visible colored fish swimming near the coastline ──
+  if (dayMix > 0.2 && _fpsSmooth > 25) {
+    if (!_shoreFish) _initShoreFish();
+    let cx = WORLD.islandCX, cy = WORLD.islandCY;
+    let srx = getSurfaceRX(), sry = getSurfaceRY();
+    let px = state.player.x, py = state.player.y;
+    for (let i = 0; i < _shoreFish.length; i++) {
+      let f = _shoreFish[i];
+      f.swimPhase += 0.03;
+      // Scatter away from player if within 80px
+      let dpx = f.x - px, dpy = f.y - py;
+      let playerDist = sqrt(dpx * dpx + dpy * dpy);
+      if (playerDist < 80 && f.scatterTimer <= 0) {
+        f.scatterTimer = 60;
+        f.angle += (dpx > 0 ? 0.5 : -0.5);
+      }
+      if (f.scatterTimer > 0) {
+        f.scatterTimer--;
+        f.x += cos(f.angle) * f.speed * 2;
+        f.y += sin(f.angle) * f.speed * 1.2;
+      } else {
+        // Gentle circular swimming near base angle
+        f.angle = f.baseAngle + sin(f.swimPhase * 0.5) * 0.8;
+        let orbitDist = 1.08 + sin(f.swimPhase * 0.3 + i * 1.7) * 0.04;
+        let targetX = cx + cos(f.angle) * srx * orbitDist;
+        let targetY = cy + sin(f.angle) * sry * orbitDist;
+        f.x = lerp(f.x, targetX, 0.04);
+        f.y = lerp(f.y, targetY, 0.04);
+      }
+      // Draw fish at screen coords
+      let fsx = w2sX(f.x), fsy = w2sY(f.y);
+      let fishDir = f.angle;
+      let fdx = cos(fishDir), fdy = sin(fishDir);
+      let fishAlpha = 160 * dayMix;
+      // Body (4px ellipse)
+      fill(f.col.r, f.col.g, f.col.b, fishAlpha);
+      rect(floor(fsx - 2), floor(fsy - 1), 4, 2);
+      // Tail (2px)
+      fill(f.col.r - 20, f.col.g - 20, f.col.b - 10, fishAlpha * 0.8);
+      rect(floor(fsx - fdx * 3), floor(fsy - fdy * 2), 2, 2);
+      // Eye dot
+      fill(20, 20, 30, fishAlpha);
+      rect(floor(fsx + fdx * 1.5), floor(fsy), 1, 1);
+    }
+  }
+
+  // Jumping fish (existing — ocean-wide)
   if (frameCount % 180 === 0) {
     if (_jumpingFish.length < 2) {
       _jumpingFish.push({
         x: random(width * 0.1, width * 0.9),
-        y: oceanTop + random(30, height - oceanTop - 30),
+        y: oceanTop + random(30, oceanH - 30),
         phase: 0, size: random(3, 6),
       });
     }
@@ -4542,14 +4663,26 @@ function drawOcean() {
       if (f.phase > PI) { _jumpingFish.splice(i, 1); continue; }
       let fy2 = f.y + jumpY;
       let fx2 = floor(f.x), fy3 = floor(fy2);
+      // Fish body
       fill(165, 185, 205, 185);
       rect(fx2 - f.size, fy3 - floor(f.size * 0.4), floor(f.size * 2.5), floor(f.size * 0.8));
+      // Tail
       fill(150, 172, 195, 180);
       rect(fx2 + floor(f.size * 1.5), fy3 - floor(f.size * 0.5), floor(f.size * 0.8), floor(f.size));
+      // Splash at entry/exit
       if (f.phase < 0.5 || f.phase > PI - 0.5) {
         fill(180, 220, 245, 50);
         let splashR = f.phase < 0.5 ? floor((0.5 - f.phase) * 15) : floor((f.phase - PI + 0.5) * 15);
         rect(fx2 - splashR, floor(f.y), splashR * 2, 2);
+      }
+      // Water droplets during arc
+      if (f.phase > 0.3 && f.phase < PI - 0.3) {
+        fill(180, 215, 240, 80 * (1 - abs(f.phase - PI / 2) / (PI / 2)));
+        for (let di = 0; di < 2; di++) {
+          let dx = floor(fx2 + sin(f.phase * 3 + di * 2.1) * f.size);
+          let dy = floor(fy3 + cos(f.phase * 2 + di * 3.7) * f.size * 0.5);
+          rect(dx, dy, 1, 1);
+        }
       }
     }
   }
