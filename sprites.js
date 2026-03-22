@@ -84,7 +84,10 @@ const SpriteManager = {
 };
 
 // ─── SPRITE SHEET REGISTRATIONS ─────────────────────────────────────────
-// Characters (32x32 per frame, 4 cols walk cycle, 4 rows directions)
+// DISABLED: Current sprites are Blender primitives (basic 3D shapes).
+// Re-enable when proper pixel art or high-quality 3D-rendered sprites are ready.
+// The rect-based drawing (fallback) looks better than these placeholder renders.
+/*
 SpriteManager.register('player_rome', 'sprites/characters/rome_player.png', 32, 32);
 SpriteManager.register('player_carthage', 'sprites/characters/carthage_player.png', 32, 32);
 SpriteManager.register('player_egypt', 'sprites/characters/egypt_player.png', 32, 32);
@@ -104,6 +107,7 @@ SpriteManager.register('building_barracks', 'sprites/buildings/barracks.png', 64
 // Military (32x32 per frame)
 SpriteManager.register('soldier_rome', 'sprites/military/roman_legionary.png', 32, 32);
 SpriteManager.register('soldier_carthage', 'sprites/military/carthage_warrior.png', 32, 32);
+*/
 
 // ─── SPRITE-AWARE DRAW WRAPPERS ────────────────────────────────────────
 
