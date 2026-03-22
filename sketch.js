@@ -101,7 +101,7 @@ function trackPlayTime() {
 setInterval(trackPlayTime, 60000);
 
 // ─── GAME SCREEN STATE MACHINE ───────────────────────────────────────────
-let gameScreen = 'menu'; // 'menu' | 'settings' | 'credits' | 'game'
+let gameScreen = 'menu'; // 'menu' | 'settings' | 'credits' | 'lobby' | 'game'
 let menuHover = -1;      // which menu item is hovered
 let menuFadeIn = 0;      // fade-in alpha (0→255 over 1 sec)
 let menuKeyIdx = -1;     // keyboard-selected item index (-1 = mouse mode)
@@ -2851,6 +2851,14 @@ function draw() {
     }
     drawMenuScreen();
     // Debug console — must draw on menu screens too
+    if (typeof Debug !== 'undefined') Debug.draw();
+    return;
+  }
+
+  // ─── LOBBY SCREEN ───
+  if (gameScreen === 'lobby') {
+    if (typeof updateLobbyMovement === 'function') updateLobbyMovement();
+    if (typeof drawLobby === 'function') drawLobby();
     if (typeof Debug !== 'undefined') Debug.draw();
     return;
   }
@@ -19132,9 +19140,24 @@ function initNations() {
   let playerFaction = state.faction || 'rome';
   let allKeys = ['carthage', 'egypt', 'greece', 'rome', 'seapeople', 'persia', 'phoenicia', 'gaul'];
   state.nations = {};
+
+  // Determine which factions are controlled by bots (MP lobby)
+  let botFactions = {};
+  if (typeof MP !== 'undefined' && MP.bots && MP.bots.length > 0) {
+    for (let b of MP.bots) {
+      if (b.faction) botFactions[b.faction] = { isBot: true, difficulty: b.difficulty || 'normal', botName: b.name };
+    }
+  }
+
   for (let k of allKeys) {
     if (k === playerFaction) continue;
     state.nations[k] = makeNation(k);
+    // Tag bot-controlled nations
+    if (botFactions[k]) {
+      state.nations[k].isBot = true;
+      state.nations[k].botDifficulty = botFactions[k].difficulty;
+      state.nations[k].botName = botFactions[k].botName;
+    }
   }
   let nationKeys = Object.keys(state.nations);
   for (let k of nationKeys) {
@@ -19184,12 +19207,16 @@ function updateNationDaily(key) {
   let pers = NATION_PERSONALITIES[rv.personality] || NATION_PERSONALITIES.balanced;
   let name = getNationName(key);
 
+  // Bot difficulty multipliers
+  let botDiff = (rv.isBot && typeof BOT_DIFFICULTY !== 'undefined' && BOT_DIFFICULTY[rv.botDifficulty])
+    ? BOT_DIFFICULTY[rv.botDifficulty] : { goldMult: 1, buildMult: 1, militaryMult: 1, raidMult: 1 };
+
   // --- ECONOMIC AI ---
   let baseIncome = 5 + rv.population * 2;
   let tradeBonus = rv.tradeActive ? 10 : 0;
   let buildingIncome = floor(rv.buildings.length * 0.5);
   let facData = FACTIONS[key] || {};
-  let income = floor((baseIncome + tradeBonus + buildingIncome) * pers.goldMult);
+  let income = floor((baseIncome + tradeBonus + buildingIncome) * pers.goldMult * botDiff.goldMult);
   income = floor(income * (facData.tradeIncomeMult || 1.0));
   rv.gold += income;
 
@@ -19202,7 +19229,7 @@ function updateNationDaily(key) {
 
   // Strategic building
   let buildCost = 30 + rv.level * 5;
-  if (random() < pers.buildChance * 0.5 && rv.gold >= buildCost) {
+  if (random() < pers.buildChance * 0.5 * botDiff.buildMult && rv.gold >= buildCost) {
     let bType = _pickNationBuilding(rv, key);
     rv.buildings.push(bType); rv.gold -= buildCost;
     rv.population += floor(random(1, 3));
@@ -19218,7 +19245,7 @@ function updateNationDaily(key) {
 
   // --- MILITARY AI ---
   let atWar = rv.wars && rv.wars.length > 0;
-  let recruitChance = pers.militaryChance * (atWar ? 0.8 : 0.4);
+  let recruitChance = pers.militaryChance * (atWar ? 0.8 : 0.4) * botDiff.militaryMult;
   if (random() < recruitChance && rv.gold >= 15) {
     let recruits = atWar ? floor(random(1, 3)) : 1;
     rv.military += recruits; rv.gold -= 15 * recruits;
@@ -19308,6 +19335,7 @@ function updateNationDaily(key) {
     if (rv.personality === 'aggressive') raidChance *= 1.5;
     if (rv.personality === 'raider') raidChance *= 2.0;
     if (rv.personality === 'trader') raidChance *= 0.4;
+    raidChance *= botDiff.raidMult;
     if (daysSinceRaid >= 3 && random() < raidChance && rv.military >= 2) startNationRaid(key);
   }
 
@@ -23599,6 +23627,7 @@ function mousePressed() {
     if (state && state.player) { state.player.targetX = null; state.player.targetY = null; state.player.vx = 0; state.player.vy = 0; state.player.moving = false; }
     return;
   }
+  if (gameScreen === 'lobby') { if (typeof lobbyHandleClick === 'function') lobbyHandleClick(); return; }
   if (gameScreen !== 'game') { handleMenuClick(); return; }
   if (state.introPhase !== 'done') { skipIntro(); return; }
   if (factionSelectActive) {
@@ -24145,6 +24174,12 @@ function keyPressed() {
   if (typeof handleIslandNamingKey === 'function' && handleIslandNamingKey(key, keyCode)) return;
   // Debug console intercepts all keys when open
   if (typeof Debug !== 'undefined' && Debug.handleKey(key, keyCode)) return;
+  // Lobby E key for relic claiming, ESC to leave
+  if (gameScreen === 'lobby') {
+    if ((key === 'e' || key === 'E') && typeof lobbyClaimRelic === 'function') { lobbyClaimRelic(); return; }
+    if (keyCode === 27) { if (typeof resetLobby === 'function') resetLobby(); gameScreen = 'menu'; return; }
+    return;
+  }
   if (gameScreen !== 'game') {
     // Keybind rebinding — intercept next keypress
     if (gameScreen === 'settings' && _rebindingAction) {

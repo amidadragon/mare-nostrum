@@ -1299,7 +1299,9 @@ let _mpSubScreen = 'main'; // 'main' | 'host' | 'join'
 
 function drawMultiplayerPanel(fadeA) {
   let w = width, h = height;
-  let panW = 320, panH = 280;
+  let hasBots = (typeof MP !== 'undefined' && MP.bots && MP.bots.length > 0);
+  let isHostOrBots = (_mpSubScreen === 'host' || hasBots);
+  let panW = 320, panH = isHostOrBots ? 420 : 280;
   let px = floor(w / 2 - panW / 2), py = floor(h / 2 - panH / 2);
 
   _drawPanelFrame(px, py, panW, panH);
@@ -1326,16 +1328,20 @@ function drawMultiplayerPanel(fadeA) {
     text('Room: ' + MP.roomCode, w / 2, py + 80);
     text('Player 2: ' + MP.remotePlayer.name, w / 2, py + 96);
 
+    // Bot list
+    _drawBotPanel(w, px, py + 110, panW);
+
     // Start game button
-    let btnY = py + 130;
+    let botsH = MP.bots.length * 20 + 40;
+    let btnY = py + 110 + botsH;
     let hoverStart = mouseX > w/2 - 60 && mouseX < w/2 + 60 && mouseY > btnY - 12 && mouseY < btnY + 12;
     fill(hoverStart ? color(60, 140, 60) : color(40, 100, 40));
     rect(w/2 - 60, btnY - 12, 120, 24, 4);
     fill(255); textSize(11);
-    text('START GAME', w / 2, btnY);
+    text('ENTER LOBBY', w / 2, btnY);
 
     // Disconnect button
-    let dcY = py + 170;
+    let dcY = btnY + 40;
     let hoverDC = mouseX > w/2 - 50 && mouseX < w/2 + 50 && mouseY > dcY - 10 && mouseY < dcY + 10;
     fill(hoverDC ? color(160, 60, 60) : color(120, 40, 40));
     rect(w/2 - 50, dcY - 10, 100, 20, 4);
@@ -1344,13 +1350,33 @@ function drawMultiplayerPanel(fadeA) {
 
   } else if (_mpSubScreen === 'host') {
     fill(200, 190, 160); textSize(11);
-    text('Waiting for player to join...', w / 2, py + 65);
+    text('Hosting — add bots or share code', w / 2, py + 55);
     fill(244, 213, 141); textSize(16);
-    text(MP.roomCode || '...', w / 2, py + 100);
+    text(MP.roomCode || '...', w / 2, py + 80);
     fill(160, 150, 120); textSize(9);
-    text('Share this code with your friend', w / 2, py + 125);
+    text('Share code with friends, or play with bots', w / 2, py + 100);
 
-    let cancelY = py + 160;
+    // Bot panel
+    _drawBotPanel(w, px, py + 115, panW);
+
+    // Start with bots button (only if bots added)
+    let botsH = MP.bots.length * 20 + 40;
+    if (MP.bots.length > 0) {
+      let startY = py + 115 + botsH;
+      let allReady = MP.allBotsReady();
+      let hoverStart = mouseX > w/2 - 60 && mouseX < w/2 + 60 && mouseY > startY - 12 && mouseY < startY + 12;
+      if (allReady) {
+        fill(hoverStart ? color(60, 140, 60) : color(40, 100, 40));
+      } else {
+        fill(50, 50, 50);
+      }
+      rect(w/2 - 60, startY - 12, 120, 24, 4);
+      fill(allReady ? 255 : 120); textSize(11);
+      text(allReady ? 'START GAME' : 'BOTS PICKING...', w / 2, startY);
+    }
+
+    let cancelBaseY = py + 115 + botsH + (MP.bots.length > 0 ? 40 : 0);
+    let cancelY = cancelBaseY;
     let hoverCancel = mouseX > w/2 - 40 && mouseX < w/2 + 40 && mouseY > cancelY - 10 && mouseY < cancelY + 10;
     fill(hoverCancel ? color(160, 60, 60) : color(120, 40, 40));
     rect(w/2 - 40, cancelY - 10, 80, 20, 4);
@@ -1382,8 +1408,9 @@ function drawMultiplayerPanel(fadeA) {
 
   } else {
     // Main multiplayer menu
-    let hostY = py + 80;
-    let joinY = py + 130;
+    let hostY = py + 70;
+    let joinY = py + 115;
+    let botsY = py + 160;
 
     let hoverHost = mouseX > w/2 - 80 && mouseX < w/2 + 80 && mouseY > hostY - 14 && mouseY < hostY + 14;
     fill(hoverHost ? color(60, 80, 120) : color(35, 50, 80));
@@ -1396,6 +1423,15 @@ function drawMultiplayerPanel(fadeA) {
     rect(w/2 - 80, joinY - 14, 160, 28, 4);
     fill(hoverJoin ? color(255, 230, 160) : color(200, 190, 160)); textSize(12);
     text('JOIN GAME', w / 2, joinY);
+
+    // Solo + Bots option
+    let hoverBots = mouseX > w/2 - 80 && mouseX < w/2 + 80 && mouseY > botsY - 14 && mouseY < botsY + 14;
+    fill(hoverBots ? color(80, 70, 110) : color(45, 40, 70));
+    rect(w/2 - 80, botsY - 14, 160, 28, 4);
+    fill(hoverBots ? color(255, 230, 160) : color(200, 190, 160)); textSize(12);
+    text('PLAY vs BOTS', w / 2, botsY);
+    fill(130, 120, 100); textSize(8);
+    text('Solo game with AI opponents', w / 2, botsY + 20);
   }
 
   _drawBackButton(w, py, panH);
@@ -1410,46 +1446,159 @@ function _drawBackButton(w, py, panH) {
   text('BACK', w / 2, backY);
 }
 
+function _drawBotPanel(w, px, baseY, panW) {
+  if (typeof MP === 'undefined') return;
+  // Update bot lobby behavior
+  MP.updateBotsLobby();
+
+  let diffColors = { easy: [100, 180, 100], normal: [200, 180, 80], hard: [200, 80, 60] };
+
+  // Add Bot / Remove Bot buttons
+  let addBtnX = w / 2 - 75, rmBtnX = w / 2 + 10;
+  let btnW2 = 65, btnH2 = 18;
+  let canAdd = MP.bots.length < MP.maxBots;
+  let hoverAdd = canAdd && mouseX > addBtnX && mouseX < addBtnX + btnW2 && mouseY > baseY - 9 && mouseY < baseY + 9;
+  fill(hoverAdd ? color(60, 110, 60) : (canAdd ? color(40, 80, 40) : color(40, 40, 40)));
+  rect(addBtnX, baseY - 9, btnW2, btnH2, 3);
+  fill(canAdd ? 255 : 100); textSize(9);
+  text('+ ADD BOT', addBtnX + btnW2 / 2, baseY);
+
+  let canRm = MP.bots.length > 0;
+  let hoverRm = canRm && mouseX > rmBtnX && mouseX < rmBtnX + btnW2 && mouseY > baseY - 9 && mouseY < baseY + 9;
+  fill(hoverRm ? color(140, 50, 50) : (canRm ? color(100, 35, 35) : color(40, 40, 40)));
+  rect(rmBtnX, baseY - 9, btnW2, btnH2, 3);
+  fill(canRm ? 255 : 100); textSize(9);
+  text('- REMOVE', rmBtnX + btnW2 / 2, baseY);
+
+  // Bot list
+  let ly = baseY + 18;
+  for (let i = 0; i < MP.bots.length; i++) {
+    let bot = MP.bots[i];
+    let dc = diffColors[bot.difficulty] || diffColors.normal;
+
+    // Bot icon (small gear/cog)
+    fill(160, 160, 180);
+    textSize(8);
+    textAlign(LEFT, CENTER);
+    text('[BOT]', px + 20, ly);
+
+    // Name
+    fill(220, 200, 160);
+    textSize(10);
+    text(bot.name, px + 55, ly);
+
+    // Faction (if picked)
+    if (bot.faction) {
+      let facName = (typeof FACTIONS !== 'undefined' && FACTIONS[bot.faction]) ? FACTIONS[bot.faction].name : bot.faction;
+      let bc = (typeof FACTIONS !== 'undefined' && FACTIONS[bot.faction]) ? FACTIONS[bot.faction].bannerColor : [180, 180, 180];
+      fill(bc[0], bc[1], bc[2]);
+      textSize(8);
+      text(facName, px + 140, ly);
+    } else {
+      fill(120, 120, 100);
+      textSize(8);
+      text('picking...', px + 140, ly);
+    }
+
+    // Difficulty button (clickable)
+    let diffBtnX = px + panW - 75, diffBtnW = 50, diffBtnH = 14;
+    let hoverDiff = mouseX > diffBtnX && mouseX < diffBtnX + diffBtnW && mouseY > ly - 7 && mouseY < ly + 7;
+    fill(hoverDiff ? dc[0] + 30 : dc[0], hoverDiff ? dc[1] + 30 : dc[1], hoverDiff ? dc[2] + 30 : dc[2], 200);
+    rect(diffBtnX, ly - 7, diffBtnW, diffBtnH, 2);
+    fill(255); textSize(8);
+    textAlign(CENTER, CENTER);
+    text(bot.difficulty.toUpperCase(), diffBtnX + diffBtnW / 2, ly);
+
+    ly += 20;
+  }
+  textAlign(CENTER, CENTER);
+}
+
+function _handleBotPanelClick(w, px, baseY, panW) {
+  if (typeof MP === 'undefined') return false;
+  // Add Bot button
+  let addBtnX = w / 2 - 75, rmBtnX = w / 2 + 10;
+  let btnW2 = 65, btnH2 = 18;
+  if (MP.bots.length < MP.maxBots && mouseX > addBtnX && mouseX < addBtnX + btnW2 && mouseY > baseY - 9 && mouseY < baseY + 9) {
+    MP.addBot('normal');
+    return true;
+  }
+  if (MP.bots.length > 0 && mouseX > rmBtnX && mouseX < rmBtnX + btnW2 && mouseY > baseY - 9 && mouseY < baseY + 9) {
+    MP.removeBot();
+    return true;
+  }
+  // Difficulty cycle buttons
+  let ly = baseY + 18;
+  for (let i = 0; i < MP.bots.length; i++) {
+    let diffBtnX = px + panW - 75, diffBtnW = 50;
+    if (mouseX > diffBtnX && mouseX < diffBtnX + diffBtnW && mouseY > ly - 7 && mouseY < ly + 7) {
+      MP.cycleBotDifficulty(i);
+      return true;
+    }
+    ly += 20;
+  }
+  return false;
+}
+
 function handleMultiplayerClick() {
   let w = width, h = height;
-  let panW = 320, panH = 280;
+  let hasBots = (typeof MP !== 'undefined' && MP.bots && MP.bots.length > 0);
+  let isHostOrBots = (_mpSubScreen === 'host' || hasBots);
+  let panW = 320, panH = isHostOrBots ? 420 : 280;
   let px = floor(w / 2 - panW / 2), py = floor(h / 2 - panH / 2);
 
   // Back button (always present)
   let backY = py + panH - 22;
   if (mouseX > w/2 - 40 && mouseX < w/2 + 40 && mouseY > backY - 8 && mouseY < backY + 10) {
-    if (_mpSubScreen !== 'main') { _mpSubScreen = 'main'; }
+    if (_mpSubScreen !== 'main') { _mpSubScreen = 'main'; MP.clearBots(); }
     else { gameScreen = 'menu'; state._mpMenuOpen = false; }
     return;
   }
 
   if (typeof MP === 'undefined') return;
 
+  // Check bot panel clicks (shared between host and connected states)
+  if (_mpSubScreen === 'host' || MP.connected) {
+    let botBaseY = MP.connected ? py + 110 : py + 115;
+    if (_handleBotPanelClick(w, px, botBaseY, panW)) return;
+  }
+
   if (MP.connected) {
-    // Start game
-    let btnY = py + 130;
+    // Start game -> go to lobby for faction selection
+    let botsH = MP.bots.length * 20 + 40;
+    let btnY = py + 110 + botsH;
     if (mouseX > w/2 - 60 && mouseX < w/2 + 60 && mouseY > btnY - 12 && mouseY < btnY + 12) {
       state._mpMenuOpen = false;
-      menuFadeOut = 1;
-      let _rs = null;
-  try { _rs = localStorage.getItem('sunlitIsles_save'); } catch(e) {}
-  let hasSave = false;
-  if (_rs) { try { let _d = JSON.parse(_rs); hasSave = _d && _d.version >= 8; } catch(e) {} }
-  if (!hasSave && _rs) { try { localStorage.removeItem('sunlitIsles_save'); } catch(e) {} }
-      menuFadeAction = hasSave ? startLoadGame : startNewGame;
+      if (typeof resetLobby === 'function') resetLobby();
+      gameScreen = 'lobby';
       return;
     }
     // Disconnect
-    let dcY = py + 170;
+    let dcY = btnY + 40;
     if (mouseX > w/2 - 50 && mouseX < w/2 + 50 && mouseY > dcY - 10 && mouseY < dcY + 10) {
       MP.disconnect();
+      MP.clearBots();
       _mpSubScreen = 'main';
       return;
     }
   } else if (_mpSubScreen === 'host') {
-    let cancelY = py + 160;
+    // Start with bots
+    let botsH = MP.bots.length * 20 + 40;
+    if (MP.bots.length > 0 && MP.allBotsReady()) {
+      let startY = py + 115 + botsH;
+      if (mouseX > w/2 - 60 && mouseX < w/2 + 60 && mouseY > startY - 12 && mouseY < startY + 12) {
+        // Start game with bots — go straight to new game with faction select
+        state._mpMenuOpen = false;
+        menuFadeOut = 1;
+        menuFadeAction = startNewGame;
+        return;
+      }
+    }
+    let cancelBaseY = py + 115 + botsH + (MP.bots.length > 0 ? 40 : 0);
+    let cancelY = cancelBaseY;
     if (mouseX > w/2 - 40 && mouseX < w/2 + 40 && mouseY > cancelY - 10 && mouseY < cancelY + 10) {
       MP.disconnect();
+      MP.clearBots();
       _mpSubScreen = 'main';
       return;
     }
@@ -1461,8 +1610,9 @@ function handleMultiplayerClick() {
     }
   } else {
     // Main MP menu
-    let hostY = py + 80;
-    let joinY = py + 130;
+    let hostY = py + 70;
+    let joinY = py + 115;
+    let botsY = py + 160;
     if (mouseX > w/2 - 80 && mouseX < w/2 + 80 && mouseY > hostY - 14 && mouseY < hostY + 14) {
       MP.host();
       _mpSubScreen = 'host';
@@ -1471,6 +1621,13 @@ function handleMultiplayerClick() {
     if (mouseX > w/2 - 80 && mouseX < w/2 + 80 && mouseY > joinY - 14 && mouseY < joinY + 14) {
       _mpSubScreen = 'join';
       _mpJoinInput = '';
+      return;
+    }
+    if (mouseX > w/2 - 80 && mouseX < w/2 + 80 && mouseY > botsY - 14 && mouseY < botsY + 14) {
+      MP.clearBots();
+      _mpSubScreen = 'host'; // reuse host screen for bot setup
+      // Don't call MP.host() — no PeerJS needed for solo + bots
+      MP.roomCode = 'SOLO';
       return;
     }
   }

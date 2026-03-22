@@ -1,6 +1,31 @@
 // MARE NOSTRUM — Multiplayer (PeerJS WebRTC)
 // Optional 1v1 real-time multiplayer. All calls guarded — single player unaffected.
 
+// ═══════════════════════════════════════════════════════════
+// BOT MANAGER — AI bots for multiplayer lobby
+// ═══════════════════════════════════════════════════════════
+
+const BOT_DIFFICULTY = {
+  easy:   { goldMult: 0.5, buildMult: 0.5, militaryMult: 0.5, raidMult: 0.3 },
+  normal: { goldMult: 1.0, buildMult: 1.0, militaryMult: 1.0, raidMult: 1.0 },
+  hard:   { goldMult: 1.5, buildMult: 1.5, militaryMult: 1.5, raidMult: 1.5 },
+};
+
+const _BOT_NAMES = [
+  'Maximus', 'Hannibal', 'Cleopatra', 'Leonidas', 'Boudicca',
+  'Darius', 'Hiram', 'Brennus', 'Scipio', 'Nefertiti',
+  'Themistocles', 'Sargon', 'Zenobia', 'Alaric', 'Hatshepsut',
+  'Pyrrhus', 'Semiramis', 'Vercingetorix', 'Hamilcar', 'Ramesses'
+];
+
+function _randomBotName() {
+  let available = _BOT_NAMES.filter(n => !MP.bots.find(b => b.name === n));
+  if (available.length === 0) return 'Bot ' + MP.bots.length;
+  return available[Math.floor(Math.random() * available.length)];
+}
+
+const _BOT_DIFF_CYCLE = ['easy', 'normal', 'hard'];
+
 const MP = {
   peer: null,
   conn: null,
@@ -16,6 +41,94 @@ const MP = {
   chatMessages: [],
   _lastSync: 0,
   _lastPos: 0,
+
+  // --- Bot system ---
+  bots: [],
+  maxBots: 7,
+
+  addBot(difficulty) {
+    if (this.bots.length >= this.maxBots) return null;
+    difficulty = difficulty || 'normal';
+    let bot = {
+      id: 'bot_' + this.bots.length + '_' + Date.now(),
+      name: _randomBotName(),
+      faction: null,
+      difficulty: difficulty,
+      x: 550 + Math.random() * 100,
+      y: 300 + Math.random() * 80,
+      targetX: 550 + Math.random() * 100,
+      targetY: 300 + Math.random() * 80,
+      moveTimer: 0,
+      pickTimer: 180 + Math.floor(Math.random() * 300), // 3-8s to pick faction
+      ready: false,
+    };
+    this.bots.push(bot);
+    return bot;
+  },
+
+  removeBot() {
+    if (this.bots.length > 0) this.bots.pop();
+  },
+
+  cycleBotDifficulty(index) {
+    if (index < 0 || index >= this.bots.length) return;
+    let bot = this.bots[index];
+    let ci = _BOT_DIFF_CYCLE.indexOf(bot.difficulty);
+    bot.difficulty = _BOT_DIFF_CYCLE[(ci + 1) % _BOT_DIFF_CYCLE.length];
+  },
+
+  updateBotsLobby() {
+    if (this.bots.length === 0) return;
+    let allFactions = ['carthage', 'egypt', 'greece', 'rome', 'seapeople', 'persia', 'phoenicia', 'gaul'];
+    // Determine claimed factions (by player + other bots)
+    let claimed = [];
+    if (state && state.faction) claimed.push(state.faction);
+    for (let b of this.bots) { if (b.faction) claimed.push(b.faction); }
+
+    for (let b of this.bots) {
+      // Wander
+      b.moveTimer--;
+      if (b.moveTimer <= 0) {
+        b.targetX = 480 + Math.random() * 200;
+        b.targetY = 270 + Math.random() * 100;
+        b.moveTimer = 120 + Math.floor(Math.random() * 120); // 2-4s
+      }
+      let dx = b.targetX - b.x, dy = b.targetY - b.y;
+      let dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > 2) {
+        b.x += (dx / dist) * 0.5;
+        b.y += (dy / dist) * 0.5;
+      }
+
+      // Auto-pick faction
+      if (!b.faction && b.pickTimer > 0) {
+        b.pickTimer--;
+        if (b.pickTimer <= 0) {
+          let available = allFactions.filter(f => !claimed.includes(f));
+          if (available.length > 0) {
+            b.faction = available[Math.floor(Math.random() * available.length)];
+            claimed.push(b.faction);
+            b.ready = true;
+          }
+        }
+      }
+    }
+  },
+
+  getClaimedFactions() {
+    let claimed = [];
+    if (state && state.faction) claimed.push(state.faction);
+    for (let b of this.bots) { if (b.faction) claimed.push(b.faction); }
+    return claimed;
+  },
+
+  allBotsReady() {
+    return this.bots.length > 0 && this.bots.every(b => b.ready);
+  },
+
+  clearBots() {
+    this.bots = [];
+  },
 
   host() {
     this.isHost = true;
@@ -124,6 +237,13 @@ const MP = {
         break;
       case 'trade_decline':
         addNotification(this.remotePlayer.name + ' declined your trade.', '#ff8844');
+        break;
+      case 'lobby_pos':
+      case 'relic_claim':
+      case 'lobby_ready':
+      case 'lobby_start':
+        msg._peerId = this.conn && this.conn.peer ? this.conn.peer : 'remote';
+        if (typeof handleLobbyMessage === 'function') handleLobbyMessage(msg);
         break;
     }
   },
