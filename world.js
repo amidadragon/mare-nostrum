@@ -65,6 +65,25 @@ function drawCoastlineShape(screenCX, screenCY, radiusX, radiusY, yOffset) {
   endShape(CLOSE);
 }
 
+// Generic organic coastline shape for any island (distant rendering)
+// seed makes each island unique, numVerts kept low for performance
+function drawIslandShape(cx, cy, rx, ry, yOff, seed) {
+  beginShape();
+  let numVerts = 48;
+  for (let i = 0; i < numVerts; i++) {
+    let angle = (i / numVerts) * TWO_PI;
+    let nv = noise(cos(angle) * 2 + seed, sin(angle) * 2 + seed);
+    let nv2 = noise(cos(angle) * 0.9 + seed + 100, sin(angle) * 0.9 + seed + 100);
+    let offset = (nv - 0.5) * 0.12 + (nv2 - 0.5) * 0.06;
+    let r = 1 + offset;
+    let vx = cx + cos(angle) * rx * r;
+    let vyOff = yOff * abs(sin(angle));
+    let vy = (cy + vyOff) + sin(angle) * ry * r;
+    vertex(vx, vy);
+  }
+  endShape(CLOSE);
+}
+
 function _getCoastlineRadiusAtAngle(angle, baseRX, baseRY) {
   let verts = getCoastlineVerts();
   // Find the two closest verts and interpolate

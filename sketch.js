@@ -17563,6 +17563,7 @@ function drawDistantIslandBase(fsx, fsy, rx, ry, opts) {
   let bright = (typeof getSkyBrightness === 'function') ? getSkyBrightness() : 0.7;
   let beachCol = (opts && opts.beachCol) || [215, 195, 155];
   let grassCol = (opts && opts.grassCol) || null;
+  let seed = (opts && opts.seed) || 87;
   if (!grassCol) {
     let sg = (typeof getSeasonGrass === 'function') ? getSeasonGrass() : { r: 90, g: 130, b: 70 };
     grassCol = [sg.r, sg.g, sg.b];
@@ -17570,27 +17571,27 @@ function drawDistantIslandBase(fsx, fsy, rx, ry, opts) {
   noStroke();
   // Water shadow
   fill(20, 60, 80, 35);
-  ellipse(fsx + 3, fsy + 4, rx * 2.2, ry * 2.2);
+  drawIslandShape(fsx + 3, fsy + 4, rx * 1.1, ry * 1.1, -2, seed);
   // Shallow water
   fill(lerp(40, 80, bright), lerp(80, 160, bright), lerp(110, 185, bright), 200);
-  ellipse(fsx, fsy, rx * 2.1, ry * 2.1);
+  drawIslandShape(fsx, fsy, rx * 1.05, ry * 1.05, -2, seed);
   fill(lerp(50, 95, bright), lerp(90, 175, bright), lerp(120, 190, bright), 210);
-  ellipse(fsx, fsy, rx * 1.9, ry * 1.9);
+  drawIslandShape(fsx, fsy, rx * 0.95, ry * 0.95, -3, seed);
   // Shore wave animation
   if (!(opts && opts.noWaves)) {
     stroke(200, 220, 255, 20 + sin(frameCount * 0.04) * 10);
     strokeWeight(1.5); noFill();
-    ellipse(fsx, fsy, rx * 1.85 + sin(frameCount * 0.025) * 3, ry * 1.85 + sin(frameCount * 0.025) * 2);
+    drawIslandShape(fsx, fsy, rx * 0.925 + sin(frameCount * 0.025) * 1.5, ry * 0.925 + sin(frameCount * 0.025) * 1, -3, seed);
     noStroke();
   }
   // Beach
   fill(beachCol[0], beachCol[1], beachCol[2]);
-  ellipse(fsx, fsy - 2, rx * 1.7, ry * 1.7);
+  drawIslandShape(fsx, fsy, rx * 0.85, ry * 0.85, -4, seed);
   // Grass layers
   fill(grassCol[0] + 10, grassCol[1] + 10, grassCol[2] + 5);
-  ellipse(fsx, fsy - 3, rx * 1.5, ry * 1.5);
+  drawIslandShape(fsx, fsy, rx * 0.75, ry * 0.75, -5, seed);
   fill(grassCol[0], grassCol[1], grassCol[2]);
-  ellipse(fsx, fsy - 4, rx * 1.3, ry * 1.3);
+  drawIslandShape(fsx, fsy, rx * 0.65, ry * 0.65, -6, seed);
 }
 
 function drawArenaDistantLabel() {
@@ -21270,20 +21271,22 @@ function drawSingleNationIsleDistant(key) {
     beachCol = [195, 180, 145]; treeCol = [45, 90, 35];
   }
 
+  // Unique seed per faction
+  let _islandSeed = key.charCodeAt(0) * 7 + key.charCodeAt(1) * 13;
   // Water shadow
   fill(20, 60, 80, 30);
-  ellipse(fsx + 3, fsy + 4, rx * 2.1, ry * 2.1);
+  drawIslandShape(fsx + 3, fsy + 4, rx * 1.05, ry * 1.05, -2, _islandSeed);
   // Shallow water ring
   fill(55, 140, 160, 45);
-  ellipse(fsx, fsy, rx * 2.05, ry * 2.05);
+  drawIslandShape(fsx, fsy, rx * 1.025, ry * 1.025, -2, _islandSeed);
   // Shore waves
   stroke(200, 220, 255, 20 + sin(frameCount * 0.04) * 10);
   strokeWeight(1.5); noFill();
-  ellipse(fsx, fsy, rx * 2.0 + sin(frameCount * 0.025) * 3, ry * 2.0 + sin(frameCount * 0.025) * 2);
+  drawIslandShape(fsx, fsy, rx * 1.0 + sin(frameCount * 0.025) * 1.5, ry * 1.0 + sin(frameCount * 0.025) * 1, -3, _islandSeed);
   noStroke();
   // Beach ring
   fill(beachCol[0], beachCol[1], beachCol[2]);
-  ellipse(fsx, fsy, rx * 1.95, ry * 1.95);
+  drawIslandShape(fsx, fsy, rx * 0.975, ry * 0.975, -3, _islandSeed);
   // Beach texture dots
   fill(beachCol[0] - 15, beachCol[1] - 15, beachCol[2] - 10, 40);
   for (let i = 0; i < 6; i++) {
@@ -21292,7 +21295,7 @@ function drawSingleNationIsleDistant(key) {
   }
   // Main terrain
   fill(terrainCol[0], terrainCol[1], terrainCol[2]);
-  ellipse(fsx, fsy, rx * 1.78, ry * 1.78);
+  drawIslandShape(fsx, fsy, rx * 0.89, ry * 0.89, -4, _islandSeed);
   // Lighter center meadow
   fill(terrainCol[0] + 10, terrainCol[1] + 15, terrainCol[2] + 5, 60);
   ellipse(fsx, fsy + ry * 0.05, rx * 0.9, ry * 0.6);
@@ -23485,24 +23488,25 @@ function drawConquestIsleDistant() {
   }
   let _cBright = getSkyBrightness();
 
+  let _cqSeed = 42;
   if (c.colonized) {
     // Colonized: proper island terrain — blue-shifted with distance
     let rx = c.isleRX, ry = c.isleRY;
     let _bs = 0.2; // blue shift factor
     // Water shadow
     fill(20, 60, 80, 35);
-    ellipse(sx + 4, sy + 5, rx * 2.15, ry * 2.15);
+    drawIslandShape(sx + 4, sy + 5, rx * 1.075, ry * 1.075, -2, _cqSeed);
     // Shallow water ring
     fill(55, 145, 165, 50);
-    ellipse(sx, sy, rx * 2.12, ry * 2.12);
+    drawIslandShape(sx, sy, rx * 1.06, ry * 1.06, -2, _cqSeed);
     // Shore waves
     stroke(200, 220, 255, 25 + sin(frameCount * 0.04) * 12);
     strokeWeight(1.5); noFill();
-    ellipse(sx, sy, rx * 2.08 + sin(frameCount * 0.025) * 3, ry * 2.08 + sin(frameCount * 0.025) * 2);
+    drawIslandShape(sx, sy, rx * 1.04 + sin(frameCount * 0.025) * 1.5, ry * 1.04 + sin(frameCount * 0.025) * 1, -3, _cqSeed);
     noStroke();
     // Beach — slightly blue-shifted
     fill(lerp(195, 180, _bs), lerp(180, 185, _bs), lerp(135, 160, _bs));
-    ellipse(sx, sy, rx * 2, ry * 2);
+    drawIslandShape(sx, sy, rx * 1.0, ry * 1.0, -3, _cqSeed);
     // Beach detail
     fill(180, 165, 120, 50);
     for (let i = 0; i < 6; i++) {
@@ -23511,13 +23515,13 @@ function drawConquestIsleDistant() {
     }
     // Grass — blue-shifted for distance
     fill(lerp(60, 80, _bs), lerp(105, 120, _bs), lerp(42, 75, _bs));
-    ellipse(sx, sy, rx * 1.85, ry * 1.85);
+    drawIslandShape(sx, sy, rx * 0.925, ry * 0.925, -4, _cqSeed);
     // Lighter meadow center
     fill(70, 120, 48, 50);
     ellipse(sx, sy + ry * 0.1, rx * 0.9, ry * 0.6);
     // Golden colony glow
     fill(255, 220, 100, 8);
-    ellipse(sx, sy, rx * 1.5, ry * 1.5);
+    drawIslandShape(sx, sy, rx * 0.75, ry * 0.75, -5, _cqSeed);
     // Dock indicator at south shore
     fill(120, 90, 50);
     rect(floor(sx - 4), floor(sy + ry * 0.88), 8, 14);
@@ -23529,32 +23533,21 @@ function drawConquestIsleDistant() {
     let ct = frameCount * 0.01;
     // Water shadow
     fill(20, 60, 80, 35);
-    ellipse(sx + 4, sy + 5, rx * 2.15, ry * 2.15);
+    drawIslandShape(sx + 4, sy + 5, rx * 1.075, ry * 1.075, -2, _cqSeed);
     // Shallow water ring
     fill(45, 130, 150, 50);
-    ellipse(sx, sy, rx * 2.12, ry * 2.12);
+    drawIslandShape(sx, sy, rx * 1.06, ry * 1.06, -2, _cqSeed);
     // Shore waves
     stroke(200, 220, 255, 20 + sin(frameCount * 0.04) * 10);
     strokeWeight(1.5); noFill();
-    ellipse(sx, sy, rx * 2.08 + sin(frameCount * 0.025) * 3, ry * 2.08 + sin(frameCount * 0.025) * 2);
+    drawIslandShape(sx, sy, rx * 1.04 + sin(frameCount * 0.025) * 1.5, ry * 1.04 + sin(frameCount * 0.025) * 1, -3, _cqSeed);
     noStroke();
-    // Beach ring — scanline fill
-    for (let row = -ry; row < ry; row += 2) {
-      let t = row / ry;
-      let w2 = rx * sqrt(max(0, 1 - t * t));
-      let wobble = sin(row * 0.06 + 0.7) * 3;
-      fill(175, 160, 120);
-      rect(floor(sx - w2 + wobble), floor(sy + row), floor(w2 * 2), 2);
-    }
-    // Dense forest interior — scanline fill
-    for (let row = -ry * 0.88; row < ry * 0.88; row += 2) {
-      let t = row / (ry * 0.88);
-      let w2 = rx * 0.88 * sqrt(max(0, 1 - t * t));
-      let wobble = sin(row * 0.08 + 1.5) * 3;
-      let greenVar = sin(row * 0.1 + ct) * 5;
-      fill(28 + greenVar, 62 + greenVar, 25);
-      rect(floor(sx - w2 + wobble), floor(sy + row), floor(w2 * 2), 2);
-    }
+    // Beach
+    fill(175, 160, 120);
+    drawIslandShape(sx, sy, rx * 1.0, ry * 1.0, -3, _cqSeed);
+    // Dense forest interior
+    fill(28, 62, 25);
+    drawIslandShape(sx, sy, rx * 0.88, ry * 0.88, -4, _cqSeed);
     // Hills / ridgeline
     fill(22, 55, 20); ellipse(sx - 15, sy - 8, 100, 65);
     fill(28, 68, 25); ellipse(sx + 10, sy - 14, 75, 48);
