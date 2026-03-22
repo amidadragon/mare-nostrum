@@ -964,7 +964,7 @@ function drawAdventureHUD() {
     fill(180, 180, 160, 150);
     textSize(9);
     textAlign(CENTER);
-    text('[E] Board boat to retreat', width / 2, height - 25);
+    text('[E] Retreat to home island', width / 2, height - 25);
   }
 
   // Controls hint

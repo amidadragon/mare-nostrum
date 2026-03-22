@@ -26262,8 +26262,8 @@ function keyPressed() {
       // Check if near north shore of home island
       let northShoreY = WORLD.islandCY - getSurfaceRY() * 0.85;
       let nearNorthShore = py < northShoreY && abs(px - WORLD.islandCX) < 80;
-      if (nearNorthShore && !a.bridgeBuilt) {
-        // Swim to arena
+      if (nearNorthShore) {
+        // Swim or walk to arena
         enterAdventure();
         return;
       }
@@ -30006,14 +30006,13 @@ function placeEraBuildings(lvl) {
 
   if (lvl === 18) {
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
-    addFloatingText(width / 2, height * 0.3, 'Arena rises — glory awaits!', '#ff8844');
-    spawnParticles(820, 455, 'build', 14);
+    addFloatingText(width / 2, height * 0.3, 'The Arena Isle grows stronger!', '#ff8844');
   }
 
   if (lvl === 19) {
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
-    addFloatingText(width / 2, height * 0.3, 'Arena complete — let the games begin!', '#ff6622');
-    spawnParticles(820, 507, 'build', 16);
+    addFloatingText(width / 2, height * 0.3, 'Military barracks established!', '#ff6622');
+    spawnParticles(830, 455, 'build', 16);
   }
 
   if (lvl === 20) {
