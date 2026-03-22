@@ -7806,7 +7806,7 @@ function _templeRoomInteractE() {
   if (dist(state.player.x, state.player.y, advX, advY) < 35) {
     var advice = 'You are prospering, leader!';
     if (state.harvest < 20) advice = 'Your food stores are low. Build more farms.';
-    else if (state.legia && state.legia.soldiers && state.legia.soldiers.length < 5) advice = 'Our military is weak. Train more soldiers.';
+    else if (state.legia && state.legia.army && state.legia.army.length < 5) advice = 'Our military is weak. Train more soldiers.';
     else if (state.nations) {
       var nk = Object.keys(state.nations);
       var badRep = nk.find(function(k) { return state.nations[k] && state.nations[k].reputation < -20; });
@@ -9753,7 +9753,8 @@ function drawWorldObjectsSorted() {
     }
   }
   // Legion soldiers on home island (ambient garrison) — cull offscreen
-  if (state.legia && state.legia.soldiers) state.legia.soldiers.forEach(s => { if (isOnScreen(s.x, s.y, 40)) _sortItems.push({ y: s.y, draw: () => drawLegionAmbientSoldier(s) }); });
+  // Patrol soldiers derived from army[] garrison + legacy soldiers[]
+  { let _ps = (typeof getPatrolSoldiers === 'function' ? getPatrolSoldiers() : []).concat(state.legia && state.legia.soldiers ? state.legia.soldiers : []); _ps.forEach(s => { if (isOnScreen(s.x, s.y, 40)) _sortItems.push({ y: s.y, draw: () => drawLegionAmbientSoldier(s) }); }); }
   // Army escort following player — cull offscreen
   if (state.legia && state.legia.army && typeof drawEscortSoldier === 'function') {
     let _escortCount = 0;
@@ -13626,12 +13627,13 @@ function drawRowingBoat() {
   }
 
   // Legion formation behind boat when marching
-  if (state.legia && state.legia.marching && state.legia.soldiers) {
+  if (state.legia && state.legia.marching) {
+    let _marchSoldiers = (state.legia.soldiers || []).concat(typeof getPatrolSoldiers === 'function' ? getPatrolSoldiers() : []);
     let boatX = floor(sx);
     let boatY = floor(sy + bob);
     let _bm = getFactionMilitary();
     noStroke();
-    state.legia.soldiers.forEach((s, i) => {
+    _marchSoldiers.forEach((s, i) => {
       let ox = -20 - (i % 3) * 12;
       let oy = 10 + floor(i / 3) * 8;
       // Small soldier body in formation — faction tunic
@@ -19213,7 +19215,7 @@ function drawLegionPatrol() {
   let lg = state.legia;
   if (!lg || lg.castrumLevel < 1 || lg.recruits < 1) return;
   // Skip orbital circles if ambient soldier entities exist (they're drawn in Y-sorted pass)
-  if (lg.soldiers && lg.soldiers.length > 0) return;
+  if ((lg.soldiers && lg.soldiers.length > 0) || (typeof getPatrolSoldiers === 'function' && getPatrolSoldiers().length > 0)) return;
   let cx = lg.castrumX, cy = lg.castrumY;
   let count = min(lg.recruits, 6);
   let t = frameCount * 0.018;
@@ -19255,23 +19257,52 @@ function drawLegionPatrol() {
   }
 }
 
-function updateLegionAmbient(dt) {
-  if (!state.legia || !state.legia.soldiers) return;
+// Derive patrol soldiers from army[] garrison units instead of separate soldiers[]
+function getPatrolSoldiers() {
+  if (!state.legia || !state.legia.army) return [];
   let cx = state.legia.castrumX || WORLD.islandCX + 200;
   let cy = state.legia.castrumY || WORLD.islandCY + 100;
-  state.legia.soldiers.forEach(s => {
-    s.patrolTimer -= dt;
-    if (s.state === 'idle' && s.patrolTimer <= 0) {
-      s.targetX = cx + random(-50, 50);
-      s.targetY = cy + random(-30, 30);
-      s.state = 'patrol';
-      s.patrolTimer = floor(random(120, 300));
-    } else if (s.state === 'patrol') {
-      let dx = (s.targetX || cx) - s.x, dy = (s.targetY || cy) - s.y;
+  return state.legia.army.filter(u => u.garrison).map(u => {
+    // Lazily init patrol properties on garrison army units
+    if (u._patrolX === undefined) {
+      u._patrolX = cx + (Math.random() - 0.5) * 60;
+      u._patrolY = cy + (Math.random() - 0.5) * 40;
+      u._patrolTimer = Math.floor(Math.random() * 140 + 60);
+      u._patrolState = 'patrol';
+      if (!u.x || u.x === 0) u.x = cx + (Math.random() - 0.5) * 60;
+      if (!u.y || u.y === 0) u.y = cy + (Math.random() - 0.5) * 40;
+      u.facing = Math.random() > 0.5 ? 1 : -1;
+    }
+    return u;
+  });
+}
+
+
+function updateLegionAmbient(dt) {
+  if (!state.legia) return;
+  let cx = state.legia.castrumX || WORLD.islandCX + 200;
+  let cy = state.legia.castrumY || WORLD.islandCY + 100;
+  let patrol = getPatrolSoldiers();
+  // Also update legacy soldiers[] if any remain (migration compat)
+  let legacy = (state.legia.soldiers || []);
+  let all = patrol.concat(legacy);
+  all.forEach(s => {
+    let timer = s._patrolTimer !== undefined ? '_patrolTimer' : 'patrolTimer';
+    let pstate = s._patrolState !== undefined ? '_patrolState' : 'state';
+    let tx = s._patrolX !== undefined ? '_patrolX' : 'targetX';
+    let ty = s._patrolY !== undefined ? '_patrolY' : 'targetY';
+    s[timer] -= dt;
+    if (s[pstate] === 'idle' && s[timer] <= 0) {
+      s[tx] = cx + random(-50, 50);
+      s[ty] = cy + random(-30, 30);
+      s[pstate] = 'patrol';
+      s[timer] = floor(random(120, 300));
+    } else if (s[pstate] === 'patrol') {
+      let dx = (s[tx] || cx) - s.x, dy = (s[ty] || cy) - s.y;
       let d = sqrt(dx * dx + dy * dy);
-      if (d < 5 || s.patrolTimer <= 0) {
-        s.state = 'idle';
-        s.patrolTimer = floor(random(60, 200));
+      if (d < 5 || s[timer] <= 0) {
+        s[pstate] = 'idle';
+        s[timer] = floor(random(60, 200));
       } else {
         s.x += (dx / d) * 1.2 * dt;
         s.y += (dy / d) * 0.8 * dt;
