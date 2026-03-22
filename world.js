@@ -555,7 +555,7 @@ function drawSky() {
     drawDriftClouds(max(bright, 0.15));
   }
 
-  if (bright > 0.05) {
+  if (bright > 0.25) { // only draw sun when actually visible (was 0.05 = ghost at night)
     let sunX = map(h, 5, 20, width * 0.1, width * 0.9);
     let fixedSkyH = height * 0.25;
     let sunArc = map(sin(map(h, 5, 20, 0, PI)), 0, 1, fixedSkyH * 1.05, height * 0.06);
@@ -1503,7 +1503,8 @@ function drawIsland() {
 
   // Edge warning glow when player is near deep water (skip when rowing)
   let playerEdge = islandEdgeDist(state.player.x, state.player.y);
-  if (!state.rowing.active && !(state.diving && state.diving.active) && playerEdge > 0.05 && !isOnBridge(state.player.x, state.player.y) && !isInShallows(state.player.x, state.player.y)) {
+  let isSwimming = typeof isNearAnyIsland === 'function' && isNearAnyIsland(state.player.x, state.player.y) && !isOnIsland(state.player.x, state.player.y);
+  if (!state.rowing.active && !(state.diving && state.diving.active) && !isSwimming && playerEdge > 0.05 && !isOnBridge(state.player.x, state.player.y) && !isInShallows(state.player.x, state.player.y)) {
     let warn = map(playerEdge, 0.05, 0.15, 0, 1);
     noFill();
     stroke(255, 60, 40, 80 * warn);
