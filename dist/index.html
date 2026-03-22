@@ -46,6 +46,7 @@
   </style>
   <script src="libs/p5.min.js"></script>
   <script src="libs/p5.sound.min.js"></script>
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
@@ -54,7 +55,7 @@
       overflow: hidden;
       cursor: default;
     }
-    canvas { display: block; }
+    canvas { display: block; touch-action: none; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 
     /* Loading screen */
     #loading {
@@ -124,9 +125,29 @@
     }, 1500);
   </script>
   <script>
+    // DEV MODE: nuke everything stale
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js').catch(() => {});
+      navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister()));
+      if (window.caches) caches.keys().then(k => k.forEach(n => caches.delete(n)));
     }
+    // Auto-delete incompatible saves (version < 8)
+    try {
+      let raw = localStorage.getItem('sunlitIsles_save');
+      if (raw) {
+        let d = JSON.parse(raw);
+        if (!d.version || d.version < 8) {
+          localStorage.removeItem('sunlitIsles_save');
+          localStorage.removeItem('sunlitIsles_backup');
+          console.log('[SAVE] Removed incompatible save (v' + (d.version || '?') + ')');
+        }
+      }
+    } catch(e) {
+      localStorage.removeItem('sunlitIsles_save');
+      localStorage.removeItem('sunlitIsles_backup');
+    }
+    sessionStorage.clear();
+    // Re-enable this line for production/itch.io release:
+    // if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
   </script>
 </body>
 </html>
