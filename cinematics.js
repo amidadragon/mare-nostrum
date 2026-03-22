@@ -1133,6 +1133,9 @@ function doFirstRepair() {
 // Transfer to home island (called after sailing cutscene)
 function completeSailToHome() {
   state.progression.homeIslandReached = true;
+  // Welcome banner for new players
+  let fName = (typeof getFactionData === 'function') ? getFactionData().name : 'your island';
+  if (typeof addNotification === 'function') addNotification('Welcome to ' + fName + '!', '#ffdd88');
   saveGame();
   state.progression.wreckExplored = true;
   trackMilestone('wreck_cleared');

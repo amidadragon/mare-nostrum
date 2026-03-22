@@ -25697,6 +25697,7 @@ function keyPressed() {
 
   // ESC — close overlays first, then menu as last resort
   if (keyCode === 27) {
+    if (!state.tutorialGoalComplete && state.tutorialGoalStep < TUTORIAL_STEPS.length && state.progression.homeIslandReached) { skipTutorial(); addNotification('Tutorial skipped', '#aaaaaa'); return; }
     if (typeof worldMapOpen !== 'undefined' && worldMapOpen) { worldMapOpen = false; return; }
     if (state.nationDiplomacyOpen) { closeNationDiplomacy(); return; }
     if (state.visitingNation) { exitNationIsland(); return; }
@@ -27109,32 +27110,53 @@ function showTutorialHintOnce(key, text, wx, wy) {
   tutorialHintCooldown = 60;
 }
 
-// ─── TUTORIAL GOAL SYSTEM — Chapter 1 goals ────────────────────────────
+// ─── TUTORIAL GOAL SYSTEM — 6-step onboarding ──────────────────────────
+const TUTORIAL_STEPS = [
+  { id: 'move',    text: 'Use WASD to move around your island',                check: function() { return state.player.moving; } },
+  { id: 'chop',    text: 'Walk to a tree and press E to chop wood',            check: function() { return state.wood > 0; } },
+  { id: 'crystal', text: 'Walk to the glowing crystals and press E to mine',   check: function() { return state.crystals > 0; } },
+  { id: 'farm',    text: 'Walk to the farm plots and press E to plant seeds',  check: function() { return state.plots && state.plots.some(function(p) { return p.planted; }); } },
+  { id: 'build',   text: 'Press B to open Build Mode and place a building',    check: function() { return state.buildings.length > 0; } },
+  { id: 'expand',  text: 'Visit the Crystal Shrine to expand your island!',    check: function() { return state.islandLevel > 1; } },
+];
+
+function skipTutorial() {
+  state.tutorialGoalStep = TUTORIAL_STEPS.length;
+  state.tutorialGoalComplete = true;
+  state.tutorialGoal = null;
+}
+
+function _nearestEntity(arr, filterFn) {
+  let best = null, bd = Infinity;
+  for (let i = 0; i < arr.length; i++) {
+    let e = arr[i];
+    if (filterFn && !filterFn(e)) continue;
+    let d = (e.x - state.player.x) * (e.x - state.player.x) + (e.y - state.player.y) * (e.y - state.player.y);
+    if (d < bd) { bd = d; best = e; }
+  }
+  return best;
+}
+
 function updateTutorialGoals() {
   if (!state.progression.homeIslandReached) return;
   if (state.tutorialGoalComplete) return;
+  if (state.prestige && state.prestige.count > 0) { skipTutorial(); return; }
   let step = state.tutorialGoalStep;
-  let prog = state.progression;
-  if (step === 0) {
-    // Step 0: Talk to Marcus
-    let mx = WORLD.islandCX + getSurfaceRX() - 100, my = WORLD.islandCY + 20;
-    state.tutorialGoal = { text: 'Find Marcus in the ruins', targetWX: mx, targetWY: my };
-    if (prog.npcsFound.marcus) { state.tutorialGoalStep = 1; }
-  } else if (step === 1) {
-    // Step 1: Harvest 3 crops
-    let farmed = state.dailyActivities.harvested || 0;
-    let total = (state.harvest || 0);
-    state.tutorialGoal = { text: 'Harvest crops (' + min(total, 3) + '/3)', targetWX: getFarmCenterX(), targetWY: getFarmCenterY() };
-    if (total >= 3) { state.tutorialGoalStep = 2; }
-  } else if (step === 2) {
-    // Step 2: Build first house
-    let hasHouse = state.buildings.some(function(b) { return b.type === 'house' || b.type === 'villa' || b.type === 'hut'; });
-    state.tutorialGoal = { text: 'Build your first structure [B]', targetWX: state.player.x, targetWY: state.player.y };
-    if (state.buildings.length > 0 || hasHouse) {
-      state.tutorialGoalStep = 3;
+  if (step >= TUTORIAL_STEPS.length) { skipTutorial(); return; }
+  let s = TUTORIAL_STEPS[step];
+  // Find target position for directional arrow
+  let tx = state.player.x, ty = state.player.y;
+  if (s.id === 'chop')    { let t = _nearestEntity(state.trees || [], function(t) { return t.alive; }); if (t) { tx = t.x; ty = t.y; } }
+  if (s.id === 'crystal') { let c = _nearestEntity(state.crystalNodes || [], function(c) { return c.charge > 0; }); if (c) { tx = c.x; ty = c.y; } }
+  if (s.id === 'farm')    { tx = getFarmCenterX(); ty = getFarmCenterY(); }
+  if (s.id === 'expand')  { if (state.crystalShrine) { tx = state.crystalShrine.x; ty = state.crystalShrine.y; } }
+  state.tutorialGoal = { text: s.text, targetWX: tx, targetWY: ty, stepId: s.id };
+  if (s.check()) {
+    state.tutorialGoalStep = step + 1;
+    if (step + 1 >= TUTORIAL_STEPS.length) {
       state.tutorialGoalComplete = true;
       state.tutorialGoal = null;
-      addNotification('Chapter 1 complete! Explore freely.', '#44ffaa');
+      addNotification('Tutorial complete! Explore freely.', '#44ffaa');
       trackMilestone('tutorial_complete');
     }
   }
@@ -27764,6 +27786,8 @@ function saveGame() {
     automation: state.automation || { granaryAuto: false, fishingPier: false, tradeRouteAuto: false, watchtowerAuto: false },
     // Progression system
     progression: state.progression,
+    tutorialGoalComplete: state.tutorialGoalComplete || false,
+    tutorialGoalStep: state.tutorialGoalStep || 0,
     // Narrative engine
     mainQuest: state.mainQuest || null,
     npcFavor: state.npcFavor || { livia: 0, marcus: 0, vesta: 0, felix: 0 },
@@ -28387,6 +28411,9 @@ function loadGame() {
       // Legacy save — mark everything as unlocked
       state.progression.gameStarted = false; // false = old save, skip progression gates
     }
+    // Restore tutorial progress
+    if (d.tutorialGoalComplete) state.tutorialGoalComplete = true;
+    if (d.tutorialGoalStep) state.tutorialGoalStep = d.tutorialGoalStep;
     // Load narrative engine state
     if (d.mainQuest && typeof d.mainQuest === 'object') state.mainQuest = d.mainQuest;
     if (d.npcFavor && typeof d.npcFavor === 'object') state.npcFavor = d.npcFavor;

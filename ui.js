@@ -3503,57 +3503,77 @@ function drawTutorialHintUI() {
   textAlign(LEFT, TOP);
 }
 
-// ─── CURRENT GOAL HUD — top-left below resources ───────────────────────
+// ─── CURRENT GOAL HUD — top-center parchment banner ─────────────────────
 function drawCurrentGoalHUD() {
   if (!state.tutorialGoal) return;
   if (state.tutorialGoalComplete) return;
   if (photoMode || screenshotMode || dialogState.active) return;
   let goal = state.tutorialGoal;
-  let gx = width - 185, gy = 158;
-  let fadeAlpha = 220;
+  let a = 220;
 
-  // Panel
+  // Top-center parchment banner
+  textSize(10);
+  let tw = textWidth(goal.text) + 40;
+  let bw = max(tw, 200), bh = 32;
+  let bx = floor(width / 2 - bw / 2), by = 12;
+  let bob = sin(frameCount * 0.04) * 1.5;
+  // Parchment bg
   noStroke();
-  fill(15, 12, 8, fadeAlpha * 0.85);
-  rect(gx, gy, 172, 28, 3);
-  stroke(180, 150, 60, fadeAlpha * 0.4);
-  strokeWeight(0.5);
+  fill(30, 24, 14, a * 0.9);
+  rect(bx, by + bob, bw, bh, 5);
+  stroke(212, 170, 70, a * 0.5);
+  strokeWeight(1);
   noFill();
-  rect(gx, gy, 172, 28, 3);
+  rect(bx, by + bob, bw, bh, 5);
   noStroke();
-
-  // Label
-  fill(180, 150, 60, fadeAlpha);
-  textSize(7);
-  textAlign(LEFT, TOP);
-  text('CURRENT GOAL', gx + 6, gy + 3);
-
+  // Step indicator dots
+  let steps = (typeof TUTORIAL_STEPS !== 'undefined') ? TUTORIAL_STEPS.length : 6;
+  let curStep = state.tutorialGoalStep || 0;
+  let dotY = by + bob + 5;
+  for (let i = 0; i < steps; i++) {
+    fill(i < curStep ? 180 : 50, i < curStep ? 150 : 40, i < curStep ? 60 : 20, a);
+    ellipse(bx + bw / 2 - (steps * 5) + i * 10 + 5, dotY, 4, 4);
+  }
   // Goal text
-  fill(240, 230, 200, fadeAlpha);
-  textSize(9);
-  text(goal.text, gx + 6, gy + 14);
+  fill(255, 245, 200, a);
+  textAlign(CENTER, CENTER);
+  textSize(10);
+  text(goal.text, floor(width / 2), by + bob + 20);
+  // ESC hint
+  fill(140, 130, 100, a * 0.6);
+  textSize(7);
+  text('ESC to skip', floor(width / 2), by + bob + bh + 6);
+  textAlign(LEFT, TOP);
 
-  // Subtle arrow pointing toward objective (world space)
-  if (goal.targetWX !== undefined && goal.targetWY !== undefined) {
+  // Directional arrow toward objective (skip for 'move' step)
+  if (goal.stepId !== 'move' && goal.targetWX !== undefined) {
     let psx = w2sX(state.player.x), psy = w2sY(state.player.y);
     let tsx = w2sX(goal.targetWX), tsy = w2sY(goal.targetWY);
     let tdist = dist(psx, psy, tsx, tsy);
-    if (tdist > 60) {
+    if (tdist > 50) {
       let ang = atan2(tsy - psy, tsx - psx);
-      let arrowR = 40;
-      let ax = psx + cos(ang) * arrowR, ay = psy + sin(ang) * arrowR;
-      let bob2 = sin(frameCount * 0.07) * 2;
+      let ax = psx + cos(ang) * 42, ay = psy + sin(ang) * 42;
+      let pulse = 100 + sin(frameCount * 0.05) * 30;
       push();
-      translate(floor(ax + bob2 * cos(ang + HALF_PI)), floor(ay + bob2 * sin(ang + HALF_PI)));
+      translate(floor(ax), floor(ay));
       rotate(ang);
-      let arrAlpha = 100 + sin(frameCount * 0.05) * 30;
-      fill(180, 150, 60, arrAlpha);
+      fill(212, 170, 70, pulse);
       noStroke();
-      triangle(7, 0, -3, -4, -3, 4);
-      fill(150, 120, 40, arrAlpha * 0.5);
-      rect(-5, -2, 5, 4, 1);
+      triangle(8, 0, -4, -5, -4, 5);
+      fill(180, 140, 50, pulse * 0.5);
+      rect(-6, -2.5, 6, 5, 1);
       pop();
     }
+  }
+  // Build step: flash B key hint near player
+  if (goal.stepId === 'build') {
+    let px = w2sX(state.player.x), py = w2sY(state.player.y) - 30;
+    let flash = 150 + sin(frameCount * 0.1) * 80;
+    fill(212, 170, 70, flash);
+    textAlign(CENTER, CENTER);
+    textSize(12);
+    text('[B]', floor(px), floor(py));
+    textAlign(LEFT, TOP);
   }
 }
 
