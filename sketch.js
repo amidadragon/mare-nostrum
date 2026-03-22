@@ -26663,7 +26663,6 @@ function keyPressed() {
             army[i].y = state.player.y + Math.sin(angle) * (50 + Math.random() * 50);
           }
           if (typeof _currentFormation !== 'undefined') _currentFormation = 'battle';
-          console.log('War horn!');
           if (typeof addFloatingText === 'function') addFloatingText(width / 2, height * 0.25, 'CALL TO ARMS!', '#ff4444');
           if (typeof snd !== 'undefined' && snd) snd.playSFX('war_horn');
           if (typeof triggerScreenShake === 'function') triggerScreenShake(4, 12, 0, 0, 'random');
