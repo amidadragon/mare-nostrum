@@ -4221,6 +4221,46 @@ function drawInner() {
   drawDoorTransition();
   drawSaveIndicator();
 
+  // Death overlay + timer
+  if (state.player._dead) {
+    state.player._deathTimer--;
+    let t = state.player._deathTimer;
+    let alpha = map(t, 180, 0, 0, 220);
+    push();
+    resetMatrix();
+    fill(0, 0, 0, alpha);
+    noStroke();
+    rect(0, 0, width, height);
+    if (alpha > 80) {
+      fill(255, 200, 50, min(alpha * 1.5, 255));
+      textAlign(CENTER, CENTER);
+      textSize(24);
+      text('The gods spare you... this time', width / 2, height / 2);
+      textSize(14);
+      fill(200, 80, 80, min(alpha * 1.5, 255));
+      text('-20% gold', width / 2, height / 2 + 35);
+    }
+    pop();
+    if (t <= 0) {
+      let p = state.player;
+      let goldLost = floor(state.gold * 0.2);
+      state.gold -= goldLost;
+      p.hp = floor(p.maxHp * 0.5);
+      p._dead = false;
+      if (p._deathSource === 'arena') {
+        if (typeof showArenaSummary === 'function') showArenaSummary(state.adventure, false);
+        exitAdventure();
+      } else {
+        exitConquest(true);
+      }
+      p.x = WORLD.islandCX;
+      p.y = WORLD.islandCY;
+      cam.x = p.x; cam.y = p.y;
+      camSmooth.x = p.x; camSmooth.y = p.y;
+      addFloatingText(width / 2, height * 0.35, '-' + goldLost + ' gold', '#ff4444');
+    }
+  }
+
   // Debug perf overlay
   if (typeof Debug !== 'undefined' && Debug.visible) {
     push();
