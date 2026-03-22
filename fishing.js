@@ -187,6 +187,27 @@ function updateFishing(dt) {
 }
 
 function startFishing() {
+  // Allow fishing from ship (anyone rowing at sea)
+  if (state.rowing && state.rowing.active) {
+    let f = state.fishing;
+    f.active = true;
+    f.phase = 'cast';
+    f.phaseTimer = 30;
+    f.timer = 0;
+    f.bite = false;
+    f.caught = false;
+    f.bobberDip = 0;
+    f.missLine = '';
+    f.streak = f.streak || 0;
+    let castAngle = state.rowing.angle + HALF_PI;
+    f.bobberX = state.player.x + cos(castAngle) * 45;
+    f.bobberY = state.player.y + sin(castAngle) * 30;
+    f.castAngle = castAngle;
+    state.player.vx = 0; state.player.vy = 0;
+    state.player.moving = false; state.player.targetX = null; state.player.targetY = null;
+    addFloatingText(w2sX(state.player.x), w2sY(state.player.y) - 30, 'Casting from ship...', '#66ccff');
+    return;
+  }
   let edgeDist = islandEdgeDist(state.player.x, state.player.y);
   if (edgeDist > -0.08) {
     let f = state.fishing;

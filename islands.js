@@ -78,6 +78,8 @@ function _getDistantScale(isleX, isleY, isleRX) {
 // Max view distance — expanded when zoomed out during sailing
 function _getMaxViewDist() {
   let base = 4000;
+  // Sea People see further when sailing (navigator's instinct)
+  if (typeof state !== 'undefined' && state.faction === 'seapeople' && state.rowing && state.rowing.active) base = 5500;
   if (typeof camZoom !== 'undefined' && camZoom < 1) return base / camZoom;
   return base;
 }

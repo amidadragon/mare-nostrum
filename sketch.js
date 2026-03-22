@@ -5277,7 +5277,11 @@ function drawAmbientShips() {
     // Sail — colored by ship type
     let puff = sin(frameCount * 0.025 + ship.t * 20) * 1.5;
     let sailR, sailG, sailB;
-    if (ship.type === 0) { sailR = 240; sailG = 210; sailB = 140; } // gold trade
+    if (ship.nationKey && FACTION_MILITARY[ship.nationKey]) {
+      let _nf = FACTION_MILITARY[ship.nationKey].conquestFlag;
+      if (ship.type === 2) { sailR = _nf[0]; sailG = _nf[1] * 0.6; sailB = _nf[2] * 0.6; } // darkened faction color for hostile
+      else { sailR = _nf[0]; sailG = _nf[1]; sailB = _nf[2]; } // faction color
+    } else if (ship.type === 0) { sailR = 240; sailG = 210; sailB = 140; } // gold trade
     else if (ship.type === 2) { sailR = 200; sailG = 80; sailB = 70; } // red enemy
     else { sailR = 235; sailG = 228; sailB = 210; } // white neutral
     fill(sailR, sailG, sailB, hAlpha * 0.9);
@@ -17188,8 +17192,9 @@ function drawShip() {
   let sailBillow = floor(sin(frameCount * 0.02) * 3);
   fill(220, 205, 175, 230);
   rect(-26 + sailBillow, -46, 52, 34);
-  // Red stripe
-  fill(160, 40, 30, 180);
+  // Faction-colored stripe
+  let _shipFM = getFactionMilitary();
+  fill(_shipFM.conquestFlag[0], _shipFM.conquestFlag[1], _shipFM.conquestFlag[2], 180);
   rect(-25 + sailBillow, -32, 50, 10);
 
   // Rigging — pixel diagonal lines
@@ -17206,13 +17211,27 @@ function drawShip() {
   rect(-51, -14, 3, 6);   // upper
   rect(-50, -22, 3, 8);   // top post
   rect(-49, -28, 3, 6);   // peak
-  // Eagle/standard at top — pixel rect + crown
-  fill(180, 140, 50);
-  rect(-51, -32, 6, 4);
-  fill(200, 160, 60);
-  rect(-50, -36, 4, 4);   // eagle head
-  rect(-52, -34, 2, 2);   // left wing
-  rect(-44, -34, 2, 2);   // right wing
+  if (state.faction === 'seapeople') {
+    // Sea People: dragon/serpent figurehead at bow
+    fill(60, 50, 40);
+    rect(62, -8, 3, 8);   // neck
+    rect(60, -16, 5, 8);  // head base
+    fill(42, 138, 106);
+    rect(59, -20, 7, 4);  // crest
+    fill(200, 60, 40);
+    rect(64, -14, 2, 2);  // eye
+    // Larger hull extension
+    fill(50, 35, 20);
+    rect(-56, -2, 6, 4);  // wider stern
+  } else {
+    // Standard: eagle/standard at top — pixel rect + crown
+    fill(180, 140, 50);
+    rect(-51, -32, 6, 4);
+    fill(200, 160, 60);
+    rect(-50, -36, 4, 4);   // eagle head
+    rect(-52, -34, 2, 2);   // left wing
+    rect(-44, -34, 2, 2);   // right wing
+  }
 
   // Flag at mast top — pixel rect with wave, faction color
   let flagWave = floor(sin(frameCount * 0.04) * 2);
@@ -17840,40 +17859,7 @@ function enemyDeath(e, a) {
 // ─── UNIFIED DISTANT ISLAND RENDERER ──────────────────────────────────────
 // All distant islands share this base: water shadow > shallow water > beach > grass
 // Individual renderers call this, then add their own structures on top.
-function drawDistantIslandBase(fsx, fsy, rx, ry, opts) {
-  let bright = (typeof getSkyBrightness === 'function') ? getSkyBrightness() : 0.7;
-  let beachCol = (opts && opts.beachCol) || [215, 195, 155];
-  let grassCol = (opts && opts.grassCol) || null;
-  let seed = (opts && opts.seed) || 87;
-  if (!grassCol) {
-    let sg = (typeof getSeasonGrass === 'function') ? getSeasonGrass() : { r: 90, g: 130, b: 70 };
-    grassCol = [sg.r, sg.g, sg.b];
-  }
-  noStroke();
-  // Water shadow
-  fill(20, 60, 80, 35);
-  drawIslandShape(fsx + 3, fsy + 4, rx * 1.1, ry * 1.1, -2, seed);
-  // Shallow water
-  fill(lerp(40, 80, bright), lerp(80, 160, bright), lerp(110, 185, bright), 200);
-  drawIslandShape(fsx, fsy, rx * 1.05, ry * 1.05, -2, seed);
-  fill(lerp(50, 95, bright), lerp(90, 175, bright), lerp(120, 190, bright), 210);
-  drawIslandShape(fsx, fsy, rx * 0.95, ry * 0.95, -3, seed);
-  // Shore wave animation
-  if (!(opts && opts.noWaves)) {
-    stroke(200, 220, 255, 20 + sin(frameCount * 0.04) * 10);
-    strokeWeight(1.5); noFill();
-    drawIslandShape(fsx, fsy, rx * 0.925 + sin(frameCount * 0.025) * 1.5, ry * 0.925 + sin(frameCount * 0.025) * 1, -3, seed);
-    noStroke();
-  }
-  // Beach
-  fill(beachCol[0], beachCol[1], beachCol[2]);
-  drawIslandShape(fsx, fsy, rx * 0.85, ry * 0.85, -4, seed);
-  // Grass layers
-  fill(grassCol[0] + 10, grassCol[1] + 10, grassCol[2] + 5);
-  drawIslandShape(fsx, fsy, rx * 0.75, ry * 0.75, -5, seed);
-  fill(grassCol[0], grassCol[1], grassCol[2]);
-  drawIslandShape(fsx, fsy, rx * 0.65, ry * 0.65, -6, seed);
-}
+// drawDistantIslandBase removed — all islands use drawIslandBase now
 
 function drawArenaDistantLabel() {
   if (state.adventure.active) return;
@@ -21141,12 +21127,21 @@ function drawSeaPeopleShips() {
     // Mast
     stroke(60, 45, 25); strokeWeight(2);
     line(0, -3, 0, -28);
-    // Sail
+    // Sail — dark grey with red trim
     noStroke();
-    fill(120, 40, 30, 200);
+    fill(70, 65, 60, 200);
     beginShape();
     vertex(-12, -26); vertex(12, -26); vertex(10, -10); vertex(-10, -10);
     endShape(CLOSE);
+    fill(120, 40, 30, 180);
+    rect(-11, -14, 22, 3);
+    // Dragon figurehead at prow
+    fill(60, 50, 40);
+    rect(33, -14, 3, 5);
+    fill(42, 138, 106);
+    rect(32, -18, 5, 4);
+    fill(200, 60, 40);
+    rect(35, -16, 2, 2); // eye
     // Oars
     stroke(70, 50, 30); strokeWeight(1);
     let oarPhase = sin(frameCount * 0.06 + s.phase) * 4;
@@ -21711,26 +21706,11 @@ function drawSingleNationIsleDistant(key) {
     }
     drawIslandBase(fsx, fsy, rx, ry, _factionCoastCache[key], _facPalette, 'medium');
   } else {
-    // Fallback: old ellipse-based rendering for unknown factions
-    fill(20, 60, 80, 30);
-    drawIslandShape(fsx + 3, fsy + 4, rx * 1.05, ry * 1.05, -2, _islandSeed);
-    fill(55, 140, 160, 45);
-    drawIslandShape(fsx, fsy, rx * 1.025, ry * 1.025, -2, _islandSeed);
-    stroke(200, 220, 255, 20 + sin(frameCount * 0.04) * 10);
-    strokeWeight(1.5); noFill();
-    drawIslandShape(fsx, fsy, rx * 1.0 + sin(frameCount * 0.025) * 1.5, ry * 1.0 + sin(frameCount * 0.025) * 1, -3, _islandSeed);
-    noStroke();
-    fill(beachCol[0], beachCol[1], beachCol[2]);
-    drawIslandShape(fsx, fsy, rx * 0.975, ry * 0.975, -3, _islandSeed);
-    fill(beachCol[0] - 15, beachCol[1] - 15, beachCol[2] - 10, 40);
-    for (let i = 0; i < 6; i++) {
-      let ba = (i / 6) * TWO_PI + 0.8;
-      ellipse(fsx + cos(ba) * rx * 0.92, fsy + sin(ba) * ry * 0.65, 8, 4);
+    // Fallback: use default palette coastline for unknown factions
+    if (!_factionCoastCache[key]) {
+      _factionCoastCache[key] = generateIslandCoastline(_islandSeed, 64, rx, ry, [{angle: Math.PI*0.5, strength: 0.05, width: 0.35, type: headland}]);
     }
-    fill(terrainCol[0], terrainCol[1], terrainCol[2]);
-    drawIslandShape(fsx, fsy, rx * 0.89, ry * 0.89, -4, _islandSeed);
-    fill(terrainCol[0] + 10, terrainCol[1] + 15, terrainCol[2] + 5, 60);
-    ellipse(fsx, fsy + ry * 0.05, rx * 0.9, ry * 0.6);
+    drawIslandBase(fsx, fsy, rx, ry, _factionCoastCache[key], ISLAND_PALETTES.default, medium);
   }
 
   // Trees (faction-appropriate) — 4-7 based on level
@@ -21848,7 +21828,7 @@ function drawSingleNationIsleDistant(key) {
       endShape(CLOSE);
       fill(70, 50, 25, hazeA + 40);
       rect(shX - 1, shY - 5, 1, 5);
-      fill(220, 210, 190, hazeA + 30);
+      fill(bannerCol[0], bannerCol[1], bannerCol[2], hazeA + 40);
       triangle(shX, shY - 5, shX + 4, shY - 3, shX, shY - 1);
     }
   }
