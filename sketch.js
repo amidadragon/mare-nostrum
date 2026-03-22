@@ -2102,7 +2102,7 @@ function initState() {
       bestWave: 0,
       // Arena isle position (near-NORTH of home island, visible from home)
       isleX: WORLD.islandCX,
-      isleY: WORLD.islandCY - 300,
+      isleY: WORLD.islandCY - 400,
       isleRX: 120,
       isleRY: 80,
       bridgeBuilt: false,  // stone bridge at level 10+
@@ -17590,7 +17590,7 @@ function drawArenaIsleDistant() {
   let sc = (_dScale && _dScale.scale < 0.98) ? _dScale.scale : 1;
   if (sc < 0.98) { translate(sx, sy); scale(sc); translate(-sx, -sy); }
   let fsx = floor(sx), fsy = floor(sy);
-  let rx = a.isleRX, ry = a.isleRY;
+  let rx = a.isleRX, ry = a.isleRY * 0.45; // isometric vertical squash (like main island)
   let bright = getSkyBrightness();
   let dayMix = max(0.15, bright);
   let aLv = getArenaLevel();
