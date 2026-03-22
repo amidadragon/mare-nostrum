@@ -17721,6 +17721,7 @@ function drawConquestDistantEntities() {
 }
 
 // ─── ARENA DRAWING ───────────────────────────────────────────────────────
+let _arenaCoastVerts = null;
 
 function drawArenaIsleDistant() {
   let a = state.adventure;
@@ -17765,8 +17766,15 @@ function drawArenaIsleDistant() {
   let rx = a.active ? (a.combatRX || 200) : a.isleRX;
   let ry = a.active ? (a.combatRY || 140) : a.isleRY;
 
-  // Unified base: water > beach > grass
-  drawDistantIslandBase(fsx, fsy, rx, ry);
+  // Organic coastline base (reusable system)
+  if (!_arenaCoastVerts) {
+    _arenaCoastVerts = generateIslandCoastline(42, 64, rx, ry, [
+      {angle: Math.PI * 0.5, strength: 0.06, width: 0.5, type: 'headland'},
+      {angle: Math.PI * 1.2, strength: 0.05, width: 0.3, type: 'bay'},
+    ]);
+  }
+  let _arenaLod = a.active ? 'close' : 'medium';
+  drawIslandBase(fsx, fsy, rx, ry, _arenaCoastVerts, ISLAND_PALETTES.arena, _arenaLod);
 
   // Arena structure (fits INSIDE the grass surface)
   let aLv = (typeof getArenaLevel === 'function') ? getArenaLevel() : 1;
