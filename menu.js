@@ -603,7 +603,7 @@ function _drawSectionDivider(cx, y, divW) {
 
 function drawSettingsPanel(fadeA) {
   let w = width, h = height;
-  let panW = 280, panH = 540;
+  let panW = 280, panH = 740;
   let px = floor(w / 2 - panW / 2), py = floor(h * 0.14);
 
   fill(0, 0, 0, 170); rect(0, 0, w, h);
@@ -753,8 +753,86 @@ function drawSettingsPanel(fadeA) {
   fill(220, 210, 180); rect(hcbx + (hcOn ? 16 : 2), hcby + 2, 10, 10, 1);
   fill(240, 230, 200, 80); rect(hcbx + (hcOn ? 17 : 3), hcby + 3, 8, 2);
 
+  // ─── KEYBINDS SECTION ───
+  _drawSectionDivider(w / 2, accY + 18, panW - 40);
+  accY += 36;
+  fill(255, 210, 80, 20); textSize(12);
+  text('KEYBINDS', w / 2, accY);
+  fill(244, 213, 141); textSize(11);
+  text('KEYBINDS', w / 2, accY);
+  accY += 16;
+
+  let kbActions = Object.keys(DEFAULT_KEYBINDS);
+  let kbRowH = 18;
+  let kbVisibleRows = 10;
+  let kbListH = kbVisibleRows * kbRowH;
+  let kbStartY = accY;
+  // Clip region for scrollable keybind list
+  let kbClipX = floor(w / 2 - panW / 2 + 15);
+  let kbClipW = panW - 30;
+
+  // Draw scroll area background
+  fill(20, 17, 12, 120); rect(kbClipX, kbStartY, kbClipW, kbListH, 2);
+
+  // Use drawingContext clipping for scrollable list
+  drawingContext.save();
+  drawingContext.beginPath();
+  drawingContext.rect(kbClipX, kbStartY, kbClipW, kbListH);
+  drawingContext.clip();
+
+  for (let ki = 0; ki < kbActions.length; ki++) {
+    let act = kbActions[ki];
+    let rowY = kbStartY + 9 + ki * kbRowH - _keybindScrollOffset;
+    if (rowY < kbStartY - kbRowH || rowY > kbStartY + kbListH + kbRowH) continue;
+    let rowHov = mouseX > kbClipX && mouseX < kbClipX + kbClipW && mouseY > rowY - 8 && mouseY < rowY + 8;
+    if (rowHov) { fill(60, 50, 35, 100); rect(kbClipX + 2, rowY - 8, kbClipW - 4, kbRowH - 2, 1); }
+    // Action label
+    fill(190, 170, 130, 220); textSize(9);
+    textAlign(LEFT, CENTER);
+    text(KEYBIND_LABELS[act] || act, kbClipX + 8, rowY);
+    // Key binding box
+    let kbBtnX = kbClipX + kbClipW - 60;
+    let isRebinding = _rebindingAction === act;
+    fill(isRebinding ? 80 : 35, isRebinding ? 60 : 30, isRebinding ? 20 : 22);
+    rect(kbBtnX, rowY - 7, 52, 14, 2);
+    if (isRebinding) {
+      fill(255, 220, 100, 180 + sin(millis() / 200) * 60); textSize(8);
+    } else {
+      fill(220, 200, 140); textSize(8);
+    }
+    textAlign(CENTER, CENTER);
+    text(isRebinding ? 'Press key...' : getKeybind(act), kbBtnX + 26, rowY);
+  }
+  drawingContext.restore();
+  textAlign(CENTER, CENTER);
+
+  // Scroll indicators
+  if (_keybindScrollOffset > 0) {
+    fill(200, 180, 120, 150); textSize(8);
+    text('\u25B2', w / 2, kbStartY - 2);
+  }
+  let maxScroll = max(0, kbActions.length * kbRowH - kbListH);
+  if (_keybindScrollOffset < maxScroll) {
+    fill(200, 180, 120, 150); textSize(8);
+    text('\u25BC', w / 2, kbStartY + kbListH + 6);
+  }
+
+  accY = kbStartY + kbListH + 14;
+
+  // Reset Defaults button
+  let rstHov = mouseX > w/2 - 50 && mouseX < w/2 + 50 && mouseY > accY - 8 && mouseY < accY + 8;
+  if (rstHov) {
+    fill(60, 50, 35, 80); rect(w/2 - 55, accY - 9, 110, 18, 2);
+    fill(220, 200, 140);
+  } else {
+    fill(160, 145, 105);
+  }
+  textSize(9); text('[ Reset Defaults ]', w / 2, accY);
+
+  accY += 18;
+
   // Delete save — red tinted with hover
-  let delY = accY + 36;
+  let delY = accY + 8;
   let delHover = mouseX > w/2 - 60 && mouseX < w/2 + 60 && mouseY > delY - 10 && mouseY < delY + 12;
   if (delHover) {
     fill(100, 30, 20, 40); rect(w/2 - 65, delY - 10, 130, 22, 2);
@@ -1092,7 +1170,7 @@ function handleMenuClick() {
   }
   if (gameScreen === 'settings') {
     let py = floor(height * 0.14);
-    let panH = 540;
+    let panH = 740;
     let fsY = py + 50;
     let tbx = floor(width / 2 + 40), tby = fsY - 7;
     if (mouseX > tbx && mouseX < tbx + 28 && mouseY > tby && mouseY < tby + 14) {
@@ -1144,8 +1222,35 @@ function handleMenuClick() {
       gameSettings.highContrast = !gameSettings.highContrast;
       _saveSettings(); return;
     }
+    // Keybind clicks
+    accY += 36 + 16; // matches draw offset for keybind section header
+    let kbActions = Object.keys(DEFAULT_KEYBINDS);
+    let kbRowH = 18;
+    let kbVisibleRows = 10;
+    let kbListH = kbVisibleRows * kbRowH;
+    let kbStartY = accY;
+    let kbPanW = 280;
+    let kbClipX = floor(width / 2 - kbPanW / 2 + 15);
+    let kbClipW = kbPanW - 30;
+    let kbBtnX = kbClipX + kbClipW - 60;
+    // Check each keybind row
+    for (let ki = 0; ki < kbActions.length; ki++) {
+      let rowY = kbStartY + 9 + ki * kbRowH - _keybindScrollOffset;
+      if (rowY < kbStartY - kbRowH || rowY > kbStartY + kbListH + kbRowH) continue;
+      if (mouseX > kbClipX && mouseX < kbClipX + kbClipW && mouseY > rowY - 8 && mouseY < rowY + 8) {
+        _rebindingAction = kbActions[ki];
+        return;
+      }
+    }
+    accY = kbStartY + kbListH + 14;
+    // Reset Defaults button
+    if (mouseX > width/2 - 50 && mouseX < width/2 + 50 && mouseY > accY - 8 && mouseY < accY + 8) {
+      gameSettings.keybinds = {};
+      _rebindingAction = null;
+      _saveSettings(); return;
+    }
+    accY += 18;
     // Delete save
-    accY += 28;
     let delY = accY + 8;
     if (mouseX > width/2 - 60 && mouseX < width/2 + 60 && mouseY > delY - 10 && mouseY < delY + 12) {
       try { if (localStorage.getItem('sunlitIsles_save')) localStorage.removeItem('sunlitIsles_save'); } catch(e) {}
@@ -1153,7 +1258,7 @@ function handleMenuClick() {
     }
     let backY = py + panH - 25;
     if (mouseX > width/2 - 40 && mouseX < width/2 + 40 && mouseY > backY - 8 && mouseY < backY + 10) {
-      gameScreen = 'menu'; return;
+      _rebindingAction = null; _keybindScrollOffset = 0; gameScreen = 'menu'; return;
     }
     return;
   }

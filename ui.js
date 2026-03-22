@@ -1603,6 +1603,316 @@ function drawInventoryScreen() {
   fill(120,100,70);textSize(10);textAlign(CENTER,BOTTOM);text('[I] Close',width/2,py+ph-6);textAlign(LEFT,TOP);
 }
 
+// ═══ CHARACTER EQUIPMENT WINDOW (C key) ══════════════════════════════════
+function drawEquipmentWindow() {
+  if (typeof equipmentWindowOpen === 'undefined' || !equipmentWindowOpen) return;
+  if (!state || !state.equipment) return;
+
+  noStroke();
+  fill(0, 0, 0, 190);
+  rect(0, 0, width, height);
+
+  var pw = min(width - 40, 520), ph = min(height - 40, 420);
+  var px = (width - pw) / 2, py = (height - ph) / 2;
+
+  // Parchment background
+  fill(30, 24, 16, 245);
+  rect(px, py, pw, ph, 6);
+  stroke(180, 145, 70, 220);
+  strokeWeight(1.5);
+  noFill();
+  rect(px, py, pw, ph, 6);
+  stroke(120, 95, 55, 80);
+  strokeWeight(0.5);
+  rect(px + 5, py + 5, pw - 10, ph - 10, 4);
+  noStroke();
+
+  // Title
+  textFont('Cinzel, Georgia, serif');
+  fill(210, 180, 80);
+  textAlign(CENTER, TOP);
+  textSize(14);
+  text('CHARACTER', width / 2, py + 12);
+  textFont('monospace');
+
+  // Layout: left side = character + slots, right side = stats
+  var charCX = px + pw * 0.35;
+  var charCY = py + ph * 0.48;
+  var slotS = 32; // slot size
+  var slotG = 4;  // slot gap
+
+  // Draw character preview (3x scale) in center
+  push();
+  translate(floor(charCX), floor(charCY));
+  scale(3);
+  if (typeof drawPlayerPreview === 'function') {
+    drawPlayerPreview();
+  } else {
+    // Fallback simple character
+    noStroke();
+    fill(195, 165, 130); rect(-3, -10, 6, 5); // head
+    fill(175, 58, 44); rect(-4, -5, 8, 9);     // body
+    fill(145, 48, 34); rect(-3, 3, 2, 5); rect(1, 3, 2, 5); // legs
+  }
+  pop();
+
+  // Equipment slot positions arranged around character
+  var slots = [
+    { key: 'head',     x: charCX - slotS / 2,         y: charCY - 70 },
+    { key: 'chest',    x: charCX - slotS / 2,         y: charCY - 30 },
+    { key: 'legs',     x: charCX - slotS / 2,         y: charCY + 10 },
+    { key: 'feet',     x: charCX - slotS / 2,         y: charCY + 50 },
+    { key: 'mainHand', x: charCX + 50,                y: charCY - 50 },
+    { key: 'offHand',  x: charCX - 50 - slotS,       y: charCY - 50 },
+    { key: 'tool',     x: charCX + 50,                y: charCY + 0 },
+    { key: 'trinket',  x: charCX - 50 - slotS,       y: charCY + 0 },
+  ];
+
+  _equipHoverSlot = null;
+  var fac = (typeof getFactionData === 'function') ? getFactionData() : null;
+  var accentC = fac ? fac.accentColor : [212, 160, 64];
+
+  for (var si = 0; si < slots.length; si++) {
+    var s = slots[si];
+    var slotDef = EQUIP_SLOTS[s.key];
+    var itemId = state.equipment[s.key];
+    var item = itemId ? EQUIPMENT_DB[itemId] : null;
+    var hover = (mouseX >= s.x && mouseX <= s.x + slotS && mouseY >= s.y && mouseY <= s.y + slotS);
+    if (hover) _equipHoverSlot = { key: s.key, item: item, itemId: itemId, x: s.x, y: s.y };
+
+    // Slot background
+    fill(item ? 45 : 28, item ? 38 : 22, item ? 28 : 16, 220);
+    rect(s.x, s.y, slotS, slotS, 3);
+
+    // Border
+    if (item) {
+      stroke(accentC[0], accentC[1], accentC[2], hover ? 255 : 180);
+      strokeWeight(hover ? 2 : 1.2);
+    } else {
+      stroke(80, 65, 45, hover ? 150 : 80);
+      strokeWeight(0.8);
+    }
+    noFill();
+    rect(s.x, s.y, slotS, slotS, 3);
+    noStroke();
+
+    // Item icon or slot label
+    textAlign(CENTER, CENTER);
+    if (item) {
+      // Draw item icon based on slot type
+      _drawEquipIcon(s.x + slotS / 2, s.y + slotS / 2, item, slotS);
+    } else {
+      // Empty slot label
+      fill(70, 60, 45);
+      textSize(7);
+      text(slotDef.name, s.x + slotS / 2, s.y + slotS / 2);
+    }
+  }
+
+  // ─── Stats panel (right side) ───
+  var stX = px + pw * 0.62;
+  var stY = py + 40;
+  var stW = pw * 0.34;
+
+  fill(35, 28, 20, 200);
+  rect(stX, stY, stW, ph - 60, 4);
+  stroke(100, 85, 55, 80);
+  strokeWeight(0.5);
+  noFill();
+  rect(stX, stY, stW, ph - 60, 4);
+  noStroke();
+
+  var lx = stX + 10;
+  var ly = stY + 10;
+
+  // Name & Faction
+  fill(210, 180, 80);
+  textSize(12);
+  textAlign(LEFT, TOP);
+  var facName = fac ? fac.name : 'UNKNOWN';
+  text(facName, lx, ly);
+  ly += 16;
+
+  fill(160, 140, 100);
+  textSize(10);
+  text('Level ' + (state.player.level || 1), lx, ly);
+  ly += 18;
+
+  // Divider
+  stroke(100, 85, 55, 60);
+  strokeWeight(0.5);
+  line(lx, ly, stX + stW - 10, ly);
+  noStroke();
+  ly += 8;
+
+  // Stats
+  var p = state.player;
+  var eqAtk = (typeof getEquipBonus === 'function') ? getEquipBonus('atk') : 0;
+  var eqDef = (typeof getEquipBonus === 'function') ? getEquipBonus('def') : 0;
+  var eqSpd = (typeof getEquipBonus === 'function') ? getEquipBonus('spd') : 0;
+  var baseAtk = [15, 20, 25][p.weapon] || 15;
+  var baseDefArr = [0, 3, 6, 10];
+  var baseDef = baseDefArr[p.armor] || 0;
+
+  var statLines = [
+    { label: 'HP',      val: p.hp + ' / ' + p.maxHp, c: '#44dd88' },
+    { label: 'Attack',  val: baseAtk + (eqAtk > 0 ? ' + ' + eqAtk : ''), c: '#ff8844' },
+    { label: 'Defense', val: baseDef + (eqDef > 0 ? ' + ' + eqDef : ''), c: '#6699cc' },
+    { label: 'Speed',   val: p.speed.toFixed(1) + (eqSpd !== 0 ? ' (' + (eqSpd > 0 ? '+' : '') + eqSpd + ')' : ''), c: '#cccc44' },
+  ];
+
+  for (var sti = 0; sti < statLines.length; sti++) {
+    var st = statLines[sti];
+    fill(130, 115, 85);
+    textSize(9);
+    textAlign(LEFT, TOP);
+    text(st.label, lx, ly);
+    fill(color(st.c));
+    textAlign(RIGHT, TOP);
+    text(st.val, stX + stW - 10, ly);
+    ly += 16;
+  }
+
+  ly += 8;
+  stroke(100, 85, 55, 60);
+  strokeWeight(0.5);
+  line(lx, ly, stX + stW - 10, ly);
+  noStroke();
+  ly += 8;
+
+  // Equipment list
+  fill(160, 140, 90);
+  textSize(10);
+  textAlign(LEFT, TOP);
+  text('EQUIPPED', lx, ly);
+  ly += 14;
+
+  var slotOrder = ['head', 'chest', 'legs', 'feet', 'mainHand', 'offHand', 'tool', 'trinket'];
+  for (var eqi = 0; eqi < slotOrder.length; eqi++) {
+    var sk = slotOrder[eqi];
+    var eqId = state.equipment[sk];
+    var eqItem = eqId ? EQUIPMENT_DB[eqId] : null;
+    fill(eqItem ? 170 : 70, eqItem ? 155 : 60, eqItem ? 120 : 45);
+    textSize(8);
+    textAlign(LEFT, TOP);
+    var slotLabel = EQUIP_SLOTS[sk].name + ': ';
+    text(slotLabel + (eqItem ? eqItem.name : '---'), lx, ly);
+    ly += 12;
+  }
+
+  // Tooltip on hover
+  if (_equipHoverSlot && _equipHoverSlot.item) {
+    var tt = _equipHoverSlot;
+    var ttW = 140, ttH = 60;
+    var ttX = min(tt.x + slotS + 5, width - ttW - 5);
+    var ttY = min(tt.y, height - ttH - 5);
+    fill(20, 16, 10, 240);
+    rect(ttX, ttY, ttW, ttH, 4);
+    stroke(accentC[0], accentC[1], accentC[2], 160);
+    strokeWeight(1);
+    noFill();
+    rect(ttX, ttY, ttW, ttH, 4);
+    noStroke();
+
+    fill(220, 200, 150);
+    textSize(10);
+    textAlign(LEFT, TOP);
+    text(tt.item.name, ttX + 6, ttY + 6);
+
+    fill(140, 125, 95);
+    textSize(8);
+    var statsStr = '';
+    if (tt.item.atk) statsStr += '+' + tt.item.atk + ' ATK  ';
+    if (tt.item.def) statsStr += '+' + tt.item.def + ' DEF  ';
+    if (tt.item.spd > 0) statsStr += '+' + tt.item.spd + ' SPD';
+    else if (tt.item.spd < 0) statsStr += tt.item.spd + ' SPD';
+    text(statsStr, ttX + 6, ttY + 22);
+
+    fill(100, 90, 70);
+    text(EQUIP_SLOTS[tt.item.slot].name + ' slot', ttX + 6, ttY + 36);
+    if (tt.item.faction) {
+      text('Faction: ' + tt.item.faction, ttX + 6, ttY + 48);
+    }
+  }
+
+  // Close hint
+  fill(120, 100, 70);
+  textSize(10);
+  textAlign(CENTER, BOTTOM);
+  text('[O] Close', width / 2, py + ph - 6);
+  textAlign(LEFT, TOP);
+}
+
+function _drawEquipIcon(cx, cy, item, size) {
+  var hs = size * 0.35;
+  push();
+  translate(cx, cy);
+  noStroke();
+
+  var slot = item.slot;
+  if (slot === 'mainHand') {
+    // Weapon icon
+    fill(180, 170, 150);
+    rect(-1, -hs, 2, hs * 2);       // blade
+    fill(120, 90, 50);
+    rect(-3, hs * 0.4, 6, 3);       // crossguard
+    rect(-1, hs * 0.4, 2, hs * 0.5); // grip
+  } else if (slot === 'head') {
+    // Helmet
+    fill(160, 145, 110);
+    arc(0, 2, hs * 2, hs * 1.8, PI, TWO_PI);
+    rect(-hs, 2, hs * 2, 3);
+    if (item.icon === 'roman' || item.icon === 'crown') {
+      fill(200, 50, 40);
+      rect(-2, -hs * 0.6, 4, hs * 0.4);
+    }
+  } else if (slot === 'chest') {
+    // Armor
+    fill(140, 125, 100);
+    rect(-hs * 0.7, -hs * 0.6, hs * 1.4, hs * 1.4, 2);
+    fill(160, 145, 115);
+    rect(-hs * 0.5, -hs * 0.4, hs, 2);
+    rect(-hs * 0.5, 0, hs, 2);
+  } else if (slot === 'legs') {
+    // Greaves
+    fill(140, 125, 100);
+    rect(-hs * 0.4, -hs * 0.5, hs * 0.3, hs);
+    rect(hs * 0.1, -hs * 0.5, hs * 0.3, hs);
+  } else if (slot === 'feet') {
+    // Boots
+    fill(120, 85, 50);
+    rect(-hs * 0.5, -2, hs * 0.4, 6);
+    rect(hs * 0.1, -2, hs * 0.4, 6);
+    rect(-hs * 0.5, 3, hs * 0.6, 2);
+    rect(0, 3, hs * 0.6, 2);
+  } else if (slot === 'offHand') {
+    // Shield
+    fill(140, 120, 85);
+    ellipse(0, 0, hs * 1.6, hs * 1.8);
+    fill(160, 140, 100);
+    ellipse(0, 0, hs * 0.6, hs * 0.6);
+  } else if (slot === 'tool') {
+    // Tool
+    fill(120, 90, 50);
+    rect(-1, -hs * 0.3, 2, hs * 1.2); // handle
+    fill(170, 165, 155);
+    rect(-hs * 0.3, -hs * 0.5, hs * 0.6, hs * 0.4); // head
+  } else if (slot === 'trinket') {
+    // Trinket/amulet
+    fill(200, 170, 60);
+    ellipse(0, 2, hs, hs);
+    fill(220, 190, 80);
+    ellipse(0, 2, hs * 0.5, hs * 0.5);
+    stroke(200, 170, 60);
+    strokeWeight(0.8);
+    noFill();
+    arc(0, -hs * 0.3, hs * 0.8, hs * 0.6, PI, TWO_PI);
+    noStroke();
+  }
+
+  pop();
+}
+
 function drawHotbar() {
   if (screenshotMode) return;
   let p = state.player;
@@ -1906,6 +2216,7 @@ function drawHUD() {
   if (state.weather && state.weather.type !== 'clear') hudH += hudLineH;
   if ((state.daysSinceRain || 0) >= 3) hudH += hudLineH;
   hudH += hudLineH; // crop select line
+  hudH += floor(hudLineH * 2.5); // player + centurion level bars
   if (state.quarrier && state.quarrier.unlocked) hudH += floor(14 * uiScale);
   hudH = min(hudH, height - 80); // clamp to avoid going off-screen
   drawHUDPanel(hudMargin, hudMargin, hudPanelW, hudH - floor(14 * uiScale));
@@ -1978,27 +2289,44 @@ function drawHUD() {
   let rankTitle = state.islandLevel >= 25 ? 'IMPERATOR' : state.islandLevel >= 20 ? 'CONSUL' : state.islandLevel >= 15 ? 'SENATOR' : state.islandLevel >= 10 ? 'GOVERNOR' : 'CITIZEN';
   text(rankTitle + ' — LV.' + state.islandLevel, hudX, cookedY + barBlockH + qOff);
   textFont('monospace');
+  // Player combat level + XP bar
+  let _plvl = state.player.level || 1;
+  let _pxp = state.player.xp || 0;
+  let _pxpNeed = _plvl * 100;
+  fill(180, 170, 140); textSize(hudSmallText);
+  text('LV.' + _plvl + '  ' + floor(_pxp) + '/' + _pxpNeed + ' XP', hudX, cookedY + barBlockH + hudLineH * 0.7 + qOff);
+  drawBarHUD(hudX, cookedY + barBlockH + hudLineH * 0.7 + floor(10 * uiScale) + qOff, barW * 0.6, max(4, floor(4 * uiScale)), _pxp / _pxpNeed, '#aabb55', '#556622', '');
+  // Centurion level
+  if (state.companionPets && state.companionPets.centurion) {
+    let _cp = state.companionPets.centurion;
+    let _ft = (typeof getFactionTerms === 'function') ? getFactionTerms() : { leader: 'Centurion' };
+    let _cxpNeed = (typeof companionXpForLevel === 'function') ? companionXpForLevel(_cp.level) : (_cp.level * 10);
+    fill(195, 170, 60); textSize(hudSmallText);
+    text(_ft.leader + ' Lv' + _cp.level + '  ' + floor(_cp.xp) + '/' + _cxpNeed, hudX, cookedY + barBlockH + hudLineH * 1.6 + qOff);
+    drawBarHUD(hudX, cookedY + barBlockH + hudLineH * 1.6 + floor(10 * uiScale) + qOff, barW * 0.6, max(4, floor(4 * uiScale)), _cp.xp / _cxpNeed, '#cc9944', '#664422', '');
+  }
   // Skill points alert
+  let _lvlBlockOff = hudLineH * 2.5; // space for player + centurion level bars
   let _skillOff = 0;
   if ((state.player.skillPoints || 0) > 0) {
     fill(255, 220, 80); textSize(hudTextSize);
-    text('[K] ' + state.player.skillPoints + ' skill pt' + (state.player.skillPoints > 1 ? 's' : '') + ' ready', hudX, cookedY + barBlockH + hudLineH + qOff);
+    text('[K] ' + state.player.skillPoints + ' skill pt' + (state.player.skillPoints > 1 ? 's' : '') + ' ready', hudX, cookedY + barBlockH + hudLineH + _lvlBlockOff + qOff);
     _skillOff = hudLineH;
   }
   // Season
   let seasonCol = getSeason() === 2 ? color(200, 140, 40) : getSeason() === 3 ? color(180, 200, 220) : getSeason() === 1 ? color(200, 180, 60) : color(80, 160, 50);
   fill(seasonCol);
   textSize(hudTextSize);
-  text(getSeasonName(), hudX, cookedY + barBlockH + hudLineH + _skillOff + qOff);
+  text(getSeasonName(), hudX, cookedY + barBlockH + hudLineH + _skillOff + _lvlBlockOff + qOff);
   // Seasonal crop hint
   let _scHint = typeof getSeasonalCrop === 'function' ? getSeasonalCrop() : null;
   if (_scHint) {
     fill(160, 150, 110, 160); textSize(hudSmallText);
-    text('Best crop: ' + _scHint.name, hudX, cookedY + barBlockH + hudLineH * 2 + _skillOff + qOff);
+    text('Best crop: ' + _scHint.name, hudX, cookedY + barBlockH + hudLineH * 2 + _skillOff + _lvlBlockOff + qOff);
   }
 
   // Ship status
-  let hudY = cookedY + barBlockH + hudLineH * 3 + _skillOff;
+  let hudY = cookedY + barBlockH + hudLineH * 3 + _skillOff + _lvlBlockOff;
   if (state.ship.state !== 'gone') {
     fill(color(C.solarBright));
     textSize(hudTextSize);
@@ -2550,6 +2878,12 @@ function drawBuildUI() {
   fill(160, 140, 100, 180);
   textSize(8);
   text('[B] close', width / 2, barY + 2);
+  if (typeof ROTATABLE_TYPES !== 'undefined' && ROTATABLE_TYPES.includes(state.buildType)) {
+    fill(140, 160, 200, 180);
+    textAlign(RIGHT, BOTTOM);
+    text('[R] Rotate', barX + barW - 4, barY - 6);
+    textAlign(CENTER, BOTTOM);
+  }
 
   // Selected item tooltip with cost or lock message
   let bp = BLUEPRINTS[state.buildType];

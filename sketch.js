@@ -5,7 +5,21 @@ p5.disableFriendlyErrors = true;
 
 // ─── ACCESSIBILITY SETTINGS (localStorage-persisted) ─────────────────────
 const _SETTINGS_KEY = 'mare_nostrum_settings';
-let gameSettings = { screenShake: true, fontScale: 1, lastSaveTime: 0, musicSource: 'lyre' };
+const DEFAULT_KEYBINDS = {
+  moveUp: 'W', moveDown: 'S', moveLeft: 'A', moveRight: 'D',
+  interact: 'E', sprint: 'SHIFT', dodge: 'ALT',
+  buildMode: 'B', demolish: 'X', rotate: 'R',
+  inventory: 'I', map: 'M', recipeBook: 'G', legia: 'L', fish: 'F', debug: '`'
+};
+const KEYBIND_LABELS = {
+  moveUp: 'Move Up', moveDown: 'Move Down', moveLeft: 'Move Left', moveRight: 'Move Right',
+  interact: 'Interact', sprint: 'Sprint', dodge: 'Dodge',
+  buildMode: 'Build Mode', demolish: 'Demolish', rotate: 'Rotate',
+  inventory: 'Inventory', map: 'Map', recipeBook: 'Recipe Book', legia: 'Legion', fish: 'Fish', debug: 'Debug'
+};
+let gameSettings = { screenShake: true, fontScale: 1, lastSaveTime: 0, musicSource: 'lyre', keybinds: {} };
+let _rebindingAction = null;
+let _keybindScrollOffset = 0;
 function _loadSettings() {
   try {
     let d = JSON.parse(localStorage.getItem(_SETTINGS_KEY));
@@ -14,11 +28,31 @@ function _loadSettings() {
       if (d.fontScale !== undefined) gameSettings.fontScale = d.fontScale;
       if (d.lastSaveTime !== undefined) gameSettings.lastSaveTime = d.lastSaveTime;
       if (d.musicSource !== undefined) gameSettings.musicSource = d.musicSource;
+      if (d.keybinds) gameSettings.keybinds = d.keybinds;
     }
   } catch(e) {}
 }
 function _saveSettings() {
   try { localStorage.setItem(_SETTINGS_KEY, JSON.stringify(gameSettings)); } catch(e) {}
+}
+function getKeybind(action) {
+  return gameSettings.keybinds[action] || DEFAULT_KEYBINDS[action] || '';
+}
+function keyMatchesAction(action, k, kc) {
+  let bound = getKeybind(action).toUpperCase();
+  if (bound === 'SHIFT') return kc === 16;
+  if (bound === 'ALT') return kc === 18;
+  if (bound === 'TAB') return kc === 9;
+  if (bound === 'ENTER') return kc === 13;
+  if (bound === 'ESCAPE') return kc === 27;
+  if (bound === '`') return k === '`';
+  return k === bound || k === bound.toLowerCase();
+}
+function isKeybindDown(action) {
+  let bound = getKeybind(action).toUpperCase();
+  if (bound === 'SHIFT') return keyIsDown(16);
+  if (bound === 'ALT') return keyIsDown(18);
+  return keyIsDown(bound.charCodeAt(0));
 }
 _loadSettings();
 
@@ -626,6 +660,10 @@ const GODS = {
   gaul:      { name: 'Cernunnos', domain: 'Nature', ultimate: 'Wild Hunt', blessingOptions: ['forest_growth', 'beast_bond', 'earth_strength'] },
 };
 
+const TEMPLE_HALLS={rome:{name:'Temple of Mars',floor1:[210,205,195],floor2:[170,165,155],wall:[45,35,28],drape:[175,28,28],accent:[200,170,50],trim:[185,178,165],altarShape:'eagle',altarColor:[200,170,50],decoType:'laurel',decoColor:[80,140,50],pet:'wolf',petColor:[140,120,100],petAccent:[100,85,70]},carthage:{name:'Temple of Tanit',floor1:[212,180,120],floor2:[180,150,100],wall:[60,40,25],drape:[120,50,160],accent:[212,180,60],trim:[240,230,208],altarShape:'crescent',altarColor:[212,180,60],decoType:'gold_disc',decoColor:[212,180,60],pet:'monkey',petColor:[160,110,60],petAccent:[200,160,110]},egypt:{name:'Temple of Ra',floor1:[232,200,114],floor2:[200,170,90],wall:[50,45,35],drape:[40,100,180],accent:[200,170,40],trim:[245,240,224],altarShape:'pyramid',altarColor:[200,170,40],decoType:'lotus',decoColor:[100,180,160],pet:'cat',petColor:[180,140,80],petAccent:[220,180,100]},greece:{name:'Temple of Athena',floor1:[240,240,248],floor2:[200,200,210],wall:[40,40,50],drape:[80,144,192],accent:[80,144,192],trim:[220,220,230],altarShape:'olive',altarColor:[80,140,50],decoType:'column',decoColor:[200,200,210],pet:'owl',petColor:[160,140,100],petAccent:[220,200,140]},seapeople:{name:'Temple of Poseidon',floor1:[138,120,90],floor2:[110,95,70],wall:[35,30,25],drape:[60,100,140],accent:[42,138,106],trim:[110,100,80],altarShape:'anchor',altarColor:[120,120,130],decoType:'net',decoColor:[90,110,100],pet:'crab',petColor:[200,80,60],petAccent:[220,120,80]},persia:{name:'Temple of Ahura Mazda',floor1:[220,200,160],floor2:[180,160,120],wall:[40,30,30],drape:[42,74,138],accent:[212,160,48],trim:[230,220,200],altarShape:'fire',altarColor:[255,140,30],decoType:'wingedsun',decoColor:[212,160,48],pet:'falcon',petColor:[120,90,60],petAccent:[180,150,100]},phoenicia:{name:'Temple of Melqart',floor1:[220,215,210],floor2:[180,175,170],wall:[45,30,30],drape:[138,16,80],accent:[180,120,40],trim:[200,190,175],altarShape:'ship',altarColor:[180,120,40],decoType:'wave',decoColor:[48,112,176],pet:'parrot',petColor:[60,180,60],petAccent:[255,80,40]},gaul:{name:'Temple of Cernunnos',floor1:[120,100,65],floor2:[95,80,50],wall:[30,28,20],drape:[42,106,48],accent:[200,160,32],trim:[100,80,50],altarShape:'dolmen',altarColor:[140,130,110],decoType:'mistletoe',decoColor:[80,140,50],pet:'boar',petColor:[120,90,60],petAccent:[80,60,40]}};
+const TEMPLE_JESTER_JOKES={rome:['Why did the Roman cross the road? To get to the other empire!','A senator walks into a bar. The bar wins the election.','What is a gladiators favorite season? FALL!','I told my centurion a joke. He said That is I funny.','How do Romans cut their hair? With Caesars!','What did the grape say when the legionary stepped on it? Nothing, it let out a little wine.'],carthage:['Why are Carthaginian merchants so calm? They always find a fair trade!','I asked Hannibal for directions. He took the long way over the Alps.','What is a Punic traders favorite game? Monopoly!','Our elephants never forget... especially debts.','Why did the merchant cross the sea? Profit was on the other side!','Tanit told me the moon was full. I said, so is my warehouse!'],egypt:['Why do mummies skip vacations? They are afraid to unwind!','What is a pharaohs favorite restaurant? Pizza Tut!','I tried to write in hieroglyphs but I kept drawing a blank.','Why was the pyramid jealous? The sphinx always had a riddle!','What music do mummies listen to? Wrap music!','Ra told me to lighten up. He does that every morning.'],greece:['Why did Achilles fail math? He could never solve his heel problem!','I asked Socrates a question. He answered with twelve more.','What is an Athenians favorite dessert? Baklava-nt to miss it!','Odysseus took ten years to get home. Should have asked for directions!','Why are Greek columns always tired? They have been holding things up for ages!','Diogenes found an honest man. Just kidding, he is still looking.'],seapeople:['Why do sea people make bad comedians? Their jokes are all washed up!','I told a wave joke but it did not make a splash.','What is a raiders favorite letter? Arrrr!','Our navigator got lost. Again. That is how we found this place!','Why did the fish blush? It saw the oceans bottom!','I tried anchoring a joke but it just sank.'],persia:['Why is the Persian Empire so bright? Because of Ahura Mazdas light bulb!','A satrap walks into a palace. Nice place, he says. I will take it.','What is an immortals least favorite thing? Mortality jokes!','Zoroaster said truth is sacred. My tax collector disagrees.','Why did the courier run so fast? The Royal Road was one way!','Our gardens hang. Our empire hangs on. I just hang around.'],phoenicia:['Why did the Phoenician invent the alphabet? Tired of drawing pictures!','I shipped a joke overseas but the punchline got lost at sea.','What did the sailor say to the purple dye? You are worth a fortune!','Our ships are unsinkable! ...Do not check the harbor.','Why do Phoenicians make great friends? They always stay in touch - by letter!','Melqart blessed our trade. Now even our jokes are priceless.'],gaul:['Why did the druid hug a tree? It was an oak-casion!','A boar walked into a feast. He was the main course!','What is a Gauls favorite drink? Anything fermented!','I asked the mistletoe for advice. It just hung there.','Why do druids make bad builders? They only work with natural materials!','Cernunnos told a deer joke. It was stag-gering.']};
+const TEMPLE_ACHIEVEMENTS=[{id:'first_harvest',name:'First Harvest',icon:'crop',milestone:'first_harvest'},{id:'built_temple',name:'Built Temple',icon:'temple',milestone:'first_build'},{id:'won_battle',name:'Won Battle',icon:'sword',milestone:'victory_conquest'},{id:'reached_level10',name:'Reached Lv10',icon:'star',milestone:'reached_lv10'},{id:'allied_nation',name:'Allied Nation',icon:'handshake',milestone:'visit_nation_0'},{id:'built_army',name:'Built Army',icon:'shield',milestone:'faction_chosen_rome'},{id:'explored_islands',name:'Explorer',icon:'compass',milestone:'game_complete'},{id:'tutorial_done',name:'Tutorial Done',icon:'scroll',milestone:'tutorial_complete'}];
+
 // ─── WRECK ISLAND CONFIG ────────────────────────────────────────────────
 const WRECK = {
   cx: -4800, cy: 0,       // wreck beach center (far west, separate from everything)
@@ -1060,6 +1098,8 @@ const BLUEPRINTS = {
   crystal_collector: { name: 'Crystal Collector', w: 40, h: 30, cost: { stone: 15, gold: 30 }, key: '', blocks: true, minLevel: 5, desc: 'Automatically harvests nearby crystal nodes', upkeep: 1 },
 };
 
+const ROTATABLE_TYPES = ['wall', 'door', 'fence', 'bridge', 'aqueduct', 'arch'];
+
 // ─── BUILDING MAINTENANCE ────────────────────────────────────────────────────────
 function calculateBuildingMaintenance() {
   let total = 0;
@@ -1366,6 +1406,7 @@ function initState() {
         walkTimer: 0,          // accumulator for walk frame advance
         helmetOff: false,      // cozy mode — no helmet when farming
       },
+      defense: 2, levelAtk: 1, // defense and attack bonus from leveling
       // Combat expansion
       level: 1, xp: 0, skillPoints: 0, totalXp: 0,
       comboCount: 0, comboTimer: 0,   // chain attacks within 40 frames for combo
@@ -1552,7 +1593,7 @@ function initState() {
       crow:      { level: 1, xp: 0, behavior: 'idle', behaviorTimer: 0, giftCooldown: 0, lastGiftDay: -1, nearPlayerTimer: 0, sleepPos: null,
                    x: WORLD.islandCX, y: WORLD.islandCY - 60, vx: 0, vy: 0, facing: 1, circlePhase: 0, cawTimer: 0, bringTimer: 0, lastBringDay: -1, landed: false, perchTarget: null },
       centurion: { level: 1, xp: 0, behavior: 'idle', behaviorTimer: 0, giftCooldown: 0, lastGiftDay: -1, nearPlayerTimer: 0, sleepPos: null,
-                   patrolTimer: 0, saluteTimer: 0, trainTimer: 0 },
+                   patrolTimer: 0, saluteTimer: 0, trainTimer: 0, ability: null },
     },
 
     // Fisherman NPC — sits on boat at shore, brings fish periodically
@@ -1576,6 +1617,11 @@ function initState() {
 
     // Temple interior
     insideTemple: false,
+    templePetX: 0, templePetY: 0,
+    templeJesterAnimTimer: 0,
+    templeJesterJokedToday: false,
+    templeAdvisorTalked: false,
+    templePetAnimTimer: 0,
 
     // Build mode
     buildMode: false,
@@ -1601,6 +1647,8 @@ function initState() {
 
     // Tool upgrades (0=none, 1=bronze, 2=iron)
     tools: { sickle: 0, axe: 0, net: 0 },
+    // Character equipment (WoW-style slots)
+    equipment: { head: null, chest: null, legs: null, feet: null, mainHand: null, offHand: null, tool: null, trinket: null },
 
     // Cats — ambient near ruins
     cats: [],
@@ -3091,6 +3139,7 @@ function drawInner() {
     if (typeof drawEconomyUIOverlay === 'function') drawEconomyUIOverlay();
     drawModifierSelectUI();
     drawBountyBoard();
+    if (typeof drawLevelUpPopup === 'function') drawLevelUpPopup();
     drawScreenFlash();
     drawCursor();
   } else if (state.adventure.active) {
@@ -3584,6 +3633,7 @@ function drawInner() {
       drawDialogSystem();
       drawEmpireDashboard();
       drawInventoryScreen();
+      if (typeof drawEquipmentWindow === 'function') drawEquipmentWindow();
       if (typeof drawSkillTree === 'function') drawSkillTree();
       if (typeof drawRecipeBookUI === 'function') drawRecipeBookUI();
       drawLegiaUI();
@@ -3596,6 +3646,7 @@ function drawInner() {
       if (typeof drawArenaSummaryOverlay === 'function') drawArenaSummaryOverlay();
       drawWardrobe();
       drawAchievementPopup();
+      if (typeof drawLevelUpPopup === 'function') drawLevelUpPopup();
       if (typeof drawAchievementsPanel === 'function') drawAchievementsPanel();
       if (typeof drawDailyQuestHUD === 'function') drawDailyQuestHUD();
       if (typeof drawHarvestArcs === 'function') drawHarvestArcs();
@@ -3809,6 +3860,7 @@ function updateTime(dt) {
     }
     // ─── NEW BUILDING DAILY EFFECTS ──────────────────────────────────────
     state._altarPrayedToday = false; // Reset altar prayer
+    state.templeJesterJokedToday = false;
     // God prayer cooldown tick
     if (state.god && state.god.prayerCooldown > 0) state.god.prayerCooldown = max(0, state.god.prayerCooldown - 1440);
     if (state.god && state.god.blessingTimer > 0) {
@@ -6552,200 +6604,436 @@ function drawTempleInterior(dt) {
     return;
   }
 
-  push();
-  // Dark interior background
-  background(20, 15, 10);
+  var fk = state.faction || 'rome';
+  var hall = TEMPLE_HALLS[fk] || TEMPLE_HALLS.rome;
+  var ft = frameCount;
+  var gPulse = sin(ft * 0.03) * 0.2 + 0.8;
 
-  // Checkerboard marble floor
+  // Pet follow logic
+  if (!state.templePetX) { state.templePetX = tp; state.templePetY = tpy + 15; }
+  var petDist = dist(state.templePetX, state.templePetY, tp, tpy + 10);
+  if (petDist > 25) {
+    state.templePetX += (tp - state.templePetX) * 0.06;
+    state.templePetY += (tpy + 10 - state.templePetY) * 0.06;
+  }
+  var petBob = sin(ft * 0.08) * (petDist > 20 ? 0.5 : 1.5);
+
+  push();
+  background(hall.wall[0] * 0.4, hall.wall[1] * 0.4, hall.wall[2] * 0.4);
+
+  // Faction-themed floor
   noStroke();
-  let tileS = 32;
-  for (let tx = 0; tx < width; tx += tileS) {
-    for (let ty = floor(height * 0.3); ty < height; ty += tileS) {
-      let light = (floor(tx / tileS) + floor(ty / tileS)) % 2 === 0;
-      fill(light ? color(210, 205, 195) : color(140, 135, 125));
+  var tileS = 32;
+  for (var tx = 0; tx < width; tx += tileS) {
+    for (var ty = floor(height * 0.3); ty < height; ty += tileS) {
+      var light = (floor(tx / tileS) + floor(ty / tileS)) % 2 === 0;
+      fill(light ? hall.floor1[0] : hall.floor2[0], light ? hall.floor1[1] : hall.floor2[1], light ? hall.floor1[2] : hall.floor2[2]);
       rect(tx, ty, tileS, tileS);
     }
   }
 
   // Back wall
-  fill(45, 35, 28);
+  fill(hall.wall[0], hall.wall[1], hall.wall[2]);
   rect(0, 0, width, height * 0.32);
-  // Wall base molding
-  fill(60, 48, 35);
+  // Wall trim
+  fill(hall.trim[0], hall.trim[1], hall.trim[2]);
   rect(0, height * 0.30, width, height * 0.02);
-  // Wall top molding
-  fill(55, 42, 30);
-  rect(0, 0, width, 8);
+  rect(0, 0, width, 6);
 
-  // Sol Invictus mosaic on back wall
-  let mosaicX = width / 2;
-  let mosaicY = height * 0.16;
-  let mosaicR = 36;
-  // Outer glow
-  let gPulse = sin(frameCount * 0.03) * 0.2 + 0.8;
-  for (let gr = mosaicR + 20; gr > mosaicR; gr -= 4) {
-    fill(255, 200, 60, 8 * gPulse);
-    circle(mosaicX, mosaicY, gr * 2);
+  // Drapes on walls
+  fill(hall.drape[0], hall.drape[1], hall.drape[2], 180);
+  rect(width * 0.05, height * 0.04, 18, height * 0.25);
+  rect(width * 0.95 - 18, height * 0.04, 18, height * 0.25);
+  fill(hall.drape[0] * 0.7, hall.drape[1] * 0.7, hall.drape[2] * 0.7, 80);
+  for (var df = 0; df < 3; df++) {
+    rect(width * 0.05 + 4 + df * 5, height * 0.06 + df * 8, 2, height * 0.2 - df * 8);
+    rect(width * 0.95 - 14 + df * 5, height * 0.06 + df * 8, 2, height * 0.2 - df * 8);
   }
-  // Sun disk
-  fill(212, 170, 50);
-  circle(mosaicX, mosaicY, mosaicR * 2);
-  fill(240, 200, 70);
-  circle(mosaicX, mosaicY, mosaicR * 1.4);
-  fill(255, 230, 120);
-  circle(mosaicX, mosaicY, mosaicR * 0.7);
-  // Rays
-  stroke(212, 170, 50, 180);
-  strokeWeight(2.5);
-  for (let r = 0; r < 12; r++) {
-    let a = r * TWO_PI / 12 + frameCount * 0.005;
-    let inner = mosaicR + 4;
-    let outer = mosaicR + 22;
-    line(mosaicX + cos(a) * inner, mosaicY + sin(a) * inner,
-         mosaicX + cos(a) * outer, mosaicY + sin(a) * outer);
+
+  // === ALTAR (center-top) ===
+  var altarX = width / 2, altarY = height * 0.38;
+  fill(hall.altarColor[0] * 0.6, hall.altarColor[1] * 0.6, hall.altarColor[2] * 0.6);
+  rect(altarX - 22, altarY, 44, 18, 2);
+  fill(hall.altarColor[0] * 0.8, hall.altarColor[1] * 0.8, hall.altarColor[2] * 0.8);
+  rect(altarX - 24, altarY - 4, 48, 6, 2);
+  // Altar icon
+  fill(hall.altarColor[0], hall.altarColor[1], hall.altarColor[2]);
+  if (hall.altarShape === 'eagle') {
+    triangle(altarX, altarY - 18, altarX - 14, altarY - 6, altarX + 14, altarY - 6);
+    rect(altarX - 2, altarY - 22, 4, 6);
+    ellipse(altarX, altarY - 24, 6, 5);
+  } else if (hall.altarShape === 'crescent') {
+    arc(altarX, altarY - 14, 24, 24, PI + 0.4, TWO_PI - 0.4);
+    fill(hall.wall[0], hall.wall[1], hall.wall[2]);
+    ellipse(altarX + 5, altarY - 15, 16, 16);
+  } else if (hall.altarShape === 'pyramid') {
+    triangle(altarX, altarY - 26, altarX - 16, altarY - 4, altarX + 16, altarY - 4);
+    fill(hall.accent[0], hall.accent[1], hall.accent[2], 120);
+    ellipse(altarX, altarY - 14, 8, 6);
+  } else if (hall.altarShape === 'olive') {
+    stroke(hall.altarColor[0], hall.altarColor[1], hall.altarColor[2]);
+    strokeWeight(2); noFill();
+    arc(altarX, altarY - 12, 20, 24, -PI * 0.8, -PI * 0.2);
+    noStroke();
+    for (var ol = 0; ol < 5; ol++) {
+      var oa = -PI * 0.8 + ol * 0.12 * PI;
+      fill(hall.altarColor[0], hall.altarColor[1], hall.altarColor[2]);
+      ellipse(altarX + cos(oa) * 10, altarY - 12 + sin(oa) * 12, 5, 3);
+    }
+  } else if (hall.altarShape === 'anchor') {
+    stroke(hall.altarColor[0], hall.altarColor[1], hall.altarColor[2]);
+    strokeWeight(2.5); noFill();
+    line(altarX, altarY - 24, altarX, altarY - 6);
+    line(altarX - 10, altarY - 22, altarX + 10, altarY - 22);
+    arc(altarX, altarY - 6, 18, 14, 0, PI);
+    noStroke();
+  } else if (hall.altarShape === 'fire') {
+    for (var f = 0; f < 3; f++) {
+      var fw = (3 - f) * 5;
+      var fh = 18 * (1 - f * 0.25);
+      var flicker = sin(ft * 0.15 + f * 1.5) * 3;
+      fill(255, 100 + f * 50, 20 + f * 20, 220 - f * 30);
+      beginShape();
+      vertex(altarX - fw + flicker, altarY - 4);
+      quadraticVertex(altarX, altarY - 4 - fh, altarX + fw + flicker, altarY - 4);
+      endShape(CLOSE);
+    }
+  } else if (hall.altarShape === 'ship') {
+    fill(hall.altarColor[0], hall.altarColor[1], hall.altarColor[2]);
+    beginShape();
+    vertex(altarX - 14, altarY - 6); vertex(altarX + 14, altarY - 6);
+    vertex(altarX + 10, altarY - 14); vertex(altarX, altarY - 22);
+    vertex(altarX - 10, altarY - 14);
+    endShape(CLOSE);
+  } else if (hall.altarShape === 'dolmen') {
+    fill(hall.altarColor[0], hall.altarColor[1], hall.altarColor[2]);
+    rect(altarX - 14, altarY - 8, 6, 12);
+    rect(altarX + 8, altarY - 8, 6, 12);
+    rect(altarX - 16, altarY - 14, 32, 6, 1);
   }
   noStroke();
-  // Face features
-  fill(180, 140, 40);
-  circle(mosaicX - 8, mosaicY - 4, 5);
-  circle(mosaicX + 8, mosaicY - 4, 5);
-  arc(mosaicX, mosaicY + 8, 16, 8, 0, PI);
 
-  // 4 Columns (2 per side)
-  let colPositions = [width * 0.18, width * 0.32, width * 0.68, width * 0.82];
-  for (let ci = 0; ci < colPositions.length; ci++) {
-    let cx = colPositions[ci];
-    let colTop2 = height * 0.08;
-    let colBot = height * 0.82;
-    // Base
-    fill(180, 174, 164);
+  // Altar glow
+  fill(hall.altarColor[0], hall.altarColor[1], hall.altarColor[2], 15 * gPulse);
+  circle(altarX, altarY - 8, 80);
+
+  // 4 Columns
+  var colPositions = [width * 0.18, width * 0.32, width * 0.68, width * 0.82];
+  for (var ci = 0; ci < colPositions.length; ci++) {
+    var cx = colPositions[ci];
+    var colTop2 = height * 0.08, colBot = height * 0.82;
+    fill(hall.trim[0] * 0.9, hall.trim[1] * 0.9, hall.trim[2] * 0.9);
     rect(cx - 14, colBot, 28, 10, 2);
-    // Shaft
-    fill(195, 188, 178);
+    fill(hall.trim[0], hall.trim[1], hall.trim[2]);
     rect(cx - 10, colTop2, 20, colBot - colTop2);
-    // Fluting
-    stroke(175, 168, 158, 50);
-    strokeWeight(0.8);
-    for (let f = -8; f <= 8; f += 4) {
-      line(cx + f, colBot, cx + f, colTop2 + 4);
-    }
-    noStroke();
-    // Capital
-    fill(200, 194, 184);
+    fill(hall.trim[0] * 0.85, hall.trim[1] * 0.85, hall.trim[2] * 0.85, 50);
+    for (var cf = -8; cf <= 8; cf += 4) { rect(cx + cf, colTop2 + 4, 1, colBot - colTop2 - 4); }
+    fill(hall.trim[0], hall.trim[1], hall.trim[2]);
     rect(cx - 14, colTop2 - 4, 28, 8, 2);
-    fill(212, 170, 64);
+    fill(hall.accent[0], hall.accent[1], hall.accent[2]);
     circle(cx - 12, colTop2, 4);
     circle(cx + 12, colTop2, 4);
   }
 
-  // Sacred flame altar (center)
-  let altarX = width / 2;
-  let altarY = height * 0.45;
-  // Altar base
-  fill(100, 80, 55);
-  rect(altarX - 20, altarY, 40, 16, 2);
-  fill(120, 95, 65);
-  rect(altarX - 18, altarY + 2, 36, 4);
-  // Altar top
-  fill(140, 110, 75);
-  rect(altarX - 22, altarY - 4, 44, 6, 2);
-  // Fire bowl
-  fill(80, 60, 40);
-  ellipse(altarX, altarY - 2, 24, 8);
-  // Animated fire
-  let ft = frameCount;
-  for (let f = 0; f < 4; f++) {
-    let fw = (4 - f) * 4;
-    let fh = 18 * (1 - f * 0.2);
-    let flicker = sin(ft * 0.15 + f * 1.5) * 3;
-    let fc = lerpColor(color(255, 100, 20, 220), color(255, 230, 60, 160), f / 4);
-    fill(fc);
-    beginShape();
-    vertex(altarX - fw + flicker, altarY - 4);
-    quadraticVertex(altarX - fw * 0.5, altarY - 4 - fh * 0.5, altarX + flicker * 0.3, altarY - 4 - fh);
-    quadraticVertex(altarX + fw * 0.5, altarY - 4 - fh * 0.5, altarX + fw + flicker, altarY - 4);
-    endShape(CLOSE);
-  }
-  // Fire glow
-  fill(255, 180, 60, 25 * gPulse);
-  circle(altarX, altarY - 10, 100);
-
-  // Torch sconces on walls (2)
-  let torchPositions = [{ x: width * 0.1, y: height * 0.18 }, { x: width * 0.9, y: height * 0.18 }];
-  for (let ti = 0; ti < torchPositions.length; ti++) {
-    let tx = torchPositions[ti].x;
-    let ty = torchPositions[ti].y;
-    // Bracket
+  // Torch sconces
+  var torchPositions = [{ x: width * 0.1, y: height * 0.18 }, { x: width * 0.9, y: height * 0.18 }];
+  for (var ti = 0; ti < torchPositions.length; ti++) {
+    var tx2 = torchPositions[ti].x, ty2 = torchPositions[ti].y;
     fill(100, 80, 50);
-    rect(tx - 3, ty, 6, 12);
-    rect(tx - 5, ty + 10, 10, 4);
-    // Torch flame
-    let tFlicker = sin(ft * 0.12 + ti * 3) * 2;
+    rect(tx2 - 3, ty2, 6, 12);
+    rect(tx2 - 5, ty2 + 10, 10, 4);
+    var tFlicker = sin(ft * 0.12 + ti * 3) * 2;
     fill(255, 140, 30, 200);
-    ellipse(tx + tFlicker, ty - 4, 10, 14);
+    ellipse(tx2 + tFlicker, ty2 - 4, 10, 14);
     fill(255, 220, 70, 160);
-    ellipse(tx + tFlicker * 0.6, ty - 7, 6, 8);
-    fill(255, 255, 180, 100);
-    ellipse(tx + tFlicker * 0.3, ty - 9, 3, 4);
-    // Torch glow
+    ellipse(tx2 + tFlicker * 0.6, ty2 - 7, 6, 8);
     fill(255, 160, 50, 12);
-    circle(tx, ty, 120);
+    circle(tx2, ty2, 120);
   }
 
-  // Warm ambient glow overlay
+  // === ACHIEVEMENT WALL (left side) ===
+  var achX = width * 0.08, achY = height * 0.4;
+  var analytics = {};
+  try { analytics = JSON.parse(localStorage.getItem('mare_nostrum_analytics')) || {}; } catch(e) {}
+  fill(hall.trim[0] * 0.7, hall.trim[1] * 0.7, hall.trim[2] * 0.7);
+  textSize(7); textAlign(CENTER, CENTER);
+  text('ACHIEVEMENTS', achX + 20, achY - 12);
+  for (var ai = 0; ai < TEMPLE_ACHIEVEMENTS.length; ai++) {
+    var ach = TEMPLE_ACHIEVEMENTS[ai];
+    var ax = achX + (ai % 2) * 28;
+    var ay = achY + floor(ai / 2) * 26;
+    var unlocked = !!analytics[ach.milestone];
+    fill(unlocked ? hall.accent[0] : 60, unlocked ? hall.accent[1] : 55, unlocked ? hall.accent[2] : 50, unlocked ? 220 : 100);
+    rect(ax, ay, 24, 20, 2);
+    fill(unlocked ? 255 : 80, unlocked ? 255 : 75, unlocked ? 255 : 70);
+    textSize(6);
+    var sym = ach.icon === 'crop' ? 'W' : ach.icon === 'temple' ? 'T' : ach.icon === 'sword' ? '+' : ach.icon === 'star' ? '*' : ach.icon === 'handshake' ? 'H' : ach.icon === 'shield' ? 'O' : ach.icon === 'compass' ? 'C' : 'S';
+    text(sym, ax + 12, ay + 7);
+    textSize(4);
+    text(ach.name, ax + 12, ay + 16);
+  }
+
+  // === ADVISOR NPC (right side, near altar) ===
+  var advX = width * 0.78, advY = height * 0.42;
+  noStroke();
+  fill(hall.drape[0] * 0.8, hall.drape[1] * 0.8, hall.drape[2] * 0.8);
+  rect(advX - 5, advY - 6, 10, 14, 2);
+  fill(196, 160, 110);
+  ellipse(advX, advY - 12, 10, 10);
+  fill(220, 215, 200);
+  arc(advX, advY - 12, 11, 8, PI, TWO_PI);
+  rect(advX - 3, advY - 8, 6, 4);
+  fill(120, 90, 50);
+  rect(advX + 7, advY - 20, 2, 28);
+  fill(hall.accent[0], hall.accent[1], hall.accent[2]);
+  circle(advX + 8, advY - 20, 4);
+  fill(240, 230, 200);
+  rect(advX - 6, advY - 2, 5, 3, 1);
+
+  if (dist(tp, tpy, advX, advY) < 45) {
+    fill(255, 220, 120, 200 + sin(ft * 0.08) * 40);
+    textSize(8); textAlign(CENTER, CENTER);
+    text('[E] Speak to Advisor', advX, advY + 22);
+  }
+
+  // === JESTER NPC (left side, near entrance) ===
+  var jestX = width * 0.22, jestY = height * 0.72;
+  var jestBob = sin(ft * 0.06) * 2;
+  if (state.templeJesterAnimTimer > 0) {
+    state.templeJesterAnimTimer -= dt;
+    jestBob = sin(ft * 0.3) * 6;
+  }
+  noStroke();
+  fill(hall.accent[0], hall.accent[1], hall.accent[2]);
+  rect(jestX - 5, jestY - 6 + jestBob, 10, 14, 2);
+  fill(hall.drape[0], hall.drape[1], hall.drape[2]);
+  rect(jestX - 4, jestY - 3 + jestBob, 4, 4);
+  rect(jestX + 1, jestY + 2 + jestBob, 4, 4);
+  fill(196, 160, 110);
+  ellipse(jestX, jestY - 12 + jestBob, 10, 10);
+  fill(hall.accent[0], hall.accent[1], hall.accent[2]);
+  triangle(jestX - 6, jestY - 16 + jestBob, jestX, jestY - 26 + jestBob, jestX - 1, jestY - 14 + jestBob);
+  triangle(jestX + 6, jestY - 16 + jestBob, jestX, jestY - 26 + jestBob, jestX + 1, jestY - 14 + jestBob);
+  fill(255, 230, 80);
+  circle(jestX - 6, jestY - 16 + jestBob, 3);
+  circle(jestX + 6, jestY - 16 + jestBob, 3);
+  fill(60, 40, 30);
+  circle(jestX - 2, jestY - 13 + jestBob, 1.5);
+  circle(jestX + 2, jestY - 13 + jestBob, 1.5);
+  noFill(); stroke(60, 40, 30); strokeWeight(0.8);
+  arc(jestX, jestY - 10 + jestBob, 6, 4, 0, PI);
+  noStroke();
+
+  if (dist(tp, tpy, jestX, jestY) < 45) {
+    fill(255, 220, 120, 200 + sin(ft * 0.08) * 40);
+    textSize(8); textAlign(CENTER, CENTER);
+    text('[E] Talk to Jester', jestX, jestY + 22);
+  }
+
+  // === PET ANIMAL ===
+  var petX = state.templePetX, petY = state.templePetY + petBob;
+  noStroke();
+  if (state.templePetAnimTimer > 0) {
+    state.templePetAnimTimer -= dt;
+    var spin = state.templePetAnimTimer * 0.02;
+    push(); translate(petX, petY); rotate(spin);
+    _drawTemplePet(hall, 0, 0);
+    pop();
+  } else {
+    _drawTemplePet(hall, petX, petY);
+  }
+
+  if (dist(tp, tpy, state.templePetX, state.templePetY) < 30) {
+    fill(255, 220, 120, 200 + sin(ft * 0.08) * 40);
+    textSize(8); textAlign(CENTER, CENTER);
+    text('[E] Pet', state.templePetX, state.templePetY + 16);
+  }
+
+  // Warm ambient glow
   noStroke();
   fill(255, 180, 80, 8);
   rect(0, 0, width, height);
 
-  // Crystal / Solar display
-  fill(200, 180, 120);
-  textAlign(CENTER, TOP);
-  textSize(10);
-  text('Temple of Sol Invictus', width / 2, 14);
-  fill(160, 150, 120);
-  textSize(11);
-  let _hudRank = ISLAND_RANKS[state.islandLevel];
-  text('Island Level ' + (state.islandLevel || 1) + (_hudRank ? ' — ' + _hudRank : '') + '  |  Day ' + state.day, width / 2, 28);
-
-  // Crystal and solar counts
-  fill(100, 220, 180);
+  // Hall name HUD
+  fill(hall.accent[0], hall.accent[1], hall.accent[2]);
+  textAlign(CENTER, TOP); textSize(10);
+  text(hall.name, width / 2, 14);
+  fill(hall.trim[0], hall.trim[1], hall.trim[2]);
   textSize(9);
+  var _hudRank = typeof ISLAND_RANKS !== 'undefined' ? ISLAND_RANKS[state.islandLevel] : '';
+  text('Level ' + (state.islandLevel || 1) + (_hudRank ? ' - ' + _hudRank : '') + '  |  Day ' + state.day, width / 2, 28);
+
+  // Crystal and solar
+  fill(100, 220, 180); textSize(9);
   text('Crystals: ' + state.crystals, width / 2 - 60, 42);
   fill(255, 200, 60);
   text('Solar: ' + state.solar + '/' + state.maxSolar, width / 2 + 60, 42);
 
   // Altar interaction prompt
-  let nearAltar = dist(tp, tpy, altarX, altarY) < 60;
-  if (nearAltar) {
+  if (dist(tp, tpy, altarX, altarY) < 60) {
     fill(255, 220, 120, 200 + sin(ft * 0.08) * 40);
-    textSize(9);
-    textAlign(CENTER, CENTER);
+    textSize(9); textAlign(CENTER, CENTER);
     if (state.crystals >= 5) {
-      text('[E] Offer 5 Crystals  →  +25 Solar', altarX, altarY + 30);
+      text('[E] Offer 5 Crystals  >  +25 Solar', altarX, altarY + 30);
     } else {
       fill(180, 120, 100);
       text('[E] Offer Crystals (need 5)', altarX, altarY + 30);
     }
   }
 
-  // Player in temple (simple Roman sprite)
+  // Player sprite
   fill(196, 160, 110);
   ellipse(tp, tpy - 18, 12, 12);
-  fill(200, 60, 40);
+  var pCol = FACTIONS[fk] ? FACTIONS[fk].player : FACTIONS.rome.player;
+  fill(pCol.tunic[0], pCol.tunic[1], pCol.tunic[2]);
   rect(tp - 6, tpy - 12, 12, 16, 2);
   fill(196, 160, 110);
   rect(tp - 2, tpy + 4, 4, 8);
 
   // Exit hints
-  fill(160, 150, 130, 160);
-  textAlign(CENTER, CENTER);
-  textSize(11);
+  fill(hall.trim[0], hall.trim[1], hall.trim[2], 160);
+  textAlign(CENTER, CENTER); textSize(11);
   text('[ESC] Exit Temple', width / 2, height * 0.95);
-  text('↓ Walk south to exit', width / 2, height * 0.88);
+  text('v Walk south to exit', width / 2, height * 0.88);
 
   textAlign(LEFT, TOP);
   pop();
 }
+
+function _drawTemplePet(hall, px, py) {
+  noStroke();
+  var pc = hall.petColor, pa = hall.petAccent;
+  fill(pc[0], pc[1], pc[2]);
+  if (hall.pet === 'wolf') {
+    ellipse(px, py, 10, 7);
+    fill(pa[0], pa[1], pa[2]);
+    ellipse(px - 5, py - 2, 5, 4);
+    triangle(px - 7, py - 5, px - 5, py - 8, px - 3, py - 5);
+  } else if (hall.pet === 'monkey') {
+    ellipse(px, py, 8, 8);
+    fill(pa[0], pa[1], pa[2]);
+    ellipse(px, py - 5, 7, 6);
+    fill(60, 40, 30);
+    circle(px - 1, py - 5, 1.5); circle(px + 1, py - 5, 1.5);
+    noFill(); stroke(pc[0], pc[1], pc[2]); strokeWeight(1);
+    arc(px + 5, py, 8, 10, -PI * 0.5, PI * 0.5);
+    noStroke();
+  } else if (hall.pet === 'cat') {
+    ellipse(px, py, 9, 7);
+    fill(pa[0], pa[1], pa[2]);
+    ellipse(px - 4, py - 2, 6, 5);
+    triangle(px - 6, py - 5, px - 4, py - 9, px - 2, py - 5);
+    triangle(px - 7, py - 5, px - 5, py - 9, px - 3, py - 5);
+    stroke(180); strokeWeight(0.4);
+    line(px - 7, py - 2, px - 11, py - 3);
+    line(px - 7, py - 1, px - 11, py);
+    noStroke();
+  } else if (hall.pet === 'owl') {
+    ellipse(px, py, 8, 10);
+    fill(pa[0], pa[1], pa[2]);
+    ellipse(px, py - 4, 8, 6);
+    fill(60, 50, 30);
+    circle(px - 2, py - 4, 2.5); circle(px + 2, py - 4, 2.5);
+    fill(220, 180, 60);
+    triangle(px, py - 3, px - 1, py - 1, px + 1, py - 1);
+  } else if (hall.pet === 'crab') {
+    ellipse(px, py, 10, 6);
+    fill(pa[0], pa[1], pa[2]);
+    circle(px - 6, py - 2, 4); circle(px + 6, py - 2, 4);
+    fill(20); circle(px - 2, py - 4, 1.5); circle(px + 2, py - 4, 1.5);
+  } else if (hall.pet === 'falcon') {
+    ellipse(px, py, 8, 6);
+    fill(pa[0], pa[1], pa[2]);
+    ellipse(px - 3, py - 1, 5, 4);
+    fill(60, 50, 30);
+    triangle(px - 6, py - 1, px - 8, py, px - 6, py + 1);
+    fill(pc[0] * 0.8, pc[1] * 0.8, pc[2] * 0.8);
+    ellipse(px + 2, py - 1, 6, 3);
+  } else if (hall.pet === 'parrot') {
+    fill(pc[0], pc[1], pc[2]);
+    ellipse(px, py, 7, 8);
+    fill(pa[0], pa[1], pa[2]);
+    ellipse(px, py - 4, 6, 5);
+    fill(255, 200, 60);
+    triangle(px - 4, py - 4, px - 6, py - 3, px - 4, py - 2);
+    fill(60);
+    circle(px - 1, py - 5, 1.2); circle(px + 1, py - 5, 1.2);
+  } else if (hall.pet === 'boar') {
+    ellipse(px, py, 12, 8);
+    fill(pa[0], pa[1], pa[2]);
+    ellipse(px - 5, py, 5, 4);
+    fill(200, 140, 110);
+    ellipse(px - 7, py, 3, 2.5);
+    fill(240);
+    rect(px - 8, py + 1, 2, 1);
+  }
+}
+
+function _templeInteractE() {
+  var tp = state.templePlayerX || width / 2;
+  var tpy = state.templePlayerY || height * 0.75;
+  var fk = state.faction || 'rome';
+  var hall = TEMPLE_HALLS[fk] || TEMPLE_HALLS.rome;
+  var altarX = width / 2, altarY = height * 0.38;
+
+  // Altar interaction (crystal -> solar)
+  if (dist(tp, tpy, altarX, altarY) < 60) {
+    if (state.crystals >= 5) {
+      state.crystals -= 5;
+      state.solar = min(state.solar + 25, state.maxSolar);
+      if (snd) snd.playSFX('crystal');
+      addFloatingText(width / 2, height * 0.25, '+25 Solar Energy', C.solarBright);
+      spawnParticles(state.player.x, state.player.y, 'divine', 8);
+    } else {
+      addFloatingText(width / 2, height * 0.25, 'Need 5 Crystals', '#ff8888');
+    }
+    return true;
+  }
+
+  // Advisor interaction
+  var advX = width * 0.78, advY = height * 0.42;
+  if (dist(tp, tpy, advX, advY) < 45) {
+    var advice = 'You are prospering, leader!';
+    if (state.harvest < 20) advice = 'Your food stores are low. Build more farms.';
+    else if (state.legia && state.legia.soldiers && state.legia.soldiers.length < 5) advice = 'Our military is weak. Train more soldiers.';
+    else if (state.nations) {
+      var nk = Object.keys(state.nations);
+      var badRep = nk.find(function(k) { return state.nations[k] && state.nations[k].reputation < -20; });
+      if (badRep) advice = 'The nations grow restless. Consider diplomacy.';
+    }
+    addFloatingText(width / 2, height * 0.25, advice, '#ffd080');
+    if (snd) snd.playSFX('click');
+    return true;
+  }
+
+  // Jester interaction
+  var jestX = width * 0.22, jestY = height * 0.72;
+  if (dist(tp, tpy, jestX, jestY) < 45) {
+    var jokes = TEMPLE_JESTER_JOKES[fk] || TEMPLE_JESTER_JOKES.rome;
+    var joke = jokes[floor(random(jokes.length))];
+    addFloatingText(width / 2, height * 0.25, joke, '#ffee88');
+    state.templeJesterAnimTimer = 60;
+    if (!state.templeJesterJokedToday) {
+      state.templeJesterJokedToday = true;
+      if (typeof state.morale !== 'undefined') state.morale = min(100, (state.morale || 50) + 5);
+      addFloatingText(width / 2, height * 0.32, '+5 Morale', '#aaffaa');
+    }
+    if (snd) snd.playSFX('click');
+    return true;
+  }
+
+  // Pet interaction
+  if (dist(tp, tpy, state.templePetX || tp, state.templePetY || tpy) < 30) {
+    state.templePetAnimTimer = 90;
+    var petSound = hall.pet === 'cat' ? 'Mrrrow!' : hall.pet === 'wolf' ? 'Awoo!' : hall.pet === 'owl' ? 'Hoo hoo!' : hall.pet === 'crab' ? '*click click*' : hall.pet === 'monkey' ? 'Ooh ooh!' : hall.pet === 'falcon' ? 'Screee!' : hall.pet === 'parrot' ? 'Squawk!' : 'Oink!';
+    addFloatingText(state.templePetX || tp, (state.templePetY || tpy) - 15, petSound, '#ffccaa');
+    if (snd) snd.playSFX('click');
+    return true;
+  }
+
+  return false;
+}
+
 
 function drawPyramid() {
   let pyr = state.pyramid;
@@ -7940,6 +8228,11 @@ function selectFaction(faction) {
   addFloatingText(width / 2, height * 0.25, FACTIONS[faction].name + ' — ' + FACTIONS[faction].subtitle, FACTIONS[faction].accentColorHex);
   // Initialize god for this faction
   state.god = { faction: faction, prayerCooldown: 0, ultimateCharge: 0, blessingActive: null, blessingTimer: 0 };
+  // Auto-equip faction starter gear
+  if (typeof FACTION_STARTER_GEAR !== "undefined" && FACTION_STARTER_GEAR[faction]) {
+    var gear = FACTION_STARTER_GEAR[faction];
+    for (var slot in gear) { if (gear[slot]) equipItem(gear[slot]); }
+  }
   trackMilestone('faction_chosen_' + faction);
   // Initialize all rival nations (everyone except player's faction)
   initNations();
@@ -8419,6 +8712,9 @@ function drawOneBuilding(b) {
 
     push();
     translate(sx, sy);
+    if (b.rot && ROTATABLE_TYPES.includes(b.type)) {
+      rotate(b.rot * HALF_PI);
+    }
     if (_building) {
       // Scale Y from ground (base of building), fade alpha
       scale(1, _buildEased);
@@ -11024,7 +11320,7 @@ function drawBuildGhost() {
   let bw = bp.w;
   let bh = bp.h;
 
-  if (state.buildRotation === 1 && (state.buildType === 'wall' || state.buildType === 'door')) {
+  if ((state.buildRotation === 1 || state.buildRotation === 3) && ROTATABLE_TYPES.includes(state.buildType)) {
     let tmp = bw; bw = bh; bh = tmp;
   }
 
@@ -11042,7 +11338,7 @@ function drawBuildGhost() {
   let valid = posValid && canAfford(state.buildType);
 
   // Ghost building sprite with transparency
-  let ghostBuilding = { x: wx, y: wy, w: bw, h: bh, type: state.buildType };
+  let ghostBuilding = { x: wx, y: wy, w: bw, h: bh, type: state.buildType, rot: state.buildRotation };
   push();
   drawingContext.globalAlpha = valid ? 0.55 : 0.25;
   drawOneBuilding(ghostBuilding);
@@ -11161,17 +11457,34 @@ function placeBuilding(wx, wy) {
 
   let bw = bp.w;
   let bh = bp.h;
-  if (state.buildRotation === 1 && (state.buildType === 'wall' || state.buildType === 'door')) {
+  if ((state.buildRotation === 1 || state.buildRotation === 3) && ROTATABLE_TYPES.includes(state.buildType)) {
     let tmp = bw; bw = bh; bh = tmp;
   }
 
   payCost(state.buildType);
-  state.buildings.push({
+  let newBuilding = {
     x: wx, y: wy,
     type: state.buildType,
     w: bw, h: bh,
+    rot: state.buildRotation,
     buildProgress: 0,
-  });
+  };
+  state.buildings.push(newBuilding);
+
+  // Feature: door placement removes overlapping walls
+  if (state.buildType === 'door') {
+    let doorHW = bw / 2 + 2;
+    let doorHH = bh / 2 + 2;
+    for (let i = state.buildings.length - 2; i >= 0; i--) {
+      let wb = state.buildings[i];
+      if (wb.type !== 'wall') continue;
+      let wHW = wb.w / 2;
+      let wHH = wb.h / 2;
+      if (abs(wb.x - wx) < doorHW + wHW && abs(wb.y - wy) < doorHH + wHH) {
+        state.buildings.splice(i, 1);
+      }
+    }
+  }
   if (snd) snd.playSFX('build');
   if (state.score) state.score.buildingsBuilt++;
   state.codex.buildingsBuilt[state.buildType] = true;
@@ -11408,10 +11721,10 @@ function updateRowing(dt) {
   if (state.expeditionModifierSelect) return;
 
   let dx = 0, dy = 0;
-  if (keyIsDown(65) || keyIsDown(LEFT_ARROW))  dx -= 1;
-  if (keyIsDown(68) || keyIsDown(RIGHT_ARROW)) dx += 1;
-  if (keyIsDown(87) || keyIsDown(UP_ARROW))    dy -= 1;
-  if (keyIsDown(83) || keyIsDown(DOWN_ARROW))  dy += 1;
+  if (isKeybindDown('moveLeft') || keyIsDown(LEFT_ARROW))  dx -= 1;
+  if (isKeybindDown('moveRight') || keyIsDown(RIGHT_ARROW)) dx += 1;
+  if (isKeybindDown('moveUp') || keyIsDown(UP_ARROW))    dy -= 1;
+  if (isKeybindDown('moveDown') || keyIsDown(DOWN_ARROW))  dy += 1;
   if (dx === 0 && dy === 0 && typeof _touchJoystick !== 'undefined' && _touchJoystick.active) {
     dx = _touchJoystick.dx; dy = _touchJoystick.dy;
   }
@@ -13190,7 +13503,8 @@ function updateCompanionPetProximity(dt) {
     cen.nearPlayerTimer += dt;
     if (cen.nearPlayerTimer > 600) {
       cen.nearPlayerTimer = 0;
-      addCompanionXp(cen, 1);
+      let _cenLvd = addCompanionXp(cen, 1);
+      if (_cenLvd && typeof applyCenturionLevelStats === 'function') applyCenturionLevelStats();
     }
   }
 
@@ -13580,6 +13894,7 @@ function tryCompanionGift(wx, wy) {
       state.gold--;
       cp.centurion.giftCooldown = 300;
       let leveled = addCompanionXp(cp.centurion, 1);
+      if (leveled && typeof applyCenturionLevelStats === 'function') applyCenturionLevelStats();
       addFloatingText(w2sX(cen.x), w2sY(cen.y) - 25, '*salutes*', '#ffcc44');
       spawnCompanionHeart(cen.x, cen.y);
       if (leveled) addFloatingText(w2sX(cen.x), w2sY(cen.y) - 38, getFactionTerms().leader + ' Level ' + cp.centurion.level + '!', '#ffcc44');
@@ -15298,6 +15613,21 @@ function generateShopOffers() {
   else if (!state.tools.ironRod) offers.push({ type: 'tool', tool: 'ironRod', price: 60, label: 'Iron Rod → 60 Gold (+30% catch rate)' });
   if (!state.tools.steelPick) offers.push({ type: 'tool', tool: 'steelPick', price: 40, label: 'Steel Pickaxe → 40 Gold (2x mining speed)' });
   if (!state.tools.lantern) offers.push({ type: 'tool', tool: 'lantern', price: 35, label: 'Lantern → 35 Gold (night visibility)' });
+  // Equipment upgrades
+  if (typeof EQUIPMENT_DB !== 'undefined' && state.equipment) {
+    var equipOffers = ['pilum','flamma','trident','centurion_crest','laurel','imperial_plate',
+      'greaves','iron_greaves','linen_skirt','caligae','war_boots','mercury_sandals',
+      'buckler','iron_shield','lantern_oh','sickle_eq','iron_pick','fishing_rod',
+      'mars_ring','hermes_charm'];
+    for (var ei = 0; ei < equipOffers.length; ei++) {
+      var eid = equipOffers[ei];
+      var edata = EQUIPMENT_DB[eid];
+      if (!edata || edata.price <= 0) continue;
+      if (state.equipment[edata.slot] === eid) continue;
+      var statStr = (edata.atk ? '+' + edata.atk + ' ATK ' : '') + (edata.def ? '+' + edata.def + ' DEF ' : '') + (edata.spd ? '+' + edata.spd + ' SPD' : '');
+      offers.push({ type: 'equip', equipId: eid, price: edata.price, label: edata.name + ' (' + EQUIP_SLOTS[edata.slot].name + ') → ' + edata.price + 'g (' + statStr.trim() + ')' });
+    }
+  }
   return offers;
 }
 
@@ -15310,7 +15640,19 @@ function doTrade(offerIdx) {
     let mpCount = state.buildings.filter(b => b.type === 'marketplace').length;
     if (mpCount > 0) priceMult *= max(0.5, 1 - 0.1 * mpCount);
   }
-  if (offer.type === 'tool') {
+  if (offer.type === 'equip') {
+    let finalPrice = max(1, floor(offer.price * priceMult));
+    if (state.gold >= finalPrice) {
+      state.gold = max(0, state.gold - finalPrice);
+      equipItem(offer.equipId);
+      if (snd) snd.playSFX('coin_clink');
+      addFloatingText(width / 2, height * 0.5, EQUIPMENT_DB[offer.equipId].name + ' equipped!', '#ffcc44');
+      spawnParticles(state.player.x, state.player.y, 'build', 8);
+      state.ship.offers = generateShopOffers();
+    } else {
+      addFloatingText(width / 2, height * 0.5, 'Need ' + finalPrice + ' gold!', C.buildInvalid);
+    }
+  } else if (offer.type === 'tool') {
     let finalPrice = max(1, floor(offer.price * priceMult));
     if (state.gold >= finalPrice) {
       state.gold = max(0, state.gold - finalPrice);
@@ -15898,9 +16240,9 @@ function updateEnemyAI(e, dt, p, a) {
       e.stateTimer -= dt;
       // Damage player on contact — boss deals double damage during charge
       if (dist(e.x, e.y, p.x, p.y) < e.size + p.size && p.invincTimer <= 0) {
-        let armorR = [0, 3, 6, 10][p.armor] || 0;
+        let defR = (typeof getPlayerDefenseReduction === 'function') ? getPlayerDefenseReduction() : ([0, 3, 6, 10][p.armor] || 0);
         let chargeMult = e.behavior === 'boss' ? 2.0 : 1.5;
-        let dmg = max(1, floor(e.damage * chargeMult) - armorR);
+        let dmg = max(1, floor(e.damage * chargeMult) - defR);
         if (typeof getFortifyReduction === 'function') {
           dmg = max(1, floor(dmg * (1 - getFortifyReduction())));
         }
@@ -15941,7 +16283,7 @@ function updateEnemyAI(e, dt, p, a) {
         // Deal damage
         let d = dist(e.x, e.y, p.x, p.y);
         if (d < e.size + 25 && p.invincTimer <= 0) {
-          let armorReduce = [0, 3, 6, 10][p.armor] || 0;
+          let armorReduce = (typeof getPlayerDefenseReduction === 'function') ? getPlayerDefenseReduction() : ([0, 3, 6, 10][p.armor] || 0);
           let eDmg = max(1, e.damage - armorReduce);
           if (typeof getFortifyReduction === 'function') {
             eDmg = max(1, floor(eDmg * (1 - getFortifyReduction())));
@@ -17164,6 +17506,123 @@ const ARMORS = [
 ];
 const POTION_COST = 15; // gold
 const POTION_HEAL = 40;
+
+// ─── CHARACTER EQUIPMENT SYSTEM ──────────────────────────────────────────
+let equipmentWindowOpen = false;
+let _equipHoverSlot = null;
+
+const EQUIP_SLOTS = {
+  head:     { name: 'Head',    col: 0, row: 0 },
+  chest:    { name: 'Chest',   col: 0, row: 1 },
+  legs:     { name: 'Legs',    col: 0, row: 2 },
+  feet:     { name: 'Feet',    col: 0, row: 3 },
+  mainHand: { name: 'Weapon',  col: 1, row: 0 },
+  offHand:  { name: 'Shield',  col: 1, row: 1 },
+  tool:     { name: 'Tool',    col: 1, row: 2 },
+  trinket:  { name: 'Trinket', col: 1, row: 3 },
+};
+
+const EQUIPMENT_DB = {
+  gladius:     { slot: 'mainHand', name: 'Gladius',          atk: 5,  def: 0, spd: 0, icon: 'sword',   price: 0,   faction: 'rome' },
+  pilum:       { slot: 'mainHand', name: 'Pilum',            atk: 7,  def: 0, spd: 0, icon: 'spear',   price: 40,  faction: null },
+  flamma:      { slot: 'mainHand', name: 'Flamma',           atk: 10, def: 0, spd: 0, icon: 'flame',   price: 80,  faction: null },
+  khopesh:     { slot: 'mainHand', name: 'Khopesh',          atk: 6,  def: 0, spd: 0, icon: 'curved',  price: 0,   faction: 'egypt' },
+  xiphos:      { slot: 'mainHand', name: 'Xiphos',           atk: 5,  def: 1, spd: 0, icon: 'short',   price: 0,   faction: 'greece' },
+  falcata:     { slot: 'mainHand', name: 'Falcata',          atk: 7,  def: 0, spd: 1, icon: 'curved',  price: 0,   faction: 'carthage' },
+  raider_axe:  { slot: 'mainHand', name: 'Raider Axe',       atk: 8,  def: 0, spd: 0, icon: 'axe',     price: 0,   faction: 'seapeople' },
+  acinaces:    { slot: 'mainHand', name: 'Acinaces',         atk: 5,  def: 0, spd: 2, icon: 'short',   price: 0,   faction: 'persia' },
+  navaja:      { slot: 'mainHand', name: 'Navaja',           atk: 4,  def: 0, spd: 3, icon: 'short',   price: 0,   faction: 'phoenicia' },
+  long_sword:  { slot: 'mainHand', name: 'Long Sword',       atk: 6,  def: 0, spd: -1, icon: 'long',   price: 0,   faction: 'gaul' },
+  trident:     { slot: 'mainHand', name: 'Neptune Trident',  atk: 12, def: 2, spd: 0, icon: 'spear',   price: 120, faction: null },
+  galea:       { slot: 'head', name: 'Galea',               atk: 0, def: 2, spd: 0,  icon: 'roman',   price: 0,   faction: 'rome' },
+  corinthian:  { slot: 'head', name: 'Corinthian Helm',     atk: 0, def: 3, spd: -1, icon: 'greek',   price: 0,   faction: 'greece' },
+  nemes:       { slot: 'head', name: 'Nemes Headdress',     atk: 0, def: 1, spd: 0,  icon: 'cloth',   price: 0,   faction: 'egypt' },
+  punic_helm:  { slot: 'head', name: 'Punic Helm',          atk: 0, def: 2, spd: 0,  icon: 'round',   price: 0,   faction: 'carthage' },
+  horned_helm: { slot: 'head', name: 'Horned Helm',         atk: 1, def: 2, spd: 0,  icon: 'horned',  price: 0,   faction: 'seapeople' },
+  tiara:       { slot: 'head', name: 'Persian Tiara',       atk: 0, def: 1, spd: 1,  icon: 'cloth',   price: 0,   faction: 'persia' },
+  phoen_cap:   { slot: 'head', name: 'Sailor Cap',          atk: 0, def: 1, spd: 1,  icon: 'cloth',   price: 0,   faction: 'phoenicia' },
+  gallic_helm: { slot: 'head', name: 'Gallic Helm',         atk: 0, def: 3, spd: 0,  icon: 'winged',  price: 0,   faction: 'gaul' },
+  centurion_crest: { slot: 'head', name: 'Centurion Crest', atk: 1, def: 4, spd: 0,  icon: 'roman',   price: 60,  faction: null },
+  laurel:      { slot: 'head', name: 'Golden Laurel',       atk: 2, def: 1, spd: 1,  icon: 'crown',   price: 100, faction: null },
+  lorica:      { slot: 'chest', name: 'Lorica Segmentata',  atk: 0, def: 5, spd: -1, icon: 'heavy',   price: 0,   faction: 'rome' },
+  linen_armor: { slot: 'chest', name: 'Linen Cuirass',      atk: 0, def: 3, spd: 0,  icon: 'light',   price: 0,   faction: 'greece' },
+  scale_mail:  { slot: 'chest', name: 'Scale Mail',         atk: 0, def: 4, spd: 0,  icon: 'medium',  price: 0,   faction: 'egypt' },
+  punic_plate: { slot: 'chest', name: 'Punic Plate',        atk: 0, def: 4, spd: 0,  icon: 'medium',  price: 0,   faction: 'carthage' },
+  raider_hide: { slot: 'chest', name: 'Raider Hide',        atk: 1, def: 3, spd: 0,  icon: 'light',   price: 0,   faction: 'seapeople' },
+  persian_robe:{ slot: 'chest', name: 'Persian Robe',       atk: 0, def: 2, spd: 2,  icon: 'light',   price: 0,   faction: 'persia' },
+  phoen_vest:  { slot: 'chest', name: 'Merchant Vest',      atk: 0, def: 2, spd: 1,  icon: 'light',   price: 0,   faction: 'phoenicia' },
+  chainmail:   { slot: 'chest', name: 'Gallic Chainmail',   atk: 0, def: 4, spd: -1, icon: 'medium',  price: 0,   faction: 'gaul' },
+  imperial_plate: { slot: 'chest', name: 'Imperial Plate',  atk: 1, def: 7, spd: -2, icon: 'heavy',   price: 100, faction: null },
+  greaves:     { slot: 'legs', name: 'Bronze Greaves',      atk: 0, def: 2, spd: 0,  icon: 'metal',   price: 25,  faction: null },
+  iron_greaves:{ slot: 'legs', name: 'Iron Greaves',        atk: 0, def: 3, spd: 0,  icon: 'metal',   price: 50,  faction: null },
+  linen_skirt: { slot: 'legs', name: 'Linen Skirt',         atk: 0, def: 1, spd: 1,  icon: 'cloth',   price: 15,  faction: null },
+  caligae:     { slot: 'feet', name: 'Caligae',             atk: 0, def: 0, spd: 1,  icon: 'sandal',  price: 15,  faction: null },
+  war_boots:   { slot: 'feet', name: 'War Boots',           atk: 0, def: 1, spd: 2,  icon: 'boot',    price: 40,  faction: null },
+  mercury_sandals: { slot: 'feet', name: 'Mercury Sandals', atk: 0, def: 0, spd: 4,  icon: 'winged',  price: 80,  faction: null },
+  scutum:      { slot: 'offHand', name: 'Scutum',           atk: 0, def: 4, spd: -1, icon: 'tower',   price: 0,   faction: 'rome' },
+  aspis:       { slot: 'offHand', name: 'Aspis',            atk: 0, def: 3, spd: 0,  icon: 'round',   price: 0,   faction: 'greece' },
+  buckler:     { slot: 'offHand', name: 'Buckler',          atk: 0, def: 2, spd: 1,  icon: 'small',   price: 20,  faction: null },
+  iron_shield: { slot: 'offHand', name: 'Iron Shield',      atk: 0, def: 5, spd: -1, icon: 'kite',    price: 60,  faction: null },
+  lantern_oh:  { slot: 'offHand', name: 'Lantern',          atk: 0, def: 0, spd: 0,  icon: 'lantern', price: 35,  faction: null },
+  sickle_eq:   { slot: 'tool', name: 'Bronze Sickle',      atk: 2, def: 0, spd: 0,  icon: 'sickle',  price: 15,  faction: null },
+  iron_pick:   { slot: 'tool', name: 'Iron Pickaxe',       atk: 3, def: 0, spd: 0,  icon: 'pick',    price: 30,  faction: null },
+  fishing_rod: { slot: 'tool', name: 'Fishing Rod',        atk: 1, def: 0, spd: 0,  icon: 'rod',     price: 20,  faction: null },
+  eagle_amulet:{ slot: 'trinket', name: 'Eagle Amulet',    atk: 2, def: 1, spd: 0,  icon: 'amulet',  price: 0,   faction: 'rome' },
+  ankh:        { slot: 'trinket', name: 'Ankh Charm',      atk: 0, def: 0, spd: 1,  icon: 'ankh',    price: 0,   faction: 'egypt' },
+  olive_wreath:{ slot: 'trinket', name: 'Olive Wreath',    atk: 1, def: 1, spd: 1,  icon: 'wreath',  price: 0,   faction: 'greece' },
+  punic_coin:  { slot: 'trinket', name: 'Punic Coin',      atk: 0, def: 2, spd: 0,  icon: 'coin',    price: 0,   faction: 'carthage' },
+  sea_shell:   { slot: 'trinket', name: 'Storm Shell',     atk: 2, def: 0, spd: 1,  icon: 'shell',   price: 0,   faction: 'seapeople' },
+  royal_seal:  { slot: 'trinket', name: 'Royal Seal',      atk: 1, def: 1, spd: 1,  icon: 'seal',    price: 0,   faction: 'persia' },
+  star_map:    { slot: 'trinket', name: 'Star Map',         atk: 0, def: 0, spd: 3,  icon: 'scroll',  price: 0,   faction: 'phoenicia' },
+  torque:      { slot: 'trinket', name: 'Golden Torque',    atk: 3, def: 0, spd: 0,  icon: 'torque',  price: 0,   faction: 'gaul' },
+  mars_ring:   { slot: 'trinket', name: 'Ring of Mars',    atk: 4, def: 2, spd: 0,  icon: 'ring',    price: 80,  faction: null },
+  hermes_charm:{ slot: 'trinket', name: 'Hermes Charm',    atk: 0, def: 0, spd: 5,  icon: 'feather', price: 60,  faction: null },
+};
+
+const FACTION_STARTER_GEAR = {
+  rome:      { head: 'galea', chest: 'lorica', mainHand: 'gladius', offHand: 'scutum', trinket: 'eagle_amulet' },
+  carthage:  { head: 'punic_helm', chest: 'punic_plate', mainHand: 'falcata', trinket: 'punic_coin' },
+  egypt:     { head: 'nemes', chest: 'scale_mail', mainHand: 'khopesh', trinket: 'ankh' },
+  greece:    { head: 'corinthian', chest: 'linen_armor', mainHand: 'xiphos', offHand: 'aspis', trinket: 'olive_wreath' },
+  seapeople: { head: 'horned_helm', chest: 'raider_hide', mainHand: 'raider_axe', trinket: 'sea_shell' },
+  persia:    { head: 'tiara', chest: 'persian_robe', mainHand: 'acinaces', trinket: 'royal_seal' },
+  phoenicia: { head: 'phoen_cap', chest: 'phoen_vest', mainHand: 'navaja', trinket: 'star_map' },
+  gaul:      { head: 'gallic_helm', chest: 'chainmail', mainHand: 'long_sword', trinket: 'torque' },
+};
+
+function getEquipBonus(stat) {
+  if (!state || !state.equipment) return 0;
+  var total = 0;
+  for (var slot in state.equipment) {
+    var itemId = state.equipment[slot];
+    if (itemId && EQUIPMENT_DB[itemId]) total += (EQUIPMENT_DB[itemId][stat] || 0);
+  }
+  return total;
+}
+
+function equipItem(itemId) {
+  if (!EQUIPMENT_DB[itemId]) return false;
+  var item = EQUIPMENT_DB[itemId];
+  if (!state.equipment) state.equipment = { head: null, chest: null, legs: null, feet: null, mainHand: null, offHand: null, tool: null, trinket: null };
+  state.equipment[item.slot] = itemId;
+  return true;
+}
+
+function unequipSlot(slot) {
+  if (!state.equipment) return;
+  state.equipment[slot] = null;
+}
+
+function buyEquipment(itemId) {
+  var item = EQUIPMENT_DB[itemId];
+  if (!item || item.price <= 0) return false;
+  if (state.gold < item.price) return false;
+  state.gold -= item.price;
+  equipItem(itemId);
+  addFloatingText(width / 2, height * 0.3, item.name + ' equipped!', '#ffcc44');
+  if (snd) snd.playSFX('purchase');
+  return true;
+}
 const HOTBAR_ITEMS = [
   { name: 'Sickle', icon: 'sickle', desc: 'Harvest crops', key: '1' },
   { name: 'Axe',    icon: 'axe',    desc: 'Chop trees',    key: '2' },
@@ -18805,13 +19264,14 @@ function updateSingleNationRaid(key, dt) {
     }
     let pDist = dist(p.x, p.y, r.x, r.y);
     if (p.attackTimer > 0 && p.slashPhase > 0 && pDist < p.attackRange + 10) {
-      let dmg = p.attackDamage;
+      let dmg = (typeof getPlayerAttackDamage === 'function') ? getPlayerAttackDamage() : p.attackDamage;
       r.hp -= dmg; r.flashTimer = 8;
       addFloatingText(w2sX(r.x), w2sY(r.y) - 15, '-' + dmg, '#ffaa44');
       spawnParticles(r.x, r.y, 'hit', 3);
     }
     if (pDist < 35 && r.attackTimer <= 0) {
-      let dmg = max(1, floor(8 + rv.level * 2) - (p.armor || 0) * 3);
+      let _rDefR = (typeof getPlayerDefenseReduction === 'function') ? getPlayerDefenseReduction() : ((p.armor || 0) * 3);
+      let dmg = max(1, floor(8 + rv.level * 2) - _rDefR);
       p.hp = max(0, p.hp - dmg); p.invincTimer = 20; r.attackTimer = 60;
       addFloatingText(w2sX(p.x), w2sY(p.y) - 15, '-' + dmg, '#ff4444');
       triggerScreenShake(3, 6);
@@ -18961,13 +19421,14 @@ function updateSeaPeopleRaid(dt) {
     }
     let pDist = dist(p.x, p.y, r.x, r.y);
     if (p.attackTimer > 0 && p.slashPhase > 0 && pDist < p.attackRange + 10) {
-      let dmg = p.attackDamage;
+      let dmg = (typeof getPlayerAttackDamage === 'function') ? getPlayerAttackDamage() : p.attackDamage;
       r.hp -= dmg; r.flashTimer = 8;
       addFloatingText(w2sX(r.x), w2sY(r.y) - 15, '-' + dmg, '#ffaa44');
       spawnParticles(r.x, r.y, 'hit', 3);
     }
     if (pDist < 35 && r.attackTimer <= 0) {
-      let dmg = max(1, r.damage - (p.armor || 0) * 3);
+      let _rDefR2 = (typeof getPlayerDefenseReduction === 'function') ? getPlayerDefenseReduction() : ((p.armor || 0) * 3);
+      let dmg = max(1, r.damage - _rDefR2);
       p.hp = max(0, p.hp - dmg); p.invincTimer = 20; r.attackTimer = 60;
       addFloatingText(w2sX(p.x), w2sY(p.y) - 15, '-' + dmg, '#ff4444');
       triggerScreenShake(3, 6);
@@ -19877,11 +20338,11 @@ function updateNationIslandVisit(dt) {
 
   // Player movement (reuse standard WASD)
   let dx = 0, dy = 0;
-  if (keyIsDown(65) || keyIsDown(LEFT_ARROW)) dx -= 1;
-  if (keyIsDown(68) || keyIsDown(RIGHT_ARROW)) dx += 1;
-  if (keyIsDown(87) || keyIsDown(UP_ARROW)) dy -= 1;
-  if (keyIsDown(83) || keyIsDown(DOWN_ARROW)) dy += 1;
-  let niSpd = p.speed * (keyIsDown(SHIFT) ? 1.6 : 1);
+  if (isKeybindDown('moveLeft') || keyIsDown(LEFT_ARROW)) dx -= 1;
+  if (isKeybindDown('moveRight') || keyIsDown(RIGHT_ARROW)) dx += 1;
+  if (isKeybindDown('moveUp') || keyIsDown(UP_ARROW)) dy -= 1;
+  if (isKeybindDown('moveDown') || keyIsDown(DOWN_ARROW)) dy += 1;
+  let niSpd = p.speed * (isKeybindDown('sprint') ? 1.6 : 1);
   if (dx || dy) {
     let m = sqrt(dx * dx + dy * dy);
     p.vx = (dx / m) * niSpd * dt;
@@ -20979,7 +21440,7 @@ function updateConquestEnemy(e, dt, p, c) {
         if (nearestD < e.size + 25) {
           let hitPlayer = dist(e.x, e.y, p.x, p.y) < e.size + 25;
           if (hitPlayer && p.invincTimer <= 0) {
-            let armorR = [0, 3, 6, 10][p.armor] || 0;
+            let armorR = (typeof getPlayerDefenseReduction === 'function') ? getPlayerDefenseReduction() : ([0, 3, 6, 10][p.armor] || 0);
             let dmg = max(1, e.damage - armorR);
             if (typeof getFortifyReduction === 'function') {
               dmg = max(1, floor(dmg * (1 - getFortifyReduction())));
@@ -22382,6 +22843,12 @@ function drawConquestBuildUI() {
 // ─── COLONY OVERLAY — draws colony buildings/farms on settled Terra Nova ──
 // ─── INPUT ────────────────────────────────────────────────────────────────
 function mouseWheel(event) {
+  // Scroll keybind list in settings
+  if (gameScreen === 'settings') {
+    let maxScroll = max(0, Object.keys(DEFAULT_KEYBINDS).length * 18 - 10 * 18);
+    _keybindScrollOffset = constrain(_keybindScrollOffset + (event.delta > 0 ? 18 : -18), 0, maxScroll);
+    return false;
+  }
   // Zoom camera with scroll wheel during gameplay
   if (gameScreen === 'game' && state && state.isInitialized) {
     let delta = -event.delta * 0.001;
@@ -22948,8 +23415,26 @@ function keyPressed() {
   // Debug console intercepts all keys when open
   if (typeof Debug !== 'undefined' && Debug.handleKey(key, keyCode)) return;
   if (gameScreen !== 'game') {
+    // Keybind rebinding — intercept next keypress
+    if (gameScreen === 'settings' && _rebindingAction) {
+      if (keyCode === 27) { _rebindingAction = null; return; } // ESC cancels
+      let keyName;
+      if (keyCode === 16) keyName = 'SHIFT';
+      else if (keyCode === 18) keyName = 'ALT';
+      else if (keyCode === 9) keyName = 'TAB';
+      else if (keyCode === 13) keyName = 'ENTER';
+      else if (keyCode === 32) keyName = 'SPACE';
+      else if (key === '`') keyName = '`';
+      else if (key.length === 1) keyName = key.toUpperCase();
+      else keyName = key.toUpperCase();
+      gameSettings.keybinds[_rebindingAction] = keyName;
+      _rebindingAction = null;
+      _saveSettings();
+      return false;
+    }
     // ESC from settings/credits back to menu
     if (keyCode === 27 && (gameScreen === 'settings' || gameScreen === 'credits')) {
+      _rebindingAction = null; _keybindScrollOffset = 0;
       gameScreen = 'menu';
     }
     if (keyCode === 27 && gameScreen === 'multiplayer' || gameScreen === 'howtoplay') {
@@ -23082,6 +23567,7 @@ function keyPressed() {
     if (state.achievementsPanelOpen) { state.achievementsPanelOpen = false; return; }
     if (empireDashOpen) { empireDashOpen = false; return; }
     if (inventoryOpen) { inventoryOpen = false; return; }
+    if (equipmentWindowOpen) { equipmentWindowOpen = false; return; }
     if (typeof skillTreeOpen !== 'undefined' && skillTreeOpen) { skillTreeOpen = false; return; }
     if (state.techTreeOpen) { state.techTreeOpen = false; return; }
     if (state.codexOpen) { state.codexOpen = false; return; }
@@ -23262,7 +23748,7 @@ function keyPressed() {
       if (handleCombatSkillKey(key)) return;
     }
     // Dodge roll on ALT (enhanced via combat.js)
-    if (keyCode === ALT) {
+    if (keyMatchesAction('dodge', key, keyCode)) {
       if (typeof tryDodgeRoll === 'function') tryDodgeRoll();
       return false;
     }
@@ -23283,7 +23769,7 @@ function keyPressed() {
       if (handleFactionAbilityKey(key)) return;
     }
     // Dodge roll on ALT in arena too
-    if (keyCode === ALT) {
+    if (keyMatchesAction('dodge', key, keyCode)) {
       if (typeof tryDodgeRoll === 'function') tryDodgeRoll();
       return false;
     }
@@ -23308,27 +23794,16 @@ function keyPressed() {
     return;
   }
   // Dodge roll on ALT
-  if (keyCode === ALT) {
+  if (keyMatchesAction('dodge', key, keyCode)) {
     if (typeof tryDodgeRoll === 'function') tryDodgeRoll();
     return false;
   }
 
   // Interact
   if (key === 'e' || key === 'E') {
-    // Temple altar conversion — 5 crystals → 25 solar
+    // Temple interior interactions (advisor, jester, pet, altar)
     if (state.insideTemple) {
-      let altarX = width / 2, altarY = height * 0.45;
-      if (dist(state.templePlayerX || width / 2, state.templePlayerY || height * 0.6, altarX, altarY) < 60) {
-        if (state.crystals >= 5) {
-          state.crystals -= 5;
-          state.solar = min(state.solar + 25, state.maxSolar);
-          if (snd) snd.playSFX('crystal');
-          addFloatingText(width / 2, height * 0.25, '+25 Solar Energy', C.solarBright);
-          spawnParticles(state.player.x, state.player.y, 'divine', 8);
-        } else {
-          addFloatingText(width / 2, height * 0.25, 'Need 5 Crystals', '#ff8888');
-        }
-      }
+      _templeInteractE();
       return;
     }
     // Dive — E near water, but NOT if near the rowboat
@@ -23687,7 +24162,7 @@ function keyPressed() {
         state.insideTemple = true;
         state.templePlayerX = width / 2;
         state.templePlayerY = height * 0.75;
-        addFloatingText(width / 2, height * 0.3, 'Entering the Temple of Sol Invictus', '#ffd080');
+        var _th = TEMPLE_HALLS[state.faction || 'rome'] || TEMPLE_HALLS.rome; addFloatingText(width / 2, height * 0.3, 'Entering ' + _th.name, '#ffd080'); state.templePetX = 0; state.templePetY = 0; state.templeJesterJokedToday = false;
       });
       return;
     }
@@ -23814,7 +24289,7 @@ function keyPressed() {
   }
 
   // Fishing / Trade with ship
-  if (key === 'f' || key === 'F') {
+  if (keyMatchesAction('fish', key, keyCode)) {
     if (state.fishing.active && state.fishing.phase === 'strike') {
       // Successful strike!
       reelFish();
@@ -23925,9 +24400,17 @@ function keyPressed() {
   }
 
   // Inventory toggle (I key)
-  if (key === 'i' || key === 'I') {
+  if (keyMatchesAction('inventory', key, keyCode)) {
     inventoryOpen = !inventoryOpen;
     if (inventoryOpen) empireDashOpen = false;
+    if (snd) snd.playSFX('page_turn');
+    return;
+  }
+
+  // Character Equipment toggle (O key)
+  if (key === 'o' || key === 'O') {
+    equipmentWindowOpen = !equipmentWindowOpen;
+    if (equipmentWindowOpen) { empireDashOpen = false; inventoryOpen = false; }
     if (snd) snd.playSFX('page_turn');
     return;
   }
@@ -23953,7 +24436,7 @@ function keyPressed() {
   }
 
   // Legion panel toggle (L key)
-  if (key === 'l' || key === 'L') {
+  if (keyMatchesAction('legia', key, keyCode)) {
     if (state.legia && state.legia.castrumLevel >= 1) {
       state.legia.legiaUIOpen = !state.legia.legiaUIOpen;
       return;
@@ -23976,7 +24459,7 @@ function keyPressed() {
   }
 
   // Recipe Book toggle (G key)
-  if (key === 'g' || key === 'G') {
+  if (keyMatchesAction('recipeBook', key, keyCode)) {
     if (typeof recipeBookOpen !== 'undefined') {
       recipeBookOpen = !recipeBookOpen;
       return;
@@ -23984,7 +24467,7 @@ function keyPressed() {
   }
 
   // Block input when overlays are open
-  if (empireDashOpen || inventoryOpen || state.naturalistOpen || wardrobeOpen || (typeof recipeBookOpen !== 'undefined' && recipeBookOpen)) return;
+  if (empireDashOpen || inventoryOpen || equipmentWindowOpen || state.naturalistOpen || wardrobeOpen || (typeof recipeBookOpen !== 'undefined' && recipeBookOpen)) return;
   if (state.techTreeOpen) return; // tech tree blocks other input
 
   // Tech tree toggle (Y key)
@@ -23995,7 +24478,7 @@ function keyPressed() {
   }
 
   // World Map toggle (M key)
-  if (key === 'm' || key === 'M') {
+  if (keyMatchesAction('map', key, keyCode)) {
     if (typeof worldMapOpen !== 'undefined') {
       worldMapOpen = !worldMapOpen;
       if (snd) snd.playSFX('page_turn');
@@ -24037,7 +24520,7 @@ function keyPressed() {
   }
 
   // Build mode toggle
-  if (key === 'b' || key === 'B') {
+  if (keyMatchesAction('buildMode', key, keyCode)) {
     state.buildMode = !state.buildMode;
     state.demolishMode = false;
     state.demolishConfirm = null;
@@ -24062,8 +24545,14 @@ function keyPressed() {
     if (key === '0') state.buildType = 'mosaic';
     if (key === '-') state.buildType = 'aqueduct';
     if (key === '=') state.buildType = 'bath';
-    if (key === 'q' || key === 'Q') state.buildRotation = (state.buildRotation + 1) % 2;
-    if (key === 'x' || key === 'X') {
+    if (key === 'r' || key === 'R' || key === 'q' || key === 'Q') {
+      if (ROTATABLE_TYPES.includes(state.buildType)) {
+        state.buildRotation = (state.buildRotation + 1) % 4;
+        addFloatingText(width / 2, height * 0.4, 'Rotated ' + (state.buildRotation * 90) + '\u00B0', '#aaddff');
+      }
+      return; // prevent R from giving seeds while in build mode
+    }
+    if (keyMatchesAction('demolish', key, keyCode)) {
       state.demolishMode = !state.demolishMode;
       state.demolishConfirm = null;
       addFloatingText(width / 2, height * 0.4, state.demolishMode ? 'DEMOLISH MODE — click building' : 'DEMOLISH OFF', state.demolishMode ? '#ff6644' : C.textDim);
@@ -24694,12 +25183,12 @@ function saveGame() {
     insideTemple: false,
     playerX: state.player.x, playerY: state.player.y, playerFacing: state.player.facing,
     playerXp: state.player.xp, playerTotalXp: state.player.totalXp,
-    playerLevel: state.player.level, playerSkillPoints: state.player.skillPoints,
+    playerLevel: state.player.level, playerSkillPoints: state.player.skillPoints, playerDefense: state.player.defense || 2, playerLevelAtk: state.player.levelAtk || 0,
     companionPets: state.companionPets ? {
       cat:       { level: state.companionPets.cat.level, xp: state.companionPets.cat.xp },
       tortoise:  { level: state.companionPets.tortoise.level, xp: state.companionPets.tortoise.xp, x: state.companionPets.tortoise.x, y: state.companionPets.tortoise.y },
       crow:      { level: state.companionPets.crow.level, xp: state.companionPets.crow.xp, x: state.companionPets.crow.x, y: state.companionPets.crow.y },
-      centurion: { level: state.companionPets.centurion.level, xp: state.companionPets.centurion.xp },
+      centurion: { level: state.companionPets.centurion.level, xp: state.companionPets.centurion.xp, ability: state.companionPets.centurion.ability || null },
     } : null,
     playerSkills: state.player.skills, playerMaxHp: state.player.maxHp,
     playerWeapon: state.player.weapon || 0, playerArmor: state.player.armor || 0, playerPotions: state.player.potions || 0,
@@ -24713,6 +25202,7 @@ function saveGame() {
     blessing: state.blessing,
     quest: state.quest,
     tools: state.tools,
+    equipment: state.equipment || null,
     cropSelect: state.cropSelect,
     cats: state.cats ? state.cats.map(c => ({ x: c.x, y: c.y, facing: c.facing, color: c.color })) : [],
     citizens: state.citizens ? state.citizens.map(c => ({ x: c.x, y: c.y, variant: c.variant, facing: c.facing, speed: c.speed })) : [],
@@ -25489,6 +25979,19 @@ function loadGame() {
     if (d.playerMaxHp) state.player.maxHp = d.playerMaxHp;
     state.player.weapon = d.playerWeapon || 0;
     state.player.armor = d.playerArmor || 0;
+    state.player.defense = d.playerDefense || floor(2 + (state.player.level || 1) * 0.5);
+    state.player.levelAtk = d.playerLevelAtk || (state.player.level || 1);
+    // Recalculate level-scaled stats for existing saves
+    let _rlvl = state.player.level || 1;
+    state.player.maxHp = max(state.player.maxHp || 100, 100 + _rlvl * 10);
+    // attackDamage is weapon-based; levelAtk adds on top via getPlayerAttackDamage()
+    if (state.companionPets && state.companionPets.centurion) {
+      let _rcl = state.companionPets.centurion.level || 1;
+      state.centurion.maxHp = floor(120 * (1 + (_rcl - 1) * 0.15));
+      state.centurion.hp = min(state.centurion.hp, state.centurion.maxHp);
+      state.centurion.attackDamage = floor(12 * (1 + (_rcl - 1) * 0.10));
+      state.centurion.speed = 2.8 * (1 + (_rcl - 1) * 0.05);
+    }
     state.player.potions = d.playerPotions || 0;
     if (d.playerXpBoost) state.player.xpBoost = d.playerXpBoost;
     if (d.playerXpBoostTimer) state.player.xpBoostTimer = d.playerXpBoostTimer;
@@ -25500,7 +26003,7 @@ function loadGame() {
       if (d.companionPets.cat) { state.companionPets.cat.level = d.companionPets.cat.level || 1; state.companionPets.cat.xp = d.companionPets.cat.xp || 0; }
       if (d.companionPets.tortoise) { state.companionPets.tortoise.level = d.companionPets.tortoise.level || 1; state.companionPets.tortoise.xp = d.companionPets.tortoise.xp || 0; if (d.companionPets.tortoise.x) { state.companionPets.tortoise.x = d.companionPets.tortoise.x; state.companionPets.tortoise.y = d.companionPets.tortoise.y; } }
       if (d.companionPets.crow) { state.companionPets.crow.level = d.companionPets.crow.level || 1; state.companionPets.crow.xp = d.companionPets.crow.xp || 0; if (d.companionPets.crow.x) { state.companionPets.crow.x = d.companionPets.crow.x; state.companionPets.crow.y = d.companionPets.crow.y; } }
-      if (d.companionPets.centurion) { state.companionPets.centurion.level = d.companionPets.centurion.level || 1; state.companionPets.centurion.xp = d.companionPets.centurion.xp || 0; }
+      if (d.companionPets.centurion) { state.companionPets.centurion.level = d.companionPets.centurion.level || 1; state.companionPets.centurion.xp = d.companionPets.centurion.xp || 0; state.companionPets.centurion.ability = d.companionPets.centurion.ability || null; }
     }
     if (d.woodcutterX) { state.woodcutter.x = d.woodcutterX; state.woodcutter.y = d.woodcutterY; }
     state.woodcutter.energy = d.woodcutterEnergy || 100;
@@ -25514,6 +26017,7 @@ function loadGame() {
     if (d.blessing && typeof d.blessing === 'object') state.blessing = { type: d.blessing.type || null, timer: d.blessing.timer || 0, cooldown: d.blessing.cooldown || 0 };
     if (d.quest) state.quest = d.quest;
     if (d.tools && typeof d.tools === 'object') state.tools = { sickle: d.tools.sickle || 0, axe: d.tools.axe || 0, net: d.tools.net || 0 };
+    if (d.equipment && typeof d.equipment === 'object') state.equipment = d.equipment;
     if (d.cropSelect) state.cropSelect = d.cropSelect;
     // Rebuild farm grid based on level instead of loading chaotic positions
     rebuildFarmGrid(state.islandLevel);

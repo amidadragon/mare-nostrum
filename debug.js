@@ -487,6 +487,11 @@ const Debug = {
           state.faction = state.faction || 'rome';
           state.gold = 200; state.wood = 50; state.stone = 30;
           state.player.level = 5;
+          state.player.maxHp = 100 + 5 * 10;
+          state.player.hp = state.player.maxHp;
+          state.player.levelAtk = 5;
+          state.player.defense = floor(2 + 5 * 0.5);
+          state.player.skillPoints = (state.player.skillPoints || 0) + 4;
           this.addLog('Skipped all intros — Lv5 with resources', '#ffdd44');
           break;
 

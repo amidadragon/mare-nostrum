@@ -879,7 +879,8 @@ function updateActiveEvent(dt) {
           if (state.player.invincTimer <= 0) {
             let armor = state.player.armor || 0;
             let dmgReduce = armor === 1 ? 3 : armor === 2 ? 6 : armor === 3 ? 10 : 0;
-            state.player.hp = max(0, state.player.hp - max(1, p.damage - dmgReduce));
+            let equipDef = (typeof getEquipBonus === 'function') ? getEquipBonus('def') : 0;
+            state.player.hp = max(0, state.player.hp - max(1, p.damage - dmgReduce - equipDef));
             state.player.invincTimer = 30;
             p.attackCooldown = 50;
           }
@@ -973,7 +974,8 @@ function updateActiveEvent(dt) {
           if (state.player.invincTimer <= 0) {
             let armor = state.player.armor || 0;
             let dmgReduce = armor === 1 ? 2 : armor === 2 ? 5 : armor === 3 ? 8 : 0;
-            state.player.hp = max(0, state.player.hp - max(1, b.damage - dmgReduce));
+            let equipDef = (typeof getEquipBonus === 'function') ? getEquipBonus('def') : 0;
+            state.player.hp = max(0, state.player.hp - max(1, b.damage - dmgReduce - equipDef));
             state.player.invincTimer = 30;
             b.attackCooldown = 45;
           }

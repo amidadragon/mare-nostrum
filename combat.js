@@ -3,6 +3,9 @@
 
 // ─── XP & LEVELING ──────────────────────────────────────────────────────────
 
+// Level-up popup state
+var _levelUpPopup = { active: false, timer: 0, level: 0, hpGain: 0, atkGain: 0, defGain: 0, skillPt: 0 };
+
 function grantXP(amount) {
   let p = state.player;
   if (p.xpBoostTimer > 0) amount = floor(amount * 1.15);
@@ -15,9 +18,15 @@ function grantXP(amount) {
     p.xp -= needed;
     level++;
     p.skillPoints = (p.skillPoints || 0) + 1;
-    p.maxHp += 10;
-    p.hp = min(p.hp + 10, p.maxHp);
-    addFloatingText(width / 2, height * 0.25, 'LEVEL UP! LV.' + level, '#ffdd44');
+    // Stat scaling per level
+    let oldMaxHp = p.maxHp;
+    p.maxHp = 100 + level * 10;
+    let hpGain = p.maxHp - oldMaxHp;
+    p.hp = min(p.hp + hpGain, p.maxHp);
+    p.levelAtk = level;  // +1 attack per level, added on top of weapon
+    p.defense = floor(2 + level * 0.5); // base defense stat
+    // Show level-up popup
+    _levelUpPopup = { active: true, timer: 180, level: level, hpGain: hpGain, atkGain: 1, defGain: 0.5, skillPt: 1 };
     spawnParticles(p.x, p.y, 'divine', 8);
     triggerScreenShake(4, 10);
     if (typeof snd !== 'undefined' && snd) snd.playSFX('skill_unlock');
@@ -25,6 +34,183 @@ function grantXP(amount) {
     _lvlUps++;
   }
   p.level = level;
+
+  // Grant centurion 50% XP from combat when deployed
+  if (state.centurion && state.centurion.task !== 'idle' && state.companionPets && state.companionPets.centurion) {
+    let cenXp = floor(amount * 0.5);
+    if (cenXp > 0) grantCenturionCombatXP(cenXp);
+  }
+}
+
+// ─── CENTURION COMBAT XP ─────────────────────────────────────────────────────
+
+function grantCenturionCombatXP(amount) {
+  let cp = state.companionPets.centurion;
+  if (cp.level >= 10) return;
+  // Scale down combat XP to match companion XP curve (companionXpForLevel uses small values)
+  let scaledAmt = max(1, floor(amount / 5));
+  let leveled = (typeof addCompanionXp === 'function') ? addCompanionXp(cp, scaledAmt) : false;
+  if (leveled) {
+    // Scale centurion stats per level
+    let cen = state.centurion;
+    cen.maxHp = floor(120 * (1 + (cp.level - 1) * 0.15));
+    cen.hp = min(cen.hp + floor(120 * 0.15), cen.maxHp);
+    cen.attackDamage = floor(12 * (1 + (cp.level - 1) * 0.10));
+    cen.speed = 2.8 * (1 + (cp.level - 1) * 0.05);
+  }
+  if (leveled) {
+    let ft = (typeof getFactionTerms === 'function') ? getFactionTerms() : { leader: 'Centurion' };
+    addFloatingText(w2sX(state.centurion.x), w2sY(state.centurion.y) - 38, ft.leader + ' Level ' + cp.level + '!', '#ffcc44');
+    spawnParticles(state.centurion.x, state.centurion.y, 'divine', 6);
+    if (typeof snd !== 'undefined' && snd) snd.playSFX('skill_unlock');
+    // Unlock special ability at level 5
+    if (cp.level >= 5 && !cp.ability) {
+      cp.ability = getCenturionAbility();
+      addFloatingText(w2sX(state.centurion.x), w2sY(state.centurion.y) - 55, 'NEW: ' + cp.ability.name + '!', '#ff88ff');
+    }
+  }
+}
+
+// Faction-specific centurion level 5 abilities
+function getCenturionAbility() {
+  let fk = state.faction || 'rome';
+  switch (fk) {
+    case 'rome':      return { name: 'Inspire', type: 'inspire', desc: 'Nearby soldiers +20% damage for 10s' };
+    case 'carthage':  return { name: 'Trade Wisdom', type: 'trade_wisdom', desc: 'Merchant prices 10% better' };
+    case 'egypt':     return { name: 'Blessing of Ra', type: 'blessing_ra', desc: 'Crystal recharge 20% faster' };
+    case 'greece':    return { name: 'Philosophy', type: 'philosophy', desc: 'Research speed +15%' };
+    case 'seapeople': return { name: 'Sea Sense', type: 'sea_sense', desc: 'Fishing yield +30%' };
+    case 'persia':    return { name: 'Royal Decree', type: 'royal_decree', desc: 'Colony income +20%' };
+    case 'phoenicia': return { name: 'Navigator', type: 'navigator', desc: 'Sailing speed +20%' };
+    case 'gaul':      return { name: 'War Cry', type: 'war_cry', desc: 'All enemies flee for 3 seconds' };
+    default:          return { name: 'Inspire', type: 'inspire', desc: 'Nearby soldiers +20% damage for 10s' };
+  }
+}
+
+// Get centurion ability bonus multipliers (called from game systems)
+function getCenturionAbilityBonus(type) {
+  let cp = state.companionPets && state.companionPets.centurion;
+  if (!cp || !cp.ability || cp.ability.type !== type) return 0;
+  return 1;
+}
+
+// Total player attack damage (weapon base + level bonus + equipment)
+function getPlayerAttackDamage() {
+  let p = state.player;
+  let base = p.attackDamage || 15;
+  let lvlBonus = p.levelAtk || 0;
+  let equipBonus = (typeof getEquipBonus === 'function') ? getEquipBonus('atk') : 0;
+  return base + lvlBonus + equipBonus;
+}
+
+// Recalculate centurion combat stats from companion level (called on any centurion level-up)
+function applyCenturionLevelStats() {
+  let cp = state.companionPets && state.companionPets.centurion;
+  if (!cp) return;
+  let cen = state.centurion;
+  cen.maxHp = floor(120 * (1 + (cp.level - 1) * 0.15));
+  cen.hp = min(cen.hp + floor(120 * 0.15), cen.maxHp);
+  cen.attackDamage = floor(12 * (1 + (cp.level - 1) * 0.10));
+  cen.speed = 2.8 * (1 + (cp.level - 1) * 0.05);
+  // Unlock ability at level 5
+  if (cp.level >= 5 && !cp.ability) {
+    cp.ability = getCenturionAbility();
+    addFloatingText(w2sX(cen.x), w2sY(cen.y) - 55, 'NEW: ' + cp.ability.name + '!', '#ff88ff');
+  }
+}
+
+// ─── PLAYER DEFENSE ──────────────────────────────────────────────────────────
+
+// Total flat damage reduction from armor equipment + defense stat
+function getPlayerDefenseReduction() {
+  let p = state.player;
+  let armorR = [0, 3, 6, 10][p.armor] || 0;
+  let defR = floor((p.defense || 0) * 0.5); // defense stat: every 2 points = 1 flat reduction
+  let equipDef = (typeof getEquipBonus === 'function') ? getEquipBonus('def') : 0;
+  return armorR + defR + equipDef;
+}
+
+// ─── LEVEL-UP POPUP DRAW ─────────────────────────────────────────────────────
+
+function drawLevelUpPopup() {
+  if (!_levelUpPopup.active) return;
+  _levelUpPopup.timer--;
+  if (_levelUpPopup.timer <= 0) { _levelUpPopup.active = false; return; }
+
+  let t = _levelUpPopup.timer;
+  let fadeIn = min(1, (180 - t) / 15);
+  let fadeOut = min(1, t / 20);
+  let alpha = min(fadeIn, fadeOut);
+
+  let popW = 220, popH = 130;
+  let popX = width / 2 - popW / 2;
+  let popY = height * 0.2;
+
+  push();
+  drawingContext.globalAlpha = alpha;
+
+  // Faction-themed border
+  let fk = state.faction || 'rome';
+  let borderCol = fk === 'rome' ? [196, 64, 50] : fk === 'carthage' ? [180, 140, 40] :
+    fk === 'egypt' ? [64, 176, 160] : fk === 'greece' ? [80, 144, 192] :
+    fk === 'seapeople' ? [42, 138, 106] : fk === 'persia' ? [106, 42, 138] :
+    fk === 'phoenicia' ? [138, 16, 80] : [90, 64, 32];
+
+  // Outer border glow
+  noFill(); strokeWeight(3); stroke(borderCol[0], borderCol[1], borderCol[2], 180 * alpha);
+  rect(popX - 2, popY - 2, popW + 4, popH + 4, 6);
+
+  // Dark panel
+  noStroke(); fill(15, 15, 25, 220 * alpha);
+  rect(popX, popY, popW, popH, 4);
+
+  // Inner border
+  strokeWeight(1); stroke(borderCol[0], borderCol[1], borderCol[2], 120 * alpha); noFill();
+  rect(popX + 3, popY + 3, popW - 6, popH - 6, 3);
+
+  noStroke();
+  // "LEVEL UP!" title in gold
+  textAlign(CENTER, TOP);
+  textFont('Cinzel, Georgia, serif');
+  fill(255, 220, 80, 255 * alpha);
+  textSize(18);
+  text('LEVEL UP!', width / 2, popY + 10);
+
+  // Level number
+  fill(240, 240, 255, 255 * alpha);
+  textSize(14);
+  text('Level ' + _levelUpPopup.level, width / 2, popY + 34);
+
+  // Stat increases
+  textFont('monospace');
+  textSize(10);
+  let ly = popY + 58;
+  fill(100, 220, 100, 255 * alpha);
+  text('+' + _levelUpPopup.hpGain + ' HP', width / 2 - 55, ly);
+  fill(255, 140, 80, 255 * alpha);
+  text('+1 ATK', width / 2, ly);
+  fill(120, 160, 255, 255 * alpha);
+  text('+0.5 DEF', width / 2 + 55, ly);
+
+  // Skill point
+  fill(255, 220, 80, 255 * alpha);
+  textSize(11);
+  text('+1 Skill Point', width / 2, ly + 18);
+
+  textAlign(LEFT, TOP);
+  textFont('monospace');
+  drawingContext.globalAlpha = 1;
+  pop();
+}
+
+// ─── CENTURION LEVEL-UP NOTIFICATION ─────────────────────────────────────────
+var _centurionLevelPopup = { active: false, timer: 0, level: 0, name: '', abilityName: '' };
+
+function drawCenturionLevelPopup() {
+  if (!_centurionLevelPopup.active) return;
+  _centurionLevelPopup.timer--;
+  if (_centurionLevelPopup.timer <= 0) { _centurionLevelPopup.active = false; return; }
+  // Handled by floating text already — this is just the ability unlock banner
 }
 
 // ─── ACTIVE SKILLS ──────────────────────────────────────────────────────────
@@ -983,7 +1169,7 @@ function updateArenaProjectiles(dt, p) {
     if (pr.life <= 0) { _arenaProjectiles.splice(i, 1); continue; }
     // Hit player
     if (dist(pr.x, pr.y, p.x, p.y) < 15 && p.invincTimer <= 0) {
-      let armorR = [0, 3, 6, 10][p.armor] || 0;
+      let armorR = getPlayerDefenseReduction();
       let dmg = max(1, pr.damage - armorR);
       // Fortify damage reduction
       if (typeof getFortifyReduction === 'function') {
@@ -3338,7 +3524,7 @@ function factionPlayerAttack() {
       let fAngle = getFacingAngle();
       let arcHalf = PI * 0.3;
       let range = p.attackRange + (p.weapon === 1 ? 12 : 0);
-      let baseDmg = floor(([15, 20, 25][p.weapon] || 15) * (typeof getNatBestiaryBonus === 'function' ? getNatBestiaryBonus() : 1));
+      let baseDmg = floor((([15, 20, 25][p.weapon] || 15) + ((typeof getEquipBonus === 'function') ? getEquipBonus('atk') : 0)) * (typeof getNatBestiaryBonus === 'function' ? getNatBestiaryBonus() : 1));
       baseDmg = floor(baseDmg * (getFactionData().combatDamageMult || 1));
       // DISCIPLINA passive: +5% per nearby friendly soldier
       let nearbyAllies = 0;
@@ -3434,7 +3620,7 @@ function factionPlayerAttack() {
       let fAngle = getFacingAngle();
       let arcHalf = PI * 0.25; // narrower arc
       let range = p.attackRange + 28; // 70px vs 42px base
-      let baseDmg = floor(([15, 20, 25][p.weapon] || 15) * (typeof getNatBestiaryBonus === 'function' ? getNatBestiaryBonus() : 1));
+      let baseDmg = floor((([15, 20, 25][p.weapon] || 15) + ((typeof getEquipBonus === 'function') ? getEquipBonus('atk') : 0)) * (typeof getNatBestiaryBonus === 'function' ? getNatBestiaryBonus() : 1));
       baseDmg = floor(baseDmg * (getFactionData().combatDamageMult || 1));
       // Phalanx 2x damage
       let isPhalanx = _phalanxCharges > 0;
@@ -3499,7 +3685,7 @@ function factionPlayerAttack() {
       let fAngle = getFacingAngle();
       let arcHalf = PI * 0.3;
       let range = p.attackRange + (p.weapon === 1 ? 12 : 0);
-      let baseDmg = floor(([15, 20, 25][p.weapon] || 15) * (typeof getNatBestiaryBonus === 'function' ? getNatBestiaryBonus() : 1));
+      let baseDmg = floor((([15, 20, 25][p.weapon] || 15) + ((typeof getEquipBonus === 'function') ? getEquipBonus('atk') : 0)) * (typeof getNatBestiaryBonus === 'function' ? getNatBestiaryBonus() : 1));
       baseDmg = floor(baseDmg * (getFactionData().combatDamageMult || 1));
       // Gaul passive: +20% combat damage
       if (f === 'gaul') baseDmg = floor(baseDmg * 1.2);

@@ -801,7 +801,7 @@ function updateNecropolisIsland(dt) {
   p.x += p.vx; p.y += p.vy; if (!isOnNecropolisIsland(p.x, p.y)) { p.x -= p.vx; p.y -= p.vy; }
   // timers decremented in main loop
   for (let sk of n.skeletons) { if (sk.hp <= 0) continue; if (sk.flashTimer > 0) sk.flashTimer -= dt; let dToP = dist(sk.x, sk.y, p.x, p.y);
-    if (dToP < 150) { let ang = atan2(p.y - sk.y, p.x - sk.x); sk.vx = cos(ang) * 1.2; sk.vy = sin(ang) * 1.2; sk.facing = sk.vx > 0 ? 1 : -1; if (dToP < 25 && sk.attackTimer <= 0) { sk.attackTimer = 60; if (p.invincTimer <= 0) { let dmg = 8 - (p.armor > 0 ? p.armor * 3 : 0); p.hp = Math.max(0, p.hp - max(1, dmg)); p.invincTimer = 30; shakeTimer = 4; addFloatingText(w2sX(p.x), w2sY(p.y) - 15, '-' + max(1, dmg), '#ff4444'); } } }
+    if (dToP < 150) { let ang = atan2(p.y - sk.y, p.x - sk.x); sk.vx = cos(ang) * 1.2; sk.vy = sin(ang) * 1.2; sk.facing = sk.vx > 0 ? 1 : -1; if (dToP < 25 && sk.attackTimer <= 0) { sk.attackTimer = 60; if (p.invincTimer <= 0) { let dmg = 8 - ((typeof getPlayerDefenseReduction === 'function') ? getPlayerDefenseReduction() : (p.armor > 0 ? p.armor * 3 : 0)); p.hp = Math.max(0, p.hp - max(1, dmg)); p.invincTimer = 30; shakeTimer = 4; addFloatingText(w2sX(p.x), w2sY(p.y) - 15, '-' + max(1, dmg), '#ff4444'); } } }
     else { sk.patrolAngle += random(-0.05, 0.05); sk.vx = cos(sk.patrolAngle) * 0.3; sk.vy = sin(sk.patrolAngle) * 0.3; sk.facing = sk.vx > 0 ? 1 : -1; }
     sk.x += sk.vx * dt; sk.y += sk.vy * dt; if (!isOnNecropolisIsland(sk.x, sk.y)) { sk.patrolAngle += PI; sk.x -= sk.vx * dt * 2; sk.y -= sk.vy * dt * 2; }
     sk.attackTimer = max(0, sk.attackTimer - dt);
@@ -1243,7 +1243,7 @@ function handleNecropolisInteract() {
   if (bestTomb) {
     bestTomb.looted = true;
     if (bestTomb.trapped && p.invincTimer <= 0) {
-      let dmg = 10 - (p.armor > 0 ? p.armor * 3 : 0);
+      let dmg = 10 - ((typeof getPlayerDefenseReduction === 'function') ? getPlayerDefenseReduction() : (p.armor > 0 ? p.armor * 3 : 0));
       p.hp = Math.max(0, p.hp - max(1, dmg));
       p.invincTimer = 45;
       shakeTimer = 6;

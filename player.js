@@ -77,13 +77,13 @@ function updatePlayer(dt) {
   if (inShallows) spd *= (state.diving && state.diving.active) ? 0.7 : 0.55;
 
   // Sprint: hold SHIFT to run 1.6x faster
-  if (keyIsDown(SHIFT)) spd *= 1.6;
+  if (isKeybindDown('sprint')) spd *= 1.6;
 
   let dx = 0, dy = 0;
-  if (keyIsDown(65) || keyIsDown(LEFT_ARROW))  dx -= 1;
-  if (keyIsDown(68) || keyIsDown(RIGHT_ARROW)) dx += 1;
-  if (keyIsDown(87) || keyIsDown(UP_ARROW))    dy -= 1;
-  if (keyIsDown(83) || keyIsDown(DOWN_ARROW))  dy += 1;
+  if (isKeybindDown('moveLeft') || keyIsDown(LEFT_ARROW))  dx -= 1;
+  if (isKeybindDown('moveRight') || keyIsDown(RIGHT_ARROW)) dx += 1;
+  if (isKeybindDown('moveUp') || keyIsDown(UP_ARROW))    dy -= 1;
+  if (isKeybindDown('moveDown') || keyIsDown(DOWN_ARROW))  dy += 1;
   // Virtual joystick input (mobile)
   if (dx === 0 && dy === 0 && typeof _touchJoystick !== 'undefined' && _touchJoystick.active) {
     dx = _touchJoystick.dx;
