@@ -1247,6 +1247,7 @@ function processBuildingMaintenance() {
   if (state.gold >= cost) {
     state.gold -= cost;
     if (state.treasury) state.treasury.dailyExpense += cost;
+    if (state._upkeepMissedDays > 0) state._upkeepMissedDays = 0;
     addNotification('Building upkeep: -' + cost + 'g', '#cc8844');
     // Restore durability on paid buildings
     for (let b of (state.buildings || [])) {
@@ -1255,22 +1256,29 @@ function processBuildingMaintenance() {
       }
     }
   } else {
-    // Partial pay -- spend what we have, but buildings decay
+    // 3-day grace period before buildings decay
+    if (state._upkeepMissedDays === undefined) state._upkeepMissedDays = 0;
+    state._upkeepMissedDays++;
     let paid = state.gold;
     state.gold = 0;
     if (state.treasury) state.treasury.dailyExpense += paid;
-    addFloatingText(width / 2, height * 0.25, 'Buildings deteriorating! Pay maintenance!', '#ff4444');
-    addNotification('Cannot afford ' + cost + 'g upkeep! Buildings losing durability.', '#ff4444');
-    for (let b of (state.buildings || [])) {
-      let bp = BLUEPRINTS[b.type];
-      if (!bp || !bp.upkeep || bp.upkeep <= 0) continue;
-      if (b.ruined) continue;
-      if (b.durability === undefined) b.durability = 100;
-      b.durability -= 5;
-      if (b.durability <= 0) {
-        b.durability = 0;
-        b.ruined = true;
-        addFloatingText(w2sX(b.x), w2sY(b.y) - 20, bp.name + ' ruined!', '#ff4444');
+    let daysLeft = 3 - state._upkeepMissedDays;
+    if (daysLeft > 0) {
+      addNotification('Low gold! Buildings will decay in ' + daysLeft + ' day' + (daysLeft > 1 ? 's' : '') + '!', '#ffaa44');
+    } else {
+      addFloatingText(width / 2, height * 0.25, 'Buildings deteriorating! Pay maintenance!', '#ff4444');
+      addNotification('Cannot afford ' + cost + 'g upkeep! Buildings losing durability.', '#ff4444');
+      for (let b of (state.buildings || [])) {
+        let bp = BLUEPRINTS[b.type];
+        if (!bp || !bp.upkeep || bp.upkeep <= 0) continue;
+        if (b.ruined) continue;
+        if (b.durability === undefined) b.durability = 100;
+        b.durability -= 5;
+        if (b.durability <= 0) {
+          b.durability = 0;
+          b.ruined = true;
+          addFloatingText(w2sX(b.x), w2sY(b.y) - 20, bp.name + ' ruined!', '#ff4444');
+        }
       }
     }
   }
@@ -2558,6 +2566,8 @@ function setup() {
       state.player.vx = 0; state.player.vy = 0; state.player.moving = false;
     }
   });
+  // Pause on window blur (alt-tab)
+  window.addEventListener('blur', function() { if (gameScreen === 'game' && state) state._paused = true; });
   // Pathfinding
   if (typeof initPathfinding === 'function') initPathfinding();
   // Load sprite sheets (falls back gracefully if PNGs missing)
@@ -2737,6 +2747,7 @@ function startLoadGame() {
     // Snap camera to player position (might be on wreck or home)
     cam.x = state.player.x; cam.y = state.player.y;
     camSmooth.x = cam.x; camSmooth.y = cam.y;
+    state._paused = false;
     gameScreen = 'game';
     noCursor();
   }
@@ -3266,7 +3277,8 @@ function drawInner() {
   // Clear canvas so zoomed-out edges don't show stale frames
   if (camZoom < 0.99) background(10, 18, 35);
   floatOffset = sin(frameCount * 0.015) * 1.5;
-  const dt = min(2, _delta * 60);
+  let dt = min(2, _delta * 60);
+  if (state._paused) dt = 0; // freeze all updates when paused
 
   // ─── INTRO CINEMATIC ─────────────────────────────────────────────────
   if (state.introPhase !== 'done') {
@@ -25572,6 +25584,7 @@ function keyPressed() {
     }
     // ESC on menu = back to game (if save exists / game in progress)
     if (keyCode === 27 && gameScreen === 'menu' && state && state.isInitialized) {
+      state._paused = false;
       gameScreen = 'game';
       return;
     }
@@ -25715,6 +25728,7 @@ function keyPressed() {
     if (state.codexOpen) { state.codexOpen = false; return; }
     if (state.journalOpen) { state.journalOpen = false; return; }
     saveGame();
+    state._paused = true;
     gameScreen = 'menu';
     menuFadeIn = 0;
     return;
