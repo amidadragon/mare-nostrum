@@ -1540,6 +1540,7 @@ function getFacingAngle() {
 function playerAttack() {
   // Route through faction combat system if available
   if (typeof factionPlayerAttack === 'function') {
+    if (state.progression && state.progression.tutorialsSeen) state.progression.tutorialsSeen.attacked = true;
     factionPlayerAttack();
     return;
   }

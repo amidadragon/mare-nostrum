@@ -1,0 +1,100 @@
+{
+  "intro": {
+    "wreck_wake": {
+      "text": "You open your eyes to the sound of waves crashing against broken timber. The storm has passed, but your ship lies in ruins.",
+      "file": "sounds/narration/narration_wreck_wake.mp3"
+    },
+    "first_steps": {
+      "text": "The sand is warm beneath your feet. This island, though small, may be your salvation.",
+      "file": "sounds/narration/narration_first_steps.mp3"
+    },
+    "first_build": {
+      "text": "With the wreckage as your foundation, you begin to build. Every civilization starts with a single stone.",
+      "file": "sounds/narration/narration_first_build.mp3"
+    }
+  },
+  "progression": {
+    "level_3": {
+      "text": "Your settlement grows. The island responds to your touch, yielding its treasures.",
+      "file": "sounds/narration/narration_level_3.mp3"
+    },
+    "level_5": {
+      "text": "Word of your island reaches distant shores. Merchants and travellers take notice.",
+      "file": "sounds/narration/narration_level_5.mp3"
+    },
+    "level_8": {
+      "text": "Your castrum stands ready. The Mediterranean is vast, and not all who sail it come in peace.",
+      "file": "sounds/narration/narration_level_8.mp3"
+    },
+    "level_10": {
+      "text": "A temple rises from the hilltop. The gods themselves watch your progress with interest.",
+      "file": "sounds/narration/narration_level_10.mp3"
+    }
+  },
+  "combat": {
+    "first_raid": {
+      "text": "Longships appear on the horizon. The Sea People have found you.",
+      "file": "sounds/narration/narration_first_raid.mp3"
+    },
+    "victory": {
+      "text": "The raiders retreat! Your defences hold. But they will return.",
+      "file": "sounds/narration/narration_victory.mp3"
+    },
+    "defeat": {
+      "text": "They have plundered your stores. Build stronger. Fight harder.",
+      "file": "sounds/narration/narration_defeat.mp3"
+    }
+  },
+  "faction_intro": {
+    "rome": {
+      "text": "Roma Aeterna. The eagle standard flies once more. Build an empire worthy of the Senate and People of Rome.",
+      "file": "sounds/narration/narration_rome_intro.mp3"
+    },
+    "carthage": {
+      "text": "Carthage shall rise again. Let the purple sails of your merchant fleet dominate these waters.",
+      "file": "sounds/narration/narration_carthage_intro.mp3"
+    },
+    "egypt": {
+      "text": "By the grace of Ra, a new kingdom begins. The sun never sets on the children of the Nile.",
+      "file": "sounds/narration/narration_egypt_intro.mp3"
+    },
+    "greece": {
+      "text": "Athena guides your hand. Philosophy, democracy, and the shield wall shall be your legacy.",
+      "file": "sounds/narration/narration_greece_intro.mp3"
+    },
+    "seapeople": {
+      "text": "The sea is your home, the waves your allies. Take what you need. Leave nothing behind.",
+      "file": "sounds/narration/narration_seapeople_intro.mp3"
+    },
+    "persia": {
+      "text": "The King of Kings builds anew. Let the royal road stretch from shore to shore.",
+      "file": "sounds/narration/narration_persia_intro.mp3"
+    },
+    "phoenicia": {
+      "text": "Masters of trade, rulers of the sea. Your purple dye shall colour the world.",
+      "file": "sounds/narration/narration_phoenicia_intro.mp3"
+    },
+    "gaul": {
+      "text": "Freedom runs in your veins. The sacred oak shelters your people. Let none stand against the war band.",
+      "file": "sounds/narration/narration_gaul_intro.mp3"
+    }
+  },
+  "exploration": {
+    "first_sail": {
+      "text": "The open sea stretches before you. Distant islands shimmer on the horizon.",
+      "file": "sounds/narration/narration_first_sail.mp3"
+    },
+    "vulcan": {
+      "text": "The air grows thick with sulphur. Mount Vulcan smoulders ahead, promising both danger and treasure.",
+      "file": "sounds/narration/narration_vulcan.mp3"
+    },
+    "hyperborea": {
+      "text": "Ice crystals catch the light. Hyperborea, the frozen north. What secrets lie beneath the frost?",
+      "file": "sounds/narration/narration_hyperborea.mp3"
+    },
+    "necropolis": {
+      "text": "The dead do not rest easy here. Tread carefully among the ancient tombs.",
+      "file": "sounds/narration/narration_necropolis.mp3"
+    }
+  }
+}

@@ -26988,6 +26988,7 @@ const TUTORIAL_STEPS = [
   { id: 'crystal', text: 'Walk to the glowing crystals and press E to mine',   check: function() { return state.dailyActivities.crystal > 0 || state.playerStats.crystalsCollected > 0; } },
   { id: 'farm',    text: 'Walk to the farm plots and press E to plant seeds',  check: function() { return state.plots && state.plots.some(function(p) { return p.planted; }); } },
   { id: 'build',   text: 'Press B to open Build Mode and place a building',    check: function() { return state.buildings.length > 0; } },
+  { id: 'attack',  text: 'Press SPACE to attack! Try it on nearby creatures',   check: function() { return state.progression.tutorialsSeen && state.progression.tutorialsSeen.attacked; } },
   { id: 'expand',  text: 'Visit the Crystal Shrine to expand your island!',    check: function() { return state.islandLevel > 1; } },
 ];
 
