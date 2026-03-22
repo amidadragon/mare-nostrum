@@ -20509,6 +20509,7 @@ function updateNationDaily(key) {
     let bType = _pickNationBuilding(rv, key);
     rv.buildings.push(bType); rv.gold -= buildCost;
     rv.population += floor(random(1, 3));
+    rv._lastBuildFrame = frameCount; rv._lastBuildType = bType;
     if (rv.buildings.length % 3 === 0) {
       let bNames = { hut: 'settlement', market: 'grand market', wall: 'fortification', barracks: 'barracks', tower: 'watchtower', temple: 'temple', harbor: 'harbor', forge: 'forge', granary: 'granary' };
       addNotification(name + ' has built a ' + (bNames[bType] || bType) + '!', '#cc9944');
@@ -20525,6 +20526,7 @@ function updateNationDaily(key) {
   if (random() < recruitChance && rv.gold >= 15) {
     let recruits = atWar ? floor(random(1, 3)) : 1;
     rv.military += recruits; rv.gold -= 15 * recruits;
+    rv._lastRecruitFrame = frameCount;
   }
 
   // AI war declarations based on relations
@@ -21943,8 +21945,11 @@ function generateNationIslandContent(key) {
   let numNPCs = min(3 + floor(lv / 2), 6);
   let npcs = [];
   let bannerCol = fac ? fac.bannerColor : [150, 100, 60];
+  let roles = ['citizen', 'citizen', 'soldier', 'merchant', 'farmer', 'priest'];
   for (let i = 0; i < numNPCs; i++) {
     let a = random(TWO_PI), d = random(0.15, 0.5) * rx;
+    let role = roles[i % roles.length];
+    let destIdx = floor(random(buildings.length));
     npcs.push({
       x: cx + cos(a) * d,
       y: cy + sin(a) * d * (ry / rx),
@@ -21953,6 +21958,8 @@ function generateNationIslandContent(key) {
       moveTimer: random(60, 200),
       idleTimer: 0,
       col: bannerCol,
+      role: role,
+      destIdx: destIdx,
     });
   }
 
@@ -22533,15 +22540,36 @@ function drawActiveNationContent() {
     fill(60, 90, 40); ellipse(tsx, tsy - t.size, t.size * 1.2, t.size * 1.5);
     fill(80, 60, 40); rect(tsx - 1, tsy - 2, 2, 4);
   }
-  // NPCs
+  // NPCs — role-based visuals
   let bannerCol = ni.bannerCol;
   for (let n of ni.npcs) {
     let sx = w2sX(n.x), sy = w2sY(n.y);
     if (sx < -20 || sx > width + 20 || sy < -20 || sy > height + 20) continue;
     fill(0, 0, 0, 25); ellipse(sx, sy + 2, 12, 4);
-    fill(bannerCol[0] * 0.6 + 100, bannerCol[1] * 0.6 + 100, bannerCol[2] * 0.6 + 100);
-    rect(sx - 4, sy - 8, 8, 10, 1);
+    if (n.role === 'soldier') {
+      fill(bannerCol[0] * 0.4 + 60, bannerCol[1] * 0.4 + 60, bannerCol[2] * 0.4 + 60);
+      rect(sx - 4, sy - 8, 8, 10, 1);
+      fill(160, 160, 160); rect(sx + 3 * n.facing, sy - 10, 2, 12); // spear
+    } else {
+      fill(bannerCol[0] * 0.6 + 100, bannerCol[1] * 0.6 + 100, bannerCol[2] * 0.6 + 100);
+      rect(sx - 4, sy - 8, 8, 10, 1);
+    }
     fill(155, 120, 85); ellipse(sx, sy - 11, 7, 7);
+    // Role props
+    if (n.role === 'merchant' && n.idleTimer <= 0) { fill(180, 140, 60); rect(sx + 3 * n.facing, sy - 5, 4, 3); } // carrying goods
+    if (n.role === 'farmer' && n.idleTimer > 0) { fill(100, 160, 60); ellipse(sx, sy - 2, 6, 3); } // harvesting
+    if (n.role === 'priest' && n.idleTimer > 0) { fill(255, 255, 200, 40 + sin(frameCount * 0.1) * 20); ellipse(sx, sy - 14, 10, 10); } // prayer glow
+  }
+  // Construction scaffolding when recently built
+  if (rv._lastBuildFrame && frameCount - rv._lastBuildFrame < 180 && ni.buildings.length > 0) {
+    let lb = ni.buildings[ni.buildings.length - 1];
+    let lbx = w2sX(lb.x), lby = w2sY(lb.y);
+    let prog = (frameCount - rv._lastBuildFrame) / 180;
+    stroke(120, 90, 50, 150 * (1 - prog)); noFill();
+    rect(lbx - lb.w / 2 - 2, lby - lb.h - 2, lb.w + 4, lb.h + 4); // scaffolding
+    noStroke();
+    fill(180, 160, 120, 30 * (1 - prog)); // dust
+    for (let di = 0; di < 3; di++) ellipse(lbx + sin(frameCount * 0.05 + di) * 8, lby - lb.h * prog, 5, 4);
   }
   // Wildlife
   if (ni.wildlife) { for (let w of ni.wildlife) drawOneFactionCreature(w); }
@@ -22568,7 +22596,18 @@ function updateActiveNationEntities(dt) {
   if (!ni) return;
   for (let n of ni.npcs) {
     n.moveTimer -= dt;
-    if (n.moveTimer <= 0) { n.vx = random(-0.3, 0.3); n.vy = random(-0.3, 0.3); n.facing = n.vx > 0 ? 1 : -1; n.moveTimer = random(80, 250); n.idleTimer = random(60, 120); }
+    if (n.moveTimer <= 0) {
+      // Walk toward a destination building, then pick a new one
+      if (ni.buildings.length > 0) {
+        n.destIdx = floor(random(ni.buildings.length));
+        let dest = ni.buildings[n.destIdx];
+        let dx = dest.x - n.x, dy = dest.y - n.y;
+        let d = sqrt(dx * dx + dy * dy) || 1;
+        let spd = n.role === 'soldier' ? 0.4 : 0.25;
+        n.vx = (dx / d) * spd; n.vy = (dy / d) * spd;
+      } else { n.vx = random(-0.3, 0.3); n.vy = random(-0.3, 0.3); }
+      n.facing = n.vx > 0 ? 1 : -1; n.moveTimer = random(80, 250); n.idleTimer = random(40, 100);
+    }
     if (n.idleTimer > 0) { n.idleTimer -= dt; } else { n.x += n.vx * dt; n.y += n.vy * dt; }
   }
   if (ni.wildlife) { for (let w of ni.wildlife) { w.timer -= dt; if (w.timer <= 0) { w.vx = (random() - 0.5) * w.speed * 2; w.vy = (random() - 0.5) * w.speed * 2; w.timer = random(80, 250); } w.x += w.vx * dt; w.y += w.vy * dt; } }

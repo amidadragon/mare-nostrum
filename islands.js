@@ -154,13 +154,14 @@ function drawNationMediumLOD(sx, sy, rx, ry, key, nation, dScale) {
     fill(80, 80, 80, 20 * warPulse); ellipse(fsx + 5, fsy - ry * 0.3, rx * 0.4, ry * 0.2);
   }
 
-  // Flag
+  // Flag — waving
   let flagY = fsy - ry * 0.55;
   fill(accentCol[0], accentCol[1], accentCol[2], 140);
   rect(fsx, flagY - 2, 1, 12);
   fill(bannerCol[0], bannerCol[1], bannerCol[2], 160);
+  let flagWave = sin(frameCount * 0.06) * 2;
   beginShape();
-  vertex(fsx + 1, flagY - 2); vertex(fsx + 8, flagY + 1); vertex(fsx + 1, flagY + 4);
+  vertex(fsx + 1, flagY - 2); vertex(fsx + 8 + flagWave, flagY + 1); vertex(fsx + 1, flagY + 4);
   endShape(CLOSE);
 
   // Tiny docked ship if trading
@@ -210,22 +211,47 @@ function drawNationCloseLOD(sx, sy, rx, ry, key, nation, dScale) {
     }
   }
 
-  // Population dots (near buildings) — only on close LOD
+  // Citizens walking between buildings with purpose
   let popCount = min(nation.population || 0, 6);
+  let numB = min(3 + floor((nation.level || 1) * 0.5), 6);
   for (let i = 0; i < popCount; i++) {
-    let pa = (i * 2.39996 + frameCount * 0.003) % TWO_PI;
-    let pr = rx * (0.15 + (i % 3) * 0.12);
-    let px = fsx + cos(pa) * pr;
-    let py = fsy + sin(pa) * pr * 0.55;
-    fill(200, 180, 150, 140);
-    rect(floor(px), floor(py), 2, 2);
+    // Walk figure-8 between two building positions
+    let t = (frameCount * 0.005 + i * 1.7) % TWO_PI;
+    let srcA = (i / numB) * PI + 0.3, dstA = ((i + 2) / numB) * PI + 0.3;
+    let lerp = (sin(t) + 1) * 0.5;
+    let px = fsx + cos(srcA) * rx * 0.25 * (1 - lerp) + cos(dstA) * rx * 0.3 * lerp;
+    let py = fsy + sin(srcA) * ry * 0.15 * (1 - lerp) + sin(dstA) * ry * 0.2 * lerp;
+    fill(200, 180, 150, 160); rect(floor(px), floor(py) - 2, 2, 3);
+    // Merchant carrying: small colored dot
+    if (i % 3 === 0) { fill(180, 140, 60, 140); rect(floor(px) + 2, floor(py) - 1, 2, 2); }
   }
 
-  // Recently built buildings — sparkle
-  if (nation._lastBuildFrame && frameCount - nation._lastBuildFrame < 120) {
-    let sparkle = sin(frameCount * 0.2) * 0.5 + 0.5;
-    fill(255, 255, 200, 60 * sparkle);
-    ellipse(fsx, fsy, rx * 0.4, ry * 0.3);
+  // Construction scaffolding — sparkle + scaffold outline
+  if (nation._lastBuildFrame && frameCount - nation._lastBuildFrame < 180) {
+    let prog = (frameCount - nation._lastBuildFrame) / 180;
+    let ba = (numB * 0.7) / numB * PI + 0.3;
+    let bx = fsx + cos(ba) * rx * 0.25, by = fsy + sin(ba) * ry * 0.15;
+    stroke(120, 90, 50, 120 * (1 - prog)); noFill();
+    rect(floor(bx) - 4, floor(by) - 7, 9, 8); noStroke();
+    fill(255, 255, 200, 50 * (1 - prog));
+    for (let di = 0; di < 2; di++) ellipse(bx + sin(frameCount * 0.06 + di) * 4, by - 5 * prog, 3, 3);
+  }
+
+  // Recruit marching from barracks
+  if (nation._lastRecruitFrame && frameCount - nation._lastRecruitFrame < 120) {
+    let rp = (frameCount - nation._lastRecruitFrame) / 120;
+    let rpx = fsx + rp * rx * 0.4, rpy = fsy - ry * 0.1;
+    fill(soldierCol[0], soldierCol[1], soldierCol[2], 200 * (1 - rp));
+    rect(floor(rpx) - 1, floor(rpy) - 2, 3, 4);
+  }
+
+  // Chimney smoke on first two buildings
+  for (let i = 0; i < min(numB, 2); i++) {
+    let sba = (i / numB) * PI + 0.3;
+    let sbx = fsx + cos(sba) * rx * 0.25 + i * rx * 0.1;
+    let sby = fsy + sin(sba) * ry * 0.15 * 0.5 - ry * 0.15;
+    fill(180, 180, 170, 15 + sin(frameCount * 0.04 + i * 2) * 8);
+    ellipse(sbx, sby - sin(frameCount * 0.025 + i) * 3, 4, 3);
   }
 
   // War fire particles
@@ -238,12 +264,17 @@ function drawNationCloseLOD(sx, sy, rx, ry, key, nation, dScale) {
     }
   }
 
-  // Farm fields as green patches
+  // Farm fields as green patches with animated farmers
   if (nation.level >= 2) {
     fill(80, 140, 50, 40);
     ellipse(fsx + rx * 0.3, fsy + ry * 0.2, rx * 0.25, ry * 0.15);
+    // Farmer dot bending down (bob)
+    fill(200, 180, 130, 120);
+    let fby = sin(frameCount * 0.08) * 1.5;
+    rect(floor(fsx + rx * 0.3), floor(fsy + ry * 0.2 + fby), 2, 2);
     if (nation.level >= 4) {
       ellipse(fsx - rx * 0.35, fsy + ry * 0.15, rx * 0.2, ry * 0.12);
+      rect(floor(fsx - rx * 0.35), floor(fsy + ry * 0.15 + fby), 2, 2);
     }
   }
   pop();
