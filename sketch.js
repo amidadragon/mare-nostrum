@@ -20734,14 +20734,6 @@ function startNationRaid(key) {
   rv.lastRaid = state.day;
   let name = getNationName(key);
 
-  // If player has garrison, trigger army battle instead of spawning raiders
-  if (typeof startIslandDefense === 'function' && typeof getGarrisonCount === 'function' && getGarrisonCount() > 0) {
-    addFloatingText(width / 2, height * 0.2, name.toUpperCase() + ' RAID! Garrison engaging!', '#ff8844');
-    if (snd) snd.playSFX('war_horn');
-    startIslandDefense(raidSize, key);
-    return;
-  }
-
   rv.raidWarning = 300;
   let shoreX = WORLD.islandCX + getSurfaceRX() * 0.95;
   let shoreY = WORLD.islandCY;
@@ -20757,6 +20749,8 @@ function startNationRaid(key) {
       vx: 0, vy: 0, attackTimer: 0, facing: -1, flashTimer: 0, stealTimer: 0,
     });
   }
+  // Spawn garrison defenders to fight raiders in real-time
+  _spawnGarrisonDefenders();
   addFloatingText(width / 2, height * 0.2, name.toUpperCase() + ' RAID INCOMING!', '#ff4444');
   addNotification(name + ' sends ' + raidSize + ' raiders to your shores!', '#ff4444');
   if (snd) { snd.playSFX('war_horn'); setTimeout(function() { if (snd) snd.playSFX('ding'); }, 500); }
@@ -20836,6 +20830,26 @@ function updateSingleNationRaid(key, dt) {
         }
       }
     }
+    // Garrison soldiers attack this raider
+    if (state._garrisonDefenders) {
+      for (let gs of state._garrisonDefenders) {
+        if (gs.hp <= 0) continue;
+        let gsDist = dist(gs.x, gs.y, r.x, r.y);
+        if (gsDist < 30 && gs.attackTimer <= 0) {
+          let gsDmg = gs.damage || 8;
+          r.hp -= gsDmg; r.flashTimer = 6;
+          gs.attackTimer = 40;
+          addFloatingText(w2sX(r.x), w2sY(r.y) - 15, '-' + gsDmg, '#88ccff');
+          spawnParticles(r.x, r.y, 'hit', 2);
+        }
+        // Raiders fight back against garrison soldiers
+        if (gsDist < 35 && r.attackTimer <= 0) {
+          let rDmg = max(1, floor(6 + rv.level * 2));
+          gs.hp -= rDmg; gs.flashTimer = 8; r.attackTimer = 60;
+          addFloatingText(w2sX(gs.x), w2sY(gs.y) - 15, '-' + rDmg, '#ff4444');
+        }
+      }
+    }
     if (r.hp <= 0) {
       rv.raidParty.splice(i, 1);
       spawnParticles(r.x, r.y, 'death', 5);
@@ -20845,6 +20859,8 @@ function updateSingleNationRaid(key, dt) {
       rv._raidKills++;
     }
   }
+  // Update garrison defender movement
+  _updateGarrisonDefenders(rv.raidParty, dt);
   if (rv.raidParty.length === 0) {
     // Casualties report
     let killed = rv._raidKills || 0;
@@ -20853,6 +20869,7 @@ function updateSingleNationRaid(key, dt) {
     addNotification(name + ' raiders defeated! ' + killed + ' enemies slain.', '#88ff88');
     rv.reputation = max(-100, rv.reputation - 5);
     rv._raidKills = 0;
+    _returnGarrisonDefenders();
   }
 }
 
@@ -20887,6 +20904,8 @@ function startSeaPeopleRaid(tier) {
   if (snd) snd.playSFX('war_horn');
   if (snd && snd.playNarration) snd.playNarration('first_raid');
   if (typeof triggerPlayerAlert === 'function') triggerPlayerAlert();
+  // Spawn garrison defenders to fight raiders in real-time
+  _spawnGarrisonDefenders();
 
   // Spawn 1-3 visual longships
   state.seaPeopleShips = [];
@@ -20928,6 +20947,7 @@ function updateSeaPeopleRaid(dt) {
     addFloatingText(width / 2, height * 0.2, 'SEA PEOPLE REPELLED!', '#88ff88');
     addNotification('Sea People raiders defeated! ' + killed + ' enemies slain.', '#88ff88');
     state._seaPeopleRaidKills = 0;
+    _returnGarrisonDefenders();
     return;
   }
 
@@ -20993,6 +21013,25 @@ function updateSeaPeopleRaid(dt) {
         }
       }
     }
+    // Garrison soldiers attack sea people raiders
+    if (state._garrisonDefenders) {
+      for (let gs of state._garrisonDefenders) {
+        if (gs.hp <= 0) continue;
+        let gsDist = dist(gs.x, gs.y, r.x, r.y);
+        if (gsDist < 30 && gs.attackTimer <= 0) {
+          let gsDmg = gs.damage || 8;
+          r.hp -= gsDmg; r.flashTimer = 6;
+          gs.attackTimer = 40;
+          addFloatingText(w2sX(r.x), w2sY(r.y) - 15, '-' + gsDmg, '#88ccff');
+          spawnParticles(r.x, r.y, 'hit', 2);
+        }
+        if (gsDist < 35 && r.attackTimer <= 0) {
+          let rDmg = max(1, r.damage || 10);
+          gs.hp -= rDmg; gs.flashTimer = 8; r.attackTimer = 60;
+          addFloatingText(w2sX(gs.x), w2sY(gs.y) - 15, '-' + rDmg, '#ff4444');
+        }
+      }
+    }
     if (r.hp <= 0) {
       state._seaPeopleRaidParty.splice(i, 1);
       spawnParticles(r.x, r.y, 'death', 5);
@@ -21004,63 +21043,15 @@ function updateSeaPeopleRaid(dt) {
       state._seaPeopleRaidKills = (state._seaPeopleRaidKills || 0) + 1;
     }
   }
+  // Update garrison defender movement toward sea people raiders
+  _updateGarrisonDefenders(state._seaPeopleRaidParty || [], dt);
 }
 
 function _spawnSeaPeopleRaiders() {
   let data = state._seaPeopleRaidData;
   if (!data) return;
 
-  if (typeof startIslandDefense === 'function' && typeof getGarrisonCount === 'function' && getGarrisonCount() > 0) {
-    addFloatingText(width / 2, height * 0.2, data.title.toUpperCase() + '! Garrison engaging!', '#ff8844');
-    let lg = state.legia;
-    let garrison = (lg && lg.army) ? lg.army.filter(u => u.garrison) : [];
-    if (garrison.length > 0) {
-      let attackers = [];
-      for (let i = 0; i < data.raidSize; i++) {
-        attackers.push({ type: 'legionary', hp: data.baseHp, maxHp: data.baseHp, damage: data.baseDmg, speed: 1.0 });
-      }
-      for (let i = 0; i < data.champCount; i++) {
-        let chp = data.baseHp * 2;
-        attackers.push({ type: 'legionary', hp: chp, maxHp: chp, damage: floor(data.baseDmg * 1.5), speed: 1.0 });
-      }
-      if (data.bossCount > 0) {
-        let bhp = data.baseHp * 5;
-        attackers.push({ type: 'cavalry', hp: bhp, maxHp: bhp, damage: data.baseDmg * 2, speed: 0.8 });
-      }
-      let cData = getCastrumLevelData();
-      let defMult = cData ? cData.defenseMult : 1.0;
-      let towers = (state.buildings || []).filter(b => b.type === 'watchtower' || b.type === 'guardtower');
-      let towerDmg = towers.length * 3;
-      let defenderUnits = garrison.map(u => ({
-        ...u, hp: floor(u.hp * defMult), maxHp: floor(u.maxHp * defMult), damage: u.damage + towerDmg,
-      }));
-      startArmyBattle(attackers, defenderUnits, {
-        type: 'defend', nationKey: 'seapeople', nationName: 'Sea People',
-        onVictory: function(battle) {
-          let stolen = floor(15 + data.tier * 10);
-          state.gold = max(0, state.gold - stolen);
-          addFloatingText(width / 2, height * 0.2, 'Defense failed! -' + stolen + 'g plundered', '#ff4444');
-          let garrisonAlive = battle.defenders.filter(u => u.alive);
-          lg.army = lg.army.filter(u => !u.garrison);
-          for (let s of garrisonAlive) { s.garrison = true; lg.army.push(s); }
-        },
-        onDefeat: function(battle) {
-          state.gold += floor(10 + data.raidSize * 3);
-          addFloatingText(width / 2, height * 0.2, 'Garrison defended! +' + floor(10 + data.raidSize * 3) + 'g', '#88ff88');
-          addNotification('Sea People raid repelled by your garrison!', '#88ff88');
-          if (typeof grantXP === 'function') grantXP(25 + data.raidSize * 5);
-          let garrisonAlive = battle.defenders.filter(u => u.alive);
-          lg.army = lg.army.filter(u => !u.garrison);
-          for (let s of garrisonAlive) { s.garrison = true; lg.army.push(s); }
-        },
-      });
-      state.seaPeopleRaidActive = false;
-      state.seaPeopleShips = [];
-      return;
-    }
-  }
-
-  // No garrison — spawn raider NPCs from eastern shore
+  // Spawn raider NPCs from eastern shore
   state._seaPeopleRaidParty = [];
   state._seaPeopleRaidKills = 0;
   let shoreX = WORLD.islandCX + getSurfaceRX() * 0.95;
@@ -21182,6 +21173,132 @@ function drawSeaPeopleRaiders() {
   }
 }
 
+// ─── GARRISON REAL-TIME DEFENSE SYSTEM ────────────────────────────────
+
+function _spawnGarrisonDefenders() {
+  if (state._garrisonDefenders && state._garrisonDefenders.length > 0) return;
+  let lg = state.legia;
+  if (!lg || !lg.army) return;
+  let garrison = lg.army.filter(u => u.garrison);
+  if (garrison.length === 0) return;
+  let count = min(5, garrison.length);
+  let cx = lg.castrumX || WORLD.islandCX + 200;
+  let cy = lg.castrumY || WORLD.islandCY + 100;
+  state._garrisonDefenders = [];
+  for (let i = 0; i < count; i++) {
+    let u = garrison[i];
+    state._garrisonDefenders.push({
+      x: cx + random(-30, 30), y: cy + random(-20, 20),
+      hp: u.hp || 60, maxHp: u.maxHp || 60,
+      damage: u.damage || 8,
+      facing: 1, flashTimer: 0, attackTimer: 0,
+      _srcIndex: lg.army.indexOf(u),
+      _unitType: u.type || 'legionary',
+    });
+  }
+  let terms = (typeof getFactionTerms === 'function') ? getFactionTerms() : { soldier: 'Soldier' };
+  addFloatingText(w2sX(cx), w2sY(cy) - 30, count + ' ' + terms.soldier + 's deploying!', '#88ccff');
+}
+
+function _updateGarrisonDefenders(enemies, dt) {
+  if (!state._garrisonDefenders) return;
+  for (let i = state._garrisonDefenders.length - 1; i >= 0; i--) {
+    let gs = state._garrisonDefenders[i];
+    gs.flashTimer = max(0, gs.flashTimer - dt);
+    gs.attackTimer = max(0, gs.attackTimer - dt);
+    if (gs.hp <= 0) {
+      spawnParticles(gs.x, gs.y, 'death', 4);
+      addFloatingText(w2sX(gs.x), w2sY(gs.y) - 20, 'Soldier fallen!', '#ff6666');
+      state._garrisonDefenders.splice(i, 1);
+      continue;
+    }
+    // Find nearest living enemy
+    let nearest = null, nearDist = 250;
+    for (let e of enemies) {
+      if (e.hp <= 0) continue;
+      let d = dist(gs.x, gs.y, e.x, e.y);
+      if (d < nearDist) { nearDist = d; nearest = e; }
+    }
+    if (nearest) {
+      let dx = nearest.x - gs.x, dy = nearest.y - gs.y;
+      let d = sqrt(dx * dx + dy * dy);
+      gs.facing = dx > 0 ? 1 : -1;
+      if (d > 25) {
+        let spd = 1.8 * dt;
+        gs.x += (dx / d) * spd; gs.y += (dy / d) * spd;
+      }
+    } else {
+      // No enemies, return toward castrum
+      let cx = (state.legia ? state.legia.castrumX : WORLD.islandCX + 200) || WORLD.islandCX + 200;
+      let cy = (state.legia ? state.legia.castrumY : WORLD.islandCY + 100) || WORLD.islandCY + 100;
+      let dx = cx - gs.x, dy = cy - gs.y;
+      let d = sqrt(dx * dx + dy * dy);
+      if (d > 10) { gs.x += (dx / d) * 1.0 * dt; gs.y += (dy / d) * 1.0 * dt; }
+      gs.facing = dx > 0 ? 1 : -1;
+    }
+  }
+}
+
+function _returnGarrisonDefenders() {
+  if (!state._garrisonDefenders) return;
+  let lg = state.legia;
+  if (lg && lg.army) {
+    let deadCount = 0;
+    // Sync HP back to army for survivors, track dead
+    let deadIndices = [];
+    for (let gs of state._garrisonDefenders) {
+      if (gs.hp <= 0) {
+        deadCount++;
+        deadIndices.push(gs._srcIndex);
+      } else if (gs._srcIndex >= 0 && gs._srcIndex < lg.army.length) {
+        lg.army[gs._srcIndex].hp = gs.hp;
+      }
+    }
+    // Remove dead garrison units from army (reverse order to preserve indices)
+    deadIndices.sort((a, b) => b - a);
+    for (let idx of deadIndices) {
+      if (idx >= 0 && idx < lg.army.length) lg.army.splice(idx, 1);
+    }
+    if (deadCount > 0) addNotification(deadCount + ' garrison soldier' + (deadCount > 1 ? 's' : '') + ' lost in defense.', '#ff8866');
+  }
+  state._garrisonDefenders = null;
+}
+
+function _drawGarrisonDefenders() {
+  if (!state._garrisonDefenders) return;
+  let _m = (typeof getFactionMilitary === 'function') ? getFactionMilitary() : { tunic: [180, 40, 40], helm: [160, 140, 60], shield: [140, 30, 30], shieldShape: 'rect', legs: [120, 80, 50] };
+  for (let gs of state._garrisonDefenders) {
+    if (gs.hp <= 0) continue;
+    let sx = w2sX(gs.x), sy = w2sY(gs.y);
+    if (sx < -30 || sx > width + 30 || sy < -30 || sy > height + 30) continue;
+    push(); translate(sx, sy); scale(gs.facing, 1); noStroke();
+    if (gs.flashTimer > 0) { fill(255, 255, 255, 200); ellipse(0, -8, 18, 24); pop(); continue; }
+    fill(0, 0, 0, 30); ellipse(0, 2, 14, 5);
+    fill(_m.legs[0], _m.legs[1], _m.legs[2]);
+    rect(-4, 0, 3, 6); rect(1, 0, 3, 6);
+    fill(_m.tunic[0], _m.tunic[1], _m.tunic[2]);
+    rect(-5, -10, 10, 12, 1);
+    fill(_m.tunic[0] * 0.7, _m.tunic[1] * 0.7, _m.tunic[2] * 0.7);
+    rect(-5, -4, 10, 2);
+    fill(160, 120, 85);
+    rect(-7, -8, 3, 7); rect(4, -8, 3, 7);
+    fill(150, 110, 75); ellipse(0, -13, 8, 8);
+    fill(_m.helm[0], _m.helm[1], _m.helm[2]);
+    arc(0, -15, 10, 8, PI, 0); rect(-5, -16, 10, 2);
+    fill(_m.shield[0], _m.shield[1], _m.shield[2]); stroke(_m.shield[0]*0.6, _m.shield[1]*0.6, _m.shield[2]*0.6); strokeWeight(1);
+    if (_m.shieldShape === 'round') ellipse(-5, -4, 7, 7);
+    else rect(-7, -8, 4, 8, 1);
+    noStroke();
+    fill(180, 180, 190); rect(5, -10, 2, 9);
+    fill(120, 90, 40); rect(4, -4, 4, 2);
+    let hpPct = gs.hp / gs.maxHp;
+    fill(0, 40, 80, 150); rect(-8, -22, 16, 3);
+    fill(hpPct > 0.5 ? color(80, 150, 220) : color(220, 120, 40));
+    rect(-8, -22, floor(16 * hpPct), 3);
+    pop();
+  }
+}
+
 function drawNationRaiders() {
   let keys = Object.keys(state.nations);
   for (let k of keys) {
@@ -21221,6 +21338,8 @@ function drawNationRaiders() {
       pop();
     }
   }
+  // Draw garrison defenders fighting raiders
+  _drawGarrisonDefenders();
 }
 
 function openNationDiplomacy(key) { state.nationDiplomacyOpen = key; }
