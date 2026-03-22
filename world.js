@@ -551,7 +551,7 @@ function drawSky() {
     rect(0, y, width, 2);
   }
 
-  if ((bright > 0.1 || (h >= 5 && h < 7)) && !stormActive) {
+  if ((bright > 0.1 || (h >= 5 && h < 7)) && !stormActive && !(typeof _frameBudget !== 'undefined' && _frameBudget.throttled)) {
     drawDriftClouds(max(bright, 0.15));
   }
 
@@ -621,7 +621,8 @@ function drawSun(x, y, bright) {
 }
 
 function drawStarField(alpha) {
-  if (frameCount % 3 !== 0) return;
+  let _starSkip = (typeof _frameBudget !== 'undefined' && _frameBudget.throttled) ? 6 : 3;
+  if (frameCount % _starSkip !== 0) return;
   if (!starPositions) {
     starPositions = [];
     // Background stars — varied sizes and colors
@@ -2827,6 +2828,7 @@ function drawRomanRoad(ix, iy) {
 // ─── GRASS TUFTS ──────────────────────────────────────────────────────────
 function drawGrassTufts() {
   if (!state.grassTufts) return;
+  if (typeof _frameBudget !== 'undefined' && _frameBudget.throttled && frameCount % 2 !== 0) return;
   let bright = getSkyBrightness();
   let windPhase = sin(frameCount * 0.018) * 1.5;
   noStroke();

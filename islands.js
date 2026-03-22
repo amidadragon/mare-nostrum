@@ -86,6 +86,10 @@ function _getMaxViewDist() {
 function getIslandLOD(dist) {
   if (dist < 200) return 'full';
   if (dist < 800) return 'close';
+  // When throttled, skip medium LOD — go straight to far
+  if (typeof _frameBudget !== 'undefined' && _frameBudget.throttled) {
+    return dist < 800 ? 'close' : 'far';
+  }
   if (dist < 2000) return 'medium';
   return 'far';
 }

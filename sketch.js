@@ -3110,7 +3110,17 @@ let _lowFpsFrames = 0;
 let _particleCap = 200;
 let _jumpingFish = [];
 
+// ─── FRAME BUDGET MONITOR ─────────────────────────────────────────────────
+let _frameBudget = { start: 0, _prevStart: 0, last: 16, avg: 16, overBudget: 0, throttled: false, recoveryFrames: 0 };
+
+function isOnScreen(wx, wy, margin) {
+  margin = margin || 50;
+  let sx = w2sX(wx), sy = w2sY(wy);
+  return sx > -margin && sx < width + margin && sy > -margin && sy < height + margin;
+}
+
 function draw() {
+  _frameBudget.start = performance.now();
   // Engine camera bounds for culling
   if (typeof Engine !== 'undefined') Engine.updateCamBounds(camSmooth.x, camSmooth.y, width / camZoom, height / camZoom);
   // Delta time
@@ -3129,12 +3139,31 @@ function draw() {
   }
   _fpsSmooth = lerp(_fpsSmooth, 1 / _delta, 0.05);
 
-  // ─── FPS WATCHDOG ───
+  // ─── FPS WATCHDOG + FRAME BUDGET ───
   if (_fpsSmooth < 30) { _lowFpsFrames++; } else { _lowFpsFrames = 0; }
-  if (_lowFpsFrames > 60 && _particleCap > 100) {
+  // Measure previous frame duration (start was set at top of previous draw())
+  if (_frameBudget._prevStart > 0) {
+    _frameBudget.last = _frameBudget.start - _frameBudget._prevStart;
+    _frameBudget.avg = lerp(_frameBudget.avg, _frameBudget.last, 0.1);
+  }
+  _frameBudget._prevStart = _frameBudget.start;
+  if (_frameBudget.avg > 18) _frameBudget.overBudget++;
+  else _frameBudget.overBudget = max(0, _frameBudget.overBudget - 1);
+  // Auto-throttle: engage after ~0.5s of lag
+  if (_frameBudget.overBudget > 30 && !_frameBudget.throttled) {
+    _frameBudget.throttled = true;
     _particleCap = 100;
-    console.warn('[perf] FPS below 30 for 60+ frames — particle cap reduced to 100');
-  } else if (_lowFpsFrames === 0 && _particleCap < 200) {
+    _frameBudget.recoveryFrames = 0;
+  }
+  // Recovery: restore after 60 frames of good performance
+  if (_frameBudget.throttled) {
+    if (_frameBudget.overBudget === 0) _frameBudget.recoveryFrames++;
+    else _frameBudget.recoveryFrames = 0;
+    if (_frameBudget.recoveryFrames > 60) {
+      _frameBudget.throttled = false;
+      _particleCap = 200;
+    }
+  } else if (_particleCap < 200) {
     _particleCap = min(_particleCap + 1, 200);
   }
 
@@ -3742,9 +3771,9 @@ function drawInner() {
     push();
     translate(shakeX, shakeY);
     drawSky();
-    drawSkyBirds();
+    if (!_frameBudget.throttled) drawSkyBirds();
     drawOcean();
-    if (typeof drawOceanWildlife === 'function') drawOceanWildlife();
+    if (typeof drawOceanWildlife === 'function' && !_frameBudget.throttled) drawOceanWildlife();
     if (typeof drawAtmosphericHaze === 'function') drawAtmosphericHaze();
     drawAmbientShips();
     drawSeaPeopleShips();
@@ -3818,17 +3847,17 @@ function drawInner() {
     translate(shakeX, shakeY + floatOffset);
     if (!state.rowing || !state.rowing.active || _homeDist < 300) {
       drawIsland();
-      drawShoreWaves();
+      if (!_frameBudget.throttled || frameCount % 2 === 0) drawShoreWaves();
       drawAmbientHouses();
       drawWorldObjectsSorted();
-      drawCitySmoke();
+      if (!_frameBudget.throttled) drawCitySmoke();
       drawLaundryLines();
       drawStreetWear();
       drawGranaryArea();
       drawAmphoraStacks();
       drawTempleIncense();
       drawForumBanner();
-      drawWindowGlow();
+      if (!_frameBudget.throttled) drawWindowGlow();
       drawRuinOverlays();
       drawCompanionTrail();
       drawPlayerTrail();
@@ -3836,8 +3865,8 @@ function drawInner() {
       drawFishing();
       if (typeof drawTidalHUD === 'function') drawTidalHUD();
       drawParticles();
-      drawSeasonalEffects();
-      drawAmbientWildlife();
+      if (!_frameBudget.throttled || frameCount % 2 === 0) drawSeasonalEffects();
+      if (!_frameBudget.throttled) drawAmbientWildlife();
       drawWeatherEffects();
       drawEnergyArcs();
       drawFloatingText();
@@ -4175,7 +4204,8 @@ function drawInner() {
     textFont('monospace'); textSize(11); textAlign(LEFT, BOTTOM); noStroke();
     let entities = (state.buildings ? state.buildings.length : 0) + (state.trees ? state.trees.length : 0) + (state.npc ? 1 : 0);
     let lines = [
-      'FPS: ' + nf(_fpsSmooth, 1, 1),
+      'FPS: ' + nf(_fpsSmooth, 1, 1) + (_frameBudget.throttled ? ' [THROTTLED]' : ''),
+      'Frame: ' + nf(_frameBudget.avg, 1, 1) + 'ms' + (_frameBudget.overBudget > 0 ? ' over:' + _frameBudget.overBudget : ''),
       'Particles: ' + particles.length + '/' + _particleCap,
       'Entities: ' + entities,
     ];
@@ -9550,26 +9580,26 @@ function drawWorldObjectsSorted() {
   _sortItems.length = 0;
   _sortItems.push({ y: state.pyramid.y - 40, draw: drawPyramid });
   _sortItems.push({ y: WORLD.islandCY - 30, draw: drawRuins });
-  // Buildings — flat items (floor, mosaic, bridge) sort BEHIND everything at their position
-  // Tall items (wall, door, etc.) sort by bottom edge for correct overlap
+  // Buildings — pre-cull offscreen, then sort
   state.buildings.forEach(b => {
+    if (!isOnScreen(b.x, b.y, 100)) return;
     let sortY = _flatBuildTypes.includes(b.type) ? b.y - 9999 : b.y + (b.h || 0) / 2;
     _sortItems.push({ y: sortY, draw: () => drawOneBuilding(b) });
   });
-  // Trees
-  state.trees.forEach(t => _sortItems.push({ y: t.y, draw: () => drawOneTree(t) }));
-  // Ambient houses + market clutter (Y-sorted with everything else)
+  // Trees — pre-cull offscreen
+  state.trees.forEach(t => { if (isOnScreen(t.x, t.y, 80)) _sortItems.push({ y: t.y, draw: () => drawOneTree(t) }); });
+  // Ambient houses + market clutter — pre-cull offscreen
   let amb = getAmbientHouses();
-  amb.houses.forEach(h => _sortItems.push({ y: h.y, draw: () => drawOneAmbientHouse(h) }));
-  amb.clutter.forEach(c => _sortItems.push({ y: c.y, draw: () => drawOneClutter(c) }));
+  amb.houses.forEach(h => { if (isOnScreen(h.x, h.y, 80)) _sortItems.push({ y: h.y, draw: () => drawOneAmbientHouse(h) }); });
+  amb.clutter.forEach(c => { if (isOnScreen(c.x, c.y, 50)) _sortItems.push({ y: c.y, draw: () => drawOneClutter(c) }); });
   // Crystal shrine
   if (state.crystalShrine) _sortItems.push({ y: state.crystalShrine.y, draw: drawCrystalShrine });
   // Fountain
   _sortItems.push({ y: WORLD.islandCY + 35, draw: drawFountain });
-  // Chickens
-  if (state.chickens) state.chickens.forEach((ch, i) => _sortItems.push({ y: ch.y, draw: () => drawOneChicken(ch) }));
-  // Faction wildlife
-  if (state.factionWildlife) state.factionWildlife.forEach(w => _sortItems.push({ y: w.y, draw: () => drawOneFactionCreature(w) }));
+  // Chickens — skip when throttled
+  if (state.chickens && !_frameBudget.throttled) state.chickens.forEach((ch, i) => { if (isOnScreen(ch.x, ch.y, 40)) _sortItems.push({ y: ch.y, draw: () => drawOneChicken(ch) }); });
+  // Faction wildlife — skip when throttled
+  if (state.factionWildlife && !_frameBudget.throttled) state.factionWildlife.forEach(w => { if (isOnScreen(w.x, w.y, 40)) _sortItems.push({ y: w.y, draw: () => drawOneFactionCreature(w) }); });
   // Harvester companion — only if awakened
   let prog = state.progression;
   let fullyUnlocked = !prog.gameStarted || prog.villaCleared; // old saves = fully unlocked
@@ -9590,11 +9620,11 @@ function drawWorldObjectsSorted() {
       }
     }
   }
-  // Legion soldiers on home island (ambient garrison)
-  if (state.legia && state.legia.soldiers) state.legia.soldiers.forEach(s => _sortItems.push({ y: s.y, draw: () => drawLegionAmbientSoldier(s) }));
-  // Army escort following player
+  // Legion soldiers on home island (ambient garrison) — cull offscreen
+  if (state.legia && state.legia.soldiers) state.legia.soldiers.forEach(s => { if (isOnScreen(s.x, s.y, 40)) _sortItems.push({ y: s.y, draw: () => drawLegionAmbientSoldier(s) }); });
+  // Army escort following player — cull offscreen
   if (state.legia && state.legia.army && typeof drawEscortSoldier === 'function') {
-    state.legia.army.filter(u => !u._assignedOfficer && u.x).slice(0, 20).forEach(u => _sortItems.push({ y: u.y, draw: () => drawEscortSoldier(u) }));
+    state.legia.army.filter(u => !u._assignedOfficer && u.x).slice(0, 20).forEach(u => { if (isOnScreen(u.x, u.y, 40)) _sortItems.push({ y: u.y, draw: () => drawEscortSoldier(u) }); });
   }
   // Characters — gated by progression
   if (fullyUnlocked || prog.companionsAwakened.lares)
@@ -12802,6 +12832,7 @@ function drawOneResource(r) {
     r.pulsePhase += 0.03;
     let rx = floor(w2sX(r.x));
     let ry = floor(w2sY(r.y));
+    if (rx < -50 || rx > width + 50 || ry < -50 || ry > height + 50) return;
     // Cull offscreen
     if (rx < -30 || rx > width + 30 || ry < -30 || ry > height + 30) return;
     let pulse = sin(r.pulsePhase) * 0.2 + 0.8;
