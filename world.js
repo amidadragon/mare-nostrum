@@ -98,6 +98,157 @@ function _getCoastlineRadiusAtAngle(angle, baseRX, baseRY) {
   return { rx: baseRX * r, ry: baseRY * r };
 }
 
+// ─── REUSABLE ISLAND COASTLINE SYSTEM ─────────────────────────────────────
+// Parameterized coastline generation + multi-layer rendering for all islands.
+
+const ISLAND_PALETTES = {
+  rome:     { water: [30,80,140], shallows: [60,140,160], cliff: [140,110,80], sand: [210,190,140], grass: [80,130,60], accent: [180,50,50] },
+  carthage: { water: [30,70,130], shallows: [70,130,150], cliff: [160,130,90], sand: [220,200,150], grass: [110,140,70], accent: [120,50,120] },
+  egypt:    { water: [20,60,120], shallows: [50,120,140], cliff: [180,160,100], sand: [230,210,160], grass: [140,150,80], accent: [200,170,50] },
+  greece:   { water: [40,90,150], shallows: [80,150,170], cliff: [200,200,200], sand: [220,210,190], grass: [90,140,70], accent: [50,80,160] },
+  vulcan:   { water: [20,30,60], shallows: [40,60,80], cliff: [60,40,30], sand: [80,60,50], grass: [50,60,40], accent: [200,80,30] },
+  arena:    { water: [30,80,140], shallows: [60,140,160], cliff: [150,120,90], sand: [200,180,130], grass: [90,120,60], accent: [180,150,50] },
+  seapeople:{ water: [25,50,90], shallows: [45,80,110], cliff: [100,95,90], sand: [150,145,140], grass: [55,70,60], accent: [80,90,100] },
+  persia:   { water: [25,65,125], shallows: [55,125,145], cliff: [170,145,95], sand: [215,195,140], grass: [100,135,65], accent: [170,130,50] },
+  phoenicia:{ water: [30,75,135], shallows: [65,135,155], cliff: [155,120,95], sand: [200,180,155], grass: [85,125,60], accent: [140,40,100] },
+  gaul:     { water: [35,85,145], shallows: [65,145,165], cliff: [130,120,90], sand: [190,180,145], grass: [60,110,45], accent: [80,100,60] },
+  default:  { water: [30,80,140], shallows: [60,140,160], cliff: [140,110,80], sand: [210,190,140], grass: [80,130,60], accent: [100,100,100] },
+};
+
+// Cache for generated coastlines: key -> [{angle, r}]
+let _islandCoastCache = {};
+
+function generateIslandCoastline(seed, numVerts, rx, ry, features) {
+  let cacheKey = seed + '_' + numVerts;
+  if (_islandCoastCache[cacheKey]) return _islandCoastCache[cacheKey];
+  let verts = [];
+  let noiseScale = Math.min(1, ry / 350);
+  for (let i = 0; i < numVerts; i++) {
+    let angle = (i / numVerts) * TWO_PI;
+    let nv = noise(cos(angle) * 2 + seed, sin(angle) * 2 + seed);
+    let nv2 = noise(cos(angle) * 0.9 + seed + 100, sin(angle) * 0.9 + seed + 100);
+    let offset = (nv - 0.5) * 0.18 * noiseScale + (nv2 - 0.5) * 0.10 * noiseScale;
+    // Angular bias: south wider, north narrower
+    let sy = Math.sin(angle);
+    offset += sy * 0.03 * noiseScale;
+    // Apply geographic features
+    if (features) {
+      for (let f = 0; f < features.length; f++) {
+        let feat = features[f];
+        let dist = Math.abs(angle - feat.angle);
+        if (dist > Math.PI) dist = TWO_PI - dist;
+        if (dist < feat.width) {
+          let t = (feat.width - dist) / feat.width;
+          if (feat.type === 'bay') offset -= t * feat.strength * noiseScale;
+          else if (feat.type === 'headland' || feat.type === 'peninsula') offset += t * feat.strength * noiseScale;
+        }
+      }
+    }
+    verts.push({ angle: angle, r: 1 + offset });
+  }
+  _islandCoastCache[cacheKey] = verts;
+  return verts;
+}
+
+function drawIslandCoastShape(cx, cy, verts, scale, rx, ry, yOffset) {
+  yOffset = yOffset || 0;
+  beginShape();
+  for (let i = 0; i < verts.length; i++) {
+    let v = verts[i];
+    let vx = cx + cos(v.angle) * rx * v.r * scale;
+    let yOff = yOffset * abs(sin(v.angle));
+    let vy = (cy + yOff) + sin(v.angle) * ry * v.r * scale;
+    vertex(vx, vy);
+  }
+  endShape(CLOSE);
+}
+
+function drawIslandBase(cx, cy, rx, ry, verts, palette, lod) {
+  let bright = (typeof getSkyBrightness === 'function') ? getSkyBrightness() : 0.7;
+  let p = palette || ISLAND_PALETTES.default;
+  noStroke();
+
+  if (lod === 'far') {
+    // FAR: shadow + grass
+    fill(20, 60, 80, 30);
+    drawIslandCoastShape(cx + 3, cy + 4, verts, 1.05, rx, ry, -2);
+    fill(p.grass[0], p.grass[1], p.grass[2]);
+    drawIslandCoastShape(cx, cy, verts, 0.9, rx, ry, -4);
+    return;
+  }
+
+  if (lod === 'medium') {
+    // MEDIUM: water gradient (3) + beach (2) + grass
+    // Water shadow
+    fill(20, 60, 80, 30);
+    drawIslandCoastShape(cx + 3, cy + 4, verts, 1.08, rx, ry, -2);
+    // Shallow water layers
+    fill(p.water[0], p.water[1], p.water[2], 120);
+    drawIslandCoastShape(cx, cy, verts, 1.05, rx, ry, -2);
+    fill(p.shallows[0], p.shallows[1], p.shallows[2], 140);
+    drawIslandCoastShape(cx, cy, verts, 1.02, rx, ry, -2);
+    fill(lerp(p.shallows[0], p.sand[0], 0.3), lerp(p.shallows[1], p.sand[1], 0.3), lerp(p.shallows[2], p.sand[2], 0.3), 160);
+    drawIslandCoastShape(cx, cy, verts, 0.98, rx, ry, -3);
+    // Beach
+    fill(p.sand[0], p.sand[1], p.sand[2]);
+    drawIslandCoastShape(cx, cy, verts, 0.92, rx, ry, -3);
+    fill(p.sand[0] - 10, p.sand[1] - 10, p.sand[2] - 5);
+    drawIslandCoastShape(cx, cy, verts, 0.88, rx, ry, -4);
+    // Grass
+    fill(p.grass[0] + 8, p.grass[1] + 8, p.grass[2] + 4);
+    drawIslandCoastShape(cx, cy, verts, 0.82, rx, ry, -5);
+    fill(p.grass[0], p.grass[1], p.grass[2]);
+    drawIslandCoastShape(cx, cy, verts, 0.75, rx, ry, -6);
+    return;
+  }
+
+  // CLOSE: full stack — water (5) + foam + cliff (3) + beach (4) + grass + rim
+  // Deep water shadow
+  fill(10, 30, 50, 35);
+  drawIslandCoastShape(cx + 4, cy + 5, verts, 1.12, rx, ry, -2);
+  // Water gradient (5 layers, deep to shallow)
+  fill(p.water[0] - 10, p.water[1] - 10, p.water[2], 100);
+  drawIslandCoastShape(cx, cy, verts, 1.10, rx, ry, -1);
+  fill(p.water[0], p.water[1], p.water[2], 130);
+  drawIslandCoastShape(cx, cy, verts, 1.07, rx, ry, -2);
+  fill(lerp(p.water[0], p.shallows[0], 0.3), lerp(p.water[1], p.shallows[1], 0.3), lerp(p.water[2], p.shallows[2], 0.3), 150);
+  drawIslandCoastShape(cx, cy, verts, 1.04, rx, ry, -2);
+  fill(p.shallows[0], p.shallows[1], p.shallows[2], 170);
+  drawIslandCoastShape(cx, cy, verts, 1.02, rx, ry, -3);
+  fill(lerp(p.shallows[0], p.sand[0], 0.4), lerp(p.shallows[1], p.sand[1], 0.4), lerp(p.shallows[2], p.sand[2], 0.4), 190);
+  drawIslandCoastShape(cx, cy, verts, 1.0, rx, ry, -3);
+  // Foam / shore wave
+  stroke(220, 235, 255, 25 + sin(frameCount * 0.04) * 12);
+  strokeWeight(1.5); noFill();
+  drawIslandCoastShape(cx, cy, verts, 0.99 + sin(frameCount * 0.025) * 0.005, rx, ry, -3);
+  noStroke();
+  // Cliff layers
+  fill(p.cliff[0], p.cliff[1], p.cliff[2]);
+  drawIslandCoastShape(cx, cy, verts, 0.96, rx, ry, -4);
+  fill(p.cliff[0] - 15, p.cliff[1] - 15, p.cliff[2] - 10);
+  drawIslandCoastShape(cx, cy, verts, 0.94, rx, ry, -4);
+  fill(p.cliff[0] + 10, p.cliff[1] + 5, p.cliff[2]);
+  drawIslandCoastShape(cx, cy, verts, 0.92, rx, ry, -5);
+  // Beach layers
+  fill(p.sand[0] + 5, p.sand[1] + 5, p.sand[2] + 5);
+  drawIslandCoastShape(cx, cy, verts, 0.90, rx, ry, -5);
+  fill(p.sand[0], p.sand[1], p.sand[2]);
+  drawIslandCoastShape(cx, cy, verts, 0.87, rx, ry, -5);
+  fill(p.sand[0] - 10, p.sand[1] - 10, p.sand[2] - 8);
+  drawIslandCoastShape(cx, cy, verts, 0.84, rx, ry, -6);
+  fill(p.sand[0] - 18, p.sand[1] - 15, p.sand[2] - 10);
+  drawIslandCoastShape(cx, cy, verts, 0.81, rx, ry, -6);
+  // Grass + rim highlight
+  fill(p.grass[0] + 12, p.grass[1] + 12, p.grass[2] + 6);
+  drawIslandCoastShape(cx, cy, verts, 0.78, rx, ry, -7);
+  fill(p.grass[0], p.grass[1], p.grass[2]);
+  drawIslandCoastShape(cx, cy, verts, 0.72, rx, ry, -8);
+  // Rim highlight (lighter edge on grass)
+  fill(p.grass[0] + 20, p.grass[1] + 20, p.grass[2] + 10, 60);
+  drawIslandCoastShape(cx, cy, verts, 0.76, rx, ry, -7);
+}
+
+
 // ─── SEASON COLORS ────────────────────────────────────────────────────────
 const _seasonGrassPalette = [
   { r: 72, g: 110, b: 48 },  // Spring — lush green
