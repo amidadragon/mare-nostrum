@@ -317,7 +317,7 @@ const DAILY_WANTS = {
     { type: 'gift', resource: 'wood', label: 'Marcus needs timber for repairs' },
     { type: 'gift', resource: 'stone', label: 'Marcus wants stone for the walls' },
     { type: 'favor', zone: 'castrum', label: 'Marcus asks you to inspect the barracks' },
-    { type: 'favor', zone: 'arena', label: 'Marcus wants you to train in the arena' },
+    { type: 'favor', zone: 'castrum', label: 'Marcus wants you to train at the barracks' },
     { type: 'activity', action: 'spar', label: 'Marcus challenges you to spar' },
     { type: 'gift', resource: 'ironOre', label: 'Marcus needs iron for weapons' },
     { type: 'activity', action: 'patrol', label: 'Marcus wants you to patrol the shore' },

@@ -33,7 +33,7 @@ function updatePlayer(dt) {
   // Faction passive speed modifiers (Greece +15%, Testudo/Phalanx lock)
   if (typeof getFactionMoveSpeedMult === 'function') {
     let fSpd = getFactionMoveSpeedMult();
-    if (fSpd <= 0 && ((state.conquest && state.conquest.active) || (state.adventure && state.adventure.active))) { spd = 0; }
+    if (fSpd <= 0 && (state.conquest && state.conquest.active)) { spd = 0; }
     else spd *= fSpd;
   }
 
@@ -319,7 +319,7 @@ function updatePlayerAnim(dt) {
   }
 
   // Context helmet: off when farming/fishing, on in combat/conquest
-  a.helmetOff = (p.hotbarSlot <= 3 && !state.conquest.active && !state.adventure.active);
+  a.helmetOff = (p.hotbarSlot <= 3 && !state.conquest.active);
 }
 
 // Trigger harvest joy bounce + happy face
@@ -1505,8 +1505,8 @@ function updatePlayerCombat(dt) {
   let newX = p.x + p.vx * dt;
   let newY = p.y + p.vy * dt;
 
-  // Island boundary (ellipse) — use conquest or arena depending on mode
-  let isle = state.conquest.active ? state.conquest : state.adventure;
+  // Island boundary (ellipse) — conquest mode
+  let isle = state.conquest;
   let ex = (newX - isle.isleX) / (isle.isleRX - 20);
   let ey = (newY - isle.isleY) / (isle.isleRY - 20);
   if (ex * ex + ey * ey < 1) {
@@ -1518,7 +1518,7 @@ function updatePlayerCombat(dt) {
     p.vx = 0; p.vy = 0;
   }
 
-  // Footstep dust in arena
+  // Footstep dust in combat
   if (p.moving && frameCount % 8 === 0) {
     particles.push({
       x: p.x + random(-4, 4), y: p.y + 8,
@@ -1546,7 +1546,7 @@ function playerAttack() {
   }
   // Fallback: original attack (should not reach here with faction system loaded)
   let p = state.player;
-  let a = state.adventure;
+  let enemies = (state.conquest && state.conquest.active) ? (state.conquest.enemies || []) : [];
   if (p.attackTimer > 0) return;
   if (p.hotbarSlot !== 4) { p.hotbarSlot = 4; addFloatingText(width / 2, height - 110, 'Switched to Weapon', '#aaddaa'); }
   p.attackTimer = p.attackCooldown;
@@ -1555,7 +1555,7 @@ function playerAttack() {
   let fAngle = getFacingAngle();
   let arcHalf = PI * 0.3;
   let range = p.attackRange + (p.weapon === 1 ? 12 : 0);
-  for (let e of a.enemies) {
+  for (let e of enemies) {
     if (e.state === 'dying' || e.state === 'dead') continue;
     let d = dist(p.x, p.y, e.x, e.y);
     if (d > range + e.size) continue;

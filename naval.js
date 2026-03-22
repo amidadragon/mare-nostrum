@@ -197,37 +197,14 @@ function playerFireCannons() {
 }
 
 function startBoardingCombat() {
+  // Arena system removed — boarding auto-resolves: sink the ship, grant gold
   let nav = state.naval;
   let e = nav.boardingTarget;
   if (!e) return;
-  let a = state.adventure;
-  a.returnX = state.rowing.x;
-  a.returnY = state.rowing.y;
-  a.active = true;
-  a.wave = 0; a.waveState = 'idle';
-  a.enemies = []; a.loot = [];
-  a.killCount = 0; a.goldEarned = 0; a.xpEarned = 0;
-  state.rowing.active = false;
-  state._boardingEnemy = e;
-  state.player.hp = state.player.maxHp;
-  state.player.x = e.x; state.player.y = e.y;
-  state.player.vx = 0; state.player.vy = 0;
-  state.player.invincTimer = 60;
-  cam.x = e.x; cam.y = e.y;
-  camSmooth.x = e.x; camSmooth.y = e.y;
-  addFloatingText(width / 2, height * 0.3, 'BOARDING ACTION!', '#ff8844');
-  // Spawn melee enemies on deck
-  let count = 2 + floor(random(3));
-  for (let ii = 0; ii < count; ii++) {
-    a.enemies.push({
-      x: e.x + random(-40, 40), y: e.y + random(-30, 30),
-      vx: 0, vy: 0, hp: 20 + (e.damage || 10), maxHp: 20 + (e.damage || 10),
-      type: 'pirate', speed: 1.2, atk: 5 + floor((e.damage || 10) / 3),
-      knockbackTimer: 0, state: 'chase', stateTimer: 60,
-      facing: 1, invincTimer: 0, flashTimer: 0,
-    });
-  }
-  a.waveTimer = 0; a.waveState = 'fighting';
+  let goldReward = 15 + floor(random(20));
+  state.gold += goldReward;
+  addFloatingText(width / 2, height * 0.3, 'BOARDING ACTION! +' + goldReward + ' Gold', '#ff8844');
+  triggerScreenShake(6, 12);
   let idx = nav.enemies.indexOf(e);
   if (idx >= 0) nav.enemies.splice(idx, 1);
   nav.boardingTarget = null;

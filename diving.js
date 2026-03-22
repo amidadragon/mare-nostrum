@@ -1355,7 +1355,7 @@ function _drawDiveTransition() {
 // Dive prompt shown when near water
 function drawDivePrompt() {
   if (!state || !state.diving || state.diving.active) return;
-  if (state.conquest.active || state.adventure.active) return;
+  if (state.conquest.active) return;
   let inShallow = typeof isInShallows === 'function' && isInShallows(state.player.x, state.player.y);
   let onBoat = state.rowing && state.rowing.active;
   if (!inShallow && !onBoat) return;

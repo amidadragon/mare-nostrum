@@ -658,7 +658,7 @@ function handleEconomyKey(k, kCode) {
   }
 
   // Open trade route UI with R near port
-  if ((k === 'r' || k === 'R') && !state.conquest.active && !state.adventure.active && !state.rowing.active) {
+  if ((k === 'r' || k === 'R') && !state.conquest.active && !state.rowing.active) {
     let port = getPortPosition();
     let d = dist(state.player.x, state.player.y, port.x, port.y);
     if (d < 80 && state.conquest.colonized) {
@@ -671,7 +671,7 @@ function handleEconomyKey(k, kCode) {
   if (state.colonyManageOpen) {
     if (handleColonyManageKey(k, kCode)) return true;
   }
-  if ((k === 'c' || k === 'C') && !state.conquest.active && !state.adventure.active && !state.rowing.active &&
+  if ((k === 'c' || k === 'C') && !state.conquest.active && !state.rowing.active &&
       !state.tradeRouteUI && !state.colonyManageOpen && !state.buildMode) {
     if (Object.keys(state.colonies || {}).length > 0) {
       state.colonyManageOpen = true;
@@ -1180,8 +1180,6 @@ function doPrestige() {
   // Keep achievement/codex progress
   let codex = state.codex ? JSON.parse(JSON.stringify(state.codex)) : null;
   let achievements = state.achievements ? [...state.achievements] : [];
-  let arenaHigh = state.arenaHighWave || 0;
-
   // Reset game state
   initState(); _demandDay = -1; _marketPriceDay = -1; _prestigeInited = false; _demandEvents = [];
 
@@ -1206,7 +1204,6 @@ function doPrestige() {
   state.ironOre = keepIron;
   if (codex) state.codex = codex;
   state.achievements = achievements;
-  state.arenaHighWave = arenaHigh;
 
   // Initialize systems that depend on state being set up
   if (typeof initConquestIsland === 'function') initConquestIsland();
@@ -1509,7 +1506,7 @@ function handlePrestigeKey(k, kCode) {
     return true;
   }
   // Open prestige UI with P key when won or after chapter 10
-  if ((k === 'p' || k === 'P') && !state.conquest.active && !state.adventure.active && !state.rowing.active) {
+  if ((k === 'p' || k === 'P') && !state.conquest.active && !state.rowing.active) {
     if (state.won || (state.mainQuest && state.mainQuest.chapter >= 9)) {
       _prestigeUIOpen = true;
       return true;

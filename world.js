@@ -107,7 +107,6 @@ const ISLAND_PALETTES = {
   egypt:    { water: [20,60,120], shallows: [50,120,140], cliff: [180,160,100], sand: [230,210,160], grass: [140,150,80], accent: [200,170,50] },
   greece:   { water: [40,90,150], shallows: [80,150,170], cliff: [200,200,200], sand: [220,210,190], grass: [90,140,70], accent: [50,80,160] },
   vulcan:   { water: [20,30,60], shallows: [40,60,80], cliff: [60,40,30], sand: [80,60,50], grass: [50,60,40], accent: [200,80,30] },
-  arena:    { water: [30,80,140], shallows: [60,140,160], cliff: [150,120,90], sand: [200,180,130], grass: [90,120,60], accent: [180,150,50] },
   seapeople:{ water: [25,50,90], shallows: [45,80,110], cliff: [100,95,90], sand: [150,145,140], grass: [55,70,60], accent: [80,90,100] },
   persia:   { water: [25,65,125], shallows: [55,125,145], cliff: [170,145,95], sand: [215,195,140], grass: [100,135,65], accent: [170,130,50] },
   phoenicia:{ water: [30,75,135], shallows: [65,135,155], cliff: [155,120,95], sand: [200,180,155], grass: [85,125,60], accent: [140,40,100] },

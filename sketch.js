@@ -982,7 +982,7 @@ let _juiceSpeedLines = []; // speed line particles for dashing
 let _juiceHpShakeTimer = 0; // HP bar shake on damage
 let _juiceToolArc = 0; // tool swing arc timer
 let _juicePickupMagnetism = true; // pickup magnetism enabled
-let _currentIsland = 'home'; // seamless island detection: 'home','arena','vulcan','hyperborea','plenty','necropolis','conquest','water', or nation key
+let _currentIsland = 'home'; // seamless island detection: 'home','vulcan','hyperborea','plenty','necropolis','conquest','water', or nation key
 let _doorTransition = null; // {timer, duration, callback, phase: 'out'|'in'}
 let starPositions = null;
 
@@ -1182,7 +1182,7 @@ const BLUEPRINTS = {
   shrine:  { name: 'Sacellum', w: 32, h: 28, cost: { stone: 5, crystals: 3 },           key: '', blocks: true,  minLevel: 3, upkeep: 1 },
   house:   { name: 'Domus',    w: 44, h: 34, cost: { wood: 4, stone: 3 },                key: '', blocks: true,  minLevel: 6, upkeep: 1 },
   library: { name: 'Biblioth', w: 72, h: 52, cost: { stone: 8, wood: 4, crystals: 2 },   key: '', blocks: true,  minLevel: 12, upkeep: 2 },
-  arena:   { name: 'Arena',    w: 84, h: 64, cost: { stone: 12, wood: 6, gold: 30 },     key: '', blocks: true,  minLevel: 15, upkeep: 3 },
+  // arena building removed
   campfire:{ name: 'Focus',    w: 16, h: 16, cost: { wood: 1 },                           key: '', blocks: false, upkeep: 0 },
   // Level 8+ (auto-spawned, not player-buildable)
   castrum: { name: 'Castrum',  w: 130, h: 100, cost: { stone: 10, wood: 8, ironOre: 5, gold: 50 }, key: '', blocks: true, minLevel: 8, upkeep: 2 },
@@ -1601,7 +1601,7 @@ function initState() {
       speed: 0,
       oarPhase: 0,       // animation phase
       wakeTrail: [],     // water wake particles
-      nearIsle: null,    // 'arena' or 'conquest' when near dock
+      nearIsle: null,    // 'conquest' when near dock
     },
 
     naval: {
@@ -2121,27 +2121,6 @@ function initState() {
     autoSaveTimer: 0,
     autoSaveInterval: 18000, // every 5 min at 60fps
 
-    // Adventure mode (Arena Isle)
-    adventure: {
-      active: false,
-      wave: 0,
-      waveTimer: 0,
-      waveState: 'idle', // idle, fighting, intermission, victory
-      enemies: [],
-      loot: [],
-      killCount: 0,
-      bestWave: 0,
-      // Arena isle position (near-NORTH of home island, visible from home)
-      isleX: WORLD.islandCX,
-      isleY: WORLD.islandCY - 400,
-      isleRX: 55,
-      isleRY: 35,
-      combatRX: 200,  // bigger when actually fighting
-      combatRY: 140,
-      bridgeBuilt: false,  // stone bridge at level 10+
-      returnX: 0, returnY: 0, // saved player pos on home island
-    },
-
     // ─── ISLE OF VULCAN (Northwest) — Volcanic island ───
     vulcan: {
       active: false,
@@ -2304,8 +2283,6 @@ function initState() {
     },
 
     _expedSummary: null, // expedition victory overlay { timer, kills, gold, loot, soldiersStart, soldiersLost, isDeath }
-    arenaHighWave: 0,    // all-time best wave across arena sessions
-
     // Food consumption
     foodShortage: 0,     // consecutive days without enough food
 
@@ -2914,15 +2891,9 @@ function isInShallows(wx, wy) {
   return d > 1.0 && d <= 1.15; // ~15% beyond island edge
 }
 
-function isInArenaSwimZone(wx, wy) {
-  // Legacy compat — now uses universal swim system
-  return !isOnIsland(wx, wy) && !isOnArenaIsland(wx, wy) && isNearAnyIsland(wx, wy, 300);
-}
-
 function getAllIslandPositions() {
   let islands = [
     { x: WORLD.islandCX, y: WORLD.islandCY, rx: getSurfaceRX(), ry: getSurfaceRY(), key: 'home' },
-    { x: state.adventure.isleX, y: state.adventure.isleY, rx: state.adventure.isleRX, ry: state.adventure.isleRY, key: 'arena' },
   ];
   if (state.conquest) islands.push({ x: state.conquest.isleX, y: state.conquest.isleY, rx: state.conquest.isleRX, ry: state.conquest.isleRY, key: 'conquest' });
   if (state.vulcan) islands.push({ x: state.vulcan.isleX, y: state.vulcan.isleY, rx: state.vulcan.isleRX, ry: state.vulcan.isleRY, key: 'vulcan' });
@@ -2944,15 +2915,14 @@ function updateCurrentIsland() {
   // Skip detection during cutscenes, temple, wreck, or active island modes (old system)
   if (state.insideTemple || state.cutscene || state.introPhase !== 'done') return;
   if (state.vulcan.active || state.hyperborea.active || state.plenty.active || state.necropolis.active) return;
-  if (state.conquest.active || state.visitingNation || state.adventure.active) return;
+  if (state.conquest.active || state.visitingNation) return;
   if (state.rowing && state.rowing.active) { _currentIsland = 'water'; if (prev !== 'water') onIslandTransition(prev, 'water'); return; }
 
   if (isOnIsland(px, py)) { _currentIsland = 'home'; }
-  else if (isOnArenaIsland(px, py)) { _currentIsland = 'arena'; }
   else {
     let found = false;
     for (let isle of getAllIslandPositions()) {
-      if (isle.key === 'home' || isle.key === 'arena') continue;
+      if (isle.key === 'home') continue;
       let dx = (px - isle.x) / isle.rx, dy = (py - isle.y) / isle.ry;
       if (dx * dx + dy * dy < 1.0) { _currentIsland = isle.key; found = true; break; }
     }
@@ -3002,7 +2972,6 @@ function onIslandTransition(from, to) {
   }
   let name = null;
   if (to === 'home') name = 'HOME ISLAND';
-  else if (to === 'arena') name = 'THE ARENA';
   else if (to === 'vulcan') name = 'ISLE OF VULCAN';
   else if (to === 'hyperborea') name = 'HYPERBOREA';
   else if (to === 'plenty') name = 'ISLE OF PLENTY';
@@ -3014,8 +2983,6 @@ function onIslandTransition(from, to) {
 
 function getCurrentIsland() { return _currentIsland; }
 function shouldDrawHomeContent() { return _currentIsland === 'home'; }
-function shouldDrawArenaContent() { return _currentIsland === 'arena'; }
-
 function isNearAnyIsland(wx, wy, range) {
   range = range || 300;
   let islands = getAllIslandPositions();
@@ -3241,13 +3208,13 @@ function draw() {
   // ─── REAL-TIME AUTOSAVE (every 5 min, skip combat) ───
   state.autoSaveTimer++;
   if (state.autoSaveTimer >= state.autoSaveInterval &&
-      !state.conquest.active && !state.adventure.active) {
+      !state.conquest.active) {
     state.autoSaveTimer = 0;
     saveGame();
   }
   try { drawInner(); } catch(err) {
     console.error('draw error:', err.message, err.stack);
-    console.error('state:', (state.conquest && state.conquest.active) ? 'conquest' : (state.adventure && state.adventure.active) ? 'adventure' : 'home',
+    console.error('state:', (state.conquest && state.conquest.active) ? 'conquest' : 'home',
       'enemies:', state.conquest && state.conquest.enemies ? state.conquest.enemies.length : 0,
       'soldiers:', state.conquest && state.conquest.soldiers ? state.conquest.soldiers.length : 0);
     if (state.conquest && state.conquest.active && state._drawErrors > 5) {
@@ -3428,7 +3395,7 @@ function drawInner() {
 
   // === WRECK BEACH MODE — before home island is reached, or revisiting ===
   if (((state.progression.gameStarted && !state.progression.homeIslandReached) || state.wreck._visiting) &&
-      !state.rowing.active && !state.conquest.active && !state.adventure.active) {
+      !state.rowing.active && !state.conquest.active) {
     updateWreckBeach(dt);
     updatePlayerAnim(dt);
     updateParticles(dt);
@@ -3648,44 +3615,6 @@ function drawInner() {
     if (typeof drawLevelUpPopup === 'function') drawLevelUpPopup();
     drawScreenFlash();
     drawCursor();
-  } else if (state.adventure.active) {
-    // === ADVENTURE MODE ===
-    updatePlayerCombat(dt);
-    updatePlayerAnim(dt);
-    updateAdventure(dt);
-    updateParticles(dt);
-    updateFloatingText(dt);
-    updateShake(dt);
-    updateCamera();
-
-    // Sky + ocean — push horizon above island
-    horizonOffset = height * 0.19;
-    push(); translate(width/2,height/2); scale(camZoom); translate(-width/2,-height/2);
-    push();
-    translate(shakeX, shakeY);
-    drawSky();
-    drawOcean();
-    if (typeof drawOceanWildlife === 'function') drawOceanWildlife();
-    if (typeof drawAtmosphericHaze === 'function') drawAtmosphericHaze();
-    pop();
-
-    // Arena (combat mode -- island already rendered by drawArenaIsleDistant)
-    push();
-    translate(shakeX, shakeY);
-    // drawArena() is the old full-island renderer -- SKIP IT
-    // The new drawArenaIsleDistant() handles island rendering with proper perspective
-    // Only draw combat entities when adventure is active
-    drawAdventureEntities();
-    drawParticles();
-    drawFloatingText();
-    pop();
-    pop(); // end zoom
-
-    drawAdventureHUD();
-    if (typeof drawFactionAbilityHUD === 'function') drawFactionAbilityHUD();
-    drawScreenFlash();
-    drawSpeedLines();
-    drawCursor();
   } else {
     // === NORMAL ISLAND MODE ===
     // Tutorial hints for new UI features
@@ -3829,8 +3758,6 @@ function drawInner() {
     // Full island rendering (visible from boat/home) — no floatOffset for distant islands
     push();
     translate(shakeX, shakeY);
-    drawArenaIsleDistant();
-    drawArenaDistantLabel();
     drawImperialBridge(); // Draw bridge BEHIND islands
     drawConquestIsleDistant();
     drawConquestDistantEntities();
@@ -3994,22 +3921,6 @@ function drawInner() {
         text('[E] Shipyard', _sysx, _sysy);
       }
     }
-    // Arena prompt — on arena island or swimming toward it
-    if (!state.rowing.active && !state.adventure.active && !state.conquest.active) {
-      let _ap = state.player;
-      let _onArenaIsle = isOnArenaIsland(_ap.x, _ap.y);
-      if (_onArenaIsle) {
-        let _apx = w2sX(_ap.x), _apy = w2sY(_ap.y) - 30 + floatOffset;
-        fill(255, 220, 150, 200 + sin(frameCount * 0.06) * 30);
-        noStroke(); textAlign(CENTER, CENTER); textSize(11);
-        text('[E] Enter Arena', _apx, _apy);
-        if (state.arenaHighWave > 0) {
-          fill(180, 160, 120, 160); textSize(9);
-          text('\u2694 Best: Wave ' + state.arenaHighWave, _apx, _apy + 14);
-        }
-      }
-    }
-
     // Dive prompt
     if (typeof drawDivePrompt === 'function') drawDivePrompt();
 
@@ -4074,8 +3985,7 @@ function drawInner() {
     // Dock prompt when rowing near an island
     if (state.rowing.active && state.rowing.nearIsle) {
       let isColonized = state.rowing.nearIsle === 'conquest' && state.conquest.colonized;
-      let label = state.rowing.nearIsle === 'arena' ? '[E] Dock at Arena' :
-                  state.rowing.nearIsle === 'wreck' ? '[E] Dock at Wreck Beach' :
+      let label = state.rowing.nearIsle === 'wreck' ? '[E] Dock at Wreck Beach' :
                   state.rowing.nearIsle === 'vulcan' ? '[E] Dock at Isle of Vulcan' :
                   state.rowing.nearIsle === 'hyperborea' ? '[E] Dock at Hyperborea' :
                   state.rowing.nearIsle === 'plenty' ? '[E] Dock at Isle of Plenty' :
@@ -4108,7 +4018,6 @@ function drawInner() {
       let r = state.rowing;
       let islands = [
         { name: 'Home', x: WORLD.islandCX, y: WORLD.islandCY, col: '#88cc88' },
-        { name: 'Arena', x: state.adventure.isleX, y: state.adventure.isleY, col: '#cc8888' },
         { name: state.conquest.colonized ? 'Colony LV.' + state.conquest.colonyLevel : 'Terra Nova', x: state.conquest.isleX, y: state.conquest.isleY, col: state.conquest.colonized ? '#88cc88' : '#88aacc' },
         { name: 'Wreck Beach', x: WRECK.cx, y: WRECK.cy, col: '#ccaa66' },
         { name: 'Isle of Vulcan', x: state.vulcan.isleX, y: state.vulcan.isleY, col: '#ff5533' },
@@ -4147,7 +4056,7 @@ function drawInner() {
     pop(); // ─── END ZOOM TRANSFORM ───
 
     // Night darkness + golden hour color grading — atmospheric tint over the world
-    if (!state.conquest.active && !state.adventure.active) {
+    if (!state.conquest.active) {
       drawNightOverlay();
       drawColorGrading();
       if (typeof drawFestivalOverlay === 'function') drawFestivalOverlay();
@@ -4213,7 +4122,6 @@ function drawInner() {
       if (typeof drawVictoryScreen === 'function') drawVictoryScreen();
       if (typeof drawVictoryProgressHUD === 'function') drawVictoryProgressHUD();
       drawExpeditionSummaryOverlay();
-      if (typeof drawArenaSummaryOverlay === 'function') drawArenaSummaryOverlay();
       drawWardrobe();
       drawAchievementPopup();
       if (typeof drawLevelUpPopup === 'function') drawLevelUpPopup();
@@ -4271,12 +4179,7 @@ function drawInner() {
       state.gold -= goldLost;
       p.hp = floor(p.maxHp * 0.5);
       p._dead = false;
-      if (p._deathSource === 'arena') {
-        if (typeof showArenaSummary === 'function') showArenaSummary(state.adventure, false);
-        exitAdventure();
-      } else {
-        exitConquest(true);
-      }
+      exitConquest(true);
       p.x = WORLD.islandCX;
       p.y = WORLD.islandCY;
       cam.x = p.x; cam.y = p.y;
@@ -5743,8 +5646,6 @@ const JOURNAL_ENTRIES = [
     text: 'There is another island to the west — dark with forest, wreathed in mist. The locals avoid it. I see firelight some nights. Whether friend or foe waits there, a soldier must know his surroundings.' },
   { id: 'first_festival', title: 'Feast of Flowers',
     text: 'We held a festival today. Garlands on every post, honey-wine in clay cups. For a moment I forgot I was an exile. The children danced and the old man played a bone flute. Rome celebrates with spectacle; here we celebrate with warmth.' },
-  { id: 'arena_found', title: 'The Arena',
-    text: 'On the northern isle, I found an amphitheatre carved from living rock. Sand-floored, tiered seats, even a gate mechanism. Someone built this for combat — or sport. The beasts that roam there suggest both.' },
   { id: 'five_hearts', title: 'Bonds of Exile',
     text: 'The old man brought me wine today — unprompted, unasked. He said I remind him of his son, lost to fever years ago. We sat and watched the sunset. Exile strips away rank and pretense. What remains is simply human.' },
   { id: 'relic_found', title: 'Relic of the IX',
@@ -11536,101 +11437,6 @@ function drawOneBuilding(b) {
         break;
       }
 
-      case 'arena': {
-        noStroke();
-        // Shadow ellipse
-        fill(0, 0, 0, 35);
-        ellipse(3, 6, bw, bh * 0.4);
-        // Outer wall — faction stone
-        fill(fc.wall[0] - 20, fc.wall[1] - 20, fc.wall[2] - 20);
-        ellipse(0, 0, bw, bh);
-        // Stone block texture on outer wall
-        stroke(fc.wall[0] - 40, fc.wall[1] - 40, fc.wall[2] - 38, 60);
-        strokeWeight(0.6);
-        for (let aRing = 0; aRing < 3; aRing++) {
-          let aRx = (bw / 2 - 2) * (1 - aRing * 0.04);
-          let aRy = (bh / 2 - 2) * (1 - aRing * 0.04);
-          ellipse(0, 0, aRx * 2, aRy * 2);
-        }
-        noStroke();
-        // Seating tier 1 — outer (faction, lightest)
-        fill(fc.wall[0] - 10, fc.wall[1] - 10, fc.wall[2] - 10);
-        ellipse(0, 0, bw - 6, bh - 6);
-        // Seating tier 2 — mid
-        fill(fc.wall[0] - 30, fc.wall[1] - 30, fc.wall[2] - 30);
-        ellipse(0, 0, bw - 18, bh - 18);
-        // Seating tier 3 — inner
-        fill(fc.wall[0] - 48, fc.wall[1] - 48, fc.wall[2] - 48);
-        ellipse(0, 0, bw - 30, bh - 30);
-        // Sand pit — arena floor
-        fill(212, 195, 158);
-        ellipse(0, 0, bw - 44, bh - 44);
-        // Sand texture streaks
-        fill(198, 182, 145, 80);
-        for (let st = 0; st < 6; st++) {
-          let sang = st * PI / 3 + 0.3;
-          let slen = (bw - 50) * 0.3;
-          stroke(185, 170, 135, 50);
-          strokeWeight(0.8);
-          line(cos(sang) * slen * 0.2, sin(sang) * slen * 0.15,
-               cos(sang) * slen, sin(sang) * slen * 0.75);
-        }
-        noStroke();
-        // Spectator dots on seating tiers — crowd suggestion
-        for (let aai = 0; aai < 28; aai++) {
-          let aAngle = aai * TWO_PI / 28 + 0.1;
-          let aTierR = 0.72 + (aai % 3) * 0.06;
-          let asx = cos(aAngle) * (bw / 2 - 4) * aTierR;
-          let asy = sin(aAngle) * (bh / 2 - 4) * aTierR;
-          // Alternate crowd color
-          let crowdColors = [[85, 35, 18], [42, 55, 95], [155, 85, 28], [28, 68, 38]];
-          let cc = crowdColors[aai % 4];
-          fill(cc[0], cc[1], cc[2], 140);
-          circle(asx, asy, 2.5);
-        }
-        // North gate (top) — faction door
-        fill(fc.door[0], fc.door[1], fc.door[2]);
-        rect(-6, -bh / 2 + 4, 12, 14, 1);
-        fill(fc.door[0] - 57, fc.door[1] - 30, fc.door[2] - 8, 220);
-        rect(-4, -bh / 2 + 6, 8, 11);
-        arc(0, -bh / 2 + 6, 8, 6, PI, TWO_PI);
-        // South main gate (bottom)
-        fill(fc.door[0] + 20, fc.door[1] + 18, fc.door[2] + 16);
-        rect(-8, bh / 2 - 16, 16, 16, 1);
-        fill(38, 28, 16, 220);
-        rect(-6, bh / 2 - 14, 12, 13);
-        arc(0, bh / 2 - 14, 12, 8, PI, TWO_PI);
-        // Velarium poles — awning poles at top of outer wall
-        fill(110, 88, 48);
-        rect(-bw / 2 + 4, -bh / 2 - 8, 2, 14);
-        rect(bw / 2 - 6, -bh / 2 - 8, 2, 14);
-        // Velarium rope lines
-        stroke(130, 110, 75, 120);
-        strokeWeight(0.7);
-        line(-bw / 2 + 5, -bh / 2 - 8, 0, -bh / 2 - 2);
-        line(bw / 2 - 5, -bh / 2 - 8, 0, -bh / 2 - 2);
-        noStroke();
-        // Faction pennant banners on poles
-        fill(fc.accent[0], fc.accent[1], fc.accent[2]);
-        rect(-bw / 2 + 6, -bh / 2 - 8, 7, 9);
-        rect(bw / 2 - 13, -bh / 2 - 8, 7, 9);
-        fill(fc.accent[0] - 30, fc.accent[1] - 6, fc.accent[2] - 6);
-        rect(-bw / 2 + 6, -bh / 2 - 2, 7, 2);
-        rect(bw / 2 - 13, -bh / 2 - 2, 7, 2);
-        // Night: torchlight in seating tiers
-        if (getSkyBrightness() < 0.35) {
-          let arenaNight = map(getSkyBrightness(), 0, 0.35, 1, 0);
-          for (let nt = 0; nt < 6; nt++) {
-            let ntAngle = nt * TWO_PI / 6;
-            let ntx = cos(ntAngle) * (bw / 2 - 10);
-            let nty = sin(ntAngle) * (bh / 2 - 10);
-            fill(255, 170, 55, 45 * arenaNight);
-            circle(ntx, nty, 8);
-          }
-        }
-        break;
-      }
-
       case 'campfire': {
         noStroke();
         let cfGlowPulse = 20 + sin(frameCount * 0.06 + b.x * 0.1) * 12;
@@ -13121,12 +12927,9 @@ function updateRowing(dt) {
   }
 
   // Detect proximity to islands — set dock prompt (E to dock)
-  let a = state.adventure;
-  let aisleDist = dist(r.x, r.y, a.isleX, a.isleY);
   let cq = state.conquest;
   let cqDist = dist(r.x, r.y, cq.isleX, cq.isleY);
   r.nearIsle = null;
-  if (aisleDist < a.isleRX * 1.5) r.nearIsle = 'arena';
   let cqNear = ((r.x - cq.isleX) / cq.isleRX) ** 2 + ((r.y - cq.isleY) / cq.isleRY) ** 2;
   if (cqNear < 1.5 * 1.5) { r.nearIsle = 'conquest'; unlockJournal('terra_nova'); }
 
@@ -13168,13 +12971,6 @@ function updateRowing(dt) {
     }
   }
 
-  // Keep boat from going through islands
-  if (aisleDist < a.isleRX * 0.8) {
-    let ang = atan2(r.y - a.isleY, r.x - a.isleX);
-    r.x = a.isleX + cos(ang) * a.isleRX * 0.82;
-    r.y = a.isleY + sin(ang) * a.isleRY * 0.82;
-    r.speed *= 0.3;
-  }
   // Elliptical collision for Terra Nova (RX != RY)
   let cqNx = (r.x - cq.isleX) / cq.isleRX;
   let cqNy = (r.y - cq.isleY) / cq.isleRY;
@@ -17323,593 +17119,9 @@ function updateShake(dt) {
   }
 }
 
-// ─── ADVENTURE / COMBAT ──────────────────────────────────────────────────
-
-const WAVE_DEFS = [
-  [{ type: 'wolf', count: 3 }],
-  [{ type: 'wolf', count: 2 }, { type: 'bandit', count: 2 }],
-  [{ type: 'harpy', count: 2 }, { type: 'bandit', count: 1 }],
-  [{ type: 'secutor', count: 2 }, { type: 'harpy', count: 1 }],
-  [{ type: 'minotaur', count: 1 }],
-];
-
-// Generate a scaled wave def for waves beyond WAVE_DEFS.length
-function generateWaveDef(n) {
-  // Cycle repeats every 10 waves; HP scales by 1.1^(cycle) per full cycle
-  let cycle = floor((n - 1) / 10);
-  let phase = ((n - 1) % 10) + 1; // 1-10 within cycle
-  let hpMult = pow(1.1, cycle);
-
-  // Wave 10 in each cycle: Centurion boss + 2 basic enemies
-  if (phase === 10) {
-    return [{ type: 'centurion', count: 1 }, { type: 'wolf', count: 2 }, { type: '_hpMult', count: hpMult }];
-  }
-  // Phases 1-3: basic enemies
-  if (phase <= 3) {
-    let count = 2 + floor(phase / 2);
-    if (phase % 2 === 0) return [{ type: 'bandit', count: count }, { type: '_hpMult', count: hpMult }];
-    return [{ type: 'wolf', count: count }, { type: '_hpMult', count: hpMult }];
-  }
-  // Phases 4-6: mixed with shield bearers
-  if (phase <= 6) {
-    let shields = 1 + floor((phase - 3) / 2);
-    let wolves = 2 + floor((phase - 3) / 2);
-    return [{ type: 'shield_bearer', count: shields }, { type: 'wolf', count: wolves }, { type: '_hpMult', count: hpMult }];
-  }
-  // Phases 7-9: mixed with archers
-  let archers = 1 + floor((phase - 6) / 2);
-  let bandits = 2 + floor((phase - 6) / 2);
-  let shields = 1;
-  return [{ type: 'archer', count: archers }, { type: 'shield_bearer', count: shields }, { type: 'bandit', count: bandits }, { type: '_hpMult', count: hpMult }];
-}
-
-function getEnemyStats(type) {
-  switch (type) {
-    case 'wolf':     return { hp: 30, damage: 8, speed: 2.2, size: 12 };
-    case 'bandit':   return { hp: 45, damage: 12, speed: 1.5, size: 14 };
-    case 'harpy':    return { hp: 35, damage: 10, speed: 2.8, size: 14 };
-    case 'secutor':  return { hp: 70, damage: 15, speed: 1.2, size: 16 };
-    case 'minotaur': return { hp: 200, damage: 25, speed: 1.0, size: 24 };
-    case 'shield_bearer': return { hp: 80, damage: 12, speed: 0.8, size: 18, behavior: 'shield', blockChance: 0.5 };
-    case 'archer':   return { hp: 35, damage: 8, speed: 1.2, size: 14, behavior: 'ranged', projectileSpeed: 3, shootCooldown: 90, preferredRange: 150 };
-    case 'centurion': return { hp: 200, damage: 25, speed: 1.0, size: 22, behavior: 'boss', chargeSpeed: 4, chargeCooldown: 180 };
-    default:         return { hp: 30, damage: 8, speed: 1.5, size: 12 };
-  }
-}
-
-function spawnWave(n) {
-  let a = state.adventure;
-  a.enemies = [];
-  let defs = n <= WAVE_DEFS.length ? WAVE_DEFS[n - 1] : generateWaveDef(n);
-  // Extract HP multiplier if present (injected by generateWaveDef)
-  let hpMult = 1;
-  let spawnDefs = defs.filter(d => {
-    if (d.type === '_hpMult') { hpMult = d.count; return false; }
-    return true;
-  });
-  let total = spawnDefs.reduce((s, d) => s + d.count, 0);
-  let idx = 0;
-  for (let def of spawnDefs) {
-    for (let i = 0; i < def.count; i++) {
-      let angle = (TWO_PI / total) * idx + random(-0.3, 0.3);
-      let stats = getEnemyStats(def.type);
-      let scaledHp = floor(stats.hp * hpMult);
-      let eObj = {
-        type: def.type,
-        x: a.isleX + cos(angle) * (((a.combatRX||200)) - 20),
-        y: a.isleY + sin(angle) * (a.isleRY - 20),
-        vx: 0, vy: 0,
-        hp: scaledHp, maxHp: scaledHp,
-        damage: stats.damage, speed: stats.speed, size: stats.size,
-        state: 'chase', stateTimer: 0,
-        attackCooldown: 0, facing: 1, flashTimer: 0,
-        chargeAngle: 0, chargeTimer: 0,
-      };
-      if (stats.behavior) eObj.behavior = stats.behavior;
-      if (stats.blockChance) eObj.blockChance = stats.blockChance;
-      if (stats.projectileSpeed) eObj.projectileSpeed = stats.projectileSpeed;
-      if (stats.shootCooldown) { eObj.shootCooldown = stats.shootCooldown; eObj.shootTimer = 0; }
-      if (stats.preferredRange) eObj.preferredRange = stats.preferredRange;
-      if (stats.chargeSpeed) eObj.chargeSpeed = stats.chargeSpeed;
-      if (stats.chargeCooldown) eObj.chargeCooldownMax = stats.chargeCooldown;
-      a.enemies.push(eObj);
-      idx++;
-    }
-  }
-  a.wave = n;
-  a.waveState = 'fighting';
-  a.waveTimer = 0;
-  let isBoss = n % 10 === 0;
-  addFloatingText(width / 2, height * 0.25, isBoss ? 'BOSS WAVE ' + n + '!' : 'WAVE ' + n, isBoss ? '#ff6633' : '#ffcc44');
-  if (isBoss) triggerScreenShake(8, 20);
-  else triggerScreenShake(4, 10);
-}
-
-function enterAdventure() {
-  let a = state.adventure;
-  let p = state.player;
-  if (typeof _killCombo !== 'undefined') { _killCombo = 0; _killComboDisplay = 0; _killComboDisplayTimer = 0; }
-  if (typeof initFactionAbilities === 'function') initFactionAbilities();
-  a.returnX = WORLD.islandCX;
-  a.returnY = WORLD.islandCY;
-  a.active = true;
-  a.wave = 0;
-  a.waveState = 'idle';
-  unlockJournal('arena_found');
-  a.enemies = [];
-  a.loot = [];
-  a.killCount = 0;
-  a.goldEarned = 0;
-  a.xpEarned = 0;
-  if (typeof _arenaProjectiles !== 'undefined') _arenaProjectiles.length = 0;
-  state.rowing.active = false;
-  p.hp = p.maxHp;
-  p.x = a.isleX;
-  p.y = a.isleY + 40;
-  p.vx = 0; p.vy = 0;
-  p.invincTimer = 60;
-  // Snap camera to arena so it doesn't float in the sky
-  cam.x = p.x; cam.y = p.y;
-  camSmooth.x = p.x; camSmooth.y = p.y;
-  addFloatingText(width / 2, height * 0.3, 'THE ARENA', '#ffcc44');
-  // Start wave 1 after short delay
-  a.waveTimer = 90;
-  a.waveState = 'intermission';
-}
-
-function exitAdventure() {
-  let a = state.adventure;
-  let p = state.player;
-  a.active = false;
-  a.enemies = [];
-  a.loot = [];
-  // Return to arena island (player swims back home)
-  p.x = a.isleX;
-  p.y = a.isleY;
-  p.vx = 0; p.vy = 0;
-  p.attackTimer = 0;
-  p.slashPhase = 0;
-  p.invincTimer = 0;
-  // Heal over time after returning
-  if (p.hp < p.maxHp * 0.5) p.hp = floor(p.maxHp * 0.5);
-  // Snap camera to home so island doesn't float
-  cam.x = p.x; cam.y = p.y;
-  camSmooth.x = p.x; camSmooth.y = p.y;
-  addFloatingText(width / 2, height * 0.3, 'Returned Home', '#88cc88');
-  if (typeof triggerNPCReaction === 'function') triggerNPCReaction('combat', p.x, p.y);
-}
-
-function updateAdventure(dt) {
-  let a = state.adventure;
-  let p = state.player;
-
-  // Decrement player combat timers
-  if (p.attackTimer > 0) p.attackTimer -= dt;
-  if (p.invincTimer > 0) p.invincTimer -= dt;
-  if (p.slashPhase > 0) p.slashPhase -= dt;
-
-  // Wave state machine
-  if (a.waveState === 'intermission') {
-    a.waveTimer -= dt;
-    if (a.waveTimer <= 0) {
-      spawnWave(a.wave + 1);
-    }
-  } else if (a.waveState === 'fighting') {
-    // Update enemies
-    for (let i = a.enemies.length - 1; i >= 0; i--) {
-      let e = a.enemies[i];
-      updateEnemyAI(e, dt, p, a);
-      if (e.state === 'dead') {
-        enemyDeath(e, a);
-        a.enemies.splice(i, 1);
-      }
-    }
-    // Check wave clear
-    if (a.enemies.length === 0) {
-      if (a.wave > a.bestWave) a.bestWave = a.wave;
-      state.arenaHighWave = max(state.arenaHighWave, a.wave);
-      let waveGold = 10 + a.wave * 5;
-      state.gold += waveGold;
-      a.goldEarned = (a.goldEarned || 0) + waveGold;
-      if (a.wave % 5 === 0) { state.crystals += 2; }
-      addFloatingText(width / 2, height * 0.3, 'Wave ' + a.wave + ' Clear! +' + waveGold + ' Gold', '#aaddff');
-      if (typeof adjustReputation === 'function') adjustReputation(5);
-      a.waveState = 'intermission';
-      a.waveTimer = 180; // 3 seconds rest between waves
-    }
-  }
-
-  // Update loot
-  for (let i = a.loot.length - 1; i >= 0; i--) {
-    let l = a.loot[i];
-    l.life -= dt;
-    if (l.life <= 0) { a.loot.splice(i, 1); continue; }
-    // Auto-collect
-    if (dist(p.x, p.y, l.x, l.y) < 30) {
-      if (l.type === 'gold') { state.gold += l.amount; addFloatingText(w2sX(l.x), w2sY(l.y) - 15, '+' + l.amount + ' Gold', '#ffcc44'); }
-      else if (l.type === 'crystal') { state.crystals += l.amount; addFloatingText(w2sX(l.x), w2sY(l.y) - 15, '+' + l.amount + ' Crystal', '#88ddff'); }
-      else if (l.type === 'wood') { state.wood += l.amount; addFloatingText(w2sX(l.x), w2sY(l.y) - 15, '+' + l.amount + ' Wood', '#bb8844'); }
-      else if (l.type === 'stone') { state.stone += l.amount; addFloatingText(w2sX(l.x), w2sY(l.y) - 15, '+' + l.amount + ' Stone', '#aaaaaa'); }
-      a.loot.splice(i, 1);
-    }
-  }
-
-  // Update archer projectiles
-  if (typeof updateArenaProjectiles === 'function') updateArenaProjectiles(dt, p);
-
-  // Player death — show arena summary
-  if (p.hp <= 0) {
-    p.hp = floor(p.maxHp * 0.5);
-    addFloatingText(width / 2, height * 0.35, 'Retreat!', '#ff6644');
-    triggerScreenShake(8, 20);
-    if (snd && snd.playNarration) snd.playNarration('defeat');
-    if (typeof showArenaSummary === 'function') showArenaSummary(a, false);
-    exitAdventure();
-  }
-}
-
-
-function updateEnemyAI(e, dt, p, a) {
-  if (e.flashTimer > 0) e.flashTimer -= dt;
-  if (e.attackCooldown > 0) e.attackCooldown -= dt;
-
-  switch (e.state) {
-    case 'chase': {
-      let dx = p.x - e.x;
-      let dy = p.y - e.y;
-      let d = sqrt(dx * dx + dy * dy);
-      e.facing = dx > 0 ? 1 : -1;
-
-      // Archer behavior: maintain range, flee if too close
-      if (e.behavior === 'ranged') {
-        let pref = e.preferredRange || 150;
-        if (d < 60) {
-          // Flee away from player
-          let md = sqrt(dx * dx + dy * dy) || 1;
-          e.vx = (-dx / md) * e.speed * 1.5;
-          e.vy = (-dy / md) * e.speed * 1.5;
-        } else if (d > pref + 30) {
-          let md = sqrt(dx * dx + dy * dy) || 1;
-          e.vx = (dx / md) * e.speed;
-          e.vy = (dy / md) * e.speed;
-        } else {
-          // Strafe at preferred range
-          let perp = sin(frameCount * 0.03 + e.x) * 0.8;
-          e.vx = (-dy / (d || 1)) * e.speed * perp;
-          e.vy = (dx / (d || 1)) * e.speed * perp;
-        }
-        e.x += e.vx * dt;
-        e.y += e.vy * dt;
-        // Shoot projectile
-        if (!e.shootTimer) e.shootTimer = 0;
-        e.shootTimer -= dt;
-        if (e.shootTimer <= 0 && d < pref + 60 && d > 40) {
-          e.shootTimer = e.shootCooldown || 90;
-          let md2 = sqrt(dx * dx + dy * dy) || 1;
-          let spd = e.projectileSpeed || 3;
-          if (typeof _arenaProjectiles !== 'undefined') {
-            _arenaProjectiles.push({
-              x: e.x, y: e.y,
-              vx: (dx / md2) * spd, vy: (dy / md2) * spd,
-              damage: e.damage, life: 120,
-              color: [120, 100, 70],
-            });
-          }
-        }
-        break;
-      }
-
-      // Centurion boss behavior: chase then charge
-      if (e.behavior === 'boss') {
-        if (!e.bossChargeCooldown) e.bossChargeCooldown = 0;
-        e.bossChargeCooldown -= dt;
-        if (d < 100 && e.bossChargeCooldown <= 0) {
-          e.state = 'windup';
-          e.stateTimer = 45;
-          e.chargeAngle = atan2(dy, dx);
-          e.vx = 0; e.vy = 0;
-          e.bossChargeCooldown = e.chargeCooldownMax || 180;
-          break;
-        }
-        // Normal chase
-        let md3 = sqrt(dx * dx + dy * dy) || 1;
-        e.vx = (dx / md3) * e.speed;
-        e.vy = (dy / md3) * e.speed;
-        e.x += e.vx * dt;
-        e.y += e.vy * dt;
-        if (d < e.size + 20 && e.attackCooldown <= 0) {
-          e.state = 'attack';
-          e.stateTimer = 15;
-        }
-        break;
-      }
-
-      // Harpy swoops sideways
-      let mx = dx, my = dy;
-      if (e.type === 'harpy') {
-        let perp = sin(frameCount * 0.04 + e.x) * 40;
-        mx += -dy / d * perp * 0.03;
-        my += dx / d * perp * 0.03;
-      }
-      // Bandit flanks slightly
-      if (e.type === 'bandit') {
-        mx += -dy * 0.15;
-        my += dx * 0.15;
-      }
-
-      let md = sqrt(mx * mx + my * my);
-      if (md > 0) {
-        e.vx = (mx / md) * e.speed;
-        e.vy = (my / md) * e.speed;
-      }
-      e.x += e.vx * dt;
-      e.y += e.vy * dt;
-
-      // Minotaur charge mechanic
-      if (e.type === 'minotaur' && d < 120 && e.attackCooldown <= 0) {
-        e.state = 'windup';
-        e.stateTimer = 45; // 0.75s windup
-        e.chargeAngle = atan2(dy, dx);
-        e.vx = 0; e.vy = 0;
-        break;
-      }
-
-      // Attack when close
-      if (d < e.size + 20 && e.attackCooldown <= 0) {
-        e.state = 'attack';
-        e.stateTimer = 15; // windup
-      }
-      break;
-    }
-    case 'windup': {
-      // Minotaur charge windup - shake in place
-      e.x += random(-1, 1);
-      e.stateTimer -= dt;
-      if (e.stateTimer <= 0) {
-        e.state = 'charging';
-        e.stateTimer = 30; // charge duration
-      }
-      break;
-    }
-    case 'charging': {
-      // Minotaur/Centurion charge!
-      let chSpd = e.chargeSpeed || (e.speed * 5);
-      e.x += cos(e.chargeAngle) * chSpd * dt;
-      e.y += sin(e.chargeAngle) * chSpd * dt;
-      e.stateTimer -= dt;
-      // Damage player on contact — boss deals double damage during charge
-      if (dist(e.x, e.y, p.x, p.y) < e.size + p.size && p.invincTimer <= 0) {
-        let defR = (typeof getPlayerDefenseReduction === 'function') ? getPlayerDefenseReduction() : ([0, 3, 6, 10][p.armor] || 0);
-        let chargeMult = e.behavior === 'boss' ? 2.0 : 1.5;
-        let dmg = max(1, floor(e.damage * chargeMult) - defR);
-        if (typeof getFortifyReduction === 'function') {
-          dmg = max(1, floor(dmg * (1 - getFortifyReduction())));
-        }
-        if (typeof getFactionDamageReduction === 'function') {
-          dmg = max(1, floor(dmg * (1 - getFactionDamageReduction())));
-        }
-        p.hp = max(0, p.hp - dmg);
-        p.invincTimer = 45;
-        addFloatingText(w2sX(p.x), w2sY(p.y) - 25, '-' + dmg, '#ff6644');
-        { let _hda = atan2(p.y - e.y, p.x - e.x); triggerScreenShake(6, 10, cos(_hda), sin(_hda), 'directional'); }
-        if (snd) snd.playSFX('player_hurt');
-        if (typeof getFortifyReflect === 'function') {
-          let reflDmg = getFortifyReflect();
-          if (reflDmg > 0) { e.hp -= reflDmg; e.flashTimer = 6; if (typeof _spawnDamageNumber === 'function') _spawnDamageNumber(e.x, e.y, reflDmg, '#aaaaff'); }
-        }
-        if (typeof _killCombo !== 'undefined') _killCombo = 0;
-      }
-      // Arena boundary
-      let bx = (e.x - a.isleX) / ((a.combatRX||200) - 10);
-      let by = (e.y - a.isleY) / ((a.combatRY||140) - 10);
-      if (bx * bx + by * by > 1 || e.stateTimer <= 0) {
-        // Boss: brief stun after charge (1 second)
-        if (e.behavior === 'boss') {
-          e.state = 'stagger';
-          e.stateTimer = 60;
-          e.vx = 0; e.vy = 0;
-        } else {
-          e.state = 'chase';
-        }
-        e.attackCooldown = 120;
-      }
-      break;
-    }
-    case 'attack': {
-      e.stateTimer -= dt;
-      e.vx = 0; e.vy = 0;
-      if (e.stateTimer <= 0) {
-        // Deal damage
-        let d = dist(e.x, e.y, p.x, p.y);
-        if (d < e.size + 25 && p.invincTimer <= 0) {
-          let armorReduce = (typeof getPlayerDefenseReduction === 'function') ? getPlayerDefenseReduction() : ([0, 3, 6, 10][p.armor] || 0);
-          let eDmg = max(1, e.damage - armorReduce);
-          if (typeof getFortifyReduction === 'function') {
-            eDmg = max(1, floor(eDmg * (1 - getFortifyReduction())));
-          }
-          if (typeof getFactionDamageReduction === 'function') {
-            eDmg = max(1, floor(eDmg * (1 - getFactionDamageReduction())));
-          }
-          p.hp = max(0, p.hp - eDmg);
-          p.invincTimer = 30;
-          addFloatingText(w2sX(p.x), w2sY(p.y) - 25, '-' + eDmg, '#ff6644');
-          { let _hda = atan2(p.y - e.y, p.x - e.x); triggerScreenShake(4, 8, cos(_hda), sin(_hda), 'directional'); }
-          spawnParticles(p.x, p.y, 'combat', 3);
-          if (snd) snd.playSFX('player_hurt');
-          if (typeof getFortifyReflect === 'function') {
-            let reflDmg = getFortifyReflect();
-            if (reflDmg > 0) { e.hp -= reflDmg; e.flashTimer = 6; if (typeof _spawnDamageNumber === 'function') _spawnDamageNumber(e.x, e.y, reflDmg, '#aaaaff'); }
-          }
-          if (typeof _killCombo !== 'undefined') _killCombo = 0;
-        }
-        e.state = 'chase';
-        e.attackCooldown = e.type === 'wolf' ? 40 : 60;
-      }
-      break;
-    }
-    case 'stagger': {
-      e.stateTimer -= dt;
-      e.vx *= 0.8; e.vy *= 0.8;
-      if (e.stateTimer <= 0) {
-        if (e.hp <= 0) { e.state = 'dying'; e.stateTimer = 20; }
-        else e.state = 'chase';
-      }
-      break;
-    }
-    case 'dying': {
-      e.stateTimer -= dt;
-      if (e.stateTimer <= 0) e.state = 'dead';
-      break;
-    }
-  }
-
-  // Enemy separation
-  for (let other of a.enemies) {
-    if (other === e) continue;
-    let sd = dist(e.x, e.y, other.x, other.y);
-    if (sd < e.size + other.size) {
-      let sa = atan2(e.y - other.y, e.x - other.x);
-      e.x += cos(sa) * 0.8;
-      e.y += sin(sa) * 0.8;
-    }
-  }
-
-  // Clamp to arena
-  let bex = (e.x - a.isleX) / ((a.combatRX||200) - 10);
-  let bey = (e.y - a.isleY) / ((a.combatRY||140) - 10);
-  if (bex * bex + bey * bey > 1) {
-    let ba = atan2(e.y - a.isleY, e.x - a.isleX);
-    e.x = a.isleX + cos(ba) * ((a.combatRX||200) - 12);
-    e.y = a.isleY + sin(ba) * ((a.combatRY||140) - 12);
-  }
-}
-
-function enemyDeath(e, a) {
-  a.killCount++;
-  if (state.score) state.score.enemiesDefeated++;
-  if (typeof _killCombo !== 'undefined') {
-    _killCombo++;
-    _killComboDisplay = _killCombo;
-    _killComboDisplayTimer = 90;
-  }
-  if (e.type && state && state.codex) {
-    if (!state.codex.enemies) state.codex.enemies = {};
-    if (!state.codex.enemies[e.type]) state.codex.enemies[e.type] = { defeated: true, count: 0, firstDay: state.day };
-    state.codex.enemies[e.type].count++;
-    state.codex.enemies[e.type].defeated = true;
-  if (typeof trackStat === 'function') trackStat('enemiesDefeated', 1);
-  if (typeof checkDailyQuestProgress === 'function') checkDailyQuestProgress('kill', 1);
-  }
-  spawnParticles(e.x, e.y, 'combat', 8);
-  if (snd) snd.playSFX('hit');
-  // Kill burst particles (colored per enemy type)
-  if (typeof spawnKillBurst === 'function') {
-    let burstCol = { wolf: [130, 95, 55], bandit: [105, 80, 55], harpy: [85, 125, 75], secutor: [145, 135, 115],
-      minotaur: [110, 70, 45], shield_bearer: [140, 130, 115], archer: [120, 100, 70], centurion: [180, 50, 40] }[e.type] || [150, 150, 150];
-    spawnKillBurst(e.x, e.y, burstCol);
-  }
-  // Drop loot
-  let drops = [];
-  switch (e.type) {
-    case 'wolf': drops.push({ type: 'gold', amount: floor(random(3, 6)) }); break;
-    case 'bandit':
-      drops.push({ type: 'gold', amount: floor(random(5, 9)) });
-      if (random() < 0.2) drops.push({ type: 'wood', amount: 1 });
-      break;
-    case 'harpy':
-      drops.push({ type: 'gold', amount: floor(random(4, 7)) });
-      if (random() < 0.3) drops.push({ type: 'crystal', amount: 1 });
-      break;
-    case 'secutor':
-      drops.push({ type: 'gold', amount: floor(random(8, 13)) });
-      if (random() < 0.4) drops.push({ type: 'stone', amount: 1 });
-      break;
-    case 'minotaur':
-      drops.push({ type: 'gold', amount: 30 });
-      drops.push({ type: 'crystal', amount: 3 });
-      spawnBossDefeated(e.x, e.y);
-      break;
-    case 'shield_bearer':
-      drops.push({ type: 'gold', amount: floor(random(8, 14)) });
-      if (random() < 0.35) drops.push({ type: 'stone', amount: 2 });
-      break;
-    case 'archer':
-      drops.push({ type: 'gold', amount: floor(random(6, 10)) });
-      if (random() < 0.25) drops.push({ type: 'wood', amount: 2 });
-      break;
-    case 'centurion':
-      drops.push({ type: 'gold', amount: 50 });
-      drops.push({ type: 'crystal', amount: 5 });
-      spawnBossDefeated(e.x, e.y);
-      break;
-  }
-  // Carthage passive: +30% gold drops
-  if (typeof getFactionGoldDropMult === 'function') {
-    let goldMult = getFactionGoldDropMult();
-    for (let d of drops) {
-      if (d.type === 'gold') d.amount = floor(d.amount * goldMult);
-    }
-  }
-  for (let d of drops) {
-    a.loot.push({
-      x: e.x + random(-15, 15), y: e.y + random(-10, 10),
-      type: d.type, amount: d.amount,
-      bobPhase: random(TWO_PI), life: 600,
-    });
-  }
-}
-
 // ─── DISTANT ISLAND LABELS & ENTITIES ────────────────────────────────────
 
-// ─── UNIFIED DISTANT ISLAND RENDERER ──────────────────────────────────────
-// All distant islands share this base: water shadow > shallow water > beach > grass
-// Individual renderers call this, then add their own structures on top.
-// drawDistantIslandBase removed — all islands use drawIslandBase now
-
-function drawArenaDistantLabel() {
-  if (state.adventure.active) return;
-  let a = state.adventure;
-  let sx = w2sX(a.isleX);
-  let sy = w2sY(a.isleY);
-  let minY = max(height * 0.06, height * 0.25 - horizonOffset) + 10;
-  sy = max(sy, minY);
-  if (sx < -300 || sx > width + 300 || sy > height + 300) return;
-  let _ds = (typeof _getDistantScale === 'function') ? _getDistantScale(a.isleX, a.isleY, a.isleRX) : null;
-  if (_ds && _ds.dist > (typeof _getMaxViewDist === 'function' ? _getMaxViewDist() : 4000)) return;
-  let _labelFade = _ds ? constrain(1 - _ds.haze / 200, 0.15, 1) : 1;
-  let sc = _ds ? _ds.scale : 1;
-  let baseY = sy + a.isleRY * 1.2 * sc + 12;
-  push();
-  noStroke(); textAlign(CENTER);
-  // Sword icon with pulse
-  fill(220, 180, 100, floor((200 + sin(frameCount * 0.05) * 40) * _labelFade));
-  textSize(max(10, floor(16 * sc)));
-  text('\u2694', sx, baseY - 2);
-  // Arena name with tier
-  let tierNames = ['', 'Fighting Pit', 'Stone Arena', 'Colosseum', 'Grand Amphitheater'];
-  let aLv = getArenaLevel();
-  fill(220, 200, 160, floor(200 * _labelFade));
-  textSize(max(9, floor(12 * sc))); textStyle(BOLD);
-  text('Arena', sx, baseY + 12 * sc);
-  textStyle(NORMAL);
-  // Tier subtitle
-  fill(190, 175, 140, floor(160 * _labelFade));
-  textSize(max(7, floor(9 * sc)));
-  text(tierNames[aLv], sx, baseY + 24 * sc);
-  // Wave record
-  let highWave = state.arenaHighWave || 0;
-  if (highWave > 0) {
-    fill(180, 160, 120, floor(140 * _labelFade));
-    textSize(max(7, floor(9 * sc)));
-    text('Best: Wave ' + highWave, sx, baseY + 35 * sc);
-  }
-  // Access hint
-  let accessY = baseY + (highWave > 0 ? 46 : 35) * sc;
-  fill(160, 180, 140, floor(120 * _labelFade));
-  textSize(max(6, floor(8 * sc)));
-  text('Swim north to enter', sx, accessY);
-  pop();
-}
+const _ARENA_REMOVED = true; // arena system removed — rebuild later
 
 function drawConquestDistantLabel() {
   if (state.conquest.active) return;
@@ -17970,140 +17182,6 @@ function drawConquestDistantEntities() {
   }
   items.sort((a, b) => a.y - b.y);
   for (let it of items) it.draw();
-}
-
-// ─── ARENA DRAWING ───────────────────────────────────────────────────────
-let _arenaCoastVerts = null;
-
-function drawArenaIsleDistant() {
-  let a = state.adventure;
-
-  // Only render the arena island when player is NEAR it (swimming, on it, or fighting)
-  // From the home island, just show a small label -- no island rendering
-  let playerOnArena = typeof isOnArenaIsland === 'function' &&
-    state.player && isOnArenaIsland(state.player.x, state.player.y);
-  let playerSwimming = !playerOnArena && typeof isNearAnyIsland === 'function' &&
-    state.player && isNearAnyIsland(state.player.x, state.player.y, 300) &&
-    !isOnIsland(state.player.x, state.player.y);
-  if (!a.active && !playerSwimming && !playerOnArena) {
-    // Just draw a tiny label on the horizon, no island shape
-    let lsx = w2sX(a.isleX), lsy = w2sY(a.isleY);
-    let _horizY = max(height * 0.06, height * 0.25 - horizonOffset) + 5;
-    lsy = max(lsy, _horizY);
-    if (lsx > 0 && lsx < width && lsy > 0 && lsy < height * 0.5) {
-      push(); noStroke();
-      fill(255, 220, 150, 140); textAlign(CENTER, CENTER); textSize(8);
-      text('Arena \u2694', lsx, lsy);
-      if (a.bestWave > 0) { fill(180, 160, 120, 120); textSize(7); text('Wave ' + a.bestWave, lsx, lsy + 10); }
-      textAlign(LEFT, TOP);
-      pop();
-    }
-    return;
-  }
-
-  let sx = w2sX(a.isleX), sy = w2sY(a.isleY);
-  let _horizY = max(height * 0.06, height * 0.25 - horizonOffset) + 5;
-  if (!playerOnArena) sy = max(sy, _horizY);
-  if (sx < -400 || sx > width + 400) return;
-  if (sy < -400 || sy > height + 400) return;
-
-  push(); noStroke();
-  // Only apply distance scaling when far away, not when swimming nearby
-  if (!playerSwimming && !playerOnArena) {
-    let _dScale = (typeof _getDistantScale === 'function') ? _getDistantScale(a.isleX, a.isleY, a.isleRX) : null;
-    if (_dScale && _dScale.scale < 0.98) {
-      translate(sx, sy); scale(_dScale.scale); translate(-sx, -sy);
-    }
-  }
-  let fsx = floor(sx), fsy = floor(sy);
-  // Use combat size when fighting, small size when viewing from distance
-  let rx = a.active ? (a.combatRX || 200) : a.isleRX;
-  let ry = a.active ? (a.combatRY || 140) : a.isleRY;
-
-  // Organic coastline base (reusable system)
-  if (!_arenaCoastVerts) {
-    _arenaCoastVerts = generateIslandCoastline(42, 64, rx, ry, [
-      {angle: Math.PI * 0.5, strength: 0.06, width: 0.5, type: 'headland'},
-      {angle: Math.PI * 1.2, strength: 0.05, width: 0.3, type: 'bay'},
-    ]);
-  }
-  let _arenaLod = a.active ? 'close' : 'medium';
-  drawIslandBase(fsx, fsy, rx, ry, _arenaCoastVerts, ISLAND_PALETTES.arena, _arenaLod);
-
-  // Arena structure (fits INSIDE the grass surface)
-  let aLv = (typeof getArenaLevel === 'function') ? getArenaLevel() : 1;
-  let inCombat = a.active;
-
-  // Atmospheric horizon haze for distant arena
-  if (!playerOnArena) {
-    let _hazeAlpha = max(0, 1 - (sy - _horizY) / 200) * 40;
-    if (_hazeAlpha > 0) { fill(180, 200, 220, _hazeAlpha); ellipse(fsx, fsy, rx * 2, ry * 2); }
-  }
-
-  // Arena details only when close
-  if (!a.active && !playerSwimming && !playerOnArena) { pop(); return; }
-  // Arena floor (sand pit)
-  fill(185, 170, 135);
-  ellipse(fsx, fsy - 4, rx * 0.9, ry * 0.9);
-  // Stone wall ring (only at level 2+, stays inside grass)
-  if (aLv >= 2) {
-    noFill(); stroke(130, 118, 100); strokeWeight(1.5);
-    ellipse(fsx, fsy - 4, rx * 1.0, ry * 1.0);
-    noStroke();
-  }
-
-  // Audience (when in combat, draw tiny spectator dots around the edge)
-  if (inCombat && aLv >= 2) {
-    let numSpectators = 12 + aLv * 6;
-    for (let i = 0; i < numSpectators; i++) {
-      let sa = (i / numSpectators) * TWO_PI;
-      let seatR = 0.56 + (i % 3) * 0.03;
-      let specX = fsx + cos(sa) * rx * seatR;
-      let specY = fsy - 5 + sin(sa) * ry * seatR;
-      // Colored tunic dots
-      let tc = (i % 5 === 0) ? [180, 50, 50] : (i % 3 === 0) ? [50, 80, 160] : [200, 180, 140];
-      fill(tc[0], tc[1], tc[2]);
-      rect(specX - 1, specY - 2, 3, 4);
-      // Head
-      fill(220, 190, 160);
-      rect(specX - 1, specY - 3, 2, 2);
-    }
-    // Cheering animation (random arms up)
-    if (frameCount % 20 < 10) {
-      for (let i = 0; i < 4; i++) {
-        let ca = (frameCount * 0.01 + i * 1.5) % TWO_PI;
-        let cx = fsx + cos(ca) * rx * 0.58;
-        let cy = fsy - 5 + sin(ca) * ry * 0.58;
-        fill(220, 190, 160);
-        rect(cx, cy - 5, 1, 3); // raised arm
-      }
-    }
-  }
-
-  // Wooden stakes (level 1)
-  if (aLv === 1) {
-    fill(110, 80, 40);
-    for (let i = 0; i < 8; i++) {
-      let sa = i * TWO_PI / 8;
-      let stx = fsx + cos(sa) * rx * 0.5;
-      let sty = fsy - 5 + sin(sa) * ry * 0.5;
-      rect(stx - 1, sty - 5, 2, 7);
-    }
-  }
-
-  // Faction flag
-  let fm = (typeof getFactionMilitary === 'function') ? getFactionMilitary() : null;
-  if (fm) {
-    fill(fm.cape[0], fm.cape[1], fm.cape[2]);
-    rect(fsx - 1, fsy - 15, 2, 10);
-    rect(fsx + 1, fsy - 15, 6 + sin(frameCount * 0.08) * 2, 4);
-  }
-  // Name
-  fill(255, 220, 150, 180); textAlign(CENTER, TOP); textSize(8);
-  text('Arena', fsx, fsy + ry * 1.1 + 2);
-  textAlign(LEFT, TOP);
-
-  pop();
 }
 
 
@@ -18763,33 +17841,6 @@ function drawLoot(a) {
     rect(lx - 3, ly - 5 + bob, 2, 2);
   }
 }
-
-function drawAdventureEntities() {
-  let a = state.adventure;
-  let p = state.player;
-  // Y-sort all: enemies + player + loot
-  let items = [];
-  for (let e of a.enemies) {
-    items.push({ y: e.y, draw: () => drawOneEnemy(e) });
-  }
-  items.push({ y: p.y, draw: () => {
-    // Draw player (blinking during invincibility)
-    if (p.invincTimer > 0 && frameCount % 4 < 2) return;
-    drawPlayer();
-  }});
-  items.sort((a, b) => a.y - b.y);
-  for (let it of items) it.draw();
-  // Loot on ground (below everything but still visible)
-  drawLoot(a);
-  // Archer projectiles
-  if (typeof drawArenaProjectiles === 'function') drawArenaProjectiles();
-  // Faction projectiles & AoEs
-  if (typeof drawPlayerProjectiles === 'function') drawPlayerProjectiles();
-  if (typeof drawFactionAoEs === 'function') drawFactionAoEs();
-  // Slash arc on top
-  drawSlashArc();
-}
-
 
 // ─── EQUIPMENT & SHOP ────────────────────────────────────────────────────
 
@@ -22914,27 +21965,6 @@ function isOnImperialBridge(wx, wy) {
   return abs(wy - archY) < 18;
 }
 
-// ─── ARENA BRIDGE — connects home island north shore to arena island ──────
-
-function isOnArenaBridge() { return false; } // deprecated — swimming replaced bridge
-
-function isOnArenaIsland(wx, wy) {
-  let a = state.adventure;
-  let dx = (wx - a.isleX) / a.isleRX;
-  let dy = (wy - a.isleY) / a.isleRY;
-  return dx * dx + dy * dy <= 1.0;
-}
-
-function getArenaLevel() {
-  let lv = state.islandLevel || 1;
-  if (lv >= 13) return 4; // Grand amphitheater
-  if (lv >= 9) return 3;  // Colosseum with arches
-  if (lv >= 5) return 2;  // Stone arena with seating
-  return 1;               // Simple fighting pit
-}
-
-function checkArenaBridgeUnlock() { } // deprecated — arena always reachable by swimming
-
 function drawImperialBridge() {
   let b = state.imperialBridge;
   if (!b.built && !b.building) return;
@@ -26013,7 +25043,7 @@ function keyPressed() {
 
   // ─── WRECK BEACH KEYS ───
   if (((state.progression.gameStarted && !state.progression.homeIslandReached) || state.wreck._visiting) &&
-      !state.rowing.active && !state.conquest.active && !state.adventure.active) {
+      !state.rowing.active && !state.conquest.active) {
     if (key === 'e' || key === 'E') {
       // When visiting wreck from sailing, E at south shore to depart
       if (state.wreck._visiting) {
@@ -26292,27 +25322,6 @@ function keyPressed() {
   if (state.rowing && state.rowing.active) {
     if (key === ' ' && typeof playerFireCannons === 'function') { playerFireCannons(); return; }
   }
-  // Adventure mode keys
-  if (state.adventure.active) {
-    // Attack
-    if (key === ' ' || key === 'j' || key === 'J') { playerAttack(); return; }
-    // Retreat (only between waves or victory)
-    if ((key === 'e' || key === 'E') && state.adventure.waveState !== 'fighting') {
-      if (typeof showArenaSummary === 'function') showArenaSummary(state.adventure, true);
-      exitAdventure(); return;
-    }
-    // Faction abilities Q/R
-    if (typeof handleFactionAbilityKey === 'function') {
-      if (handleFactionAbilityKey(key)) return;
-    }
-    // Dodge roll on ALT in arena too
-    if (keyMatchesAction('dodge', key, keyCode)) {
-      if (typeof tryDodgeRoll === 'function') tryDodgeRoll();
-      return false;
-    }
-    return; // Block all other keys during adventure
-  }
-
   // Upgrade shop close
   if (state.upgradeShopOpen) {
     if (keyCode === 27 || key === 'e' || key === 'E') { state.upgradeShopOpen = false; return; }
@@ -26350,12 +25359,12 @@ function keyPressed() {
     }
     // Dive from boat — E while rowing in open water
     if (typeof startDive === 'function' && state.rowing && state.rowing.active &&
-        !state.conquest.active && !state.adventure.active) {
+        !state.conquest.active) {
       startDive(); return;
     }
     // Dive — E near water, but NOT if near the rowboat
     if (typeof startDive === 'function' && !state.rowing.active && !state.buildMode &&
-        !state.conquest.active && !state.adventure.active &&
+        !state.conquest.active &&
         !(state.vulcan && state.vulcan.active) && !(state.hyperborea && state.hyperborea.active) &&
         !(state.plenty && state.plenty.active) && !(state.necropolis && state.necropolis.active) &&
         !state._activeExploration) {
@@ -26532,21 +25541,12 @@ function keyPressed() {
       }
     }
 
-    // Enter arena — player must be on the arena island
-    if (!state.rowing.active && !state.adventure.active && !state.conquest.active) {
-      if (isOnArenaIsland(state.player.x, state.player.y)) {
-        enterAdventure();
-        return;
-      }
-    }
-
     // Rowboat embark/disembark
     if (state.rowing.active) {
       let r = state.rowing;
       // Dock at nearby island
       // Board enemy ship if boarding target available
       if (state.naval && state.naval.boardingTarget && typeof startBoardingCombat === 'function') { startBoardingCombat(); return; }
-      if (r.nearIsle === 'arena') { enterAdventure(); return; }
       if (r.nearIsle === 'conquest') {
         if (state.conquest.colonized) {
           // Colonized — free, peaceful entry
@@ -27028,7 +26028,7 @@ function keyPressed() {
   }
 
   // Hotbar 1-0 direct select
-  if (!state.buildMode && !state.conquest.active && !state.adventure.active) {
+  if (!state.buildMode && !state.conquest.active) {
     let numKey = key === '0' ? 9 : parseInt(key) - 1;
     if (numKey >= 0 && numKey < HOTBAR_ITEMS.length) {
       let item = HOTBAR_ITEMS[numKey];
@@ -28047,8 +27047,6 @@ function saveGame() {
     },
     // Legia military system
     legia: state.legia || null,
-    arenaHighWave: state.arenaHighWave || 0,
-    arenaBridgeBuilt: state.adventure.bridgeBuilt || false,
     // Random events
     activeEvent: state.activeEvent || null,
     eventCooldown: state.eventCooldown || {},
@@ -28641,12 +27639,6 @@ function loadGame() {
       if (!state.buildings.some(b => b.type === 'castrum')) {
         state.buildings.push({ x: 920, y: 480, w: 130, h: 100, type: 'castrum', rot: 0 });
       }
-    }
-    state.arenaHighWave = d.arenaHighWave || 0;
-    state.adventure.bridgeBuilt = d.arenaBridgeBuilt || false;
-    // Auto-fix: if level >= 10 but bridge not built yet, build it
-    if ((state.islandLevel || 1) >= 10 && !state.adventure.bridgeBuilt) {
-      state.adventure.bridgeBuilt = true;
     }
     // Random events
     if (d.activeEvent && typeof d.activeEvent === 'object') state.activeEvent = d.activeEvent;
@@ -30359,7 +29351,7 @@ function placeEraBuildings(lvl) {
 
   if (lvl === 18) {
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
-    addFloatingText(width / 2, height * 0.3, 'The Arena Isle grows stronger!', '#ff8844');
+    addFloatingText(width / 2, height * 0.3, 'Fortifications strengthened!', '#ff8844');
   }
 
   if (lvl === 19) {
@@ -30422,7 +29414,6 @@ function expandIsland() {
   if (cost.ancientRelic) state.ancientRelic -= cost.ancientRelic;
   if (cost.titanBone) state.titanBone -= cost.titanBone;
   state.islandLevel++;
-  checkArenaBridgeUnlock();
   triggerIslandMilestone(state.islandLevel);
   addNotification('Island expanded to Level ' + state.islandLevel, '#ffdd66');
   // Island grows less per level at higher tiers

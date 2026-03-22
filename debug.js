@@ -146,7 +146,6 @@ const Debug = {
             state.isInitialized = true;
             state.rowing = state.rowing || {}; state.rowing.active = false;
             state.conquest = state.conquest || {}; state.conquest.active = false;
-            state.adventure = state.adventure || {}; state.adventure.active = false;
             if (!state.buildings || state.buildings.length === 0) buildIsland();
             state.player.x = WORLD.islandCX;
             state.player.y = WORLD.islandCY;
@@ -198,7 +197,6 @@ const Debug = {
           cam.x = state.player.x; cam.y = state.player.y;
           camSmooth.x = cam.x; camSmooth.y = cam.y;
           if (state.conquest.active) state.conquest.active = false;
-          if (state.adventure.active) state.adventure.active = false;
           state.rowing.active = false;
           state.progression.homeIslandReached = true;
           this.addLog('Teleported home', '#88ddff');
@@ -402,7 +400,6 @@ const Debug = {
           cam.x = state.player.x; cam.y = state.player.y;
           camSmooth.x = cam.x; camSmooth.y = cam.y;
           if (state.conquest.active) state.conquest.active = false;
-          if (state.adventure.active) state.adventure.active = false;
           state.rowing.active = false;
 
           this.addLog('═══ DEV MODE ACTIVATED ═══', '#ffdd44');

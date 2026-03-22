@@ -897,87 +897,6 @@ function drawShopUI() {
   textAlign(LEFT, TOP);
 }
 
-// ─── ADVENTURE HUD ──────────────────────────────────────────────────────
-function drawAdventureHUD() {
-  let p = state.player;
-  let a = state.adventure;
-  push();
-
-  // HP Bar — top center (shakes on damage)
-  let barW = 200, barH = 16;
-  let barX = width / 2 - barW / 2;
-  let barY = 15;
-  let _hpShakeOff = 0;
-  if (_juiceHpShakeTimer > 0) {
-    _hpShakeOff = floor(sin(_juiceHpShakeTimer * 1.5) * 3);
-    _juiceHpShakeTimer -= 1;
-  }
-  // Background
-  fill(40, 15, 15, 200);
-  rect(barX - 2 + _hpShakeOff, barY - 2, barW + 4, barH + 4, 4);
-  // Empty
-  fill(80, 25, 20);
-  rect(barX + _hpShakeOff, barY, barW, barH, 3);
-  // Filled
-  let hpFrac = max(0, p.hp / p.maxHp);
-  let hpCol = hpFrac > 0.5 ? color(180, 50, 30) : (hpFrac > 0.25 ? color(200, 120, 20) : color(220, 40, 40));
-  fill(hpCol);
-  rect(barX + _hpShakeOff, barY, barW * hpFrac, barH, 3);
-  // Low HP pulse
-  if (hpFrac < 0.25) {
-    let pulse = sin(frameCount * 0.15) * 0.3 + 0.7;
-    fill(220, 40, 40, 40 * pulse);
-    rect(barX + _hpShakeOff, barY, barW * hpFrac, barH, 3);
-  }
-  // Text
-  fill(255);
-  textSize(10);
-  textAlign(CENTER, CENTER);
-  text('HP ' + max(0, floor(p.hp)) + ' / ' + p.maxHp, width / 2 + _hpShakeOff, barY + barH / 2);
-
-  // Wave indicator
-  let waveText = '';
-  if (a.waveState === 'fighting') waveText = 'WAVE ' + a.wave + (a.wave % 10 === 0 ? '  BOSS' : '');
-  else if (a.waveState === 'intermission') waveText = 'Next wave in ' + ceil(a.waveTimer / 60) + '...';
-  else if (a.waveState === 'victory') waveText = 'VICTORY! Press E to return';
-  else if (a.waveState === 'idle') waveText = 'Prepare...';
-  fill(255, 230, 180);
-  textSize(12);
-  text(waveText, width / 2, barY + barH + 16);
-
-  // Kill count
-  fill(200, 180, 140, 180);
-  textSize(9);
-  textAlign(LEFT, TOP);
-  text('Kills: ' + a.killCount, 15, 15);
-  text('Gold: ' + state.gold, 15, 28);
-
-  // Attack cooldown indicator
-  if (p.attackTimer > 0) {
-    let cdFrac = p.attackTimer / p.attackCooldown;
-    fill(60, 60, 60, 150);
-    ellipse(width / 2, barY + barH + 42, 20, 20);
-    fill(255, 200, 80, 200);
-    arc(width / 2, barY + barH + 42, 18, 18, -HALF_PI, -HALF_PI + TWO_PI * (1 - cdFrac));
-  }
-
-  // Retreat hint
-  if (a.waveState !== 'fighting') {
-    fill(180, 180, 160, 150);
-    textSize(9);
-    textAlign(CENTER);
-    text('[E] Retreat to home island', width / 2, height - 25);
-  }
-
-  // Controls hint
-  fill(160, 150, 130, 120);
-  textSize(11);
-  textAlign(RIGHT, BOTTOM);
-  text('WASD move | SPACE attack | SHIFT sprint | ALT dodge', width - 10, height - 10);
-
-  pop();
-}
-
 // ─── EXPEDITION FORGE UI ────────────────────────────────────────────────
 function drawUpgradeShopUI() {
   if (!state.upgradeShopOpen) return;
@@ -1564,7 +1483,7 @@ function drawEmpireDashboard() {
   fill(20,25,35,200); rect(mX,mY,mW,mH,4);
   stroke(100,85,55,100); strokeWeight(0.5); noFill(); rect(mX,mY,mW,mH,4); noStroke();
   fill(140,120,80); textSize(10); textAlign(CENTER,TOP); text('WORLD MAP',mX+mW/2,mY+3);
-  let _isls=[{n:'Home',x:WORLD.islandCX,y:WORLD.islandCY,c:color(80,120,50),rx:18,ry:12},{n:'Arena',x:state.adventure.isleX,y:state.adventure.isleY,c:color(160,80,60),rx:8,ry:6},{n:'Terra Nova',x:state.conquest.isleX,y:state.conquest.isleY,c:state.conquest.colonized?color(80,160,80):color(80,120,160),rx:14,ry:10},{n:'Vulcan',x:state.vulcan.isleX,y:state.vulcan.isleY,c:color(180,60,30),rx:10,ry:8},{n:'Hyperborea',x:state.hyperborea.isleX,y:state.hyperborea.isleY,c:color(100,180,220),rx:11,ry:8},{n:'Plenty',x:state.plenty.isleX,y:state.plenty.isleY,c:color(60,160,60),rx:12,ry:9},{n:'Necropolis',x:state.necropolis.isleX,y:state.necropolis.isleY,c:color(120,50,160),rx:10,ry:7}];
+  let _isls=[{n:'Home',x:WORLD.islandCX,y:WORLD.islandCY,c:color(80,120,50),rx:18,ry:12},{n:'Terra Nova',x:state.conquest.isleX,y:state.conquest.isleY,c:state.conquest.colonized?color(80,160,80):color(80,120,160),rx:14,ry:10},{n:'Vulcan',x:state.vulcan.isleX,y:state.vulcan.isleY,c:color(180,60,30),rx:10,ry:8},{n:'Hyperborea',x:state.hyperborea.isleX,y:state.hyperborea.isleY,c:color(100,180,220),rx:11,ry:8},{n:'Plenty',x:state.plenty.isleX,y:state.plenty.isleY,c:color(60,160,60),rx:12,ry:9},{n:'Necropolis',x:state.necropolis.isleX,y:state.necropolis.isleY,c:color(120,50,160),rx:10,ry:7}];
   let _mnX=Infinity,_mxX=-Infinity,_mnY=Infinity,_mxY=-Infinity;
   _isls.forEach(i=>{_mnX=min(_mnX,i.x);_mxX=max(_mxX,i.x);_mnY=min(_mnY,i.y);_mxY=max(_mxY,i.y);});
   let _mSc=min((mW-40)/max(_mxX-_mnX,1),(mH-40)/max(_mxY-_mnY,1));
@@ -3361,19 +3280,6 @@ function drawBuildIcon(type, selected) {
       fill(accent);
       rect(-9, -5, 18, 1.5);
       break;
-    case 'arena':
-      // Arena icon — oval with seating and banners
-      fill(selected ? color(210, 190, 150) : color(150, 135, 108));
-      ellipse(0, 0, 18, 14);
-      fill(c1);
-      for (let ai = 0; ai < 8; ai++) {
-        let aa = ai * TWO_PI / 8;
-        rect(cos(aa) * 8 - 1, sin(aa) * 6 - 1, 3, 3);
-      }
-      fill(selected ? color(180, 35, 35) : color(130, 30, 30));
-      rect(-9, -10, 4, 6);
-      rect(5, -10, 4, 6);
-      break;
     case 'campfire':
       // Campfire icon — stone ring with flame
       fill(c2);
@@ -4293,7 +4199,6 @@ let worldMapOpen = false;
 function _getCompassIslands() {
   let islands = [
     { name: 'Home', x: WORLD.islandCX, y: WORLD.islandCY, col: '#88cc88', icon: '\u2302' },
-    { name: 'Arena', x: state.adventure.isleX, y: state.adventure.isleY, col: '#cc8888', icon: '\u2694' },
     { name: state.conquest.colonized ? 'Colony' : 'Terra Nova', x: state.conquest.isleX, y: state.conquest.isleY, col: state.conquest.colonized ? '#88cc88' : '#88aacc', icon: '\u2694' },
     { name: 'Wreck Beach', x: WRECK.cx, y: WRECK.cy, col: '#ccaa66', icon: '\u2693' },
     { name: 'Vulcan', x: state.vulcan.isleX, y: state.vulcan.isleY, col: '#ff5533', icon: '\u2740' },
@@ -4472,7 +4377,7 @@ function drawWorldMap() {
 }
 
 function _getDiscoveredIslandKeys() {
-  let keys = ['Home', 'Arena'];
+  let keys = ['Home'];
   if (state.conquest.phase !== 'unexplored' || state.conquest.colonized) keys.push(state.conquest.colonized ? 'Colony' : 'Terra Nova');
   keys.push('Wreck Beach');
   if (state.vulcan.phase !== 'unexplored') keys.push('Vulcan');
