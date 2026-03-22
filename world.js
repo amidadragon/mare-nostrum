@@ -2466,6 +2466,8 @@ function drawDistrictGrounds(ix, iy) {
     let pr = lerp(_gt[0] - 15, _gt[0], dayMix), pg = lerp(_gt[1] - 15, _gt[1], dayMix), pb = lerp(_gt[2] - 15, _gt[2], dayMix);
     let pw = iw * 0.18, ph = ih * 0.10;
     _drawInsula(ix + iw * 0.02 - pw / 2, iy - 20 - ph / 2, pw, ph, pr, pg, pb, 100);
+    drawingContext.restore();
+    pop();
     return;
   }
 
