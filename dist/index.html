@@ -46,6 +46,8 @@
   </style>
   <script src="libs/p5.min.js"></script>
   <script src="libs/p5.sound.min.js"></script>
+  <script src="libs/easystar.min.js"></script>
+  <script src="libs/lz-string.min.js"></script>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -115,6 +117,10 @@
     <div class="bar-wrap"><div class="bar-fill"></div></div>
     <div class="sub">NAVIGATING THE ANCIENT WATERS...</div>
   </div>
+
+  <script src="sprites.js?v=1774222000"></script>
+  <script src="lobby.js?v=1774222000"></script>
+  <script src="naval.js?v=1774222000"></script>
   <script src="game.min.js"></script>
   <script>
     // Hide loading screen after p5 starts
@@ -134,7 +140,11 @@
     try {
       let raw = localStorage.getItem('sunlitIsles_save');
       if (raw) {
-        let d = JSON.parse(raw);
+        let json = raw;
+        if (typeof LZString !== 'undefined') {
+          try { let dec = LZString.decompressFromUTF16(raw); if (dec) json = dec; } catch(e) {}
+        }
+        let d = JSON.parse(json);
         if (!d.version || d.version < 8) {
           localStorage.removeItem('sunlitIsles_save');
           localStorage.removeItem('sunlitIsles_backup');
