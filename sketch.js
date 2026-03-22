@@ -17229,16 +17229,33 @@ function drawArenaDistantLabel() {
   let minY = max(height * 0.06, height * 0.25 - horizonOffset) + 10;
   sy = max(sy, minY);
   if (sx < -300 || sx > width + 300 || sy > height + 300) return;
+  let _ds = (typeof _getDistantScale === 'function') ? _getDistantScale(a.isleX, a.isleY, a.isleRX) : null;
+  if (_ds && _ds.dist > (typeof _getMaxViewDist === 'function' ? _getMaxViewDist() : 4000)) return;
+  let _labelFade = _ds ? constrain(1 - _ds.haze / 200, 0.15, 1) : 1;
+  let sc = _ds ? _ds.scale : 1;
+  let baseY = sy + a.isleRY * 0.4 * sc + 12;
   push();
-  noStroke();
-  fill(200, 185, 150, 140 + sin(frameCount * 0.03) * 30);
-  textSize(9); textAlign(CENTER); textStyle(ITALIC);
-  text('Arena Isle', sx, sy + a.isleRY + 18);
+  noStroke(); textAlign(CENTER);
+  // Sword icon
+  fill(200, 160, 100, floor((180 + sin(frameCount * 0.05) * 40) * _labelFade));
+  textSize(max(9, floor(14 * sc)));
+  text('\u2694', sx, baseY - 2);
+  // Name
+  fill(200, 185, 150, floor(180 * _labelFade));
+  textSize(max(8, floor(11 * sc))); textStyle(ITALIC);
+  text('Arena Isle', sx, baseY + 12 * sc);
   textStyle(NORMAL);
   if (a.bestWave > 0) {
-    fill(180, 160, 120, 120);
-    textSize(10);
-    text('Best: Wave ' + a.bestWave, sx, sy + a.isleRY + 28);
+    fill(180, 160, 120, floor(140 * _labelFade));
+    textSize(max(7, floor(9 * sc)));
+    text('Best: Wave ' + a.bestWave, sx, baseY + 24 * sc);
+  }
+  // Distance
+  if (typeof _getIslandDist === 'function') {
+    let d = _getIslandDist(a.isleX, a.isleY);
+    fill(180, 170, 140, floor(120 * _labelFade));
+    textSize(max(7, floor(8 * sc)));
+    text(d, sx, baseY + (a.bestWave > 0 ? 34 : 24) * sc);
   }
   pop();
 }
@@ -17307,13 +17324,14 @@ function drawConquestDistantEntities() {
 // ─── ARENA DRAWING ───────────────────────────────────────────────────────
 
 function drawArenaIsleDistant() {
-  // Draw the arena as a tiny silhouette ON the horizon line
+  // Draw the arena as a small island silhouette on the horizon
   if (state.adventure.active) return;
   let a = state.adventure;
   let sx = w2sX(a.isleX);
-  // Always pin to the horizon — looks like a distant island on the water
-  let horizonY = max(height * 0.06, height * 0.25 - horizonOffset);
-  let sy = horizonY + 5; // just below horizon line
+  let sy = w2sY(a.isleY);
+  // Clamp to horizon — never float above water
+  let _horizY = max(height * 0.06, height * 0.25 - horizonOffset) + 5;
+  sy = max(sy, _horizY);
   // Distance-based scaling
   let _dScale = null;
   if (typeof _getDistantScale === 'function') {
@@ -17327,47 +17345,43 @@ function drawArenaIsleDistant() {
     translate(sx, sy); scale(_dScale.scale); translate(-sx, -sy);
   }
   let fsx = floor(sx), fsy = floor(sy);
-  // Atmospheric perspective — distant blue-grey haze
+  let rx = a.isleRX, ry = a.isleRY;
   let bright = getSkyBrightness();
   let hazeA = lerp(60, 30, bright);
-  let blueShift = 0.35;
-  // Haze fog between viewer and island
-  fill(140, 165, 190, 20 * bright);
-  ellipse(fsx, fsy, 70, 14);
-  // Island silhouette — faded toward blue-grey with distance
-  let gr = lerp(60 + 30 * bright, 120, blueShift);
-  let gg = lerp(75 + 25 * bright, 140, blueShift);
-  let gb = lerp(50 + 20 * bright, 160, blueShift);
-  fill(gr, gg, gb, hazeA + 40);
-  rect(fsx - 20, fsy - 3, 40, 5, 2);
-  fill(gr + 20, gg + 20, gb + 15, hazeA + 30);
-  rect(fsx - 16, fsy - 5, 32, 4, 1);
-  // Colosseum silhouette — simplified, blue-shifted
-  let cr = lerp(120 + 30 * bright, 140, blueShift);
-  let cg = lerp(115 + 25 * bright, 150, blueShift);
-  let cb = lerp(100 + 20 * bright, 165, blueShift);
+  let _bs = 0.35; // blue shift
+  // Haze fog
+  fill(140, 165, 190, 15 * bright);
+  ellipse(fsx, fsy, rx * 1.4, ry * 0.35);
+  // Water shadow
+  fill(20, 60, 80, 30);
+  ellipse(fsx + 2, fsy + 3, rx * 1.3, ry * 0.7);
+  // Shore water ring
+  fill(55, 140, 160, 40);
+  ellipse(fsx, fsy, rx * 1.25, ry * 0.65);
+  // Beach sand
+  let gr = lerp(195, 180, _bs), gg = lerp(180, 185, _bs), gb = lerp(135, 160, _bs);
+  fill(gr, gg, gb);
+  ellipse(fsx, fsy, rx * 1.15, ry * 0.6);
+  // Arena terrain — darker sandy
+  fill(lerp(155, 150, _bs), lerp(145, 150, _bs), lerp(125, 150, _bs));
+  ellipse(fsx, fsy, rx * 1.0, ry * 0.52);
+  // Arena sand floor
+  fill(lerp(185, 170, _bs), lerp(170, 170, _bs), lerp(130, 155, _bs), hazeA + 40);
+  ellipse(fsx, fsy, rx * 0.85, ry * 0.44);
+  // Colosseum walls — small rects
+  let cr = lerp(120 + 30 * bright, 140, _bs);
+  let cg = lerp(115 + 25 * bright, 150, _bs);
+  let cb = lerp(100 + 20 * bright, 165, _bs);
   fill(cr, cg, cb, hazeA + 25);
-  rect(fsx - 8, fsy - 8, 16, 3);
+  rect(fsx - floor(rx * 0.25), fsy - floor(ry * 0.22), floor(rx * 0.5), floor(ry * 0.09));
+  // Colosseum pillars
   for (let i = -1; i <= 1; i++) {
-    let ch = i === 0 ? 5 : 3;
-    rect(fsx + i * 5 - 1, fsy - 5 - ch, 2, ch);
+    let ch = i === 0 ? floor(ry * 0.14) : floor(ry * 0.09);
+    rect(fsx + floor(i * rx * 0.16) - 1, fsy - floor(ry * 0.15) - ch, 2, ch);
   }
   // Water reflection below
-  fill(30 + 20 * bright, 60 + 40 * bright, 80 + 30 * bright, 15);
-  rect(fsx - 18, fsy + 3, 36, 4);
-  // Final atmospheric wash
-  fill(160, 185, 210, 12 * bright);
-  rect(fsx - 22, fsy - 10, 44, 18);
-  // Label
-  fill(200, 185, 150, hazeA + 60);
-  textSize(10); textAlign(CENTER); textStyle(ITALIC);
-  text('Arena Isle', sx, sy + 14);
-  textStyle(NORMAL);
-  if (a.bestWave > 0) {
-    fill(180, 160, 120, hazeA + 40);
-    textSize(9);
-    text('Best: Wave ' + a.bestWave, sx, sy + 22);
-  }
+  fill(30 + 20 * bright, 60 + 40 * bright, 80 + 30 * bright, 12);
+  ellipse(fsx, fsy + ry * 0.4, rx * 1.1, ry * 0.2);
   pop();
 }
 

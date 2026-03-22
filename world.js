@@ -416,32 +416,32 @@ function drawSky() {
 }
 
 function drawSun(x, y, bright) {
-  let r = 28;
+  let r = 12;
   let fx = floor(x), fy = floor(y);
   noStroke();
   // Outer pixel glow — cross shape
-  for (let g = 5; g > 0; g--) {
-    let s = g * 20;
-    fill(220, 140, 20, (6 - g) * 4 * bright);
-    rect(fx - 2, fy - s, 4, s * 2);
-    rect(fx - s, fy - 2, s * 2, 4);
+  for (let g = 4; g > 0; g--) {
+    let s = g * 10;
+    fill(220, 140, 20, (5 - g) * 4 * bright);
+    rect(fx - 1, fy - s, 2, s * 2);
+    rect(fx - s, fy - 1, s * 2, 2);
   }
   // Diagonal rays — stepped pixel beams
   for (let i = 0; i < 8; i++) {
     let angle = (TWO_PI / 8) * i + frameCount * 0.004;
     let len = floor(r * 2.2 + sin(frameCount * 0.04 + i * 1.3) * r * 0.6);
     fill(240, 180, 40, 25 * bright);
-    for (let d = r; d < len; d += 4) {
+    for (let d = r; d < len; d += 3) {
       let rx = floor(fx + cos(angle) * d);
       let ry = floor(fy + sin(angle) * d);
-      rect(rx, ry, 3, 3);
+      rect(rx, ry, 2, 2);
     }
   }
   // Sun disc — pixel square with stepped corners
   fill(255, 210, 90, 240 * bright);
-  rect(fx - r, fy - r + 6, r * 2, r * 2 - 12);
-  rect(fx - r + 6, fy - r, r * 2 - 12, r * 2);
-  rect(fx - r + 3, fy - r + 3, r * 2 - 6, r * 2 - 6);
+  rect(fx - r, fy - r + 3, r * 2, r * 2 - 6);
+  rect(fx - r + 3, fy - r, r * 2 - 6, r * 2);
+  rect(fx - r + 2, fy - r + 2, r * 2 - 4, r * 2 - 4);
   // Bright core
   fill(255, 240, 180, 200 * bright);
   rect(fx - floor(r * 0.55), fy - floor(r * 0.55), floor(r * 1.1), floor(r * 1.1));
@@ -621,7 +621,7 @@ function drawMoonPhased(bright) {
 
   // Moonlight glow on water/ground (stronger at full moon)
   let fullness = 1 - abs(phase - 0.5) * 2; // 0 at new, 1 at full
-  let glowR = 12 + fullness * 10;
+  let glowR = 8 + fullness * 6;
   fill(140, 170, 210, moonAlpha * 0.06 * fullness);
   ellipse(moonX, moonY, glowR * 3, glowR * 2.5);
   fill(160, 185, 220, moonAlpha * 0.03 * fullness);
@@ -629,42 +629,42 @@ function drawMoonPhased(bright) {
 
   // Pixel cross glow
   fill(180, 200, 230, moonAlpha * 0.15 * (0.3 + fullness * 0.7));
-  rect(moonX - 1, moonY - 20, 2, 40);
-  rect(moonX - 20, moonY - 1, 40, 2);
+  rect(moonX - 1, moonY - 14, 2, 28);
+  rect(moonX - 14, moonY - 1, 28, 2);
 
-  // Moon body
+  // Moon body (~16px)
   fill(220, 225, 235, moonAlpha);
-  rect(moonX - 9, moonY - 11, 18, 22);
-  rect(moonX - 11, moonY - 9, 22, 18);
-  rect(moonX - 10, moonY - 10, 20, 20);
+  rect(moonX - 6, moonY - 8, 12, 16);
+  rect(moonX - 8, moonY - 6, 16, 12);
+  rect(moonX - 7, moonY - 7, 14, 14);
 
   // Phase shadow — crescent moves based on phase
   if (phase < 0.45 || phase > 0.55) {
     let shadowSide = phase < 0.5 ? 1 : -1; // which side is shadowed
     let shadowWidth = abs(phase < 0.5 ? (0.5 - phase) * 2 : (phase - 0.5) * 2);
-    let sw = floor(shadowWidth * 20);
+    let sw = floor(shadowWidth * 14);
     fill(10, 18, 35, moonAlpha * 0.8);
     if (shadowSide > 0) {
-      rect(moonX + 10 - sw, moonY - 9, sw + 2, 18);
-      rect(moonX + 10 - sw + 2, moonY - 10, sw, 20);
+      rect(moonX + 7 - sw, moonY - 6, sw + 2, 12);
+      rect(moonX + 7 - sw + 2, moonY - 7, sw, 14);
     } else {
-      rect(moonX - 11, moonY - 9, sw + 2, 18);
-      rect(moonX - 11, moonY - 10, sw, 20);
+      rect(moonX - 8, moonY - 6, sw + 2, 12);
+      rect(moonX - 8, moonY - 7, sw, 14);
     }
   }
 
   // Surface craters (always visible on lit part)
   fill(200, 205, 220, moonAlpha * 0.3);
-  rect(moonX - 5, moonY + 1, 3, 3);
-  rect(moonX - 3, moonY - 4, 2, 2);
-  rect(moonX + 2, moonY - 2, 2, 2);
+  rect(moonX - 3, moonY + 1, 2, 2);
+  rect(moonX - 2, moonY - 3, 2, 2);
+  rect(moonX + 2, moonY - 1, 2, 2);
 
   // Moonbeam on water — cool blue column below moon
   if (fullness > 0.3) {
     let skyH = max(height * 0.06, height * 0.25 - horizonOffset);
-    for (let ry = skyH; ry < skyH + 50; ry += 4) {
-      let reflA = moonAlpha * 0.04 * fullness * (1 - (ry - skyH) / 50);
-      let rw = floor(6 + sin(ry * 0.1 + frameCount * 0.02) * 3);
+    for (let ry = skyH; ry < skyH + 40; ry += 4) {
+      let reflA = moonAlpha * 0.04 * fullness * (1 - (ry - skyH) / 40);
+      let rw = floor(4 + sin(ry * 0.1 + frameCount * 0.02) * 2);
       fill(180, 200, 230, reflA);
       rect(moonX - rw, ry, rw * 2, 2);
     }
