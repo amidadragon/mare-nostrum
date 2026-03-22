@@ -2191,6 +2191,55 @@ function drawHUD() {
   if (photoMode || screenshotMode) return;
   if (dialogState.active) return;
 
+  // Minimized HUD — thin top bar with essentials only
+  if (state.hudMinimized) {
+    let uiSc = min(width / 1280, height / 800);
+    let barH = max(22, floor(26 * uiSc));
+    let txSz = max(10, floor(11 * uiSc));
+    // Fade when player is near top
+    let _psy2 = w2sY(state.player.y);
+    let _minFade = _psy2 < barH + 30 ? 0.35 : 1.0;
+    drawingContext.globalAlpha = _minFade;
+    noStroke();
+    fill(20, 18, 14, 200);
+    rect(0, 0, width, barH, 0, 0, 4, 4);
+    stroke(80, 70, 50, 120);
+    strokeWeight(1);
+    line(0, barH, width, barH);
+    noStroke();
+    textAlign(LEFT, CENTER);
+    textSize(txSz);
+    let mx = 12;
+    let my = barH / 2;
+    // Gold
+    fill(210, 180, 80);
+    text('GOLD ' + (state.gold || 0), mx, my);
+    mx += textWidth('GOLD ' + (state.gold || 0)) + 18;
+    // HP
+    let hpCol = state.player.hp < state.player.maxHp * 0.3 ? color(255, 80, 60) : color(180, 220, 160);
+    fill(hpCol);
+    text('HP ' + max(0, floor(state.player.hp)) + '/' + state.player.maxHp, mx, my);
+    mx += textWidth('HP ' + max(0, floor(state.player.hp)) + '/' + state.player.maxHp) + 18;
+    // Solar
+    fill(255, 220, 100);
+    text('SOLAR ' + floor(state.solar) + '/' + state.maxSolar, mx, my);
+    mx += textWidth('SOLAR ' + floor(state.solar) + '/' + state.maxSolar) + 18;
+    // Crystals
+    fill(68, 255, 170);
+    text('CRYS ' + (state.crystals || 0), mx, my);
+    mx += textWidth('CRYS ' + (state.crystals || 0)) + 18;
+    // Day
+    fill(180, 170, 150);
+    text('Day ' + state.day, mx, my);
+    // [H] hint on right side
+    fill(120, 110, 90);
+    textAlign(RIGHT, CENTER);
+    text('[H] expand', width - 12, my);
+    drawingContext.globalAlpha = 1.0;
+    textAlign(LEFT, TOP);
+    return;
+  }
+
   // UI scale factor — 1.0 at 1280x800, scales with screen size
   let uiScale = min(width / 1280, height / 800);
   _uiScale = uiScale;

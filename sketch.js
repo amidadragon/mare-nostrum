@@ -2010,6 +2010,8 @@ function initState() {
       boss: null,            // active boss object or null
       bossDefeated: [],      // list of defeated boss types
       crystalNodes: [],      // { x, y, collected }
+      crystalRainDrops: [],   // { x, y, timer, collected } — interactive crystal rain pickups
+      hudMinimized: false,
       resourceDeposits: [],  // { x, y, type:'iron'|'stone', hp, maxHp, depleted }
       fishingSpots: [],      // { x, y, cooldown }
       wildlife: [],          // ambient birds/rabbits { x, y, type, vx, vy, timer }
@@ -4595,11 +4597,17 @@ function updateTime(dt) {
     if (state.necropolis && state.necropolis.phase !== 'unexplored') {
       (state.necropolis.soulNodes || []).forEach(n => n.collected = false);
     }
-    // Crystal rain event (15% chance per day after day 10)
+    // Crystal rain event (15% chance per day after day 10) — spawns collectible drops
     if (state.day > 10 && random() < 0.15) {
-      let crystalAmt = floor(random(2, 5));
-      state.crystals += crystalAmt;
-      addFloatingText(width / 2, height * 0.35, 'Crystal rain! +' + crystalAmt + ' crystals', '#44ffaa');
+      let dropCount = floor(random(3, 6));
+      let srx = getSurfaceRX() * 0.7;
+      let sry = getSurfaceRY() * 0.7;
+      for (let _cri = 0; _cri < dropCount; _cri++) {
+        let dx = WORLD.islandCX + random(-srx, srx);
+        let dy = WORLD.islandCY + random(-sry, sry);
+        state.crystalRainDrops.push({ x: dx, y: dy, timer: 3600, collected: false, glow: random(1000) });
+      }
+      addFloatingText(width / 2, height * 0.35, 'Crystal rain! ' + dropCount + ' crystals fell nearby', '#44ffaa');
       spawnParticles(state.player.x, state.player.y, 'divine', 6);
     }
     // Vesta crystal gift at 6+ hearts (daily)
@@ -4682,6 +4690,17 @@ function updateTime(dt) {
 
   // Crystal Collector auto-harvest
   updateCrystalCollector(dt);
+
+  // Crystal rain drop timers — despawn after 60s (3600 frames)
+  if (state.crystalRainDrops && state.crystalRainDrops.length > 0) {
+    for (let _crd = state.crystalRainDrops.length - 1; _crd >= 0; _crd--) {
+      let drop = state.crystalRainDrops[_crd];
+      if (drop.collected) { state.crystalRainDrops.splice(_crd, 1); continue; }
+      drop.timer -= dt;
+      drop.glow += 0.05 * dt;
+      if (drop.timer <= 0) { state.crystalRainDrops.splice(_crd, 1); }
+    }
+  }
 
   state.plots.forEach(p => {
     if (p.planted && !p.ripe) {
@@ -9675,6 +9694,7 @@ function drawWorldObjectsSorted() {
     state.plots.forEach(p => _groundItems.push({ y: p.y, draw: () => drawOnePlot(p) }));
     state.resources.forEach(r => { if (!(abs(r.x - templeX) < 70 && r.y > templeY - 80 && r.y < templeY + 15)) _groundItems.push({ y: r.y, draw: () => drawOneResource(r) }); });
     state.crystalNodes.forEach(c => _groundItems.push({ y: c.y, draw: () => drawOneCrystal(c) }));
+    if (state.crystalRainDrops) state.crystalRainDrops.forEach(d => { if (!d.collected) _groundItems.push({ y: d.y, draw: () => drawCrystalRainDrop(d) }); });
     if (state.factionFlora) state.factionFlora.forEach(fl => _groundItems.push({ y: fl.y, draw: () => drawOneFlora(fl) }));
     _groundItems.sort((a, b) => a.y - b.y);
     _groundSortFrame = frameCount;
@@ -12889,6 +12909,36 @@ function drawCrystalShape(x, y, size) {
   // Bottom
   rect(cx - s * 0.7, cy + s * 0.6, s * 1.4, 2);
   rect(cx - s * 0.3, cy + s * 0.8, s * 0.6, 2);
+}
+
+// ─── CRYSTAL RAIN DROPS (interactive collectibles) ────────────────────────
+function drawCrystalRainDrop(drop) {
+  let nx = w2sX(drop.x), ny = w2sY(drop.y);
+  if (nx < -30 || nx > width + 30 || ny < -30 || ny > height + 30) return;
+  let pulse = sin(drop.glow) * 0.4 + 0.6;
+  let fadeAlpha = drop.timer < 600 ? map(drop.timer, 0, 600, 0, 1) : 1;
+  noStroke();
+  // Glow
+  fill(68, 255, 170, floor(30 * pulse * fadeAlpha));
+  circle(nx, ny, 18);
+  fill(68, 255, 170, floor(15 * pulse * fadeAlpha));
+  circle(nx, ny, 28);
+  // Crystal body — small gem
+  fill(10, 85, 51, floor(220 * fadeAlpha));
+  drawCrystalShape(nx, ny, 4);
+  fill(0, 200, 100, floor(180 * fadeAlpha));
+  drawCrystalShape(nx, ny, 2.8);
+  fill(68, 255, 170, floor(255 * pulse * fadeAlpha));
+  drawCrystalShape(nx, ny, 1.5 * pulse);
+  // E prompt when near
+  let pd = dist(state.player.x, state.player.y, drop.x, drop.y);
+  if (pd < 40) {
+    fill(0, 0, 0, floor(140 * fadeAlpha));
+    rect(nx - 10, ny - 20, 20, 12, 3);
+    fill(68, 255, 170, floor(255 * fadeAlpha));
+    textAlign(CENTER, CENTER); textSize(9);
+    text('[E]', nx, ny - 14);
+  }
 }
 
 // ─── CRYSTAL COLLECTOR ────────────────────────────────────────────────────
@@ -26107,6 +26157,21 @@ function keyPressed() {
     if (interactGhostSighting()) return;
     if (interactWanderingSoldier()) return;
 
+    // Crystal rain drop pickup
+    if (state.crystalRainDrops && state.crystalRainDrops.length > 0) {
+      let nearDrop = state.crystalRainDrops.find(d => !d.collected && dist(state.player.x, state.player.y, d.x, d.y) < 40);
+      if (nearDrop) {
+        nearDrop.collected = true;
+        state.crystals += 1;
+        state.solar = min(state.maxSolar, state.solar + 1);
+        if (snd) snd.playSFX('crystal');
+        addFloatingText(w2sX(nearDrop.x), w2sY(nearDrop.y) - 15, '+1 Crystal +1 Solar', '#44ffaa');
+        spawnParticles(nearDrop.x, nearDrop.y, 'divine', 3);
+        if (typeof trackStat === 'function') trackStat('crystalsCollected', 1);
+        return;
+      }
+    }
+
     // God prayer at temple: E near temple → god dialogue → choose blessing → 1-day cooldown
     {
       let nearTemple = state.buildings.find(b => b.type === 'temple' &&
@@ -26835,6 +26900,13 @@ function keyPressed() {
   }
 
   // Skill tree toggle (K key)
+  // HUD minimize toggle (H key)
+  if (key === 'h' || key === 'H') {
+    state.hudMinimized = !state.hudMinimized;
+    addFloatingText(width / 2, height * 0.1, state.hudMinimized ? 'HUD minimized (H to expand)' : 'HUD expanded', '#ffdc50');
+    return;
+  }
+
   if (key === 'k' || key === 'K') {
     if (typeof toggleSkillTree === 'function') toggleSkillTree();
     return;
@@ -27606,6 +27678,7 @@ function saveGame() {
     meals: state.meals, wine: state.wine, oil: state.oil,
     stew: state.stew, garum: state.garum, honeyedFigs: state.honeyedFigs, ambrosia: state.ambrosia,
     foodShortage: state.foodShortage || 0,
+    hudMinimized: state.hudMinimized || false,
     seaPeopleRaidCooldown: state.seaPeopleRaidCooldown || 0,
     templeCourt: { visitors: [], lastSpawn: state.templeCourt ? state.templeCourt.lastSpawn : 0 },
     weather: state.weather, daysSinceRain: state.daysSinceRain || 0, heartRewards: state.heartRewards,
@@ -27648,6 +27721,7 @@ function saveGame() {
     trees: (state.trees || []).map(t => ({ x: t.x, y: t.y, health: t.health, maxHealth: t.maxHealth, alive: t.alive, size: t.size, type: t.type })),
     crystalShrine: state.crystalShrine ? { x: state.crystalShrine.x, y: state.crystalShrine.y } : null,
     crystalNodes: state.crystalNodes.map(c => ({ x: c.x, y: c.y, size: c.size, phase: c.phase, charge: c.charge })),
+    crystalRainDrops: (state.crystalRainDrops || []).filter(d => !d.collected).map(d => ({ x: d.x, y: d.y, timer: d.timer, glow: d.glow })),
     resources: state.resources.map(r => ({ x: r.x, y: r.y, type: r.type, active: r.active, respawnTimer: r.respawnTimer })),
     ruins: state.ruins.map(r => ({ x: r.x, y: r.y, w: r.w, h: r.h, rot: r.rot })),
     grassTufts: (state.grassTufts || []).map(g => ({ x: g.x, y: g.y, blades: g.blades, height: g.height, hue: g.hue, sway: g.sway })),
@@ -28100,6 +28174,7 @@ function loadGame() {
     state.meals = d.meals || 0; state.wine = d.wine || 0; state.oil = d.oil || 0;
     state.stew = d.stew || 0; state.garum = d.garum || 0; state.honeyedFigs = d.honeyedFigs || 0; state.ambrosia = d.ambrosia || 0;
     state.foodShortage = d.foodShortage || 0;
+    state.hudMinimized = d.hudMinimized || false;
     state.seaPeopleRaidCooldown = d.seaPeopleRaidCooldown || 0;
     if (d.templeCourt) { state.templeCourt.lastSpawn = d.templeCourt.lastSpawn || 0; }
     state.heartRewards = Array.isArray(d.heartRewards) ? d.heartRewards : [];
@@ -28631,6 +28706,7 @@ function loadGame() {
       state.crystalNodes.push({ x: shX - 60, y: shY - 10, size: 18, phase: random(TWO_PI), charge: 80, respawnTimer: 0 });
       state.crystalNodes.push({ x: shX + 60, y: shY - 10, size: 18, phase: random(TWO_PI), charge: 80, respawnTimer: 0 });
     }
+    state.crystalRainDrops = (d.crystalRainDrops || []).map(d2 => ({ x: d2.x, y: d2.y, timer: d2.timer, collected: false, glow: d2.glow || 0 }));
     if (d.resources) {
       state.resources = d.resources.map(r => ({ ...r, pulsePhase: random(TWO_PI) }));
     }
