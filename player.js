@@ -75,6 +75,8 @@ function updatePlayer(dt) {
     shakeY += sin(prog * PI) * 2;
   }
   if (inShallows) spd *= (state.diving && state.diving.active) ? 0.7 : 0.55;
+  // Swimming to arena: slow speed in deep water
+  if (typeof isInSwimCorridor === 'function' && isInSwimCorridor(p.x, p.y)) spd *= 0.4;
 
   // Sprint: hold SHIFT to run 1.6x faster
   if (isKeybindDown('sprint')) spd *= 1.6;

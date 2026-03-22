@@ -2878,6 +2878,14 @@ function isInShallows(wx, wy) {
   return d > 1.0 && d <= 1.15; // ~15% beyond island edge
 }
 
+function isInSwimCorridor(wx, wy) {
+  let a = state.adventure;
+  let swimCX = WORLD.islandCX;
+  let swimTopY = a.isleY + a.isleRY;
+  let swimBotY = WORLD.islandCY - getSurfaceRY() * 0.7;
+  return abs(wx - swimCX) < 50 && wy > swimTopY && wy < swimBotY;
+}
+
 // Check if a point is walkable (on island, shallows, bridge, pier, or imperial bridge)
 function isWalkable(wx, wy) {
   // Temple room — rectangular boundary
@@ -2897,6 +2905,8 @@ function isWalkable(wx, wy) {
   if (isOnIsland(wx, wy) || isInShallows(wx, wy) || isOnBridge(wx, wy) || isOnPier(wx, wy) || isOnImperialBridge(wx, wy) || isOnArenaBridge(wx, wy)) return true;
   // When bridge built, arena island is walkable from home island context
   if (state.adventure.bridgeBuilt && !state.adventure.active && isOnArenaIsland(wx, wy)) return true;
+  // Swim corridor to arena
+  if (!state.adventure.active && !state.rowing.active && isInSwimCorridor(wx, wy)) return true;
   return false;
 }
 
