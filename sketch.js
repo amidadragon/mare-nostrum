@@ -26145,6 +26145,11 @@ function keyPressed() {
       _castrumRoomInteractE();
       return;
     }
+    // Dive from boat — E while rowing in open water
+    if (typeof startDive === 'function' && state.rowing && state.rowing.active &&
+        !state.conquest.active && !state.adventure.active) {
+      startDive(); return;
+    }
     // Dive — E near water, but NOT if near the rowboat
     if (typeof startDive === 'function' && !state.rowing.active && !state.buildMode &&
         !state.conquest.active && !state.adventure.active &&

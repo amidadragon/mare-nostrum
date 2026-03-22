@@ -215,16 +215,27 @@ function initDiveWorld() {
 function startDive() {
   let d = state.diving;
   if (d.active) { exitDive(); return; }
+  let isOpenWater = state.rowing && state.rowing.active;
   let inShallow = typeof isInShallows === 'function' && isInShallows(state.player.x, state.player.y);
   let nearWater = !isOnIsland(state.player.x, state.player.y);
-  if (!inShallow && !nearWater) {
+  if (!isOpenWater && !inShallow && !nearWater) {
     addFloatingText(width / 2, height * 0.4, 'Walk to the water to dive!', '#aaaaaa');
     return;
   }
   d.active = true;
+  d.openWater = !!isOpenWater;
   d.breath = d.maxBreath + d.lungCapacity * 25;
   d.totalDives++;
-  initDiveWorld();
+  if (isOpenWater) {
+    d.openWaterCX = state.rowing.x;
+    d.openWaterCY = state.rowing.y;
+    state.rowing.active = false;
+    state.player.x = d.openWaterCX;
+    state.player.y = d.openWaterCY;
+    initOpenWaterDive();
+  } else {
+    initDiveWorld();
+  }
 
   // Splash transition
   _diveTransition = { active: true, timer: 0, maxTime: 25, entering: true };
@@ -247,7 +258,15 @@ function startDive() {
 function exitDive() {
   let d = state.diving;
   if (!d.active) return;
+  let wasOpenWater = d.openWater;
   d.active = false;
+  d.openWater = false;
+  if (wasOpenWater) {
+    state.rowing.active = true;
+    state.rowing.x = state.player.x;
+    state.rowing.y = state.player.y;
+    d.treasures = []; d.creatures = []; d.seabed = [];
+  }
 
   // Surface transition
   _diveTransition = { active: true, timer: 0, maxTime: 20, entering: false };
@@ -296,11 +315,18 @@ function updateDiving(dt) {
   if (!d.active) return;
 
   // Oxygen management — deeper = faster drain
-  // Calculate player depth based on distance from island center
-  let _dcx = state.player.x - WORLD.islandCX, _dcy = state.player.y - WORLD.islandCY;
-  let _playerRim = sqrt((_dcx / state.islandRX) * (_dcx / state.islandRX) + (_dcy / (state.islandRY * 0.45)) * (_dcy / (state.islandRY * 0.45)));
-  let depthMult = _playerRim < 1.2 ? 1.0 : _playerRim < 1.4 ? 1.5 : 2.2;  // shallow/mid/deep
-  d.depth = _playerRim < 1.2 ? 0 : _playerRim < 1.4 ? 1 : 2;
+  let depthMult, _playerRim;
+  if (d.openWater) {
+    let _odx = state.player.x - d.openWaterCX, _ody = state.player.y - d.openWaterCY;
+    _playerRim = sqrt(_odx * _odx + _ody * _ody) / 150;
+    depthMult = _playerRim < 0.5 ? 1.0 : _playerRim < 1.0 ? 1.3 : 1.8;
+    d.depth = _playerRim < 0.5 ? 0 : _playerRim < 1.0 ? 1 : 2;
+  } else {
+    let _dcx = state.player.x - WORLD.islandCX, _dcy = state.player.y - WORLD.islandCY;
+    _playerRim = sqrt((_dcx / state.islandRX) * (_dcx / state.islandRX) + (_dcy / (state.islandRY * 0.45)) * (_dcy / (state.islandRY * 0.45)));
+    depthMult = _playerRim < 1.2 ? 1.0 : _playerRim < 1.4 ? 1.5 : 2.2;
+    d.depth = _playerRim < 1.2 ? 0 : _playerRim < 1.4 ? 1 : 2;
+  }
   d.breath -= 0.08 * depthMult * dt;
   // Warn when breath is low
   if (d.breath < 40 && d.breath > 38 && depthMult > 1.0) {
@@ -314,8 +340,8 @@ function updateDiving(dt) {
     return;
   }
 
-  // Auto-exit when back on island
-  if (isOnIsland(state.player.x, state.player.y)) {
+  // Auto-exit when back on island (skip for open water dives)
+  if (!d.openWater && isOnIsland(state.player.x, state.player.y)) {
     exitDive();
     return;
   }
@@ -1329,14 +1355,46 @@ function _drawDiveTransition() {
 // Dive prompt shown when near water
 function drawDivePrompt() {
   if (!state || !state.diving || state.diving.active) return;
-  if (state.rowing.active || state.conquest.active || state.adventure.active) return;
+  if (state.conquest.active || state.adventure.active) return;
   let inShallow = typeof isInShallows === 'function' && isInShallows(state.player.x, state.player.y);
-  if (!inShallow) return;
+  let onBoat = state.rowing && state.rowing.active;
+  if (!inShallow && !onBoat) return;
 
   fill(100, 200, 255, floor(160 + sin(frameCount * 0.07) * 40));
   noStroke(); textSize(10); textAlign(CENTER);
   text('[D] Dive', floor(width / 2), height - 60);
   textAlign(LEFT, TOP);
+}
+
+
+function initOpenWaterDive() {
+  let d = state.diving;
+  d.treasures = []; d.creatures = []; d.seabed = [];
+  let cx = d.openWaterCX, cy = d.openWaterCY;
+  let fishCols = [[60,140,200],[200,160,40],[120,200,120],[200,100,60],[100,180,180]];
+  for (let i = 0; i < 8; i++) {
+    let angle = random(TWO_PI), r = random(40, 180);
+    let fx = cx + cos(angle) * r, fy = cy + sin(angle) * r * 0.5;
+    d.creatures.push({
+      x: fx, y: fy, vx: random(-0.6, 0.6), vy: random(-0.1, 0.1),
+      type: 'fish', col: fishCols[floor(random(fishCols.length))],
+      frame: random(TWO_PI), homeX: fx, homeY: fy,
+      fishSprite: null, schoolId: floor(i / 3),
+    });
+  }
+  for (let i = 0; i < 5; i++) {
+    d.seabed.push({
+      x: cx + random(-200, 200), y: cy + random(80, 140),
+      type: 'seagrass', size: random(8, 16), sway: random(TWO_PI), variant: floor(random(3)),
+    });
+  }
+  let ta = random(TWO_PI), tr = random(60, 160);
+  d.treasures.push({
+    x: cx + cos(ta) * tr, y: cy + sin(ta) * tr * 0.5,
+    type: 'amphora', name: 'Sunken Amphora', value: 5,
+    col: [180, 120, 60], collected: false, sparkle: random(TWO_PI),
+    respawnTimer: 0, depthTier: 1,
+  });
 }
 
 // Diving system loaded
