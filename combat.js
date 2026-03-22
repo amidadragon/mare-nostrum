@@ -4461,10 +4461,13 @@ function updatePlayerEscort(dt) {
   let p = state.player;
   let nearEnemy = _isNearEnemies(p.x, p.y, 150);
 
-  // Auto-switch to battle when enemies near, back to march after 5s
+  // Decrement call-to-arms cooldown
+  if (state._callToArmsCooldown > 0) state._callToArmsCooldown -= dt;
+
+  // Auto-switch to battle when enemies near, back to march after 2s
   if (nearEnemy) {
     if (_currentFormation === 'march') _currentFormation = 'battle';
-    _formationAutoTimer = 300; // ~5s at 60fps
+    _formationAutoTimer = 120; // ~2s at 60fps
   } else if (_formationAutoTimer > 0) {
     _formationAutoTimer -= dt;
     if (_formationAutoTimer <= 0 && _currentFormation === 'battle') _currentFormation = 'march';
@@ -4485,10 +4488,14 @@ function updatePlayerEscort(dt) {
     // Initialize position
     if (unit.x === undefined || unit.x === 0) { unit.x = pos.x; unit.y = pos.y; }
 
-    // Smooth lerp to formation position
-    let followSpeed = nearEnemy ? 0.09 : 0.05;
-    unit.x += (pos.x - unit.x) * followSpeed * dt;
-    unit.y += (pos.y - unit.y) * followSpeed * dt;
+    // Smooth lerp to formation position (snappy follow)
+    let dx = pos.x - unit.x, dy = pos.y - unit.y;
+    let distToTarget = sqrt(dx * dx + dy * dy);
+    let followSpeed = 0.15 + min(0.15, 0.1 * distToTarget / 200);
+    if (distToTarget > 200) followSpeed *= 2; // sprint to catch up
+    followSpeed = min(followSpeed, 0.3);
+    unit.x += dx * followSpeed * dt;
+    unit.y += dy * followSpeed * dt;
 
     // Auto-attack enemies within range
     let atkRange = isRanged ? 90 : (isCav ? 70 : 60);

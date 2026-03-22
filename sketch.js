@@ -26647,9 +26647,28 @@ function keyPressed() {
     return false; // prevent browser tab switching
   }
 
-  // Wardrobe toggle (V key — vestments)
+  // V key: Call to Arms (if army exists) or Wardrobe toggle
   if (key === 'v' || key === 'V') {
     if (gameScreen === 'game' && !state.diving.active && !state.rowing.active) {
+      // Call to Arms: teleport army to player
+      if (state.legia && state.legia.army && state.legia.army.length > 0 && !state.legia.garrison) {
+        if (!state._callToArmsCooldown || state._callToArmsCooldown <= 0) {
+          let army = state.legia.army;
+          for (let i = 0; i < army.length; i++) {
+            let angle = (i / army.length) * Math.PI * 2;
+            army[i].x = state.player.x + Math.cos(angle) * (50 + Math.random() * 50);
+            army[i].y = state.player.y + Math.sin(angle) * (50 + Math.random() * 50);
+          }
+          if (typeof _currentFormation !== 'undefined') _currentFormation = 'battle';
+          console.log('War horn!');
+          if (typeof addFloatingText === 'function') addFloatingText(width / 2, height * 0.25, 'CALL TO ARMS!', '#ff4444');
+          if (typeof snd !== 'undefined' && snd) snd.playSFX('war_horn');
+          if (typeof triggerScreenShake === 'function') triggerScreenShake(4, 12, 0, 0, 'random');
+          state._callToArmsCooldown = 60;
+          return;
+        }
+      }
+      // Fallback: wardrobe
       wardrobeOpen = !wardrobeOpen;
       return;
     }
