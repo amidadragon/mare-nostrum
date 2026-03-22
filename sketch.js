@@ -9196,7 +9196,8 @@ function drawFactionSelect(dt) {
   // Confirmation overlay
   if (_pendingFaction && FACTIONS[_pendingFaction]) {
     let pf = FACTIONS[_pendingFaction];
-    let oW = min(360, width * 0.6), oH = 90;
+    let _isSP = _pendingFaction === 'seapeople';
+    let oW = min(_isSP ? 420 : 360, width * 0.7), oH = _isSP ? 130 : 90;
     let oX = (width - oW) / 2, oY = (height - oH) / 2;
     fill(0, 0, 0, 180 * a); rect(0, 0, width, height);
     fill(25, 22, 18, 240 * a); rect(oX, oY, oW, oH, 6);
@@ -9205,10 +9206,15 @@ function drawFactionSelect(dt) {
     textAlign(CENTER, CENTER); textSize(14);
     fill(220, 200, 140, 240 * a);
     text('You chose ' + pf.name, width / 2, oY + 24);
+    if (_isSP) {
+      textSize(10); fill(255, 100, 60, 230 * a);
+      text('Warning: Sea People start on a ship with no island.', width / 2, oY + 46);
+      text('This is a very different experience. Recommended for experienced players.', width / 2, oY + 60);
+    }
     textSize(11); fill(170, 160, 140, 220 * a);
-    text('This is permanent! Press ENTER to confirm or ESC to cancel.', width / 2, oY + 52);
+    text('This is permanent! Press ENTER to confirm or ESC to cancel.', width / 2, oY + (_isSP ? 82 : 52));
     textSize(10); fill(140, 130, 110, 180 * a);
-    text('ENTER = confirm    ESC = cancel', width / 2, oY + 74);
+    text('ENTER = confirm    ESC = cancel', width / 2, oY + (_isSP ? 100 : 74));
   }
   drawingContext.globalAlpha = 1;
 }
@@ -9302,8 +9308,9 @@ function _drawFactionCard(x, y, w, h, fac, hovered, a) {
   if (_fkName) { textAlign(CENTER, TOP); textSize(9); fill(120, 110, 90, 180 * a); text('[' + _fkMap[_fkName] + ']', cx, gy + 8); }
   textAlign(CENTER, TOP); textSize(14);
   fill(bc[0] + 60, bc[1] + 60, bc[2] + 60, 240 * a);
-  var _dispName = fac.name + (_fkName === 'seapeople' ? '  (ADVANCED)' : '');
-  text(_dispName, cx, gy + 20);
+  text(fac.name, cx, gy + 20);
+  if (_fkName === 'seapeople') { textSize(9); fill(255, 140, 40, 240 * a); text('(ADVANCED)', cx, gy + 36); }
+  if (_fkName === 'rome') { textSize(9); fill(80, 200, 80, 240 * a); text('(RECOMMENDED)', cx, gy + 36); }
   textSize(10); fill(160, 150, 130, 200 * a); text(fac.subtitle, cx, gy + 38);
   textAlign(LEFT, TOP); textSize(11);
   let ly = gy + 58;
