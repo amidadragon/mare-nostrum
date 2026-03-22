@@ -67,6 +67,8 @@ export default [
         handleEconomyKey: "readonly", handleEconomyClick: "readonly", onDayTransitionEconomy: "readonly",
         startDive: "readonly", exitDive: "readonly", updateDiving: "readonly", drawDivingOverlay: "readonly", drawDivePrompt: "readonly",
         enterVulcan: "readonly", exitVulcan: "readonly", enterHyperborea: "readonly", enterPlenty: "readonly", enterNecropolis: "readonly",
+        enterVulcanContent: "readonly", enterHyperboreContent: "readonly", enterPlentyContent: "readonly", enterNecropolisContent: "readonly",
+        _isExplorationActive: "readonly",
         isOnImperialBridge: "readonly", Debug: "readonly",
         console: "readonly", document: "readonly", window: "readonly", localStorage: "readonly", setTimeout: "readonly", setInterval: "readonly",
       },

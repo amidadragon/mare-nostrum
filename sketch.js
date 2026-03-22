@@ -2934,6 +2934,22 @@ function onIslandTransition(from, to) {
     state._activeNation = null;
   }
   if (to === 'water' || to === from) return;
+  // Seamless exploration island entry
+  let _exploIsles = ['vulcan','hyperborea','plenty','necropolis'];
+  if (_exploIsles.includes(to)) {
+    let isle = state[to];
+    if (isle && isle.phase === 'unexplored') {
+      if (to === 'vulcan') enterVulcanContent();
+      else if (to === 'hyperborea') enterHyperboreContent();
+      else if (to === 'plenty') enterPlentyContent();
+      else if (to === 'necropolis') enterNecropolisContent();
+    }
+    if (!isle.frozenObelisk && to === 'hyperborea') isle.frozenObelisk = { x: isle.isleX, y: isle.isleY };
+    if (state.narrativeFlags) state.narrativeFlags['discover_' + to] = true;
+    trackMilestone('first_island');
+    state._activeExploration = to;
+  }
+  if (_exploIsles.includes(from)) { state._activeExploration = null; }
   // Seamless nation island entry — generate content at world coords
   if (to && state.nations && state.nations[to] && !state.visitingNation) {
     let rv = state.nations[to];
@@ -3648,6 +3664,12 @@ function drawInner() {
     updateChickens(dt);
     if (frameCount % 5 === 0) updateFactionWildlife(dt * 5);
     if (state._activeNation) updateActiveNationEntities(dt);
+    if (state._activeExploration) {
+      if (state._activeExploration === 'vulcan') updateVulcanIsland(dt);
+      else if (state._activeExploration === 'hyperborea') updateHyperboreIsland(dt);
+      else if (state._activeExploration === 'plenty') updatePlentyIsland(dt);
+      else if (state._activeExploration === 'necropolis') updateNecropolisIsland(dt);
+    }
     { let _pg = state.progression;
       let _full = !_pg.gameStarted || _pg.villaCleared;
       if (_full || _pg.companionsAwakened.harvester) updateHarvester(dt);
@@ -3740,6 +3762,13 @@ function drawInner() {
     drawRivalIsleDistant();
     // Seamless nation island content (when player is standing on a nation island)
     if (state._activeNation) drawActiveNationContent();
+    // Seamless exploration island content
+    if (state._activeExploration) {
+      if (state._activeExploration === 'vulcan') { drawVulcanEntities(); }
+      else if (state._activeExploration === 'hyperborea') { drawHyperboreEntities(); }
+      else if (state._activeExploration === 'plenty') { drawPlentyEntities(); }
+      else if (state._activeExploration === 'necropolis') { drawNecropolisEntities(); }
+    }
     // Fog dims distant islands
     if (state.weather.type === 'fog') {
       let _fogHorizonY = max(height * 0.06, height * 0.25 - horizonOffset) + 30;
@@ -4098,6 +4127,12 @@ function drawInner() {
       if (typeof drawArmyBattle === 'function') drawArmyBattle();
       drawRivalDiplomacyUI();
       if (state._activeNation && state.nationDiplomacyOpen) drawNationDiplomacyUI();
+      if (state._activeExploration) {
+        if (state._activeExploration === 'vulcan') drawVulcanHUD();
+        else if (state._activeExploration === 'hyperborea') drawHyperboreHUD();
+        else if (state._activeExploration === 'plenty') drawPlentyHUD();
+        else if (state._activeExploration === 'necropolis') drawNecropolisHUD();
+      }
       if (typeof drawTechTreeUI === 'function') drawTechTreeUI();
       if (typeof drawVictoryScreen === 'function') drawVictoryScreen();
       if (typeof drawVictoryProgressHUD === 'function') drawVictoryProgressHUD();
@@ -25555,6 +25590,14 @@ function keyPressed() {
     if (key === 'e' || key === 'E') { if (handleActiveNationInteract()) return; }
   }
 
+  // Seamless exploration island E-key
+  if (state._activeExploration && (key === 'e' || key === 'E')) {
+    if (state._activeExploration === 'vulcan') { handleVulcanInteract(); return; }
+    if (state._activeExploration === 'hyperborea') { handleHyperboreInteract(); return; }
+    if (state._activeExploration === 'plenty') { handlePlentyInteract(); return; }
+    if (state._activeExploration === 'necropolis') { handleNecropolisInteract(); return; }
+  }
+
   // ─── WRECK BEACH KEYS ───
   if (((state.progression.gameStarted && !state.progression.homeIslandReached) || state.wreck._visiting) &&
       !state.rowing.active && !state.conquest.active && !state.adventure.active) {
@@ -25896,7 +25939,8 @@ function keyPressed() {
     if (typeof startDive === 'function' && !state.rowing.active && !state.buildMode &&
         !state.conquest.active && !state.adventure.active &&
         !(state.vulcan && state.vulcan.active) && !(state.hyperborea && state.hyperborea.active) &&
-        !(state.plenty && state.plenty.active) && !(state.necropolis && state.necropolis.active)) {
+        !(state.plenty && state.plenty.active) && !(state.necropolis && state.necropolis.active) &&
+        !state._activeExploration) {
       let _port = typeof getPortPosition === 'function' ? getPortPosition() : { x: 0, y: 0 };
       let _nearBoat = dist(state.player.x, state.player.y, _port.x - 80, _port.y + 20) < 70;
       if (!_nearBoat && isInShallows(state.player.x, state.player.y)) {
@@ -26093,10 +26137,17 @@ function keyPressed() {
         addFloatingText(width / 2, height * 0.35, 'Wreck Beach', C.sand);
         return;
       }
-      if (r.nearIsle === 'vulcan') { enterVulcan(); return; }
-      if (r.nearIsle === 'hyperborea') { enterHyperborea(); return; }
-      if (r.nearIsle === 'plenty') { enterPlenty(); return; }
-      if (r.nearIsle === 'necropolis') { enterNecropolis(); return; }
+      if (['vulcan','hyperborea','plenty','necropolis'].includes(r.nearIsle)) {
+        let _ei = state[r.nearIsle];
+        state.rowing.active = false;
+        let _da = atan2(r.y - _ei.isleY, r.x - _ei.isleX);
+        state.player.x = _ei.isleX + cos(_da) * _ei.isleRX * 0.6;
+        state.player.y = _ei.isleY + sin(_da) * _ei.isleRY * 0.6;
+        state.player.vx = 0; state.player.vy = 0;
+        cam.x = state.player.x; cam.y = state.player.y;
+        _startCamTransition(); camZoomTarget = 1.0;
+        return;
+      }
       if (state.nations && state.nations[r.nearIsle]) {
         // Seamless disembark — don't teleport, just step onto the island
         let _nv = state.nations[r.nearIsle];
