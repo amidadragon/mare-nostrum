@@ -808,6 +808,9 @@ function drawIsland() {
   // --- Shallow water gradient (warm lagoon) ---
   // Use drawCoastlineShape so water follows the same organic coastline as the beach
   // This prevents ocean peeking through where noise offsets push the beach outward
+  // Opaque base — blocks deep ocean wave patterns from bleeding through semi-transparent layers
+  fill(lerp(18, 42, dayMix), lerp(45, 130, dayMix), lerp(68, 170, dayMix));
+  drawCoastlineShape(ix, iy, iw * 0.56, ih * 0.25, -10);
   // Outermost: warm medium blue
   fill(lerp(20, 48, dayMix), lerp(50, 140, dayMix), lerp(75, 180, dayMix), 180);
   drawCoastlineShape(ix, iy, iw * 0.56, ih * 0.25, -10);

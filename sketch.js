@@ -3543,6 +3543,7 @@ function drawInner() {
     translate(shakeX, shakeY + floatOffset);
     if (!state.rowing || !state.rowing.active || _homeDist < 300) {
       drawIsland();
+      drawShoreWaves();
       drawAmbientHouses();
       drawWorldObjectsSorted();
       drawCitySmoke();
@@ -3587,7 +3588,6 @@ function drawInner() {
       drawFestivalDecorations();
       drawBottles();
       drawTreasureHint();
-      drawShoreWaves();
     }
     drawRowingBoat();
     if (typeof drawNavalCombat === 'function') drawNavalCombat();
