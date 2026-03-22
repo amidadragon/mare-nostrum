@@ -2104,11 +2104,12 @@ function initState() {
       loot: [],
       killCount: 0,
       bestWave: 0,
-      // Arena isle position (near-NORTH of home island)
-      isleX: WORLD.islandCX + 100,
-      isleY: WORLD.islandCY - 700,
-      isleRX: 160,
-      isleRY: 110,
+      // Arena isle position (near-NORTH of home island, visible from home)
+      isleX: WORLD.islandCX,
+      isleY: WORLD.islandCY - 300,
+      isleRX: 120,
+      isleRY: 80,
+      bridgeBuilt: false,  // stone bridge at level 10+
       returnX: 0, returnY: 0, // saved player pos on home island
     },
 
@@ -2897,7 +2898,10 @@ function isWalkable(wx, wy) {
     let dy = (wy - WORLD.islandCY) / (state.islandRY * 0.8);
     return dx * dx + dy * dy < 1;
   }
-  return isOnIsland(wx, wy) || isInShallows(wx, wy) || isOnBridge(wx, wy) || isOnPier(wx, wy) || isOnImperialBridge(wx, wy);
+  if (isOnIsland(wx, wy) || isInShallows(wx, wy) || isOnBridge(wx, wy) || isOnPier(wx, wy) || isOnImperialBridge(wx, wy) || isOnArenaBridge(wx, wy)) return true;
+  // When bridge built, arena island is walkable from home island context
+  if (state.adventure.bridgeBuilt && !state.adventure.active && isOnArenaIsland(wx, wy)) return true;
+  return false;
 }
 
 // Check if a wall/fence/chest blocks movement at this point
@@ -3763,6 +3767,29 @@ function drawInner() {
         text('[E] Shipyard', _sysx, _sysy);
       }
     }
+    // Arena swim/walk prompt at north shore
+    if (!state.rowing.active && !state.adventure.active && !state.conquest.active) {
+      let _ap = state.player;
+      let _northY = WORLD.islandCY - getSurfaceRY() * 0.85;
+      let _nearNorth = _ap.y < _northY && abs(_ap.x - WORLD.islandCX) < 80;
+      let _onArenaIsle = state.adventure.bridgeBuilt && isOnArenaIsland(_ap.x, _ap.y);
+      if (_nearNorth || _onArenaIsle) {
+        let _apx = w2sX(_ap.x), _apy = w2sY(_ap.y) - 30 + floatOffset;
+        fill(255, 220, 150, 200 + sin(frameCount * 0.06) * 30);
+        noStroke(); textAlign(CENTER, CENTER); textSize(11);
+        if (state.adventure.bridgeBuilt) {
+          text(_onArenaIsle ? '[E] Enter Arena' : '[E] Walk to Arena', _apx, _apy);
+        } else {
+          text('[E] Swim to Arena', _apx, _apy);
+        }
+        // Show wave record
+        if (state.arenaHighWave > 0) {
+          fill(180, 160, 120, 160); textSize(9);
+          text('\u2694 Best: Wave ' + state.arenaHighWave, _apx, _apy + 14);
+        }
+      }
+    }
+
     // Dive prompt
     if (typeof drawDivePrompt === 'function') drawDivePrompt();
 
@@ -17033,9 +17060,14 @@ function exitAdventure() {
   a.active = false;
   a.enemies = [];
   a.loot = [];
-  // Always return to home island center (player was rowing before)
-  p.x = WORLD.islandCX;
-  p.y = WORLD.islandCY;
+  // Return to north shore if bridge exists, else home center
+  if (a.bridgeBuilt) {
+    p.x = WORLD.islandCX;
+    p.y = WORLD.islandCY - getSurfaceRY() * 0.7;
+  } else {
+    p.x = WORLD.islandCX;
+    p.y = WORLD.islandCY;
+  }
   p.vx = 0; p.vy = 0;
   p.attackTimer = 0;
   p.slashPhase = 0;
@@ -17435,7 +17467,6 @@ function drawArenaDistantLabel() {
   let a = state.adventure;
   let sx = w2sX(a.isleX);
   let sy = w2sY(a.isleY);
-  // Clamp to below horizon — don't float in the sky
   let minY = max(height * 0.06, height * 0.25 - horizonOffset) + 10;
   sy = max(sy, minY);
   if (sx < -300 || sx > width + 300 || sy > height + 300) return;
@@ -17443,29 +17474,39 @@ function drawArenaDistantLabel() {
   if (_ds && _ds.dist > (typeof _getMaxViewDist === 'function' ? _getMaxViewDist() : 4000)) return;
   let _labelFade = _ds ? constrain(1 - _ds.haze / 200, 0.15, 1) : 1;
   let sc = _ds ? _ds.scale : 1;
-  let baseY = sy + a.isleRY * 0.4 * sc + 12;
+  let baseY = sy + a.isleRY * 1.2 * sc + 12;
   push();
   noStroke(); textAlign(CENTER);
-  // Sword icon
-  fill(200, 160, 100, floor((180 + sin(frameCount * 0.05) * 40) * _labelFade));
-  textSize(max(9, floor(14 * sc)));
+  // Sword icon with pulse
+  fill(220, 180, 100, floor((200 + sin(frameCount * 0.05) * 40) * _labelFade));
+  textSize(max(10, floor(16 * sc)));
   text('\u2694', sx, baseY - 2);
-  // Name
-  fill(200, 185, 150, floor(180 * _labelFade));
-  textSize(max(8, floor(11 * sc))); textStyle(ITALIC);
-  text('Arena Isle', sx, baseY + 12 * sc);
+  // Arena name with tier
+  let tierNames = ['', 'Fighting Pit', 'Stone Arena', 'Colosseum', 'Grand Amphitheater'];
+  let aLv = getArenaLevel();
+  fill(220, 200, 160, floor(200 * _labelFade));
+  textSize(max(9, floor(12 * sc))); textStyle(BOLD);
+  text('Arena', sx, baseY + 12 * sc);
   textStyle(NORMAL);
-  if (a.bestWave > 0) {
+  // Tier subtitle
+  fill(190, 175, 140, floor(160 * _labelFade));
+  textSize(max(7, floor(9 * sc)));
+  text(tierNames[aLv], sx, baseY + 24 * sc);
+  // Wave record
+  let highWave = state.arenaHighWave || 0;
+  if (highWave > 0) {
     fill(180, 160, 120, floor(140 * _labelFade));
     textSize(max(7, floor(9 * sc)));
-    text('Best: Wave ' + a.bestWave, sx, baseY + 24 * sc);
+    text('Best: Wave ' + highWave, sx, baseY + 35 * sc);
   }
-  // Distance
-  if (typeof _getIslandDist === 'function') {
-    let d = _getIslandDist(a.isleX, a.isleY);
-    fill(180, 170, 140, floor(120 * _labelFade));
-    textSize(max(7, floor(8 * sc)));
-    text(d, sx, baseY + (a.bestWave > 0 ? 34 : 24) * sc);
+  // Access hint
+  let accessY = baseY + (highWave > 0 ? 46 : 35) * sc;
+  fill(160, 180, 140, floor(120 * _labelFade));
+  textSize(max(6, floor(8 * sc)));
+  if (a.bridgeBuilt) {
+    text('Walk north across the bridge', sx, accessY);
+  } else {
+    text('Walk to north shore to swim', sx, accessY);
   }
   pop();
 }
@@ -17534,7 +17575,7 @@ function drawConquestDistantEntities() {
 // ─── ARENA DRAWING ───────────────────────────────────────────────────────
 
 function drawArenaIsleDistant() {
-  // Draw the arena as a small island silhouette on the horizon
+  // Draw the arena as a nearby small island north of home
   if (state.adventure.active) return;
   let a = state.adventure;
   let sx = w2sX(a.isleX);
@@ -17542,56 +17583,251 @@ function drawArenaIsleDistant() {
   // Clamp to horizon — never float above water
   let _horizY = max(height * 0.06, height * 0.25 - horizonOffset) + 5;
   sy = max(sy, _horizY);
-  // Distance-based scaling
   let _dScale = null;
   if (typeof _getDistantScale === 'function') {
     _dScale = _getDistantScale(a.isleX, a.isleY, a.isleRX);
     if (_dScale.dist > (typeof _getMaxViewDist === 'function' ? _getMaxViewDist() : 4000)) return;
   }
-  if (sx < -200 || sx > width + 200) return;
+  if (sx < -300 || sx > width + 300) return;
   push();
   noStroke();
-  if (_dScale && _dScale.scale < 0.98) {
-    translate(sx, sy); scale(_dScale.scale); translate(-sx, -sy);
-  }
+  let sc = (_dScale && _dScale.scale < 0.98) ? _dScale.scale : 1;
+  if (sc < 0.98) { translate(sx, sy); scale(sc); translate(-sx, -sy); }
   let fsx = floor(sx), fsy = floor(sy);
   let rx = a.isleRX, ry = a.isleRY;
   let bright = getSkyBrightness();
-  let hazeA = lerp(60, 30, bright);
-  let _bs = 0.35; // blue shift
-  // Haze fog
-  fill(140, 165, 190, 15 * bright);
-  ellipse(fsx, fsy, rx * 1.4, ry * 0.35);
-  // Water shadow
-  fill(20, 60, 80, 30);
-  ellipse(fsx + 2, fsy + 3, rx * 1.3, ry * 0.7);
+  let aLv = getArenaLevel();
+
+  // Deep water shadow
+  fill(20, 60, 80, 35);
+  ellipse(fsx + 2, fsy + 3, rx * 2.3, ry * 2.3);
   // Shore water ring
-  fill(55, 140, 160, 40);
-  ellipse(fsx, fsy, rx * 1.25, ry * 0.65);
+  fill(55, 140, 160, 50);
+  ellipse(fsx, fsy, rx * 2.2, ry * 2.2);
   // Beach sand
-  let gr = lerp(195, 180, _bs), gg = lerp(180, 185, _bs), gb = lerp(135, 160, _bs);
-  fill(gr, gg, gb);
-  ellipse(fsx, fsy, rx * 1.15, ry * 0.6);
-  // Arena terrain — darker sandy
-  fill(lerp(155, 150, _bs), lerp(145, 150, _bs), lerp(125, 150, _bs));
-  ellipse(fsx, fsy, rx * 1.0, ry * 0.52);
-  // Arena sand floor
-  fill(lerp(185, 170, _bs), lerp(170, 170, _bs), lerp(130, 155, _bs), hazeA + 40);
-  ellipse(fsx, fsy, rx * 0.85, ry * 0.44);
-  // Colosseum walls — small rects
-  let cr = lerp(120 + 30 * bright, 140, _bs);
-  let cg = lerp(115 + 25 * bright, 150, _bs);
-  let cb = lerp(100 + 20 * bright, 165, _bs);
-  fill(cr, cg, cb, hazeA + 25);
-  rect(fsx - floor(rx * 0.25), fsy - floor(ry * 0.22), floor(rx * 0.5), floor(ry * 0.09));
-  // Colosseum pillars
-  for (let i = -1; i <= 1; i++) {
-    let ch = i === 0 ? floor(ry * 0.14) : floor(ry * 0.09);
-    rect(fsx + floor(i * rx * 0.16) - 1, fsy - floor(ry * 0.15) - ch, 2, ch);
+  fill(210, 195, 150);
+  ellipse(fsx, fsy, rx * 2.05, ry * 2.05);
+  // Grass/terrain
+  fill(135, 155, 95);
+  ellipse(fsx, fsy, rx * 1.8, ry * 1.8);
+
+  // Arena structure by level
+  if (aLv === 1) {
+    // Simple fighting pit — dirt circle with wooden stakes
+    fill(185, 170, 130);
+    ellipse(fsx, fsy, rx * 1.2, ry * 1.2);
+    fill(170, 155, 115);
+    ellipse(fsx, fsy, rx * 0.9, ry * 0.9);
+    // Wooden stakes around pit
+    fill(110, 80, 40);
+    for (let i = 0; i < 12; i++) {
+      let ang = i * TWO_PI / 12;
+      let stx = fsx + cos(ang) * rx * 0.55;
+      let sty = fsy + sin(ang) * ry * 0.55;
+      rect(stx - 1, sty - 6, 2, 8);
+    }
+  } else if (aLv === 2) {
+    // Stone arena with seating walls
+    fill(155, 145, 125);
+    ellipse(fsx, fsy, rx * 1.4, ry * 1.4);
+    fill(145, 135, 110);
+    ellipse(fsx, fsy, rx * 1.2, ry * 1.2);
+    // Sand floor
+    fill(195, 180, 140);
+    ellipse(fsx, fsy, rx * 0.9, ry * 0.9);
+    // Stone wall blocks
+    fill(120, 110, 95);
+    for (let i = 0; i < 16; i++) {
+      let ang = i * TWO_PI / 16;
+      let wx = fsx + cos(ang) * rx * 0.65;
+      let wy = fsy + sin(ang) * ry * 0.65;
+      rect(wx - 3, wy - 4, 6, 6, 1);
+    }
+  } else if (aLv === 3) {
+    // Colosseum-style with arches and tiers
+    fill(160, 150, 130);
+    ellipse(fsx, fsy, rx * 1.5, ry * 1.5);
+    // Seating tiers
+    fill(150, 140, 120);
+    ellipse(fsx, fsy, rx * 1.35, ry * 1.35);
+    fill(140, 130, 110);
+    ellipse(fsx, fsy, rx * 1.2, ry * 1.2);
+    // Sand floor
+    fill(200, 185, 145);
+    ellipse(fsx, fsy, rx * 0.85, ry * 0.85);
+    // Arched walls
+    fill(115, 105, 90);
+    for (let i = 0; i < 20; i++) {
+      let ang = i * TWO_PI / 20;
+      let wx = fsx + cos(ang) * rx * 0.72;
+      let wy = fsy + sin(ang) * ry * 0.72;
+      rect(wx - 3, wy - 6, 6, 9, 1);
+    }
+    // Arch openings at cardinal points
+    fill(200, 185, 145);
+    for (let ga of [0, HALF_PI, PI, PI + HALF_PI]) {
+      let gx = fsx + cos(ga) * rx * 0.72;
+      let gy = fsy + sin(ga) * ry * 0.72;
+      ellipse(gx, gy - 2, 10, 8);
+    }
+  } else {
+    // Grand amphitheater with faction decorations
+    fill(165, 155, 135);
+    ellipse(fsx, fsy, rx * 1.6, ry * 1.6);
+    // Multiple seating tiers
+    fill(155, 145, 125);
+    ellipse(fsx, fsy, rx * 1.45, ry * 1.45);
+    fill(145, 135, 115);
+    ellipse(fsx, fsy, rx * 1.3, ry * 1.3);
+    fill(135, 125, 105);
+    ellipse(fsx, fsy, rx * 1.15, ry * 1.15);
+    // Sand floor
+    fill(205, 190, 150);
+    ellipse(fsx, fsy, rx * 0.8, ry * 0.8);
+    // Grand arched wall ring
+    fill(110, 100, 85);
+    for (let i = 0; i < 24; i++) {
+      let ang = i * TWO_PI / 24;
+      let isGate = false;
+      for (let ca of [0, HALF_PI, PI, PI + HALF_PI]) {
+        if (abs(ang - ca) < 0.15 || abs(ang - ca - TWO_PI) < 0.15) isGate = true;
+      }
+      if (isGate) continue;
+      let wx = fsx + cos(ang) * rx * 0.78;
+      let wy = fsy + sin(ang) * ry * 0.78;
+      rect(wx - 3, wy - 8, 7, 12, 1);
+    }
+    // Columns at 8 points
+    fill(195, 185, 165);
+    for (let i = 0; i < 8; i++) {
+      let ca = (i / 8) * TWO_PI + PI / 8;
+      let cx = fsx + cos(ca) * rx * 0.7;
+      let cy = fsy + sin(ca) * ry * 0.7;
+      rect(cx - 2, cy - 14, 4, 16);
+      rect(cx - 4, cy - 16, 8, 3, 1); // capital
+    }
+    // Faction-colored banners
+    let fc = typeof getFactionColors === 'function' ? getFactionColors() : { accent: [160, 35, 25] };
+    let ac = fc.accent || [160, 35, 25];
+    for (let bi = 0; bi < 4; bi++) {
+      let ba = bi * HALF_PI + PI / 4;
+      let bx = fsx + cos(ba) * rx * 0.85;
+      let by = fsy + sin(ba) * ry * 0.85;
+      fill(ac[0], ac[1], ac[2], 200);
+      rect(bx - 3, by - 10, 6, 8);
+      fill(100, 80, 45);
+      rect(bx - 0.5, by - 14, 1, 16);
+    }
   }
-  // Water reflection below
+
+  // Torches at night
+  if (bright < 0.35) {
+    let nightA = map(bright, 0, 0.35, 1, 0);
+    for (let ti = 0; ti < 4; ti++) {
+      let ta = ti * HALF_PI + PI / 4;
+      let tx = fsx + cos(ta) * rx * 0.6;
+      let ty = fsy + sin(ta) * ry * 0.6;
+      let fl = sin(frameCount * 0.18 + ti * 2) * 2;
+      fill(255, 200, 60, 180 * nightA);
+      ellipse(tx, ty - 4 + fl, 6, 8);
+      fill(255, 160, 50, 25 * nightA);
+      ellipse(tx, ty, 30, 18);
+    }
+  }
+
+  // Water reflection
   fill(30 + 20 * bright, 60 + 40 * bright, 80 + 30 * bright, 12);
-  ellipse(fsx, fsy + ry * 0.4, rx * 1.1, ry * 0.2);
+  ellipse(fsx, fsy + ry * 1.2, rx * 2.0, ry * 0.4);
+  pop();
+
+  // Draw arena bridge if built
+  drawArenaBridge();
+}
+
+function drawArenaBridge() {
+  let a = state.adventure;
+  if (!a.bridgeBuilt) return;
+
+  let bright = getSkyBrightness();
+  let homeNorthY = WORLD.islandCY - getSurfaceRY() * 0.95;
+  let arenaSouthY = a.isleY + a.isleRY * 0.85;
+  let bridgeCX = WORLD.islandCX;
+
+  // Bridge spans from home north shore to arena south shore
+  let numArches = 4;
+  let totalLen = homeNorthY - arenaSouthY;
+  let segLen = totalLen / numArches;
+
+  push();
+  noStroke();
+
+  // Draw stone causeway
+  for (let i = 0; i <= numArches; i++) {
+    let t = i / numArches;
+    let segY = arenaSouthY + t * totalLen;
+    let sx = w2sX(bridgeCX);
+    let sy = w2sY(segY);
+
+    // Stone deck
+    let deckCol = lerpColor(color(130, 120, 105), color(180, 170, 150), bright);
+    fill(deckCol);
+    rect(sx - 18, sy - 4, 36, 8, 1);
+
+    // Railings
+    fill(lerpColor(color(100, 92, 80), color(155, 145, 130), bright));
+    rect(sx - 20, sy - 8, 4, 12, 1);
+    rect(sx + 16, sy - 8, 4, 12, 1);
+  }
+
+  // Stone arches (between supports)
+  for (let i = 0; i < numArches; i++) {
+    let t = (i + 0.5) / numArches;
+    let archY = arenaSouthY + t * totalLen;
+    let sx = w2sX(bridgeCX);
+    let sy = w2sY(archY);
+
+    // Arch support pillar going into water
+    fill(lerpColor(color(90, 82, 72), color(140, 130, 115), bright));
+    rect(sx - 4, sy - 2, 8, 18);
+    // Pillar base reflection
+    fill(60, 80, 100, 30);
+    ellipse(sx, sy + 16, 12, 5);
+
+    // Stone connection between supports
+    fill(lerpColor(color(125, 115, 100), color(170, 160, 140), bright));
+    rect(sx - 16, sy - 3, 32, 6, 1);
+  }
+
+  // Faction-colored banners on bridge posts
+  let fc = typeof getFactionColors === 'function' ? getFactionColors() : { accent: [160, 35, 25] };
+  let ac = fc.accent || [160, 35, 25];
+  for (let bi = 0; bi < 2; bi++) {
+    let bpy = arenaSouthY + (bi + 0.5) * totalLen * 0.5;
+    let sx = w2sX(bridgeCX);
+    let sy = w2sY(bpy);
+    let wave = sin(frameCount * 0.04 + bi) * 1.5;
+    // Left banner
+    fill(100, 80, 45);
+    rect(sx - 22, sy - 14, 2, 12);
+    fill(ac[0], ac[1], ac[2], 200);
+    beginShape();
+    vertex(sx - 20, sy - 14);
+    vertex(sx - 12 + wave, sy - 12);
+    vertex(sx - 13 + wave, sy - 6);
+    vertex(sx - 20, sy - 8);
+    endShape(CLOSE);
+    // Right banner
+    fill(100, 80, 45);
+    rect(sx + 20, sy - 14, 2, 12);
+    fill(ac[0], ac[1], ac[2], 200);
+    beginShape();
+    vertex(sx + 22, sy - 14);
+    vertex(sx + 30 - wave, sy - 12);
+    vertex(sx + 29 - wave, sy - 6);
+    vertex(sx + 22, sy - 8);
+    endShape(CLOSE);
+  }
+
   pop();
 }
 
@@ -22344,6 +22580,46 @@ function isOnImperialBridge(wx, wy) {
   return abs(wy - archY) < 18;
 }
 
+// ─── ARENA BRIDGE — connects home island north shore to arena island ──────
+
+function isOnArenaBridge(wx, wy) {
+  let a = state.adventure;
+  if (!a.bridgeBuilt) return false;
+  // Bridge runs from home island north edge to arena island south edge
+  let homeNorthY = WORLD.islandCY - getSurfaceRY() * 0.95;
+  let arenaSouthY = a.isleY + a.isleRY * 0.85;
+  let bridgeCX = WORLD.islandCX;
+  if (abs(wx - bridgeCX) > 18) return false;
+  if (wy > homeNorthY + 5 || wy < arenaSouthY - 5) return false;
+  return true;
+}
+
+function isOnArenaIsland(wx, wy) {
+  let a = state.adventure;
+  let dx = (wx - a.isleX) / a.isleRX;
+  let dy = (wy - a.isleY) / a.isleRY;
+  return dx * dx + dy * dy <= 1.0;
+}
+
+function getArenaLevel() {
+  let lv = state.islandLevel || 1;
+  if (lv >= 13) return 4; // Grand amphitheater
+  if (lv >= 9) return 3;  // Colosseum with arches
+  if (lv >= 5) return 2;  // Stone arena with seating
+  return 1;               // Simple fighting pit
+}
+
+function checkArenaBridgeUnlock() {
+  if (state.adventure.bridgeBuilt) return;
+  if ((state.islandLevel || 1) >= 10) {
+    state.adventure.bridgeBuilt = true;
+    addFloatingText(width / 2, height * 0.25, 'STONE BRIDGE TO ARENA BUILT!', '#ffcc44');
+    addFloatingText(width / 2, height * 0.32, 'Walk north to the arena!', '#aaddff');
+    if (snd) snd.playSFX('fanfare');
+    triggerScreenShake(8, 20);
+  }
+}
+
 function drawImperialBridge() {
   let b = state.imperialBridge;
   if (!b.built && !b.building) return;
@@ -25953,6 +26229,25 @@ function keyPressed() {
       }
     }
 
+    // Walk/swim to arena from north shore (or walk across bridge)
+    if (!state.rowing.active && !state.adventure.active && !state.conquest.active) {
+      let px = state.player.x, py = state.player.y;
+      let a = state.adventure;
+      // Check if on arena island (walked across bridge)
+      if (a.bridgeBuilt && isOnArenaIsland(px, py)) {
+        enterAdventure();
+        return;
+      }
+      // Check if near north shore of home island
+      let northShoreY = WORLD.islandCY - getSurfaceRY() * 0.85;
+      let nearNorthShore = py < northShoreY && abs(px - WORLD.islandCX) < 80;
+      if (nearNorthShore && !a.bridgeBuilt) {
+        // Swim to arena
+        enterAdventure();
+        return;
+      }
+    }
+
     // Rowboat embark/disembark
     if (state.rowing.active) {
       let r = state.rowing;
@@ -27386,6 +27681,7 @@ function saveGame() {
     // Legia military system
     legia: state.legia || null,
     arenaHighWave: state.arenaHighWave || 0,
+    arenaBridgeBuilt: state.adventure.bridgeBuilt || false,
     // Random events
     activeEvent: state.activeEvent || null,
     eventCooldown: state.eventCooldown || {},
@@ -27620,6 +27916,7 @@ function migrateSave(d) {
     d.necropolisLoot = d.necropolisLoot || null;
     d.legia = d.legia || null;
     d.arenaHighWave = d.arenaHighWave || 0;
+    d.arenaBridgeBuilt = d.arenaBridgeBuilt || false;
     d.activeEvent = d.activeEvent || null;
     d.eventCooldown = d.eventCooldown || {};
     d.eventHistory = d.eventHistory || [];
@@ -27976,6 +28273,11 @@ function loadGame() {
       }
     }
     state.arenaHighWave = d.arenaHighWave || 0;
+    state.adventure.bridgeBuilt = d.arenaBridgeBuilt || false;
+    // Auto-fix: if level >= 10 but bridge not built yet, build it
+    if ((state.islandLevel || 1) >= 10 && !state.adventure.bridgeBuilt) {
+      state.adventure.bridgeBuilt = true;
+    }
     // Random events
     if (d.activeEvent && typeof d.activeEvent === 'object') state.activeEvent = d.activeEvent;
     if (d.eventCooldown && typeof d.eventCooldown === 'object') state.eventCooldown = d.eventCooldown;
@@ -29747,6 +30049,7 @@ function expandIsland() {
   if (cost.ancientRelic) state.ancientRelic -= cost.ancientRelic;
   if (cost.titanBone) state.titanBone -= cost.titanBone;
   state.islandLevel++;
+  checkArenaBridgeUnlock();
   triggerIslandMilestone(state.islandLevel);
   addNotification('Island expanded to Level ' + state.islandLevel, '#ffdd66');
   // Island grows less per level at higher tiers

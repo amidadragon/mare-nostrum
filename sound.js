@@ -623,7 +623,9 @@ class SoundManager {
     this._seagullTimer = 0;
     // Recorded music system
     this._musicTrack = null; // currently playing music key
-    this._musicFading = false;
+    this._musicFadingOut = null; // track being faded out
+    this._musicFadeIn = 1; // 0→1 fade-in progress for current track
+    this._musicFadeOut = 0; // 1→0 fade-out progress for old track
   }
 
   init() {
@@ -824,16 +826,22 @@ class SoundManager {
       wolf_howl: 'sounds/sfx_wolf_howl.mp3',
       wood_chop: 'sounds/sfx_wood_chop.ogg',
       writing: 'sounds/sfx_writing.ogg',
-      // Music tracks
-      music_combat: 'sounds/music_combat.mp3',
-      music_festival: 'sounds/music_festival.mp3',
-      music_menu: 'sounds/music_menu.ogg',
-      music_night: 'sounds/music_night.ogg',
-      music_peaceful: 'sounds/music_peaceful.ogg',
+      // Music tracks (AI-generated)
+      music_combat: 'sounds/music_combat_ai.mp3',
+      music_festival: 'sounds/music_festival_ai.mp3',
+      music_menu: 'sounds/music_menu_ai.mp3',
+      music_night: 'sounds/music_night_ai.mp3',
+      music_peaceful: 'sounds/music_peaceful_ai.mp3',
       music_sad: 'sounds/music_sad.ogg',
-      music_sailing: 'sounds/music_sailing.ogg',
-      music_temple: 'sounds/music_temple.mp3',
-      music_victory: 'sounds/music_victory.wav',
+      music_sailing: 'sounds/music_sailing_ai.mp3',
+      music_temple: 'sounds/music_temple_ai.mp3',
+      music_victory: 'sounds/music_victory_ai.mp3',
+      music_vulcan: 'sounds/music_vulcan_ai.mp3',
+      music_hyperborea: 'sounds/music_hyperborea_ai.mp3',
+      music_necropolis: 'sounds/music_necropolis_ai.mp3',
+      music_defeat: 'sounds/music_defeat_ai.mp3',
+      music_lobby: 'sounds/music_lobby_ai.mp3',
+      music_raid: 'sounds/music_raid_ai.mp3',
       // Narration voice clips
       narr_wreck_wake: 'sounds/narration/narration_wreck_wake.mp3',
       narr_wreck_fire: 'sounds/narration/narration_wreck_fire.mp3',
@@ -1143,16 +1151,22 @@ class SoundManager {
   // ─── RECORDED MUSIC SYSTEM ───
   // Call each frame. Selects and loops appropriate music track based on game state.
   // Only active when gameSettings.musicSource === 'recorded'.
+  // Crossfades between tracks over ~1s.
   updateMusic() {
     if (!this.ready || !this._samplesLoaded) return;
     let useRecorded = typeof gameSettings !== 'undefined' && gameSettings.musicSource === 'recorded';
     if (!useRecorded) {
-      // Stop any playing music track
       if (this._musicTrack) {
         let s = this._samples[this._musicTrack];
         if (s && s.isPlaying()) s.stop();
         this._musicTrack = null;
       }
+      if (this._musicFadingOut) {
+        let s = this._samples[this._musicFadingOut];
+        if (s && s.isPlaying()) s.stop();
+        this._musicFadingOut = null;
+      }
+      this._musicFadeIn = 1;
       return;
     }
     let musicVol = this.vol.master * this.vol.music;
@@ -1165,15 +1179,25 @@ class SoundManager {
       return;
     }
 
+    // Initialize crossfade state
+    if (this._musicFadeIn === undefined) this._musicFadeIn = 1;
+    if (!this._musicFadingOut) this._musicFadingOut = null;
+    if (!this._musicFadeOut) this._musicFadeOut = 0;
+
     // Determine desired track
     let target = 'music_peaceful';
     if (typeof gameScreen !== 'undefined' && (gameScreen === 'menu' || gameScreen === 'settings' || gameScreen === 'credits')) {
       target = 'music_menu';
+    } else if (typeof gameScreen !== 'undefined' && gameScreen === 'lobby') {
+      target = 'music_lobby';
     } else if (typeof state !== 'undefined') {
       if (state.conquest && state.conquest.active) target = 'music_combat';
+      else if (state.seaPeopleRaidActive) target = 'music_raid';
       else if (state.festival) target = 'music_festival';
       else if (state.rowing && state.rowing.active) target = 'music_sailing';
-      else if (state.necropolis && state.necropolis.active) target = 'music_sad';
+      else if (state.vulcan && state.vulcan.active) target = 'music_vulcan';
+      else if (state.hyperborea && state.hyperborea.active) target = 'music_hyperborea';
+      else if (state.necropolis && state.necropolis.active) target = 'music_necropolis';
       else if (state.visitingNation) target = 'music_temple';
       else if (state.time >= 1200 || state.time < 300) target = 'music_night';
       // Near temple?
@@ -1183,28 +1207,51 @@ class SoundManager {
       }
     }
 
-    // Don't switch if sample doesn't exist
+    // Fall back if sample doesn't exist
     if (!this._samples[target]) target = 'music_peaceful';
-    if (!this._samples[target]) return; // no music samples at all
+    if (!this._samples[target]) return;
+
+    // Crossfade: fade out old track
+    if (this._musicFadingOut) {
+      this._musicFadeOut = max(0, this._musicFadeOut - 0.02); // ~1s at 60fps
+      let s = this._samples[this._musicFadingOut];
+      if (s && s.isPlaying()) {
+        s.setVolume(musicVol * this._musicFadeOut);
+        if (this._musicFadeOut <= 0) { s.stop(); this._musicFadingOut = null; }
+      } else {
+        this._musicFadingOut = null;
+      }
+    }
+
+    // Crossfade: fade in current track
+    if (this._musicFadeIn < 1) {
+      this._musicFadeIn = min(1, this._musicFadeIn + 0.02); // ~1s at 60fps
+    }
 
     // Switch track if needed
     if (this._musicTrack !== target) {
-      // Stop old
+      // Move current to fading-out slot
       if (this._musicTrack) {
-        let old = this._samples[this._musicTrack];
-        if (old && old.isPlaying()) old.stop();
+        // If already fading something out, hard-stop it
+        if (this._musicFadingOut && this._musicFadingOut !== this._musicTrack) {
+          let old2 = this._samples[this._musicFadingOut];
+          if (old2 && old2.isPlaying()) old2.stop();
+        }
+        this._musicFadingOut = this._musicTrack;
+        this._musicFadeOut = this._musicFadeIn; // fade from current level
       }
-      // Start new
+      // Start new track fading in
       let s = this._samples[target];
       if (s) {
-        s.setVolume(musicVol);
+        this._musicFadeIn = 0;
+        s.setVolume(0);
         s.loop();
         this._musicTrack = target;
       }
     } else {
-      // Update volume
+      // Update volume with fade-in
       let s = this._samples[this._musicTrack];
-      if (s) s.setVolume(musicVol);
+      if (s) s.setVolume(musicVol * this._musicFadeIn);
     }
   }
 
