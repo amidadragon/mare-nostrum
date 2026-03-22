@@ -4,7 +4,7 @@
 Browser-playable p5.js game. Shipwrecked Roman exile rebuilds on floating islands — farming, combat, colony building, 10-chapter narrative. v1.0.0 release candidate.
 
 ## Tech Stack
-- **Renderer**: p5.js (CDN, no build step)
+- **Renderer**: q5.js (local, drop-in p5.js replacement, no build step)
 - **Audio**: p5.sound (procedural — 6 lyre modes, 25+ SFX, ambient per island)
 - **State**: JS state machine, localStorage save/load (format v7)
 - **Input**: WASD/arrows + click-to-move + touch

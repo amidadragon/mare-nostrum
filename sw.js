@@ -1,7 +1,7 @@
 const CACHE_NAME = 'mare-nostrum-v7';
 const ASSETS = [
   'index.html',
-  'libs/p5.min.js',
+  'libs/q5.min.js',
   'libs/p5.sound.min.js',
   'libs/cinzel-latin.woff2',
   'libs/cinzel-latin-ext.woff2',

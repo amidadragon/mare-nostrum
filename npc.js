@@ -1241,16 +1241,34 @@ function updateCitizens(dt) {
         let target = pickCitizenTarget(c);
         c.targetX = target.x;
         c.targetY = target.y;
+        c._path = null;
+        c._pathIdx = 0;
         c.state = 'walking';
         c.timer = floor(random(180, 500));
+        // Use pathfinding if available
+        if (typeof findPath === 'function' && _pathfinder) {
+          findPath(c.x, c.y, target.x, target.y, function(path) {
+            if (path && path.length > 1) { c._path = path; c._pathIdx = 1; }
+          });
+        }
       }
     } else if (c.state === 'walking') {
-      let dx = c.targetX - c.x, dy = c.targetY - c.y;
+      // Follow path if available, otherwise walk straight
+      let tx = c.targetX, ty = c.targetY;
+      if (c._path && c._pathIdx < c._path.length) {
+        tx = c._path[c._pathIdx].x;
+        ty = c._path[c._pathIdx].y;
+      }
+      let dx = tx - c.x, dy = ty - c.y;
       let d = sqrt(dx * dx + dy * dy);
-      if (d < 5 || c.timer <= 0) {
+      if (d < 8 && c._path && c._pathIdx < c._path.length - 1) {
+        // Advance to next path node
+        c._pathIdx++;
+      } else if (d < 5 || c.timer <= 0) {
         c.state = 'idle';
         c.timer = floor(random(60, 180));  // pause at destination
         c.vx = 0; c.vy = 0;
+        c._path = null;
         // 30% chance of idle animation at waypoint
         if (random() < 0.3) {
           let anims = ['sweep', 'sit', 'chat'];

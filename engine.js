@@ -335,4 +335,57 @@ const Engine = {
   });
 })();
 
+// ─── PATHFINDING (EasyStar.js) ──────────────────────────────────────────────
+let _pathGrid = null;
+let _pathfinder = null;
+
+function initPathfinding() {
+  if (typeof EasyStar === 'undefined') return;
+  _pathfinder = new EasyStar.js();
+  updatePathGrid();
+}
+
+function updatePathGrid() {
+  if (!_pathfinder) return;
+  let gridW = 60, gridH = 40; // ~20px per cell
+  let grid = [];
+  for (let y = 0; y < gridH; y++) {
+    grid[y] = [];
+    for (let x = 0; x < gridW; x++) {
+      let wx = WORLD.islandCX - 600 + x * 20;
+      let wy = WORLD.islandCY - 400 + y * 20;
+      grid[y][x] = isWalkable(wx, wy) && !isBlockedByBuilding(wx, wy) ? 0 : 1;
+    }
+  }
+  _pathfinder.setGrid(grid);
+  _pathfinder.setAcceptableTiles([0]);
+  _pathfinder.enableDiagonals();
+  _pathGrid = grid;
+}
+
+function findPath(fromX, fromY, toX, toY, callback) {
+  if (!_pathfinder) { callback(null); return; }
+  let ox = WORLD.islandCX - 600, oy = WORLD.islandCY - 400;
+  let fx = Math.floor((fromX - ox) / 20);
+  let fy = Math.floor((fromY - oy) / 20);
+  let tx = Math.floor((toX - ox) / 20);
+  let ty = Math.floor((toY - oy) / 20);
+  // Clamp to grid bounds
+  let gW = 60, gH = 40;
+  fx = Math.max(0, Math.min(gW - 1, fx));
+  fy = Math.max(0, Math.min(gH - 1, fy));
+  tx = Math.max(0, Math.min(gW - 1, tx));
+  ty = Math.max(0, Math.min(gH - 1, ty));
+  _pathfinder.findPath(fx, fy, tx, ty, function(path) {
+    if (path) {
+      callback(path.map(function(p) {
+        return { x: ox + p.x * 20 + 10, y: oy + p.y * 20 + 10 };
+      }));
+    } else {
+      callback(null);
+    }
+  });
+  _pathfinder.calculate();
+}
+
 // Engine v0.9 loaded

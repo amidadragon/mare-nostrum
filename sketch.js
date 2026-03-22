@@ -1,7 +1,7 @@
 // MARE NOSTRUM — Cozy Roman Survival-Crafting v2
 // Camera-based rendering, expandable island, blueprint building system
 // p5.js sketch
-p5.disableFriendlyErrors = true;
+if (typeof p5 !== 'undefined') p5.disableFriendlyErrors = true;
 
 // ─── ACCESSIBILITY SETTINGS (localStorage-persisted) ─────────────────────
 const _SETTINGS_KEY = 'mare_nostrum_settings';
@@ -57,9 +57,10 @@ function isKeybindDown(action) {
 _loadSettings();
 
 // ─── GLOBAL TEXT READABILITY — enforce minimum size + dark outlines ──────
-const _origTextSize = p5.prototype.textSize;
+const _p5Class = (typeof Q5 !== 'undefined') ? Q5 : p5;
+const _origTextSize = _p5Class.prototype.textSize;
 const MIN_TEXT_SIZE = 10;
-p5.prototype.textSize = function(s) {
+_p5Class.prototype.textSize = function(s) {
   let scaled = s * (gameSettings.fontScale || 1);
   return _origTextSize.call(this, max(scaled, MIN_TEXT_SIZE));
 };
@@ -2540,6 +2541,8 @@ function setup() {
       state.player.vx = 0; state.player.vy = 0; state.player.moving = false;
     }
   });
+  // Pathfinding
+  if (typeof initPathfinding === 'function') initPathfinding();
   // Load sprite sheets (falls back gracefully if PNGs missing)
   SpriteManager.loadAll();
   // Hide loading screen now that everything is initialized
@@ -12435,6 +12438,7 @@ function placeBuilding(wx, wy) {
     buildProgress: 0,
   };
   state.buildings.push(newBuilding);
+  if (typeof updatePathGrid === 'function') updatePathGrid();
 
   // Feature: door placement removes overlapping walls
   if (state.buildType === 'door') {
@@ -27473,12 +27477,21 @@ function saveGame() {
       console.log('[SAVE] Save size: ' + sizeKB + 'KB');
     }
 
-    localStorage.setItem(_SAVE_KEY, json);
+    let compressed = json;
+    if (typeof LZString !== 'undefined') {
+      compressed = LZString.compressToUTF16(json);
+    }
+    localStorage.setItem(_SAVE_KEY, compressed);
 
     // Validate: read back and verify parse
     let readback = localStorage.getItem(_SAVE_KEY);
     if (!readback) throw new Error('Save readback empty');
-    JSON.parse(readback); // throws if corrupt
+    // Decompress if needed, then verify JSON
+    let rbJson = readback;
+    if (typeof LZString !== 'undefined') {
+      try { let d = LZString.decompressFromUTF16(readback); if (d) rbJson = d; } catch(e) {}
+    }
+    JSON.parse(rbJson); // throws if corrupt
 
     _saveIndicatorTimer = 60;
     addFloatingText(width / 2, height * 0.4, 'GAME SAVED', C.crystalGlow);
@@ -27663,15 +27676,24 @@ function loadGame() {
     addFloatingText(width / 2, height * 0.4, 'No save found!', C.buildInvalid);
     return;
   }
+  // Try LZ-String decompression, fall back to raw JSON
+  let json = raw;
+  if (typeof LZString !== 'undefined') {
+    try { let dec = LZString.decompressFromUTF16(raw); if (dec) json = dec; } catch(e) {}
+  }
   let d;
   try {
-    d = JSON.parse(raw);
+    d = JSON.parse(json);
   } catch(parseErr) {
     console.error('[LOAD] Main save corrupt, trying backup:', parseErr);
     try {
       let backup = localStorage.getItem(_BACKUP_KEY);
       if (backup) {
-        d = JSON.parse(backup);
+        let bJson = backup;
+        if (typeof LZString !== 'undefined') {
+          try { let dec = LZString.decompressFromUTF16(backup); if (dec) bJson = dec; } catch(e) {}
+        }
+        d = JSON.parse(bJson);
         localStorage.setItem(_SAVE_KEY, backup); // restore main from backup
         addFloatingText(width / 2, height * 0.35, 'Recovered from backup save', [255, 200, 80]);
       }
@@ -28280,8 +28302,13 @@ function loadGame() {
 function exportSave() {
   let raw = localStorage.getItem(_SAVE_KEY);
   if (!raw) { console.log('[SAVE] No save to export.'); return; }
-  try { JSON.parse(raw); } catch(e) { console.error('[SAVE] Current save is corrupt!'); return; }
-  let blob = new Blob([raw], { type: 'application/json' });
+  // Decompress if needed — export always writes plain JSON
+  let json = raw;
+  if (typeof LZString !== 'undefined') {
+    try { let dec = LZString.decompressFromUTF16(raw); if (dec) json = dec; } catch(e) {}
+  }
+  try { JSON.parse(json); } catch(e) { console.error('[SAVE] Current save is corrupt!'); return; }
+  let blob = new Blob([json], { type: 'application/json' });
   let url = URL.createObjectURL(blob);
   let a = document.createElement('a');
   a.href = url;
@@ -28290,7 +28317,7 @@ function exportSave() {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  console.log('[SAVE] Save exported (' + Math.round(raw.length / 1024) + 'KB)');
+  console.log('[SAVE] Save exported (' + Math.round(json.length / 1024) + 'KB)');
 }
 
 function importSave(json) {

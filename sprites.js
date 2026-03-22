@@ -21,27 +21,27 @@ const SpriteManager = {
     if (this._totalCount === 0) { this.loaded = true; return; }
     for (let name in this.sheets) {
       let s = this.sheets[name];
-      s.img = loadImage(s.path,
-        () => {
+      let self = this;
+      try {
+        s.img = loadImage(s.path, () => {
           // Validate: image must be exact multiple of frame size and have at least 2 frames
           s.cols = Math.floor(s.img.width / s.frameW);
           s.rows = Math.floor(s.img.height / s.frameH);
           if (s.cols < 2 || s.rows < 1 || s.img.width % s.frameW !== 0 || s.img.height % s.frameH !== 0) {
             console.warn('Sprite invalid (not a proper sheet): ' + s.path + ' (' + s.img.width + 'x' + s.img.height + ')');
-            s.loaded = false; // reject -- fall back to rect drawing
+            s.loaded = false;
           } else {
             s.loaded = true;
           }
-          this._loadCount++;
-          if (this._loadCount >= this._totalCount) this.loaded = true;
-        },
-        () => {
-          console.warn('Sprite not found: ' + s.path);
-          s.loaded = false;
-          this._loadCount++;
-          if (this._loadCount >= this._totalCount) this.loaded = true;
-        }
-      );
+          self._loadCount++;
+          if (self._loadCount >= self._totalCount) self.loaded = true;
+        });
+      } catch(e) {
+        console.warn('Sprite not found: ' + s.path);
+        s.loaded = false;
+        self._loadCount++;
+        if (self._loadCount >= self._totalCount) self.loaded = true;
+      }
     }
   },
 
