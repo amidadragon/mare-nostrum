@@ -17587,10 +17587,21 @@ function drawArenaIsleDistant() {
   if (sx < -300 || sx > width + 300) return;
   push();
   noStroke();
-  let sc = (_dScale && _dScale.scale < 0.98) ? _dScale.scale : 1;
+
+  // Perspective scaling: islands higher on screen (closer to horizon) appear smaller
+  // This creates the realistic "far away = small" effect
+  let horizonY = max(height * 0.06, height * 0.25 - (typeof horizonOffset !== 'undefined' ? horizonOffset : 0));
+  let screenBottom = height * 0.85; // where the player's island sits on screen
+  let normalizedDepth = constrain((sy - horizonY) / (screenBottom - horizonY), 0.05, 1.0);
+  // Perspective scale: at horizon = 0.15, at player level = 1.0
+  let perspScale = 0.15 + normalizedDepth * 0.85;
+  // Also apply distance scale if available
+  let distScale = (_dScale && _dScale.scale < 0.98) ? _dScale.scale : 1;
+  let sc = min(perspScale, distScale);
+
   if (sc < 0.98) { translate(sx, sy); scale(sc); translate(-sx, -sy); }
   let fsx = floor(sx), fsy = floor(sy);
-  let rx = a.isleRX, ry = a.isleRY * 0.45; // isometric vertical squash (like main island)
+  let rx = a.isleRX, ry = a.isleRY * 0.45; // isometric vertical squash
   let bright = getSkyBrightness();
   let dayMix = max(0.15, bright);
   let aLv = getArenaLevel();

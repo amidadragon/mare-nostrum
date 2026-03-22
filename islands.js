@@ -18,13 +18,23 @@ function _getDistantScale(isleX, isleY, isleRX) {
   if (state.rowing && state.rowing.active) { px = state.rowing.x; py = state.rowing.y; }
   else { px = WORLD.islandCX; py = WORLD.islandCY; }
   let d = sqrt((isleX - px) * (isleX - px) + (isleY - py) * (isleY - py));
-  // Full size when within ~1.5x island radius, shrinks to 0.08 at far distance
+
+  // Distance-based scale
   let nearDist = isleRX * 2.5;
-  // Expand view range when zoomed out
   let zoomMult = (typeof camZoom !== 'undefined' && camZoom < 1) ? 1 / camZoom : 1;
   let farDist = 3500 * zoomMult;
   let t = constrain((d - nearDist) / (farDist - nearDist), 0, 1);
-  let s = lerp(1.0, 0.08, t * t);
+  let distScale = lerp(1.0, 0.08, t * t);
+
+  // Screen-space perspective: islands higher on screen appear smaller (depth illusion)
+  let sy = (typeof w2sY === 'function') ? w2sY(isleY) : height / 2;
+  let horizY = max(height * 0.06, height * 0.25 - (typeof horizonOffset !== 'undefined' ? horizonOffset : 0));
+  let screenBot = height * 0.85;
+  let normDepth = constrain((sy - horizY) / (screenBot - horizY), 0.05, 1.0);
+  let perspScale = 0.15 + normDepth * 0.85;
+
+  // Use the smaller of distance and perspective scales
+  let s = min(distScale, perspScale);
   let haze = lerp(0, 180, t);
   return { scale: s, haze: haze, dist: d };
 }
