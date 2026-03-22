@@ -4360,8 +4360,15 @@ function updatePlayerEscort(dt) {
 
     // Initialize position and per-soldier personality
     if (unit.x === undefined || unit.x === 0) { unit.x = pos.x; unit.y = pos.y; }
-    if (unit._speedMult === undefined) unit._speedMult = 0.9 + Math.random() * 0.2;
+    if (unit._speedMult === undefined) unit._speedMult = 0.95 + Math.random() * 0.1;
     if (unit._jitterX === undefined) { unit._jitterX = 0; unit._jitterY = 0; unit._jitterTimer = floor(Math.random() * 120); }
+    if (unit._heightOff === undefined) unit._heightOff = (Math.random() - 0.5) * 4;
+    if (unit._colorOff === undefined) unit._colorOff = floor((Math.random() - 0.5) * 20);
+    if (unit._sinPhase === undefined) unit._sinPhase = Math.random() * TWO_PI;
+    if (unit._idleFaceTimer === undefined) unit._idleFaceTimer = floor(Math.random() * 180);
+
+    // Archers stay further back
+    if (isRanged) { pos.x += cos(facingAngle + PI) * 15; pos.y += sin(facingAngle + PI) * 15; }
 
     // Refresh jitter offset every ~120 frames (soldiers fidget)
     unit._jitterTimer = (unit._jitterTimer || 0) + dt;
@@ -4374,7 +4381,14 @@ function updatePlayerEscort(dt) {
     let jitteredX = pos.x + (unit._jitterX || 0);
     let jitteredY = pos.y + (unit._jitterY || 0);
 
-    // Smooth lerp to formation position (staggered speed per soldier)
+    // Chase nearby enemies (break formation)
+    let chaseTarget = _findNearestRaidEnemy(unit.x, unit.y, isRanged ? 90 : 60);
+    if (chaseTarget && chaseTarget.hp > 0) {
+      jitteredX = chaseTarget.x + (isRanged ? (unit.x - chaseTarget.x) * 0.3 : 0);
+      jitteredY = chaseTarget.y + (isRanged ? (unit.y - chaseTarget.y) * 0.3 : 0);
+    }
+
+    // Smooth lerp to target position (staggered speed per soldier)
     let dx = jitteredX - unit.x, dy = jitteredY - unit.y;
     let distToTarget = sqrt(dx * dx + dy * dy);
     let followSpeed = (0.15 + min(0.15, 0.1 * distToTarget / 200)) * unit._speedMult;
@@ -4383,9 +4397,18 @@ function updatePlayerEscort(dt) {
     unit.x += dx * followSpeed * dt;
     unit.y += dy * followSpeed * dt;
 
+    // Face direction of movement (not always toward player)
+    if (distToTarget > 3) {
+      unit._facing = dx > 0 ? 1 : -1;
+    } else {
+      // Idle: look around every 3-5 seconds
+      unit._idleFaceTimer = (unit._idleFaceTimer || 0) + dt;
+      if (unit._idleFaceTimer > 180 + (i % 3) * 60) { unit._facing = Math.random() > 0.5 ? 1 : -1; unit._idleFaceTimer = 0; }
+    }
+
     // Walking wobble - subtle sine sway when moving
     if (distToTarget > 5) {
-      unit.x += sin(frameCount * 0.1 + i * 2.3) * 0.5;
+      unit.x += sin(frameCount * 0.1 + unit._sinPhase) * 0.5;
     }
 
     // Auto-attack enemies within range
@@ -4398,10 +4421,14 @@ function updatePlayerEscort(dt) {
         target.hp -= dmg;
         target.flashTimer = 8;
         unit._escortAtkTimer = isRanged ? 45 : (isCav ? 25 : 30);
+        unit._atkAnim = 8; // arm swing frames
         if (typeof _spawnDamageNumber === 'function') _spawnDamageNumber(target.x, target.y, dmg, '#ffaa44');
         if (typeof spawnParticles === 'function') spawnParticles(target.x, target.y, 'combat', 2);
+        if (!unit._shoutedRecently) { if (typeof addFloatingText === 'function') addFloatingText(w2sX(unit.x), w2sY(unit.y) - 18, '!', '#ff4444'); unit._shoutedRecently = 120; }
       }
     }
+    if (unit._atkAnim > 0) unit._atkAnim -= dt;
+    if (unit._shoutedRecently > 0) unit._shoutedRecently -= dt;
   }
 }
 
@@ -4451,15 +4478,20 @@ function drawEscortSoldier(unit) {
   if (sx < -30 || sx > width + 30 || sy < -30 || sy > height + 30) return;
   let mil = getFactionMilitary();
   let uDef = UNIT_TYPES[unit.type] || UNIT_TYPES.legionary;
-  let facing = (unit.x < state.player.x) ? 1 : -1;
+  let facing = unit._facing || ((unit.x < state.player.x) ? 1 : -1);
+  let hOff = unit._heightOff || 0;
+  let cOff = unit._colorOff || 0;
 
-  // Walking bob when moving
+  // Walking bob when moving (staggered phase per soldier)
   let _moveDist = sqrt((unit._lastX !== undefined ? unit.x - unit._lastX : 0) ** 2 + (unit._lastY !== undefined ? unit.y - unit._lastY : 0) ** 2);
-  let _walkBob = _moveDist > 0.3 ? sin(frameCount * 0.2 + unit.x * 0.5) * 1 : 0;
+  let _walkBob = _moveDist > 0.3 ? sin(frameCount * 0.2 + (unit._sinPhase || 0)) * 1 : 0;
   unit._lastX = unit.x; unit._lastY = unit.y;
 
+  // Attack arm swing offset
+  let atkSwing = (unit._atkAnim > 0) ? sin(unit._atkAnim * 0.8) * 4 : 0;
+
   push();
-  translate(sx, sy + floatOffset + _walkBob);
+  translate(sx, sy + floatOffset + _walkBob + hOff);
   scale(facing, 1);
   noStroke();
 
@@ -4524,23 +4556,23 @@ function drawEscortSoldier(unit) {
     ellipse(0, -2, 24, 20);
     noStroke();
   } else {
-    // Legionary default
-    fill(mil.tunic[0], mil.tunic[1], mil.tunic[2]);
+    // Legionary default — with per-soldier color variation
+    fill(mil.tunic[0] + cOff, mil.tunic[1] + cOff, mil.tunic[2] + cOff);
     rect(-3, -8, 6, 10);
-    fill(mil.armor[0], mil.armor[1], mil.armor[2]);
+    fill(mil.armor[0] + cOff * 0.5, mil.armor[1] + cOff * 0.5, mil.armor[2] + cOff * 0.5);
     rect(-3, -7, 6, 4);
     fill(195, 165, 130);
     rect(-2, -12, 4, 4);
     fill(mil.helm[0], mil.helm[1], mil.helm[2]);
     rect(-3, -13, 6, 3);
-    // Spear
+    // Spear with attack swing
     stroke(100, 80, 60); strokeWeight(1);
-    line(3, -15, 3, 4); noStroke();
+    line(3 + atkSwing, -15, 3, 4); noStroke();
     fill(mil.shield[0], mil.shield[1], mil.shield[2]);
     if (mil.shieldShape === 'round') ellipse(-4, -3, 5, 5);
     else rect(-5, -6, 2, 6);
-    // Walking anim
-    let step = sin(frameCount * 0.12 + unit.x) * 2;
+    // Walking anim — staggered phase
+    let step = sin(frameCount * 0.12 + (unit._sinPhase || 0)) * 2;
     fill(mil.legs[0], mil.legs[1], mil.legs[2]);
     rect(-2, 2, 2, 3);
     rect(0 + step * 0.3, 2, 2, 3);

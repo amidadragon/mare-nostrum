@@ -1690,8 +1690,8 @@ function initState() {
     },
 
     // Port positions — stored in state, updated on island expansion
-    portLeft: null,   // rowboat dock (left side)
-    portRight: null,  // merchant dock (right side)
+    portLeft: null,   // rowboat dock (right side)
+    portRight: null,  // merchant dock (left side)
 
     plots: [],
     resources: [],
@@ -2873,11 +2873,11 @@ function isOnBridge(wx, wy) {
   return false;
 }
 
-// Check if point is on the harbor pier (extends left from port)
+// Check if point is on the harbor pier (extends right from port into water)
 function isOnPier(wx, wy) {
   let port = getPortPosition();
-  let pierLeft = port.x - 150;
-  let pierRight = port.x + 30;
+  let pierLeft = port.x - 30;
+  let pierRight = port.x + 150;
   let pierTop = port.y - 10;
   let pierBot = port.y + 10;
   return wx >= pierLeft && wx <= pierRight && wy >= pierTop && wy <= pierBot;
@@ -3898,7 +3898,7 @@ function drawInner() {
     let _boatUnlocked = !state.progression.gameStarted || state.progression.villaCleared;
     if (!state.rowing.active && _boatUnlocked) {
       let port = getPortPosition();
-      let boatWX = port.x - 80;
+      let boatWX = port.x + 80;
       let boatWY = port.y + 20;
       if (dist(state.player.x, state.player.y, boatWX, boatWY) < 60) {
         let promptX = w2sX(boatWX);
@@ -5725,7 +5725,7 @@ function spawnVisitor() {
   state.visitor = {
     type: v.type, name: v.name, color: v.color,
     greeting: v.greeting, offer: v.offer, trade: v.trade,
-    x: port.x + 20, y: port.y - 10,
+    x: port.x - 20, y: port.y - 10,
     timer: 1200, // stays for ~20 seconds at 60fps
     interacted: false, dialogTimer: 0, currentLine: 0,
   };
@@ -14353,7 +14353,7 @@ function updateFisherman(dt) {
   }
   // Position at port shoreline
   let port = getPortPosition();
-  f.boatX = port.x - 30;
+  f.boatX = port.x + 30;
   f.boatY = port.y + 40;
   f.x = f.boatX; f.y = f.boatY;
   // Catch fish every ~20 seconds
@@ -16698,14 +16698,14 @@ function updatePortPositions() {
   // Ports always at the shoreline — just past the grass surface edge
   let srx = getSurfaceRX();
   let sry = getSurfaceRY();
-  // Left port: 5% past the surface edge (in the shallows)
+  // Player port: RIGHT side of island (pier extends right into water)
   state.portLeft = {
-    x: WORLD.islandCX - srx - 20,
+    x: WORLD.islandCX + srx + 10,
     y: WORLD.islandCY + sry * 0.15
   };
-  // Right port: same principle
+  // Merchant port: LEFT side of island
   state.portRight = {
-    x: WORLD.islandCX + srx + 10,
+    x: WORLD.islandCX - srx - 20,
     y: WORLD.islandCY - sry * 0.05
   };
 }
@@ -16719,8 +16719,8 @@ function updateShip(dt) {
   let ship = state.ship;
   ship.timer += dt;
 
-  // Merchant docks on RIGHT shore — far end of pier
-  ship.dockX = WORLD.islandCX + getSurfaceRX() * 1.12;
+  // Merchant docks on LEFT shore — far end of pier
+  ship.dockX = WORLD.islandCX - getSurfaceRX() * 1.12;
   ship.dockY = WORLD.islandCY + 20;
 
   switch (ship.state) {
@@ -16728,7 +16728,7 @@ function updateShip(dt) {
       if (ship.timer > ship.nextArrival) {
         ship.state = 'arriving';
         ship.timer = 0;
-        ship.x = WORLD.islandCX + state.islandRX + 400;
+        ship.x = WORLD.islandCX - state.islandRX - 400;
         ship.y = ship.dockY;
         ship.offers = generateShopOffers();
         addFloatingText(width / 2, height * 0.3, 'A merchant ship approaches!', C.solarBright);
@@ -16758,7 +16758,7 @@ function updateShip(dt) {
         ship.shopOpen = false;
         addFloatingText(width / 2, height * 0.35, 'Mercator sailing away...', C.textDim);
       }
-      // Player must be near the right-side merchant dock (in shallows)
+      // Player must be near the left-side merchant dock (in shallows)
       let pd = dist2(state.player.x, state.player.y, ship.dockX, ship.dockY);
       ship.shopOpen = (pd < 120);
 
@@ -16794,9 +16794,9 @@ function updateShip(dt) {
       break;
 
     case 'leaving':
-      ship.x += 2;
-      ship.y += 0.1; // sail away right
-      if (ship.x > WORLD.islandCX + state.islandRX + 500) {
+      ship.x -= 2;
+      ship.y += 0.1; // sail away left
+      if (ship.x < WORLD.islandCX - state.islandRX - 500) {
         ship.state = 'gone';
         ship.timer = 0;
         ship.nextArrival = 3600 + random(-600, 600);
@@ -16917,8 +16917,8 @@ function drawShip() {
 
   push();
   translate(sx, sy + bob);
-  // Flip ship to face island (left) when docked or arriving
-  if (ship.state === 'docked' || ship.state === 'arriving') scale(-1, 1);
+  // Flip ship to face island (right) when leaving, normal when docked/arriving from left
+  if (ship.state === 'leaving') scale(-1, 1);
   noStroke();
 
   // Water around hull — pixel wake rects
@@ -17044,7 +17044,6 @@ function drawShip() {
   // "TRADE" indicator — counter-flip text so it reads correctly
   if (ship.state === 'docked') {
     push();
-    scale(-1, 1); // undo the ship flip for text
     fill(color(C.solarBright));
     textAlign(CENTER, CENTER);
     textSize(10);
@@ -25369,7 +25368,7 @@ function keyPressed() {
         !(state.plenty && state.plenty.active) && !(state.necropolis && state.necropolis.active) &&
         !state._activeExploration) {
       let _port = typeof getPortPosition === 'function' ? getPortPosition() : { x: 0, y: 0 };
-      let _nearBoat = dist(state.player.x, state.player.y, _port.x - 80, _port.y + 20) < 70;
+      let _nearBoat = dist(state.player.x, state.player.y, _port.x + 80, _port.y + 20) < 70;
       if (!_nearBoat && isInShallows(state.player.x, state.player.y)) {
         startDive(); return;
       }
@@ -25596,7 +25595,7 @@ function keyPressed() {
       // Otherwise disembark — snap player back to pier
       let port = getPortPosition();
       state.rowing.active = false;
-      state.player.x = port.x - 40;
+      state.player.x = port.x + 40;
       state.player.y = port.y;
       state.player.vx = 0;
       state.player.vy = 0;
@@ -25611,13 +25610,13 @@ function keyPressed() {
     // Check if near rowboat at pier (pier extends left from port) — gate behind villa
     let _canBoard = !state.progression.gameStarted || state.progression.villaCleared;
     let port = getPortPosition();
-    let boatWorldX = port.x - 80;
+    let boatWorldX = port.x + 80;
     let boatWorldY = port.y + 20;
     if (_canBoard && dist(state.player.x, state.player.y, boatWorldX, boatWorldY) < 60) {
       state.rowing.active = true;
       state.rowing.x = boatWorldX;
       state.rowing.y = boatWorldY;
-      state.rowing.angle = PI; // facing left (west, away from island)
+      state.rowing.angle = 0; // facing right (east, away from island)
       state.rowing.speed = 0;
       state.rowing.oarPhase = 0;
       state.rowing.wakeTrail = [];

@@ -1456,13 +1456,13 @@ function drawIsland() {
   // Gravel side-paths from ports to the main road
   noStroke();
   let roadSY2 = w2sY(WORLD.islandCY - 8);
-  // Left port path — scattered gravel dots from port down to road
+  // Right port path — scattered gravel dots from port to road
   let portPos = getPortPosition();
-  let portSX = w2sX(portPos.x + 30);
+  let portSX = w2sX(portPos.x - 30);
   let portSY = w2sY(portPos.y);
   for (let gi = 0; gi < 12; gi++) {
     let gt = gi / 11;
-    let gx = lerp(portSX, w2sX(WORLD.islandCX - 280), gt);
+    let gx = lerp(portSX, w2sX(WORLD.islandCX + 280), gt);
     let gy = lerp(portSY, roadSY2, gt);
     fill(145, 135, 118, 60 + gi * 4);
     rect(floor(gx) - 4, floor(gy) - 1, 8, 3, 1);
@@ -1486,9 +1486,9 @@ function drawIsland() {
   // City wall / pomerium (Era 2+, drawn after roads but before buildings)
   drawCityWall(ix, iy, iw, ih);
 
-  // Harbor port (player ship — left side)
+  // Harbor port (player ship — right side)
   drawPort();
-  // Merchant port (Mercator — right side)
+  // Merchant port (Mercator — left side)
   drawMerchantPort();
 
   // District props — scarecrow, training dummies, lamp posts, awnings, etc.
@@ -1539,10 +1539,9 @@ function drawPort() {
 
   push();
   translate(px, py);
-  scale(-1, 1); // Mirror — pier extends left
   noStroke();
 
-  // === ROMAN HARBOR (Portus Magnus) ===
+  // === ROMAN HARBOR (Portus Magnus) — pier extends right into water ===
 
   // --- Long stone pier extending far into the sea ---
   // Main pier — long stone walkway
@@ -1896,6 +1895,7 @@ function drawMerchantPort() {
 
   push();
   translate(px, py);
+  scale(-1, 1); // Mirror — pier extends left into water
   noStroke();
 
   // === MERCHANT DOCK (Emporium) ===
