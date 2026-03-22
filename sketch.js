@@ -23775,6 +23775,12 @@ function conquestPlayerAttack() {
 
 // ─── CONQUEST DRAWING ────────────────────────────────────────────────────
 
+let _cqVerts = null;
+function _getCqVerts(rx, ry) {
+  if (!_cqVerts) _cqVerts = generateIslandCoastline(42, 64, rx, ry, [{angle: PI*0.3, strength: 0.07, width: 0.4, type: 'headland'}, {angle: PI*1.4, strength: 0.05, width: 0.3, type: 'bay'}]);
+  return _cqVerts;
+}
+
 function drawConquestIsleDistant() {
   if (state.conquest.active) return;
   let c = state.conquest;
@@ -23799,64 +23805,27 @@ function drawConquestIsleDistant() {
 
   let _cqSeed = 42;
   if (c.colonized) {
-    // Colonized: proper island terrain — blue-shifted with distance
+    // Colonized: organic coastline terrain
     let rx = c.isleRX, ry = c.isleRY;
-    let _bs = 0.2; // blue shift factor
-    // Water shadow
-    fill(20, 60, 80, 35);
-    drawIslandShape(sx + 4, sy + 5, rx * 1.075, ry * 1.075, -2, _cqSeed);
-    // Shallow water ring
-    fill(55, 145, 165, 50);
-    drawIslandShape(sx, sy, rx * 1.06, ry * 1.06, -2, _cqSeed);
-    // Shore waves
-    stroke(200, 220, 255, 25 + sin(frameCount * 0.04) * 12);
-    strokeWeight(1.5); noFill();
-    drawIslandShape(sx, sy, rx * 1.04 + sin(frameCount * 0.025) * 1.5, ry * 1.04 + sin(frameCount * 0.025) * 1, -3, _cqSeed);
-    noStroke();
-    // Beach — slightly blue-shifted
-    fill(lerp(195, 180, _bs), lerp(180, 185, _bs), lerp(135, 160, _bs));
-    drawIslandShape(sx, sy, rx * 1.0, ry * 1.0, -3, _cqSeed);
-    // Beach detail
-    fill(180, 165, 120, 50);
-    for (let i = 0; i < 6; i++) {
-      let ba = (i / 6) * TWO_PI + 1.1;
-      ellipse(sx + cos(ba) * rx * 0.94, sy + sin(ba) * ry * 0.65, 10, 5);
-    }
-    // Grass — blue-shifted for distance
-    fill(lerp(60, 80, _bs), lerp(105, 120, _bs), lerp(42, 75, _bs));
-    drawIslandShape(sx, sy, rx * 0.925, ry * 0.925, -4, _cqSeed);
-    // Lighter meadow center
-    fill(70, 120, 48, 50);
-    drawIslandShape(sx, sy + ry * 0.1, rx * 0.45, ry * 0.3, -5, _cqSeed + 1);
+    let cqV = _getCqVerts(rx, ry);
+    drawIslandBase(sx, sy, rx, ry, cqV, ISLAND_PALETTES.default, 'medium');
     // Golden colony glow
     fill(255, 220, 100, 8);
-    drawIslandShape(sx, sy, rx * 0.75, ry * 0.75, -5, _cqSeed);
+    drawIslandCoastShape(sx, sy, cqV, 0.75, rx, ry, -5);
     // Dock indicator at south shore
     fill(120, 90, 50);
     rect(floor(sx - 4), floor(sy + ry * 0.88), 8, 14);
     fill(100, 75, 40);
     rect(floor(sx - 6), floor(sy + ry * 0.86), 12, 3);
   } else {
-    // Unexplored / in-progress: full island terrain (wild, uncolonized)
+    // Unexplored / in-progress: organic coastline terrain (wild)
     let rx = c.isleRX, ry = c.isleRY;
     let ct = frameCount * 0.01;
-    // Water shadow
-    fill(20, 60, 80, 35);
-    drawIslandShape(sx + 4, sy + 5, rx * 1.075, ry * 1.075, -2, _cqSeed);
-    // Shallow water ring
-    fill(45, 130, 150, 50);
-    drawIslandShape(sx, sy, rx * 1.06, ry * 1.06, -2, _cqSeed);
-    // Shore waves
-    stroke(200, 220, 255, 20 + sin(frameCount * 0.04) * 10);
-    strokeWeight(1.5); noFill();
-    drawIslandShape(sx, sy, rx * 1.04 + sin(frameCount * 0.025) * 1.5, ry * 1.04 + sin(frameCount * 0.025) * 1, -3, _cqSeed);
-    noStroke();
-    // Beach
-    fill(175, 160, 120);
-    drawIslandShape(sx, sy, rx * 1.0, ry * 1.0, -3, _cqSeed);
-    // Dense forest interior
+    let cqV = _getCqVerts(rx, ry);
+    drawIslandBase(sx, sy, rx, ry, cqV, ISLAND_PALETTES.default, 'medium');
+    // Dense forest interior on top
     fill(28, 62, 25);
-    drawIslandShape(sx, sy, rx * 0.88, ry * 0.88, -4, _cqSeed);
+    drawIslandCoastShape(sx, sy, cqV, 0.7, rx, ry, -4);
     // Hills / ridgeline
     fill(22, 55, 20); drawIslandShape(sx - 15, sy - 8, 50, 32, -6, _cqSeed + 2);
     fill(28, 68, 25); drawIslandShape(sx + 10, sy - 14, 37, 24, -6, _cqSeed + 3);
@@ -23874,7 +23843,7 @@ function drawConquestIsleDistant() {
     }
     // Mist over wild island
     fill(160, 180, 160, 18 + sin(frameCount * 0.015) * 10);
-    drawIslandShape(sx, sy, rx * 0.9, ry * 0.65, -2, _cqSeed + 5);
+    drawIslandCoastShape(sx, sy, cqV, 0.65, rx, ry, -2);
     // Enemy camp fires visible from distance (if explored)
     if (c.phase !== 'unexplored' && c.phase !== 'locked') {
       for (let i = 0; i < 3; i++) {
@@ -23913,7 +23882,8 @@ function drawConquestIsleDistant() {
   let _cRX = c.isleRX, _cRY = c.isleRY;
   let _cHazeA = _dScale ? max(10, floor(_dScale.haze * 0.5)) : floor(10 * _cBright);
   fill(160, 185, 210, _cHazeA);
-  ellipse(sx, sy, _cRX * 2.2, _cRY * 2.2);
+  let _cqHV = _getCqVerts(_cRX, _cRY);
+  drawIslandCoastShape(sx, sy, _cqHV, 1.1, _cRX, _cRY, -2);
   pop();
 }
 
@@ -23924,49 +23894,28 @@ function drawConquestIsland() {
   push();
   noStroke();
 
-  // Water shadow
-  fill(20, 60, 80, 40);
-  ellipse(ix + 5, iy + 7, c.isleRX * 2.15, c.isleRY * 2.15);
-  // Shallow water ring
-  fill(55, 145, 165, 55);
-  ellipse(ix, iy, c.isleRX * 2.12, c.isleRY * 2.12);
-  // Shore waves
-  stroke(200, 220, 255, 30 + sin(frameCount * 0.04) * 15);
-  strokeWeight(1.5);
-  noFill();
-  ellipse(ix, iy, c.isleRX * 2.08 + sin(frameCount * 0.025) * 3, c.isleRY * 2.08 + sin(frameCount * 0.025) * 2);
-  noStroke();
-  // Beach
-  fill(195, 180, 135);
-  ellipse(ix, iy, c.isleRX * 2, c.isleRY * 2);
-  // Beach detail — darker sand patches
-  fill(180, 165, 120, 60);
-  for (let i = 0; i < 8; i++) {
-    let ba = (i / 8) * TWO_PI + 1.1;
-    let br = c.isleRX * 0.94;
-    ellipse(ix + cos(ba) * br, iy + sin(ba) * br * 0.69, 12, 6);
-  }
-  // Grass
-  fill(60, 105, 42);
-  ellipse(ix, iy, c.isleRX * 1.85, c.isleRY * 1.85);
+  // Organic coastline base (close LOD)
+  let cqV = _getCqVerts(c.isleRX, c.isleRY);
+  drawIslandBase(ix, iy, c.isleRX, c.isleRY, cqV, ISLAND_PALETTES.default, 'close');
+
   // Lighter meadow center (cleared area)
   let clearRadius = map(c.trees.filter(t => !t.alive).length, 0, c.trees.length, 0.3, 1.2);
   fill(70, 120, 48, 60);
-  ellipse(ix, iy + c.isleRY * 0.15, c.isleRX * clearRadius, c.isleRY * clearRadius * 0.7);
+  drawIslandCoastShape(ix, iy, cqV, clearRadius * 0.5, c.isleRX, c.isleRY, -5);
 
   // Phase atmosphere
   if (c.phase === 'landing' || c.phase === 'unexplored') {
     // Edge mist
     fill(140, 160, 140, 18 + sin(frameCount * 0.02) * 8);
-    ellipse(ix, iy, c.isleRX * 2, c.isleRY * 2);
+    drawIslandCoastShape(ix, iy, cqV, 1.0, c.isleRX, c.isleRY, -2);
   } else if (c.phase === 'defending') {
     // Red danger tinge at edges
     fill(180, 40, 30, 10 + sin(frameCount * 0.05) * 6);
-    ellipse(ix, iy, c.isleRX * 2.1, c.isleRY * 2.1);
+    drawIslandCoastShape(ix, iy, cqV, 1.05, c.isleRX, c.isleRY, -2);
   } else if (c.phase === 'settled') {
     // Golden glow
     fill(255, 220, 100, 8);
-    ellipse(ix, iy, c.isleRX * 1.5, c.isleRY * 1.5);
+    drawIslandCoastShape(ix, iy, cqV, 0.75, c.isleRX, c.isleRY, -5);
   }
 
   // Grass tufts
