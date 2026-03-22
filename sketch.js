@@ -17866,7 +17866,8 @@ function drawArenaBridge() {
   pop();
 }
 
-function drawArena() {
+// drawArena DELETED -- replaced by drawArenaIsleDistant with proper coastline rendering
+function drawArena() { return; /* old arena renderer completely disabled */
   let a = state.adventure;
   push();
 
