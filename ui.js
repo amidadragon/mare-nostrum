@@ -3504,12 +3504,26 @@ function drawTutorialHintUI() {
 }
 
 // ─── CURRENT GOAL HUD — top-center parchment banner ─────────────────────
+let _tutBannerFade = 0;  // 0-1 smooth fade for tutorial banner
+let _tutBannerLastStep = -1;
 function drawCurrentGoalHUD() {
-  if (!state.tutorialGoal) return;
-  if (state.tutorialGoalComplete) return;
-  if (photoMode || screenshotMode || dialogState.active) return;
+  // Smooth fade in/out
+  let showBanner = state.tutorialGoal && !state.tutorialGoalComplete && !photoMode && !screenshotMode && !(dialogState && dialogState.active);
+  if (showBanner) {
+    _tutBannerFade = min(1, _tutBannerFade + 0.04);
+  } else {
+    _tutBannerFade = max(0, _tutBannerFade - 0.06);
+    if (_tutBannerFade <= 0) return;
+  }
+  // Flash on step change
+  let curStep = state.tutorialGoalStep || 0;
+  if (curStep !== _tutBannerLastStep) {
+    _tutBannerLastStep = curStep;
+    _tutBannerFade = 0.3; // brief dip on step change for visual feedback
+  }
   let goal = state.tutorialGoal;
-  let a = 220;
+  if (!goal) return;
+  let a = 220 * _tutBannerFade;
 
   // Top-center parchment banner
   textSize(10);
@@ -3528,7 +3542,6 @@ function drawCurrentGoalHUD() {
   noStroke();
   // Step indicator dots
   let steps = (typeof TUTORIAL_STEPS !== 'undefined') ? TUTORIAL_STEPS.length : 6;
-  let curStep = state.tutorialGoalStep || 0;
   let dotY = by + bob + 5;
   for (let i = 0; i < steps; i++) {
     fill(i < curStep ? 180 : 50, i < curStep ? 150 : 40, i < curStep ? 60 : 20, a);
@@ -3546,14 +3559,14 @@ function drawCurrentGoalHUD() {
   textAlign(LEFT, TOP);
 
   // Directional arrow toward objective (skip for 'move' step)
-  if (goal.stepId !== 'move' && goal.targetWX !== undefined) {
+  if (goal.stepId !== 'move' && goal.stepId !== 'attack' && goal.targetWX !== undefined) {
     let psx = w2sX(state.player.x), psy = w2sY(state.player.y);
     let tsx = w2sX(goal.targetWX), tsy = w2sY(goal.targetWY);
     let tdist = dist(psx, psy, tsx, tsy);
     if (tdist > 50) {
       let ang = atan2(tsy - psy, tsx - psx);
       let ax = psx + cos(ang) * 42, ay = psy + sin(ang) * 42;
-      let pulse = 100 + sin(frameCount * 0.05) * 30;
+      let pulse = (100 + sin(frameCount * 0.05) * 30) * _tutBannerFade;
       push();
       translate(floor(ax), floor(ay));
       rotate(ang);
@@ -3568,11 +3581,21 @@ function drawCurrentGoalHUD() {
   // Build step: flash B key hint near player
   if (goal.stepId === 'build') {
     let px = w2sX(state.player.x), py = w2sY(state.player.y) - 30;
-    let flash = 150 + sin(frameCount * 0.1) * 80;
+    let flash = (150 + sin(frameCount * 0.1) * 80) * _tutBannerFade;
     fill(212, 170, 70, flash);
     textAlign(CENTER, CENTER);
     textSize(12);
     text('[B]', floor(px), floor(py));
+    textAlign(LEFT, TOP);
+  }
+  // Attack step: flash SPACE key hint near player
+  if (goal.stepId === 'attack') {
+    let px = w2sX(state.player.x), py = w2sY(state.player.y) - 30;
+    let flash = (150 + sin(frameCount * 0.1) * 80) * _tutBannerFade;
+    fill(212, 170, 70, flash);
+    textAlign(CENTER, CENTER);
+    textSize(12);
+    text('[SPACE]', floor(px), floor(py));
     textAlign(LEFT, TOP);
   }
 }
