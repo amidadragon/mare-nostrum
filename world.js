@@ -48,7 +48,9 @@ function drawCoastlineShape(screenCX, screenCY, radiusX, radiusY, yOffset) {
     let v = verts[i];
     let r = 1 + v.offset;
     let vx = screenCX + cos(v.angle) * radiusX * r;
-    let vy = (screenCY + yOffset) + sin(v.angle) * radiusY * r;
+    // Attenuate yOffset at east/west edges (sin≈0) to prevent layer misalignment
+    let yOff = yOffset * abs(sin(v.angle));
+    let vy = (screenCY + yOff) + sin(v.angle) * radiusY * r;
     vertex(vx, vy);
   }
   endShape(CLOSE);
@@ -819,7 +821,7 @@ function drawIsland() {
     let foamRX = foamBase.rx + foamPulse * iw;
     let foamRY = foamBase.ry + foamPulse * ih * 0.4;
     let ffx = ix + cos(fa) * foamRX;
-    let ffy = (iy - 14) + sin(fa) * foamRY;
+    let ffy = (iy - 14 * abs(sin(fa))) + sin(fa) * foamRY;
     fill(255, 255, 255, 40 + sin(foamPhase + fa * 5) * 20);
     ellipse(ffx, ffy, 8 + sin(fa * 2.7) * 3, 3);
   }
@@ -835,7 +837,7 @@ function drawIsland() {
     let refRX = refBase.rx + sin(reflPhase + ra * 2) * 0.005 * iw;
     let refRY = refBase.ry + sin(reflPhase + ra * 2) * 0.002 * ih;
     let rx2 = ix + cos(ra) * refRX;
-    let ry2 = (iy - 12) + sin(ra) * refRY;
+    let ry2 = (iy - 12 * abs(sin(ra))) + sin(ra) * refRY;
     fill(200, 230, 255, 18 * wave * dayMix);
     rect(floor(rx2) - 3, floor(ry2), 6 + floor(wave2 * 4), 2);
     // Inner shimmer — closer to shore, brighter
@@ -843,7 +845,7 @@ function drawIsland() {
     let refRX2 = refBase2.rx + sin(reflPhase * 0.8 + ra * 3) * 0.004 * iw;
     let refRY2 = refBase2.ry + sin(reflPhase * 0.8 + ra * 3) * 0.002 * ih;
     let rx3 = ix + cos(ra) * refRX2;
-    let ry3 = (iy - 13) + sin(ra) * refRY2;
+    let ry3 = (iy - 13 * abs(sin(ra))) + sin(ra) * refRY2;
     fill(220, 240, 255, 22 * wave2 * dayMix);
     rect(floor(rx3) - 2, floor(ry3), 4 + floor(wave * 3), 1);
   }
@@ -858,7 +860,7 @@ function drawIsland() {
     ];
     sandSeeds.forEach(s => {
       let sx2 = ix + cos(s.a) * iw * s.r;
-      let sy2 = (iy - 12) + sin(s.a) * ih * (s.r * 0.42);
+      let sy2 = (iy - 12 * abs(sin(s.a))) + sin(s.a) * ih * (s.r * 0.42);
       fill(200, 185, 140, sandAlpha);
       ellipse(sx2, sy2, 14 + sin(s.a * 3.7) * 4, 6);
     });
@@ -871,7 +873,7 @@ function drawIsland() {
       let fa = (fi * 1.7 + fishPhase) % TWO_PI;
       let fishDist = 0.47 + sin(fishPhase * 0.3 + fi * 2.1) * 0.015;
       let fx2 = ix + cos(fa) * iw * fishDist;
-      let fy2 = (iy - 12) + sin(fa) * ih * (fishDist * 0.42);
+      let fy2 = (iy - 12 * abs(sin(fa))) + sin(fa) * ih * (fishDist * 0.42);
       let fishAlpha = 18 + sin(fishPhase * 2 + fi * 3) * 8;
       // Only show occasionally (fish dart in and out)
       if (sin(fishPhase * 0.5 + fi * 4.3) > 0.2) {
@@ -924,7 +926,7 @@ function drawIsland() {
   for (let ba = PI * 0.3; ba < PI * 0.7; ba += 0.15) {
     let bCoast = _getCoastlineRadiusAtAngle(ba, iw * 0.478, ih * 0.210);
     let bx = ix + cos(ba) * bCoast.rx;
-    let by = (iy - 12) + sin(ba) * bCoast.ry;
+    let by = (iy - 12 * abs(sin(ba))) + sin(ba) * bCoast.ry;
     ellipse(bx, by, 12 + sin(ba * 3.7) * 4, 5);
   }
 
@@ -934,7 +936,7 @@ function drawIsland() {
     pebSeeds.forEach(pa => {
       let pCoast = _getCoastlineRadiusAtAngle(pa, iw * 0.468, ih * 0.198);
       let px2 = floor(ix + cos(pa) * pCoast.rx + sin(pa * 7.3) * 3);
-      let py2 = floor((iy - 14) + sin(pa) * pCoast.ry + cos(pa * 5.1) * 2);
+      let py2 = floor((iy - 14 * abs(sin(pa))) + sin(pa) * pCoast.ry + cos(pa * 5.1) * 2);
       fill(120, 108, 88, 70 + sin(pa * 11) * 20);
       rect(px2, py2, 2, 1);
     });
@@ -946,7 +948,7 @@ function drawIsland() {
     for (let ha = PI + 0.3; ha < TWO_PI - 0.3; ha += 0.18) {
       let hCoast = _getCoastlineRadiusAtAngle(ha, iw * 0.462, ih * 0.193);
       let hx = floor(ix + cos(ha) * hCoast.rx + sin(ha * 3.1) * 4);
-      let hy = floor((iy - 14) + sin(ha) * hCoast.ry + cos(ha * 2.7) * 2);
+      let hy = floor((iy - 14 * abs(sin(ha))) + sin(ha) * hCoast.ry + cos(ha * 2.7) * 2);
       fill(88, 78, 62);
       rect(hx - 3, hy - 2, 5 + floor(sin(ha * 5.3) * 2), 3);
       rect(hx, hy - 4, 3, 2);
@@ -963,7 +965,7 @@ function drawIsland() {
     for (let ta = -0.3; ta < PI / 4; ta += 0.18) {
       let tCoast = _getCoastlineRadiusAtAngle(ta, iw * 0.455, ih * 0.190);
       let tx = ix + cos(ta) * tCoast.rx + sin(ta * 4.1) * 3;
-      let ty = (iy - 14) + sin(ta) * tCoast.ry + cos(ta * 3.3) * 2;
+      let ty = (iy - 14 * abs(sin(ta))) + sin(ta) * tCoast.ry + cos(ta * 3.3) * 2;
       // Pool water — animated shimmer
       let poolShimmer = sin(frameCount * 0.04 + ta * 5) * 0.3 + 0.7;
       fill(35, 90, 105, 80 * poolShimmer);
@@ -989,7 +991,7 @@ function drawIsland() {
       let sfCoast = _getCoastlineRadiusAtAngle(sa, iw * 0.468, ih * 0.198);
       let wave = sin(foamT + sa * 6) * 0.5 + 0.5;
       let sfx = ix + cos(sa) * (sfCoast.rx + wave * 4);
-      let sfy = (iy - 14) + sin(sa) * (sfCoast.ry + wave * 2);
+      let sfy = (iy - 14 * abs(sin(sa))) + sin(sa) * (sfCoast.ry + wave * 2);
       fill(255, 255, 255, 20 + wave * 25);
       ellipse(sfx, sfy, 6 + wave * 4, 2);
       // Bubble dots in foam
@@ -1018,7 +1020,7 @@ function drawIsland() {
     debrisSeeds.forEach(d => {
       let dCoast = _getCoastlineRadiusAtAngle(d.a, iw * 0.466, ih * 0.197);
       let dx = floor(ix + cos(d.a) * dCoast.rx + sin(d.a * 5.3) * 3);
-      let dy = floor((iy - 15) + sin(d.a) * dCoast.ry);
+      let dy = floor((iy - 15 * abs(sin(d.a))) + sin(d.a) * dCoast.ry);
       if (d.type === 'driftwood') {
         fill(130, 105, 70, 90);
         rect(dx - 5, dy, 10, 2, 1);

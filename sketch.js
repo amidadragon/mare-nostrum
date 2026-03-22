@@ -4831,27 +4831,27 @@ function drawShoreWaves() {
   if (frameCount % 2 !== 0) return;
   let ix = w2sX(WORLD.islandCX);
   let iy = w2sY(WORLD.islandCY);
-  // Outermost shallow water ring: ellipse(ix, iy-10, iw*1.12, ih*0.50)
-  // where iw = islandRX*2, so semi-axes are islandRX*1.12 and islandRY*0.50
-  // Waves at the outer edge of the shallow lagoon where it meets open ocean
-  let rx = state.islandRX * 1.12;   // match outermost shallow water semi-axis
-  let ry = state.islandRY * 0.50;   // match outermost shallow water semi-axis
-  let cy = iy - 10;  // match outermost shallow water center
+  let iw = state.islandRX * 2;
+  let ih = state.islandRY * 2;
   let t = frameCount * 0.015;
   let bright = getSkyBrightness();
   let dayMix = max(0.3, bright);
 
   noStroke();
   // Animated sine-based shoreline — foam crests roll in and out
+  // Uses coastline verts so waves follow the same organic shape as shallow water layers
   for (let a = 0; a < TWO_PI; a += 0.045) {
+    let coastR = _getCoastlineRadiusAtAngle(a, iw * 0.56, ih * 0.25);
+    // yOffset attenuation at east/west to match drawCoastlineShape fix
+    let yOff = -10 * abs(sin(a));
     // Multi-frequency wave for organic shoreline movement
     let wave1 = sin(t * 2.5 + a * 6);
     let wave2 = sin(t * 1.8 + a * 3.5 + 1.2) * 0.5;
     let wave3 = sin(t * 3.5 + a * 9) * 0.25;
     let wavePhase = wave1 + wave2 + wave3;
     let waveOff = floor(wavePhase * 4 + 3);
-    let ex = floor(ix + cos(a) * (rx + waveOff));
-    let ey = floor(cy + sin(a) * (ry + waveOff * 0.4));
+    let ex = floor(ix + cos(a) * (coastR.rx + waveOff));
+    let ey = floor((iy + yOff) + sin(a) * (coastR.ry + waveOff * 0.4));
     let foamA = (70 + sin(t * 1.2 + a * 4) * 28) * dayMix;
     // Pixel foam — animated horizontal rects
     fill(225, 242, 255, foamA);
@@ -4869,20 +4869,20 @@ function drawShoreWaves() {
     }
   }
   // Inner pixel foam — beach-to-shallow transition
-  let beachRX = state.islandRX * 0.96;
-  let beachRY = state.islandRY * 0.41;
-  let beachCY = iy - 14;
-  let grassRX = state.islandRX * 0.90;
-  let grassRY = state.islandRY * 0.36;
-  let grassCY = iy - 18;
+  // Uses coastline-aware radii to match island layers
   for (let a = 0; a < TWO_PI; a += 0.08) {
     let wavePhase = sin(t * 3.0 + a * 4 + 1.5);
     if (wavePhase > 0.35) {
+      let beachR = _getCoastlineRadiusAtAngle(a, iw * 0.48, ih * 0.205);
+      let grassR = _getCoastlineRadiusAtAngle(a, iw * 0.45, ih * 0.18);
+      let beachYOff = -14 * abs(sin(a));
+      let grassYOff = -18 * abs(sin(a));
       let waveOff = floor((wavePhase - 0.35) * 3);
-      let ex = floor(ix + cos(a) * (beachRX + waveOff));
-      let ey = floor(beachCY + sin(a) * (beachRY + waveOff * 0.4));
-      let gx2 = (ex - ix) / grassRX;
-      let gy2 = (ey - grassCY) / grassRY;
+      let ex = floor(ix + cos(a) * (beachR.rx + waveOff));
+      let ey = floor((iy + beachYOff) + sin(a) * (beachR.ry + waveOff * 0.4));
+      // Check against grass boundary (coastline-aware)
+      let gx2 = (ex - ix) / grassR.rx;
+      let gy2 = (ey - (iy + grassYOff)) / grassR.ry;
       if (gx2 * gx2 + gy2 * gy2 < 1.0) continue;
       fill(232, 248, 255, (wavePhase - 0.35) * 95 * dayMix);
       rect(ex - 3, ey, 6, 2);
