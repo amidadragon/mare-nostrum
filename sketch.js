@@ -17867,6 +17867,8 @@ function drawArenaIsleDistant() {
   let aLv = (typeof getArenaLevel === 'function') ? getArenaLevel() : 1;
   let inCombat = a.active;
 
+  // Arena details only when close
+  if (!a.active && !playerSwimming && !playerOnArena) { pop(); return; }
   // Arena floor (sand pit)
   fill(185, 170, 135);
   ellipse(fsx, fsy - 4, rx * 0.9, ry * 0.9);
