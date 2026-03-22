@@ -863,7 +863,13 @@ class SoundManager {
       narr_first_harvest: 'sounds/narration/narration_first_harvest.mp3',
       narr_first_build: 'sounds/narration/narration_first_build.mp3',
       narr_first_fish: 'sounds/narration/narration_first_fish.mp3',
-      narr_first_combat: 'sounds/narration/narration_first_combat.mp3'
+      narr_first_combat: 'sounds/narration/narration_first_combat.mp3',
+      narr_first_steps: 'sounds/narration/narration_first_steps.mp3',
+      narr_victory: 'sounds/narration/narration_victory.mp3',
+      narr_defeat: 'sounds/narration/narration_defeat.mp3',
+      narr_vulcan: 'sounds/narration/narration_vulcan.mp3',
+      narr_necropolis: 'sounds/narration/narration_necropolis.mp3',
+      narr_hyperborea: 'sounds/narration/narration_hyperborea.mp3'
     };
     let loaded = 0;
     const total = Object.keys(files).length;
