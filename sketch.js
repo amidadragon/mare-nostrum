@@ -125,6 +125,7 @@ const _BACKUP_KEY = 'sunlitIsles_backup';
 let factionSelectActive = false;  // true when showing faction choice screen
 let factionSelectHover = null;    // 'rome' | 'carthage' | 'egypt' | 'greece' | null
 let factionSelectFade = 0;        // fade-in alpha
+let _pendingFaction = null;        // confirmation step before faction lock
 
 // Faction constants — bonuses and colors
 const FACTIONS = {
@@ -9152,6 +9153,23 @@ function drawFactionSelect(dt) {
   textAlign(CENTER, TOP); textSize(10);
   fill(130, 120, 100, 200 * a);
   text('R: Rome  C: Carthage  E: Egypt  G: Greece  S: Sea People  P: Persia  F: Phoenicia  L: Gaul', width / 2, row2Y + cardH + 16);
+  // Confirmation overlay
+  if (_pendingFaction && FACTIONS[_pendingFaction]) {
+    let pf = FACTIONS[_pendingFaction];
+    let oW = min(360, width * 0.6), oH = 90;
+    let oX = (width - oW) / 2, oY = (height - oH) / 2;
+    fill(0, 0, 0, 180 * a); rect(0, 0, width, height);
+    fill(25, 22, 18, 240 * a); rect(oX, oY, oW, oH, 6);
+    stroke(pf.bannerColor[0], pf.bannerColor[1], pf.bannerColor[2], 200 * a);
+    strokeWeight(2); noFill(); rect(oX, oY, oW, oH, 6); noStroke();
+    textAlign(CENTER, CENTER); textSize(14);
+    fill(220, 200, 140, 240 * a);
+    text('You chose ' + pf.name, width / 2, oY + 24);
+    textSize(11); fill(170, 160, 140, 220 * a);
+    text('This is permanent! Press ENTER to confirm or ESC to cancel.', width / 2, oY + 52);
+    textSize(10); fill(140, 130, 110, 180 * a);
+    text('ENTER = confirm    ESC = cancel', width / 2, oY + 74);
+  }
   drawingContext.globalAlpha = 1;
 }
 function _drawFactionCard(x, y, w, h, fac, hovered, a) {
@@ -9237,8 +9255,15 @@ function _drawFactionCard(x, y, w, h, fac, hovered, a) {
     fill(42, 106, 48, 180 * a);
     for (let bi = -4; bi <= 4; bi += 2) rect(cx + bi, gy - 10, 2, 4);
   }
+  // Keyboard shortcut hint
+  var _fkMap = {rome:'R',carthage:'C',egypt:'E',greece:'G',seapeople:'S',persia:'P',phoenicia:'F',gaul:'L'};
+  var _fkName = '';
+  for (var _fk in _fkMap) { if (FACTIONS[_fk] === fac) { _fkName = _fk; break; } }
+  if (_fkName) { textAlign(CENTER, TOP); textSize(9); fill(120, 110, 90, 180 * a); text('[' + _fkMap[_fkName] + ']', cx, gy + 8); }
   textAlign(CENTER, TOP); textSize(14);
-  fill(bc[0] + 60, bc[1] + 60, bc[2] + 60, 240 * a); text(fac.name, cx, gy + 20);
+  fill(bc[0] + 60, bc[1] + 60, bc[2] + 60, 240 * a);
+  var _dispName = fac.name + (_fkName === 'seapeople' ? '  (ADVANCED)' : '');
+  text(_dispName, cx, gy + 20);
   textSize(10); fill(160, 150, 130, 200 * a); text(fac.subtitle, cx, gy + 38);
   textAlign(LEFT, TOP); textSize(11);
   let ly = gy + 58;
@@ -24925,7 +24950,8 @@ function mousePressed() {
   if (gameScreen !== 'game') { handleMenuClick(); return; }
   if (state.introPhase !== 'done') { skipIntro(); return; }
   if (factionSelectActive) {
-    if (factionSelectHover) selectFaction(factionSelectHover);
+    if (_pendingFaction) { selectFaction(_pendingFaction); _pendingFaction = null; return; }
+    if (factionSelectHover) { _pendingFaction = factionSelectHover; }
     return;
   }
   if (state.cutscene) { skipCutscene(); return; }
@@ -25471,14 +25497,19 @@ function keyPressed() {
   if (snd) snd.resume();
   // Faction select keyboard shortcuts
   if (factionSelectActive) {
-    if (key === 'r' || key === 'R') { selectFaction('rome'); return; }
-    if (key === 'c' || key === 'C') { selectFaction('carthage'); return; }
-    if (key === 'e' || key === 'E') { selectFaction('egypt'); return; }
-    if (key === 'g' || key === 'G') { selectFaction('greece'); return; }
-    if (key === 's' || key === 'S') { selectFaction('seapeople'); return; }
-    if (key === 'p' || key === 'P') { selectFaction('persia'); return; }
-    if (key === 'f' || key === 'F') { selectFaction('phoenicia'); return; }
-    if (key === 'l' || key === 'L') { selectFaction('gaul'); return; }
+    if (_pendingFaction) {
+      if (keyCode === 13 || keyCode === 10) { selectFaction(_pendingFaction); _pendingFaction = null; return; }
+      if (keyCode === 27) { _pendingFaction = null; return; }
+      return;
+    }
+    if (key === 'r' || key === 'R') { _pendingFaction = 'rome'; return; }
+    if (key === 'c' || key === 'C') { _pendingFaction = 'carthage'; return; }
+    if (key === 'e' || key === 'E') { _pendingFaction = 'egypt'; return; }
+    if (key === 'g' || key === 'G') { _pendingFaction = 'greece'; return; }
+    if (key === 's' || key === 'S') { _pendingFaction = 'seapeople'; return; }
+    if (key === 'p' || key === 'P') { _pendingFaction = 'persia'; return; }
+    if (key === 'f' || key === 'F') { _pendingFaction = 'phoenicia'; return; }
+    if (key === 'l' || key === 'L') { _pendingFaction = 'gaul'; return; }
     return;
   }
   // Island milestone overlay — dismiss on any key
