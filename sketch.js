@@ -17583,8 +17583,72 @@ function drawConquestDistantEntities() {
 // ─── ARENA DRAWING ───────────────────────────────────────────────────────
 
 function drawArenaIsleDistant() {
-  // DEBUG removed
-  // Draw the arena as a proper island with layered coastline (same technique as main island)
+  if (state.adventure.active) return;
+  // Use the SAME rendering as nation islands -- simple, proven, works with perspective
+  let a = state.adventure;
+  let sx = w2sX(a.isleX), sy = w2sY(a.isleY);
+  let _horizY = max(height * 0.06, height * 0.25 - horizonOffset) + 5;
+  sy = max(sy, _horizY);
+  let _dScale = (typeof _getDistantScale === 'function') ? _getDistantScale(a.isleX, a.isleY, a.isleRX) : null;
+  if (_dScale && _dScale.dist > (typeof _getMaxViewDist === 'function' ? _getMaxViewDist() : 4000)) return;
+  if (sx < -400 || sx > width + 400) return;
+
+  push(); noStroke();
+  if (_dScale && _dScale.scale < 0.98) {
+    translate(sx, sy); scale(_dScale.scale); translate(-sx, -sy);
+  }
+  let bright = getSkyBrightness();
+  let fsx = floor(sx), fsy = floor(sy);
+  let rx = a.isleRX, ry = a.isleRY * 0.45; // isometric squash
+
+  // Water shadow
+  fill(20, 60, 80, 35);
+  ellipse(fsx + 3, fsy + 4, rx * 2.2, ry * 2.2);
+  // Shallow water
+  fill(lerp(40, 80, bright), lerp(80, 160, bright), lerp(110, 185, bright), 200);
+  ellipse(fsx, fsy, rx * 2.1, ry * 2.1);
+  fill(lerp(50, 95, bright), lerp(90, 175, bright), lerp(120, 190, bright), 210);
+  ellipse(fsx, fsy, rx * 1.9, ry * 1.9);
+  // Beach
+  fill(215, 195, 155);
+  ellipse(fsx, fsy - 2, rx * 1.7, ry * 1.7);
+  // Grass
+  let sg = (typeof getSeasonGrass === 'function') ? getSeasonGrass() : { r: 90, g: 130, b: 70 };
+  fill(sg.r + 10, sg.g + 10, sg.b + 5);
+  ellipse(fsx, fsy - 3, rx * 1.5, ry * 1.5);
+  fill(sg.r, sg.g, sg.b);
+  ellipse(fsx, fsy - 4, rx * 1.3, ry * 1.3);
+
+  // Arena structure (simple, scales with ellipses above)
+  let aLv = (typeof getArenaLevel === 'function') ? getArenaLevel() : 1;
+  fill(170, 155, 130);
+  ellipse(fsx, fsy - 5, rx * 1.0, ry * 1.0); // arena floor
+  if (aLv >= 2) {
+    noFill(); stroke(140, 125, 105); strokeWeight(max(1, 2 * ((_dScale && _dScale.scale) || 1)));
+    ellipse(fsx, fsy - 5, rx * 1.1, ry * 1.1); // stone wall ring
+    noStroke();
+  }
+  // Faction flag
+  let fm = (typeof getFactionMilitary === 'function') ? getFactionMilitary() : null;
+  if (fm) {
+    fill(fm.cape[0], fm.cape[1], fm.cape[2]);
+    rect(fsx - 1, fsy - 15, 2, 10);
+    rect(fsx + 1, fsy - 15, 6 + sin(frameCount * 0.08) * 2, 4);
+  }
+  // Name
+  fill(255, 220, 150, 180); textAlign(CENTER, TOP); textSize(8);
+  text('Arena', fsx, fsy + ry * 1.1 + 2);
+  textAlign(LEFT, TOP);
+
+  pop();
+  if (a.bridgeBuilt) drawArenaBridge();
+}
+
+/* OLD drawArenaIsleDistant code deleted - was 200 lines of custom coastline rendering
+   that didn't work with perspective scaling. Replaced with simple ellipse-based renderer
+   matching nation island style. */
+
+function _drawArenaIsleDistant_DELETED() { // placeholder to maintain line numbers
   if (state.adventure.active) return;
   let a = state.adventure;
   let sx = w2sX(a.isleX);

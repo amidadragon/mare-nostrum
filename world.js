@@ -675,16 +675,16 @@ function drawMoonPhased(bright) {
 
   // Moonlight glow on water/ground (stronger at full moon)
   let fullness = 1 - abs(phase - 0.5) * 2; // 0 at new, 1 at full
-  let glowR = 8 + fullness * 6;
-  fill(140, 170, 210, moonAlpha * 0.06 * fullness);
-  ellipse(moonX, moonY, glowR * 3, glowR * 2.5);
-  fill(160, 185, 220, moonAlpha * 0.03 * fullness);
-  ellipse(moonX, moonY, glowR * 4.5, glowR * 3);
+  let glowR = 4 + fullness * 3; // much smaller glow
+  fill(140, 170, 210, moonAlpha * 0.04 * fullness);
+  ellipse(moonX, moonY, glowR * 2.5, glowR * 2);
+  fill(160, 185, 220, moonAlpha * 0.02 * fullness);
+  ellipse(moonX, moonY, glowR * 3.5, glowR * 2.5);
 
-  // Pixel cross glow
-  fill(180, 200, 230, moonAlpha * 0.15 * (0.3 + fullness * 0.7));
-  rect(moonX - 1, moonY - 14, 2, 28);
-  rect(moonX - 14, moonY - 1, 28, 2);
+  // Pixel cross glow (smaller)
+  fill(180, 200, 230, moonAlpha * 0.1 * (0.3 + fullness * 0.7));
+  rect(moonX - 1, moonY - 8, 2, 16);
+  rect(moonX - 8, moonY - 1, 16, 2);
 
   // Moon body (~16px)
   fill(220, 225, 235, moonAlpha);
