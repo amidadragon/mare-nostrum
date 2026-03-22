@@ -25442,7 +25442,7 @@ function mousePressed() {
     }
   }
 
-  if (!clicked && mouseButton === LEFT) {
+  if (!clicked && mouseButton === LEFT && !(state._buildExitFrame && frameCount - state._buildExitFrame < 10)) {
     let wx = s2wX(mouseX);
     let wy = s2wY(mouseY);
     state.player.targetX = wx;
@@ -25661,7 +25661,7 @@ function keyPressed() {
       return;
     }
     if (state.demolishConfirm) { state.demolishConfirm = null; return; }
-    if (state.buildMode) { state.buildMode = false; return; }
+    if (state.buildMode) { state.buildMode = false; state._buildExitFrame = frameCount; return; }
     if (state.insideTemple) {
       state.insideTemple = false;
       state.player.x = state._templeReturnX || state.pyramid.x;
@@ -26933,6 +26933,7 @@ function keyPressed() {
       addFloatingText(width / 2, height * 0.4, 'BUILD MODE ON', C.crystalGlow);
     } else {
       addFloatingText(width / 2, height * 0.4, 'BUILD MODE OFF', C.textDim);
+      state._buildExitFrame = frameCount;
     }
   }
 
