@@ -23741,7 +23741,7 @@ function drawConquestIsleDistant() {
     drawIslandShape(sx, sy, rx * 0.925, ry * 0.925, -4, _cqSeed);
     // Lighter meadow center
     fill(70, 120, 48, 50);
-    ellipse(sx, sy + ry * 0.1, rx * 0.9, ry * 0.6);
+    drawIslandShape(sx, sy + ry * 0.1, rx * 0.45, ry * 0.3, -5, _cqSeed + 1);
     // Golden colony glow
     fill(255, 220, 100, 8);
     drawIslandShape(sx, sy, rx * 0.75, ry * 0.75, -5, _cqSeed);
@@ -23772,9 +23772,9 @@ function drawConquestIsleDistant() {
     fill(28, 62, 25);
     drawIslandShape(sx, sy, rx * 0.88, ry * 0.88, -4, _cqSeed);
     // Hills / ridgeline
-    fill(22, 55, 20); ellipse(sx - 15, sy - 8, 100, 65);
-    fill(28, 68, 25); ellipse(sx + 10, sy - 14, 75, 48);
-    fill(35, 78, 32); ellipse(sx - 5, sy - 18, 52, 32);
+    fill(22, 55, 20); drawIslandShape(sx - 15, sy - 8, 50, 32, -6, _cqSeed + 2);
+    fill(28, 68, 25); drawIslandShape(sx + 10, sy - 14, 37, 24, -6, _cqSeed + 3);
+    fill(35, 78, 32); drawIslandShape(sx - 5, sy - 18, 26, 16, -6, _cqSeed + 4);
     // Tree canopy clusters
     for (let i = 0; i < 14; i++) {
       let ta = (i * 2.39996) % TWO_PI;
@@ -23788,7 +23788,7 @@ function drawConquestIsleDistant() {
     }
     // Mist over wild island
     fill(160, 180, 160, 18 + sin(frameCount * 0.015) * 10);
-    ellipse(sx, sy, rx * 1.8, ry * 1.3);
+    drawIslandShape(sx, sy, rx * 0.9, ry * 0.65, -2, _cqSeed + 5);
     // Enemy camp fires visible from distance (if explored)
     if (c.phase !== 'unexplored' && c.phase !== 'locked') {
       for (let i = 0; i < 3; i++) {

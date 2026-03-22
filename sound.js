@@ -1157,9 +1157,11 @@ class SoundManager {
   // ─── RECORDED MUSIC SYSTEM ───
   // Call each frame. Selects and loops appropriate music track based on game state.
   // Only active when gameSettings.musicSource === 'recorded'.
-  // Crossfades between tracks over ~1s.
+  // Crossfades between tracks over ~1s. Adds silence gaps and track variation.
   updateMusic() {
     if (!this.ready || !this._samplesLoaded) return;
+    // Initialize music state for silence gaps / variation
+    if (!this._musicState) this._musicState = { silenceTimer: 0, lastTrack: null, loopCount: 0 };
     let useRecorded = typeof gameSettings !== 'undefined' && gameSettings.musicSource === 'recorded';
     if (!useRecorded) {
       if (this._musicTrack) {
@@ -1173,6 +1175,8 @@ class SoundManager {
         this._musicFadingOut = null;
       }
       this._musicFadeIn = 1;
+      this._musicState.silenceTimer = 0;
+      this._musicState.loopCount = 0;
       return;
     }
     let musicVol = this.vol.master * this.vol.music;
@@ -1189,6 +1193,21 @@ class SoundManager {
     if (this._musicFadeIn === undefined) this._musicFadeIn = 1;
     if (!this._musicFadingOut) this._musicFadingOut = null;
     if (!this._musicFadeOut) this._musicFadeOut = 0;
+
+    // Handle silence gap countdown
+    if (this._musicState.silenceTimer > 0) {
+      this._musicState.silenceTimer--;
+      // Keep fading out old track during silence
+      if (this._musicFadingOut) {
+        this._musicFadeOut = max(0, this._musicFadeOut - 0.02);
+        let s = this._samples[this._musicFadingOut];
+        if (s && s.isPlaying()) {
+          s.setVolume(musicVol * this._musicFadeOut);
+          if (this._musicFadeOut <= 0) { s.stop(); this._musicFadingOut = null; }
+        } else { this._musicFadingOut = null; }
+      }
+      return;
+    }
 
     // Determine desired track
     let target = 'music_peaceful';
@@ -1246,19 +1265,69 @@ class SoundManager {
         this._musicFadingOut = this._musicTrack;
         this._musicFadeOut = this._musicFadeIn; // fade from current level
       }
-      // Start new track fading in
+      // Start new track fading in (use play, not loop, so we can detect end)
       let s = this._samples[target];
       if (s) {
         this._musicFadeIn = 0;
         s.setVolume(0);
-        s.loop();
+        s.play();
         this._musicTrack = target;
+        this._musicState.loopCount = 0;
       }
     } else {
-      // Update volume with fade-in
       let s = this._samples[this._musicTrack];
-      if (s) s.setVolume(musicVol * this._musicFadeIn);
+      if (s) {
+        // Detect track ended (not playing + no silence timer = track finished)
+        if (!s.isPlaying() && this._musicFadeIn >= 1 && this._musicState.silenceTimer <= 0) {
+          this._musicState.loopCount++;
+          let roll = Math.random();
+          if (this._musicState.loopCount > 2 && roll < 0.3) {
+            // 30% chance: silence gap (15-30 sec = 900-1800 frames at 60fps)
+            this._musicState.silenceTimer = Math.floor(Math.random() * 900 + 900);
+            this._musicState.lastTrack = this._musicTrack;
+            return;
+          } else if (roll < 0.5) {
+            // 20% chance: switch to different track in same mood
+            let alt = this._pickAlternateMusicTrack(target);
+            if (alt && alt !== target) {
+              let as = this._samples[alt];
+              if (as) {
+                as.setVolume(0);
+                as.play();
+                this._musicTrack = alt;
+                this._musicFadeIn = 0;
+                this._musicState.loopCount = 0;
+                return;
+              }
+            }
+            // Fallback: just replay same track
+            s.play();
+          } else {
+            // 50% chance: continue looping normally
+            s.play();
+          }
+        }
+        // Update volume with fade-in
+        s.setVolume(musicVol * this._musicFadeIn);
+      }
     }
+  }
+
+  // Pick a different music track in the same mood category
+  _pickAlternateMusicTrack(current) {
+    let moodGroups = {
+      calm: ['music_peaceful', 'music_night', 'music_temple'],
+      intense: ['music_combat', 'music_raid'],
+      adventure: ['music_sailing', 'music_vulcan', 'music_hyperborea'],
+      special: ['music_festival', 'music_necropolis']
+    };
+    for (let group of Object.values(moodGroups)) {
+      if (group.includes(current) && group.length > 1) {
+        let candidates = group.filter(t => t !== current && this._samples[t]);
+        if (candidates.length > 0) return candidates[Math.floor(Math.random() * candidates.length)];
+      }
+    }
+    return null;
   }
 
   // Play a one-shot music sting (victory, etc)
