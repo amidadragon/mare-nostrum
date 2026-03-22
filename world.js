@@ -12,12 +12,12 @@ function getCoastlineVerts() {
   _coastlineVerts = [];
   let numVerts = 128;
   let noiseSeed = 42;
-  let noiseScale = Math.min(1, ry / 450);
+  let noiseScale = Math.min(1, ry / 350);
   for (let i = 0; i < numVerts; i++) {
     let angle = (i / numVerts) * TWO_PI;
     let noiseVal = noise(cos(angle) * 2 + noiseSeed, sin(angle) * 2 + noiseSeed);
     let noiseVal2 = noise(cos(angle) * 0.9 + noiseSeed + 100, sin(angle) * 0.9 + noiseSeed + 100);
-    let offset = (noiseVal - 0.5) * 0.14 * noiseScale + (noiseVal2 - 0.5) * 0.08 * noiseScale;
+    let offset = (noiseVal - 0.5) * 0.18 * noiseScale + (noiseVal2 - 0.5) * 0.10 * noiseScale;
 
     // Angular bias: south wider (beach/port), north narrower (rocky)
     let sy = Math.sin(angle); // +1 at south (PI/2), -1 at north
@@ -26,13 +26,22 @@ function getCoastlineVerts() {
     // Fixed geographic features to break ellipse symmetry
     // West headland/peninsula (angle ~PI)
     let westDist = Math.abs(angle - Math.PI);
-    if (westDist < 0.35) offset += (0.35 - westDist) / 0.35 * 0.06 * noiseScale;
-    // Northeast bay/indent (angle ~5.5 rad, i.e. ~315 degrees)
+    if (westDist < 0.35) offset += (0.35 - westDist) / 0.35 * 0.09 * noiseScale;
+    // Northeast bay/indent (angle ~0.4 rad)
     let neDist = Math.abs(angle - 0.4);
-    if (neDist < 0.3) offset -= (0.3 - neDist) / 0.3 * 0.05 * noiseScale;
+    if (neDist < 0.3) offset -= (0.3 - neDist) / 0.3 * 0.075 * noiseScale;
     // South beach — wider flatter area (angle ~PI/2)
     let southDist = Math.abs(angle - Math.PI * 0.5);
-    if (southDist < 0.5) offset += (0.5 - southDist) / 0.5 * 0.03 * noiseScale;
+    if (southDist < 0.5) offset += (0.5 - southDist) / 0.5 * 0.045 * noiseScale;
+    // Northwest peninsula (angle ~3*PI/4)
+    let nwDist = Math.abs(angle - Math.PI * 0.75);
+    if (nwDist < 0.3) offset += (0.3 - nwDist) / 0.3 * 0.08 * noiseScale;
+    // Southeast cove (angle ~5*PI/4)
+    let seDist = Math.abs(angle - Math.PI * 1.25);
+    if (seDist < 0.25) offset -= (0.25 - seDist) / 0.25 * 0.06 * noiseScale;
+    // East bluff (angle ~0.2)
+    let eDist = Math.abs(angle - 0.2);
+    if (eDist < 0.25) offset += (0.25 - eDist) / 0.25 * 0.05 * noiseScale;
 
     _coastlineVerts.push({ angle: angle, offset: offset });
   }
@@ -301,10 +310,10 @@ function drawSunbeams(sunX, sunY, h) {
   }
 
   // Extra glow halo around sun during golden hour
-  fill(255, 220, 140, 30 * intensity);
-  ellipse(sunX, sunY, 70, 70);
-  fill(255, 230, 160, 18 * intensity);
-  ellipse(sunX, sunY, 110, 110);
+  fill(255, 220, 140, 25 * intensity);
+  ellipse(sunX, sunY, 45, 45);
+  fill(255, 230, 160, 12 * intensity);
+  ellipse(sunX, sunY, 65, 65);
 }
 
 let _cachedSkyTop = null, _cachedSkyBot = null, _cachedSkyFrame = -1;
@@ -612,11 +621,11 @@ function drawMoonPhased(bright) {
 
   // Moonlight glow on water/ground (stronger at full moon)
   let fullness = 1 - abs(phase - 0.5) * 2; // 0 at new, 1 at full
-  let glowR = 30 + fullness * 30;
+  let glowR = 12 + fullness * 10;
   fill(140, 170, 210, moonAlpha * 0.06 * fullness);
-  ellipse(moonX, moonY, glowR * 4, glowR * 3);
+  ellipse(moonX, moonY, glowR * 3, glowR * 2.5);
   fill(160, 185, 220, moonAlpha * 0.03 * fullness);
-  ellipse(moonX, moonY, glowR * 6, glowR * 4);
+  ellipse(moonX, moonY, glowR * 4.5, glowR * 3);
 
   // Pixel cross glow
   fill(180, 200, 230, moonAlpha * 0.15 * (0.3 + fullness * 0.7));
@@ -891,17 +900,17 @@ function drawIsland() {
 
   // ─── CLIFF EDGE — rocky band between water and beach ───
   // Bottom rock band — outermost, darkest
-  fill(70, 58, 40);
-  drawCoastlineShape(ix, iy, iw * 0.482, ih * 0.208, -7);
+  fill(130, 115, 88);
+  drawCoastlineShape(ix, iy, iw * 0.478, ih * 0.206, -7);
   // Lighter rock/sandstone
-  fill(120, 100, 72);
-  drawCoastlineShape(ix, iy, iw * 0.480, ih * 0.206, -9);
+  fill(155, 140, 110);
+  drawCoastlineShape(ix, iy, iw * 0.477, ih * 0.205, -9);
   // Mid brown dirt
-  fill(95, 72, 48);
-  drawCoastlineShape(ix, iy, iw * 0.478, ih * 0.204, -11);
+  fill(145, 128, 100);
+  drawCoastlineShape(ix, iy, iw * 0.476, ih * 0.204, -11);
   // Dark earth band (innermost cliff layer, transitions to sand)
-  fill(82, 62, 42);
-  drawCoastlineShape(ix, iy, iw * 0.476, ih * 0.202, -13);
+  fill(140, 122, 95);
+  drawCoastlineShape(ix, iy, iw * 0.475, ih * 0.203, -13);
 
   // ─── BEACH — layered sand strip between water and cliff ───
   // Wet sand at waterline (darkest, simulates wave-lapped sand)
