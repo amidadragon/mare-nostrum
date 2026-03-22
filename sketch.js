@@ -21244,6 +21244,8 @@ function drawNationIslesDistant() {
   }
 }
 
+let _factionCoastCache = {};
+
 function drawSingleNationIsleDistant(key) {
   let rv = state.nations[key];
   if (!rv || rv.defeated) return;
@@ -21301,32 +21303,45 @@ function drawSingleNationIsleDistant(key) {
 
   // Unique seed per faction
   let _islandSeed = key.charCodeAt(0) * 7 + key.charCodeAt(1) * 13;
-  // Water shadow
-  fill(20, 60, 80, 30);
-  drawIslandShape(fsx + 3, fsy + 4, rx * 1.05, ry * 1.05, -2, _islandSeed);
-  // Shallow water ring
-  fill(55, 140, 160, 45);
-  drawIslandShape(fsx, fsy, rx * 1.025, ry * 1.025, -2, _islandSeed);
-  // Shore waves
-  stroke(200, 220, 255, 20 + sin(frameCount * 0.04) * 10);
-  strokeWeight(1.5); noFill();
-  drawIslandShape(fsx, fsy, rx * 1.0 + sin(frameCount * 0.025) * 1.5, ry * 1.0 + sin(frameCount * 0.025) * 1, -3, _islandSeed);
-  noStroke();
-  // Beach ring
-  fill(beachCol[0], beachCol[1], beachCol[2]);
-  drawIslandShape(fsx, fsy, rx * 0.975, ry * 0.975, -3, _islandSeed);
-  // Beach texture dots
-  fill(beachCol[0] - 15, beachCol[1] - 15, beachCol[2] - 10, 40);
-  for (let i = 0; i < 6; i++) {
-    let ba = (i / 6) * TWO_PI + 0.8;
-    ellipse(fsx + cos(ba) * rx * 0.92, fsy + sin(ba) * ry * 0.65, 8, 4);
+
+  // Use reusable coastline system if palette exists
+  let _facPalette = ISLAND_PALETTES[key] || null;
+  if (_facPalette) {
+    if (!_factionCoastCache[key]) {
+      let _features = [];
+      if (key === 'carthage') _features = [{angle: Math.PI*0.6, strength: 0.07, width: 0.4, type: 'headland'}, {angle: Math.PI*1.5, strength: 0.05, width: 0.3, type: 'bay'}];
+      else if (key === 'egypt') _features = [{angle: Math.PI*0.4, strength: 0.06, width: 0.5, type: 'headland'}, {angle: Math.PI*1.1, strength: 0.04, width: 0.35, type: 'bay'}];
+      else if (key === 'greece') _features = [{angle: Math.PI*0.3, strength: 0.08, width: 0.35, type: 'bay'}, {angle: Math.PI*1.3, strength: 0.06, width: 0.3, type: 'peninsula'}];
+      else if (key === 'seapeople') _features = [{angle: Math.PI*0.7, strength: 0.09, width: 0.3, type: 'headland'}, {angle: Math.PI*1.6, strength: 0.07, width: 0.25, type: 'bay'}];
+      else if (key === 'persia') _features = [{angle: Math.PI*0.5, strength: 0.05, width: 0.45, type: 'headland'}, {angle: Math.PI*1.4, strength: 0.04, width: 0.3, type: 'bay'}];
+      else if (key === 'phoenicia') _features = [{angle: Math.PI*0.8, strength: 0.07, width: 0.35, type: 'peninsula'}, {angle: Math.PI*0.2, strength: 0.05, width: 0.3, type: 'bay'}];
+      else if (key === 'gaul') _features = [{angle: Math.PI*1.0, strength: 0.06, width: 0.4, type: 'headland'}, {angle: Math.PI*1.8, strength: 0.05, width: 0.3, type: 'bay'}];
+      else _features = [{angle: Math.PI*0.5, strength: 0.05, width: 0.35, type: 'headland'}];
+      _factionCoastCache[key] = generateIslandCoastline(_islandSeed, 64, rx, ry, _features);
+    }
+    drawIslandBase(fsx, fsy, rx, ry, _factionCoastCache[key], _facPalette, 'medium');
+  } else {
+    // Fallback: old ellipse-based rendering for unknown factions
+    fill(20, 60, 80, 30);
+    drawIslandShape(fsx + 3, fsy + 4, rx * 1.05, ry * 1.05, -2, _islandSeed);
+    fill(55, 140, 160, 45);
+    drawIslandShape(fsx, fsy, rx * 1.025, ry * 1.025, -2, _islandSeed);
+    stroke(200, 220, 255, 20 + sin(frameCount * 0.04) * 10);
+    strokeWeight(1.5); noFill();
+    drawIslandShape(fsx, fsy, rx * 1.0 + sin(frameCount * 0.025) * 1.5, ry * 1.0 + sin(frameCount * 0.025) * 1, -3, _islandSeed);
+    noStroke();
+    fill(beachCol[0], beachCol[1], beachCol[2]);
+    drawIslandShape(fsx, fsy, rx * 0.975, ry * 0.975, -3, _islandSeed);
+    fill(beachCol[0] - 15, beachCol[1] - 15, beachCol[2] - 10, 40);
+    for (let i = 0; i < 6; i++) {
+      let ba = (i / 6) * TWO_PI + 0.8;
+      ellipse(fsx + cos(ba) * rx * 0.92, fsy + sin(ba) * ry * 0.65, 8, 4);
+    }
+    fill(terrainCol[0], terrainCol[1], terrainCol[2]);
+    drawIslandShape(fsx, fsy, rx * 0.89, ry * 0.89, -4, _islandSeed);
+    fill(terrainCol[0] + 10, terrainCol[1] + 15, terrainCol[2] + 5, 60);
+    ellipse(fsx, fsy + ry * 0.05, rx * 0.9, ry * 0.6);
   }
-  // Main terrain
-  fill(terrainCol[0], terrainCol[1], terrainCol[2]);
-  drawIslandShape(fsx, fsy, rx * 0.89, ry * 0.89, -4, _islandSeed);
-  // Lighter center meadow
-  fill(terrainCol[0] + 10, terrainCol[1] + 15, terrainCol[2] + 5, 60);
-  ellipse(fsx, fsy + ry * 0.05, rx * 0.9, ry * 0.6);
 
   // Trees (faction-appropriate) — 4-7 based on level
   let numTrees = min(4 + lv, 8);
