@@ -30,6 +30,7 @@ DIST_FILES=(
   icon-192.png
   icon-384.png
   icon-512.png
+  logo.png
 )
 
 # Verify all dist files exist
