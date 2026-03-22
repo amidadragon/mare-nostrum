@@ -17573,17 +17573,32 @@ function drawConquestDistantEntities() {
 
 function drawArenaIsleDistant() {
   let a = state.adventure;
-  let sx = w2sX(a.isleX), sy = w2sY(a.isleY);
 
-  // Check if player is swimming toward arena or near it
+  // Only render the arena island when player is NEAR it (swimming, on it, or fighting)
+  // From the home island, just show a small label -- no island rendering
   let playerSwimming = typeof isInArenaSwimZone === 'function' &&
     state.player && isInArenaSwimZone(state.player.x, state.player.y);
   let playerOnArena = typeof isOnArenaIsland === 'function' &&
     state.player && isOnArenaIsland(state.player.x, state.player.y);
-  let playerNear = playerSwimming || playerOnArena;
+  if (!a.active && !playerSwimming && !playerOnArena) {
+    // Just draw a tiny label on the horizon, no island shape
+    let lsx = w2sX(a.isleX), lsy = w2sY(a.isleY);
+    let _horizY = max(height * 0.06, height * 0.25 - horizonOffset) + 5;
+    lsy = max(lsy, _horizY);
+    if (lsx > 0 && lsx < width && lsy > 0 && lsy < height * 0.5) {
+      push(); noStroke();
+      fill(255, 220, 150, 140); textAlign(CENTER, CENTER); textSize(8);
+      text('Arena \u2694', lsx, lsy);
+      if (a.bestWave > 0) { fill(180, 160, 120, 120); textSize(7); text('Wave ' + a.bestWave, lsx, lsy + 10); }
+      textAlign(LEFT, TOP);
+      pop();
+    }
+    return;
+  }
 
-  // Only clamp to horizon and apply distance scale when viewing from far away
-  if (!playerNear) {
+  let sx = w2sX(a.isleX), sy = w2sY(a.isleY);
+  // Player is already confirmed near (swimming, on island, or fighting) from check above
+  if (!a.active && !playerSwimming && !playerOnArena) {
     let _horizY = max(height * 0.06, height * 0.25 - horizonOffset) + 5;
     sy = max(sy, _horizY);
     let _dScale = (typeof _getDistantScale === 'function') ? _getDistantScale(a.isleX, a.isleY, a.isleRX) : null;
