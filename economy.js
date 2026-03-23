@@ -168,7 +168,7 @@ function updateTradeRoutes(dt) {
           let demandMult = getDemandBonus(route.good);
           goldGain = floor(goldGain * demandMult);
           // Reputation price modifier
-          if (typeof getReputationPriceMult === 'function') goldGain = floor(goldGain * (2 - getReputationPriceMult()));
+          if (typeof getReputationPriceMult === 'function') goldGain = max(0, floor(goldGain * (2 - getReputationPriceMult())));
           state.gold += goldGain;
           route.goldEarned += goldGain;
           if (typeof adjustReputation === 'function') adjustReputation(1);
@@ -724,9 +724,11 @@ function updateMarketDemand() {
   let goodKeys = Object.keys(TRADE_GOODS);
   // Pick 2 demand goods, seeded by day
   let seed = day * 7 + 31;
+  if (goodKeys.length < 2) { _currentDemand = goodKeys.slice(0, 2); return; }
   let i1 = Math.floor(_hannoSeededRandom(seed) * goodKeys.length);
   let i2 = Math.floor(_hannoSeededRandom(seed + 99) * (goodKeys.length - 1));
   if (i2 >= i1) i2++;
+  i2 = Math.min(i2, goodKeys.length - 1);
   _currentDemand = [goodKeys[i1], goodKeys[i2]];
   // Notify on day transition if player has trade routes
   if (state.tradeRoutes.length > 0 || state.conquest.colonized) {

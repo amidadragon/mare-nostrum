@@ -956,6 +956,7 @@ function onPlotHarvest(p) {
   let sameCrop = (p.lastCrop === cropType);
   p.fertility = max(0, p.fertility - (sameCrop ? 15 : 5));
   // Check rotation bonus: 3 different crops in sequence
+  if (!p.cropHistory) p.cropHistory = [];
   p.cropHistory.push(cropType);
   if (p.cropHistory.length > 3) p.cropHistory.shift();
   let rotationBonus = false;
