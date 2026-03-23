@@ -4996,7 +4996,7 @@ function _drawWarShip(ship, isPlayer) {
 }
 
 function _drawHPBar(x, y, w2, h, hp, maxHp, label) {
-  let pct = max(0, hp / maxHp);
+  let pct = maxHp > 0 ? max(0, hp / maxHp) : 0;
   fill(40, 0, 0, 180); noStroke();
   rect(x, y, w2, h);
   fill(pct > 0.5 ? color(80, 180, 80) : pct > 0.25 ? color(200, 180, 40) : color(200, 60, 40));

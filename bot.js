@@ -68,10 +68,10 @@ const BotAI = {
     let is = nation.islandState, cx = nation.isleX, cy = nation.isleY;
     let rx = is.islandRX || 500, ry = is.islandRY || 320;
     switch (type) {
-      case 'mine_crystal': { let n = is.crystalNodes.find(n => (n.charge||0) > 0); return n ? { type, target: {x:n.x,y:n.y}, timer: 0 } : null; }
-      case 'chop': { let t = is.trees[Math.floor(Math.random()*is.trees.length)]; return t ? { type, target: {x:t.x,y:t.y}, timer: 0 } : null; }
-      case 'harvest': { let p = is.plots.find(p => p.stage==='ready'); return p ? { type, target: {x:p.x,y:p.y}, timer: 0 } : null; }
-      case 'plant': { let p = is.plots.find(p => !p.crop); return p ? { type, target: {x:p.x,y:p.y}, timer: 0 } : null; }
+      case 'mine_crystal': { let n = is.crystalNodes && is.crystalNodes.find(n => (n.charge||0) > 0); return n ? { type, target: {x:n.x,y:n.y}, timer: 0 } : null; }
+      case 'chop': { let t = is.trees && is.trees.length > 0 ? is.trees[Math.floor(Math.random()*is.trees.length)] : null; return t ? { type, target: {x:t.x,y:t.y}, timer: 0 } : null; }
+      case 'harvest': { let p = is.plots && is.plots.find(p => p.stage==='ready'); return p ? { type, target: {x:p.x,y:p.y}, timer: 0 } : null; }
+      case 'plant': { let p = is.plots && is.plots.find(p => !p.crop); return p ? { type, target: {x:p.x,y:p.y}, timer: 0 } : null; }
       case 'mine_stone': return { type, target: {x: cx+(Math.random()-0.5)*rx*0.4, y: cy+(Math.random()-0.5)*ry*0.2}, timer: 0 };
       case 'expand': return { type, target: {x: cx-rx*0.7, y: cy}, timer: 0 };
       case 'recruit': { let b = is.buildings ? is.buildings.find(b => b.type==='castrum') : null; return { type, target: b ? {x:b.x,y:b.y} : {x:cx,y:cy}, timer: 0 }; }
