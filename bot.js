@@ -87,8 +87,21 @@ const BotAI = {
         if ((cn.charge || 0) < 50) cn.charge = Math.min(50, (cn.charge || 0) + 0.25);
       }
     }
+    // Population growth: spawn new citizens when food + housing available
+    let is = nation.islandState;
+    if (is && is.citizens && Math.random() < 0.002) {
+      let maxPop = 5 + (is.islandLevel || 1) * 2;
+      let domusCount = is.buildings ? is.buildings.filter(b => b.type === 'domus' || b.type === 'villa').length : 0;
+      maxPop += domusCount * 3;
+      if (is.citizens.length < maxPop && (is.harvest || 0) > 0) {
+        is.harvest = Math.max(0, (is.harvest || 0) - 1);
+        let cx = nation.isleX, cy = nation.isleY;
+        is.citizens.push({ x: cx + (Math.random()-0.5)*80, y: cy + (Math.random()-0.5)*30, speed: 0.3 + Math.random()*0.2, targetX: cx, targetY: cy, moveTimer: 60, skin: Math.floor(Math.random()*5), variant: Math.floor(Math.random()*4), facing: Math.random()>0.5?1:-1, state: 'walking', walkBobPhase: Math.random()*Math.PI*2, tunicR: 100+Math.floor(Math.random()*80), tunicG: 80+Math.floor(Math.random()*60), tunicB: 60+Math.floor(Math.random()*40), activity: null, activityTimer: 0 });
+        nation.population = is.citizens.length;
+      }
+    }
     // Passive income: small gold trickle from population
-    if (nation.islandState.citizens && nation.islandState.citizens.length > 0 && Math.random() < 0.005) {
+    if (is && is.citizens && is.citizens.length > 0 && Math.random() < 0.005) {
       nation.islandState.gold = (nation.islandState.gold || 0) + 1;
       nation.gold = (nation.gold || 0) + 1;
     }
