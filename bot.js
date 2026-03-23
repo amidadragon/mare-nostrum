@@ -48,6 +48,14 @@ const BotAI = {
     // Trade: bots with market/forum generate gold
     if (is.buildings && is.buildings.some(b => b.type === 'forum' || b.type === 'market'))
       actions.push({ type: 'trade', score: 0.8 });
+    // Build: place strategic buildings when resources available
+    if (wood >= 15 && stone >= 10 && is.buildings && level >= 3) {
+      let hasWall = is.buildings.some(b => b.type === 'wall');
+      let hasTower = is.buildings.some(b => b.type === 'watchtower');
+      let hasForge = is.buildings.some(b => b.type === 'forge');
+      if (!hasWall || !hasTower || !hasForge)
+        actions.push({ type: 'build', score: 0.9 });
+    }
     // Regrow trees: bots replant when trees are low
     if (is.trees && is.trees.length < 8 && wood >= 5)
       actions.push({ type: 'replant', score: 0.6 });
@@ -135,6 +143,7 @@ const BotAI = {
       case 'trade': { let b = is.buildings ? is.buildings.find(b => b.type==='forum'||b.type==='market') : null; return { type, target: b ? {x:b.x,y:b.y} : {x:cx,y:cy}, timer: 0 }; }
       case 'replant': return { type, target: {x: cx+(Math.random()-0.5)*rx*0.4, y: cy+(Math.random()-0.5)*ry*0.15}, timer: 0 };
       case 'tend_crops': { let p = is.plots && is.plots.find(p => p.crop && p.stage==='growing'); return p ? { type, target: {x:p.x,y:p.y}, timer: 0 } : null; }
+      case 'build': return { type, target: {x: cx + (Math.random()-0.5)*rx*0.3, y: cy + (Math.random()-0.5)*ry*0.15}, timer: 0 };
       default: { let a=Math.random()*Math.PI*2, r=Math.random()*0.4+0.1; return { type:'patrol', target: {x:cx+Math.cos(a)*rx*r*0.6, y:cy+Math.sin(a)*ry*r*0.25}, timer: 0 }; }
     }
   },
@@ -306,6 +315,22 @@ const BotAI = {
               }
             }
           }
+          bot.task = null;
+        } break;
+      case 'build':
+        if (task.timer > 35) {
+          // Pick what to build based on what's missing
+          let _bType = 'wall';
+          if (!is.buildings.some(b => b.type === 'watchtower')) _bType = 'watchtower';
+          else if (!is.buildings.some(b => b.type === 'forge')) _bType = 'forge';
+          else if (!is.buildings.some(b => b.type === 'windmill')) _bType = 'windmill';
+          else _bType = ['wall', 'domus', 'well'][Math.floor(Math.random() * 3)];
+          let _bw = _bType === 'wall' ? 30 : 24, _bh = _bType === 'wall' ? 8 : 20;
+          is.buildings.push({ type: _bType, x: task.target.x, y: task.target.y, w: _bw, h: _bh, hp: 100, built: true, rot: 0, buildProgress: 0 });
+          is.wood = Math.max(0, (is.wood || 0) - 10);
+          is.stone = Math.max(0, (is.stone || 0) - 5);
+          if (typeof addFloatingText === 'function') addFloatingText(w2sX(bot.x), w2sY(bot.y) - 20, 'Built ' + _bType, '#aaddff');
+          if (typeof spawnParticles === 'function') spawnParticles(task.target.x, task.target.y, 'build', 5);
           bot.task = null;
         } break;
       case 'patrol':
