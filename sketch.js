@@ -2725,8 +2725,8 @@ function isOnPier(wx, wy) {
   let port = getPortPosition();
   let pierLeft = port.x - 30;
   let pierRight = port.x + 150;
-  let pierTop = port.y - 10;
-  let pierBot = port.y + 10;
+  let pierTop = port.y - 15;
+  let pierBot = port.y + 30; // extend south to reach the boat position
   return wx >= pierLeft && wx <= pierRight && wy >= pierTop && wy <= pierBot;
 }
 
@@ -3559,13 +3559,18 @@ function drawInner() {
     translate(shakeX, shakeY + floatOffset);
     if (!state.rowing || !state.rowing.active || _homeDist < 300) {
       drawIsland();
-      // Open world: render first bot nation island using home island engine
+      // Open world: render first bot nation island nearby for testing
       if (state.nations) {
         let _owKey = Object.keys(state.nations)[0];
         if (_owKey) {
           let _own = state.nations[_owKey];
+          // Place first bot island east of home island (close enough to sail to)
+          let botCX = WORLD.islandCX + 1200;
+          let botCY = WORLD.islandCY;
+          _own.isleX = botCX;
+          _own.isleY = botCY;
           let _owt = (typeof FACTION_TERRAIN !== 'undefined') ? (FACTION_TERRAIN[_owKey] || FACTION_TERRAIN.rome) : { seed: 42 };
-          drawIslandAt({ cx: _own.isleX, cy: _own.isleY, rx: _own.isleRX || 400, ry: _own.isleRY || 260, level: _own.level || 1, seed: _owt.seed, factionKey: _owKey });
+          drawIslandAt({ cx: botCX, cy: botCY, rx: 400, ry: 260, level: _own.level || 1, seed: _owt.seed, factionKey: _owKey });
         }
       }
       if (!_frameBudget.throttled || frameCount % 2 === 0) drawShoreWaves();
