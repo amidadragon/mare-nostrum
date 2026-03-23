@@ -5184,8 +5184,11 @@ function updateInvasion(dt) {
   if (!nation) { inv.active = false; return; }
   let is = nation.islandState || {};
   if (is.templeHP == null) { is.templeHP = 100; is.templeMaxHP = 100; }
-  let templeX = nation.isleX;
-  let templeY = nation.isleY - 30;
+  // Find the actual temple building on the island
+  let templeB = (nation.islandState && nation.islandState.buildings) ?
+    nation.islandState.buildings.find(b => b.isTemple || b.type === 'temple') : null;
+  let templeX = templeB ? templeB.x : nation.isleX;
+  let templeY = templeB ? templeB.y : nation.isleY - 30;
 
   for (let a of inv.attackers) {
     if (a.hp <= 0) continue;

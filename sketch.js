@@ -8932,16 +8932,22 @@ function selectFaction(faction) {
     let is = createIslandState(k);
     let n = state.nations[k];
     let cx = n.isleX, cy = n.isleY;
-    // Place 8-12 starter buildings on each bot island
-    let bpKeys = Object.keys(BLUEPRINTS).filter(bk => (BLUEPRINTS[bk].minLevel || 1) <= 5);
-    for (let i = 0; i < 10; i++) {
+    // TEMPLE -- every island must have one (center-north)
+    is.buildings.push({ type: 'temple', x: cx, y: cy - (is.islandRY || 320) * 0.15, w: 70, h: 50, hp: 100, built: true, isTemple: true });
+    // CASTRUM -- military building (center-east)
+    is.buildings.push({ type: 'castrum', x: cx + (is.islandRX || 500) * 0.3, y: cy, w: 60, h: 50, hp: 100, built: true });
+    // Place 8 more starter buildings (houses, market, etc.)
+    let bpKeys = Object.keys(BLUEPRINTS).filter(bk => (BLUEPRINTS[bk].minLevel || 1) <= 5 && bk !== 'temple' && bk !== 'castrum');
+    for (let i = 0; i < 8; i++) {
       let bk = bpKeys[floor(random(bpKeys.length))];
       let bp = BLUEPRINTS[bk];
-      let ang = random(TWO_PI), rd = random(0.2, 0.6);
+      let ang = random(TWO_PI), rd = random(0.2, 0.5);
       let bx = cx + cos(ang) * (is.islandRX || 500) * rd * 0.8;
       let by = cy + sin(ang) * (is.islandRY || 320) * rd * 0.35;
       is.buildings.push({ type: bk, x: bx, y: by, w: bp.w || 40, h: bp.h || 40, hp: 100, built: true });
     }
+    // Give bot a military force
+    n.military = 5 + floor(random(3));
     is.islandLevel = 3;
     n.islandState = is;
     // Create bot AI character on this island
