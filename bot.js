@@ -110,8 +110,9 @@ const BotAI = {
         }
       }
     }
-    // Passive resource generation from buildings (workers produce resources)
-    if (is && is.buildings && Math.random() < 0.008) {
+    // Background economy: minimal passive resources for off-screen nations
+    // Bot leader uses REAL functions (chopTree, trainUnit, etc.) when on-screen
+    if (is && is.buildings && Math.random() < 0.004) {
       let hasGranary = is.buildings.some(b => b.type === 'granary');
       let hasForge = is.buildings.some(b => b.type === 'forge');
       let hasWindmill = is.buildings.some(b => b.type === 'windmill');
