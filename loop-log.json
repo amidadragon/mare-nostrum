@@ -52,5 +52,23 @@
     "files": ["economy.js", "npc.js", "save.js"],
     "tests": "23/23",
     "timestamp": "2026-03-23T06:50:00Z"
+  },
+  {
+    "cycle": 7,
+    "card": "69c0d615e30c64af7657f36d",
+    "title": "Bot gold sync + army cap scaling",
+    "result": "pass",
+    "files": ["bot.js"],
+    "tests": "23/23",
+    "timestamp": "2026-03-23T06:55:00Z"
+  },
+  {
+    "cycle": 8,
+    "card": "inline",
+    "title": "Edge case guards: demand bounds, negative gold, cropHistory",
+    "result": "pass",
+    "files": ["economy.js", "farming.js"],
+    "tests": "23/23",
+    "timestamp": "2026-03-23T07:00:00Z"
   }
 ]
