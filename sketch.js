@@ -994,6 +994,13 @@ let starPositions = null;
 // Districts: Farm(W), Residential(NW), Center(C), Civic(NE), Market(E), Military(SE), Sacred(N)
 const CITY_SLOTS = [
   // ===============================================================
+  // ERA 0: SETTLEMENT (Lv 1) — first structures after shipwreck
+  // ===============================================================
+  { id: 'shelter_start',   x: 580, y: 400, w: 28, h: 22, type: 'domus',        level: 1,  district: 'center' },
+  { id: 'campfire_start',  x: 610, y: 410, w: 12, h: 12, type: 'torch',        level: 1,  district: 'center' },
+  { id: 'fence_start',     x: 560, y: 420, w: 32, h:  8, type: 'fence',        level: 1,  district: 'center' },
+
+  // ===============================================================
   // ERA 1: VILLAGE (Lv 2-8)
   // ===============================================================
 
@@ -1215,25 +1222,25 @@ function start1v1Game(playerFaction) {
   state.progression.villaCleared = true;
   state.progression.tutorialDone = true;
   state.introPhase = null;
-  // Player starts on home island at level 3 (has basic buildings)
-  state.islandLevel = 3;
-  state.islandRX = 500 + 35 * 3;
-  state.islandRY = 320 + 24 * 3;
+  // Both player and bot start at level 1 — same mechanics, fair start
+  state.islandLevel = 1;
+  state.islandRX = 535; // 500 + 35
+  state.islandRY = 344; // 320 + 24
   state.player.x = WORLD.islandCX;
   state.player.y = WORLD.islandCY;
   cam.x = state.player.x; cam.y = state.player.y;
   camSmooth.x = cam.x; camSmooth.y = cam.y;
-  // Starting resources — enough to build and grow
-  state.wood = 20; state.stone = 10; state.crystals = 10;
-  state.gold = 20; state.seeds = 5; state.harvest = 8;
+  // Starting resources — same for both player and bot
+  state.wood = 15; state.stone = 8; state.crystals = 8;
+  state.gold = 15; state.seeds = 5; state.harvest = 5;
   state.solar = 80;
   // Random faction if not specified
   let factions = ['rome', 'carthage', 'egypt', 'greece', 'seapeople', 'persia', 'phoenicia', 'gaul'];
   if (!playerFaction) playerFaction = factions[Math.floor(Math.random() * factions.length)];
-  // Select faction (this inits nations + bot islands at level 3 via _gameMode)
+  // Select faction (this inits nations + bot islands at level 1 via _gameMode)
   if (typeof selectFaction === 'function') selectFaction(playerFaction);
-  // Place buildings for levels 1-3
-  if (typeof placeEraBuildings === 'function') { placeEraBuildings(1); placeEraBuildings(2); placeEraBuildings(3); }
+  // Place level 1 buildings (shelter, campfire, fence)
+  if (typeof placeEraBuildings === 'function') placeEraBuildings(1);
   gameScreen = 'game';
   if (typeof addNotification === 'function') {
     addNotification('1v1 Strategy Mode — Race to dominance!', '#ffdd44');
