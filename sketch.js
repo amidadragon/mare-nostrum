@@ -3559,6 +3559,15 @@ function drawInner() {
     translate(shakeX, shakeY + floatOffset);
     if (!state.rowing || !state.rowing.active || _homeDist < 300) {
       drawIsland();
+      // Open world: render first bot nation island using home island engine
+      if (state.nations) {
+        let _owKey = Object.keys(state.nations)[0];
+        if (_owKey) {
+          let _own = state.nations[_owKey];
+          let _owt = (typeof FACTION_TERRAIN !== 'undefined') ? (FACTION_TERRAIN[_owKey] || FACTION_TERRAIN.rome) : { seed: 42 };
+          drawIslandAt({ cx: _own.isleX, cy: _own.isleY, rx: _own.isleRX || 400, ry: _own.isleRY || 260, level: _own.level || 1, seed: _owt.seed, factionKey: _owKey });
+        }
+      }
       if (!_frameBudget.throttled || frameCount % 2 === 0) drawShoreWaves();
       drawAmbientHouses();
       drawWorldObjectsSorted();

@@ -5,13 +5,15 @@
 let _coastlineVerts = null;
 let _coastlineLastRX = 0;
 let _coastlineLastRY = 0;
+let _coastlineSeed = 42;
+let _coastlineLastSeed = 0;
 
 function getCoastlineVerts() {
   let rx = state.islandRX, ry = state.islandRY;
-  if (_coastlineVerts && _coastlineLastRX === rx && _coastlineLastRY === ry) return _coastlineVerts;
+  if (_coastlineVerts && _coastlineLastRX === rx && _coastlineLastRY === ry && _coastlineLastSeed === _coastlineSeed) return _coastlineVerts;
   _coastlineVerts = [];
   let numVerts = 128;
-  let noiseSeed = 42;
+  let noiseSeed = _coastlineSeed;
   let noiseScale = Math.min(1, ry / 350);
   for (let i = 0; i < numVerts; i++) {
     let angle = (i / numVerts) * TWO_PI;
@@ -47,6 +49,7 @@ function getCoastlineVerts() {
   }
   _coastlineLastRX = rx;
   _coastlineLastRY = ry;
+  _coastlineLastSeed = _coastlineSeed;
   return _coastlineVerts;
 }
 
@@ -944,6 +947,46 @@ function drawAtlantisRings() {
       pop();
     });
   });
+}
+
+// ─── FACTION TERRAIN VISUALS ─────────────────────────────────────────────
+const FACTION_TERRAIN = {
+  rome:      { grass: [90,130,70],  beach: [215,195,155], seed: 42,  trees: 'oak' },
+  carthage:  { grass: [110,140,80], beach: [220,200,160], seed: 137, trees: 'palm' },
+  egypt:     { grass: [140,150,90], beach: [230,210,170], seed: 213, trees: 'palm' },
+  greece:    { grass: [85,135,75],  beach: [210,200,180], seed: 89,  trees: 'olive' },
+  seapeople: { grass: [70,100,65],  beach: [170,165,150], seed: 167, trees: 'pine' },
+  persia:    { grass: [130,140,85], beach: [225,205,165], seed: 251, trees: 'cypress' },
+  phoenicia: { grass: [95,125,70],  beach: [205,190,155], seed: 193, trees: 'cedar' },
+  gaul:      { grass: [65,110,55],  beach: [180,170,140], seed: 311, trees: 'oak' },
+};
+
+// ─── MULTI-ISLAND WRAPPER ────────────────────────────────────────────────
+// Renders any island using the home island engine by temporarily swapping globals.
+// opts: { cx, cy, rx, ry, level, seed, factionKey }
+function drawIslandAt(opts) {
+  let savedCX = WORLD.islandCX, savedCY = WORLD.islandCY;
+  let savedRX = state.islandRX, savedRY = state.islandRY;
+  let savedLevel = state.islandLevel;
+  let savedSeed = _coastlineSeed;
+
+  WORLD.islandCX = opts.cx;
+  WORLD.islandCY = opts.cy;
+  state.islandRX = opts.rx || 400;
+  state.islandRY = opts.ry || 260;
+  state.islandLevel = opts.level || 1;
+  _coastlineSeed = opts.seed || 42;
+  _coastlineVerts = null; // force regeneration for this island
+
+  drawIsland();
+
+  WORLD.islandCX = savedCX;
+  WORLD.islandCY = savedCY;
+  state.islandRX = savedRX;
+  state.islandRY = savedRY;
+  state.islandLevel = savedLevel;
+  _coastlineSeed = savedSeed;
+  _coastlineVerts = null; // invalidate so home island recalculates next frame
 }
 
 // ─── ISLAND ───────────────────────────────────────────────────────────────
