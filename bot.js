@@ -183,6 +183,26 @@ const BotAI = {
       nation.islandState.gold = (nation.islandState.gold || 0) + 1;
       nation.gold = (nation.gold || 0) + 1;
     }
+    // Auto-raid: launch attack on player when strong enough
+    let _armySz = is && is.legia && is.legia.army ? is.legia.army.length : 0;
+    let _alreadyRaiding = nation.raidParty && nation.raidParty.length > 0;
+    let _canRaid = _armySz >= 4 && !_alreadyRaiding && !nation.allied && !nation.vassal;
+    if (_canRaid && Math.random() < 0.001) {
+      // Aggression check: raid more in 1v1, or when reputation is low
+      let _raidChance = (state._gameMode === '1v1') ? 0.5 : ((nation.reputation || 0) < -10 ? 0.3 : 0.1);
+      if (Math.random() < _raidChance && typeof startNationRaid === 'function') {
+        let _rName = typeof getNationName === 'function' ? getNationName(nationKey) : nationKey;
+        if (typeof addNotification === 'function') addNotification(_rName + ' launches a raid on your shores!', '#ff4444');
+        if (typeof snd !== 'undefined' && snd && snd.playSFX) snd.playSFX('war_horn');
+        startNationRaid(nationKey);
+        // Consume army units for the raid
+        if (is.legia && is.legia.army) {
+          let sent = Math.min(2, is.legia.army.length);
+          is.legia.army.splice(0, sent);
+          nation.military = is.legia.army.length;
+        }
+      }
+    }
     // Track player level for race comparisons
     state._realPlayerLevel = state.islandLevel;
     // Faster AI in 1v1 mode (cooldown 8 vs 20)
