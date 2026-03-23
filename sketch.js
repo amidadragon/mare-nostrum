@@ -2455,278 +2455,37 @@ function drawInner() {
           drawIslandAt({ cx: botCX, cy: botCY, rx: _isRX, ry: _isRY, level: _own.islandState ? _own.islandState.islandLevel : (_own.level || 1), seed: _owt.seed, factionKey: _owKey });
           // Draw bot buildings using the REAL drawOneBuilding function
           if (_own.islandState && _own.islandState.buildings) {
-            // Temporarily set globals so drawOneBuilding/drawOneTree read correct era/faction/island
-            let _savedLevel = state.islandLevel;
-            let _savedFaction = state.faction;
-            let _savedWorldCX = WORLD.islandCX;
-            let _savedWorldCY = WORLD.islandCY;
-            let _savedRX = state.islandRX;
-            let _savedRY = state.islandRY;
-            state.islandLevel = _own.islandState.islandLevel || 5;
-            state.faction = _owKey;
-            WORLD.islandCX = botCX;
-            WORLD.islandCY = botCY;
-            state.islandRX = _isRX;
-            state.islandRY = _isRY;
-            // Force rect-based rendering for bot buildings (skip sprites)
-            let _savedSM = (typeof SpriteManager !== 'undefined') ? SpriteManager : null;
-            if (_savedSM) { window._botRender = true; }
-            // Y-sort all bot entities for proper depth
-            let _botItems = [];
-            // PYRAMID (main temple visual) — the most important building
-            if (_own.islandState.pyramid && typeof drawPyramid === 'function') {
-              let _savedPyr = state.pyramid;
-              state.pyramid = _own.islandState.pyramid;
-              _botItems.push({ y: _own.islandState.pyramid.y - 40, draw: () => { state.pyramid = _own.islandState.pyramid; drawPyramid(); state.pyramid = _savedPyr; } });
+            // ═══ USE REAL RENDERING PIPELINE — same code path as player island ═══
+            // Swap full island state, call drawWorldObjectsSorted(), swap back.
+            // This guarantees 100% visual parity — no manual element-by-element rendering.
+            if (typeof swapToIsland === 'function') {
+              swapToIsland(_own.islandState, botCX, botCY);
+              state.faction = _owKey;
+              // Ensure all required state exists for rendering (null guards)
+              if (!state.pyramid) state.pyramid = { x: botCX, y: botCY - 40, level: state.islandLevel || 1 };
+              if (!state.resources) state.resources = [];
+              if (!state.factionFlora) state.factionFlora = [];
+              if (!state.factionWildlife) state.factionWildlife = [];
+              if (!state.chickens) state.chickens = [];
+              if (!state.cats) state.cats = [];
+              if (!state.ruins) state.ruins = [];
+              if (!state.crystalRainDrops) state.crystalRainDrops = [];
+              if (!state.plots) state.plots = [];
+              if (!state.crystalShrine) state.crystalShrine = { x: botCX - 200, y: botCY };
+              // Null guards for player-specific objects that drawWorldObjectsSorted reads
+              let _needProg = !state.progression;
+              if (_needProg) state.progression = { gameStarted: true, villaCleared: true, companionsAwakened: {} };
+              let _needHarv = !state.harvester;
+              let _needLegia = !state.legia;
+              if (_needLegia) state.legia = { army: [], soldiers: [], castrumX: botCX + 100, castrumY: botCY + 50, castrumLevel: 0 };
+              // Force ground re-sort for bot island
+              _groundSortFrame = -999;
+              // Render everything — SAME function that draws the player island
+              drawWorldObjectsSorted();
+              // Restore player state
+              if (_needProg) state.progression = null;
+              swapBack();
             }
-            // Ruins
-            if (_own.islandState.ruins && typeof drawRuins === 'function') {
-              _botItems.push({ y: botCY - 30, draw: () => { let _sr = state.ruins; state.ruins = _own.islandState.ruins; drawRuins(); state.ruins = _sr; } });
-            }
-            // Crystal shrine (altar)
-            if (_own.islandState.crystalShrine && typeof drawCrystalShrine === 'function') {
-              let _savedShrine = state.crystalShrine;
-              _botItems.push({ y: _own.islandState.crystalShrine.y, draw: () => { state.crystalShrine = _own.islandState.crystalShrine; drawCrystalShrine(); state.crystalShrine = _savedShrine; } });
-            }
-            // Crystal nodes
-            if (_own.islandState.crystalNodes && typeof drawOneCrystal === 'function') {
-              for (let cn of _own.islandState.crystalNodes) {
-                _botItems.push({ y: cn.y - 9999, draw: () => drawOneCrystal(cn) });
-              }
-            }
-            // Farm plots
-            if (_own.islandState.plots && typeof drawOnePlot === 'function') {
-              for (let p of _own.islandState.plots) {
-                _botItems.push({ y: p.y - 9999, draw: () => drawOnePlot(p) });
-              }
-            }
-            // Resources (scattered stone/vine/leaf)
-            if (_own.islandState.resources && typeof drawOneResource === 'function') {
-              for (let r of _own.islandState.resources) {
-                if (!r.collected) _botItems.push({ y: r.y - 9999, draw: () => drawOneResource(r) });
-              }
-            }
-            for (let b of _own.islandState.buildings) {
-              _botItems.push({ y: b.y, draw: () => { if (typeof drawOneBuilding === 'function') drawOneBuilding(b); } });
-            }
-            // Trees on bot island
-            if (_own.islandState.trees && typeof drawOneTree === 'function') {
-              for (let t of _own.islandState.trees) {
-                _botItems.push({ y: t.y, draw: () => drawOneTree(t) });
-              }
-            }
-            // Ambient houses on bot island (generated once, cached)
-            if (!_own.islandState._ambientHouses && _own.islandState.islandLevel >= 5 && typeof drawOneAmbientHouse === 'function') {
-              let _bah = [];
-              let _bRX = _own.islandState.islandRX || 400;
-              let _bRY = _own.islandState.islandRY || 260;
-              let _hCount = Math.min(8, Math.floor((_own.islandState.islandLevel - 4) * 1.5));
-              for (let _hi = 0; _hi < _hCount; _hi++) {
-                let _a = Math.PI * 2 * _hi / _hCount + 0.3;
-                let _r = 0.25 + Math.random() * 0.25;
-                let _hx = botCX + Math.cos(_a) * _bRX * _r * 0.6;
-                let _hy = botCY + Math.sin(_a) * _bRY * _r * 0.3;
-                let _hv = _hi % 4;
-                _bah.push({ x: _hx, y: _hy, w: 20 + (_hv % 3) * 3, h: 16 + (_hv % 3) * 2, variant: _hv });
-              }
-              _own.islandState._ambientHouses = _bah;
-            }
-            if (_own.islandState._ambientHouses) {
-              for (let h of _own.islandState._ambientHouses) {
-                _botItems.push({ y: h.y, draw: () => drawOneAmbientHouse(h) });
-              }
-            }
-            // Market clutter on bot island (level 8+)
-            if (!_own.islandState._clutter && _own.islandState.islandLevel >= 8 && typeof drawOneClutter === 'function') {
-              let _bc = [];
-              let _cTypes = ['stall', 'crate', 'barrel', 'crate', 'barrel'];
-              for (let _ci = 0; _ci < Math.min(5, _own.islandState.islandLevel - 7); _ci++) {
-                let _a = Math.PI * 0.5 + Math.PI * _ci / 5;
-                _bc.push({ x: botCX + Math.cos(_a) * 40 + (_ci - 2) * 25, y: botCY + Math.sin(_a) * 15, type: _cTypes[_ci], color: _ci % 3 });
-              }
-              _own.islandState._clutter = _bc;
-            }
-            if (_own.islandState._clutter) {
-              for (let c of _own.islandState._clutter) {
-                _botItems.push({ y: c.y, draw: () => drawOneClutter(c) });
-              }
-            }
-            // Faction flora on bot island (generated once, cached)
-            if (!_own.islandState._flora && typeof FACTION_FLORA !== 'undefined' && typeof drawOneFlora === 'function') {
-              let _ffl = FACTION_FLORA[_owKey] || FACTION_FLORA.rome;
-              let _bf = [];
-              for (let _fi = 0; _fi < 12; _fi++) {
-                let _a = Math.PI * 2 * _fi / 12 + 0.7;
-                let _r = 0.15 + Math.random() * 0.45;
-                let _tmpl = _ffl[_fi % _ffl.length];
-                _bf.push({ x: botCX + Math.cos(_a) * (_isRX * _r), y: botCY + Math.sin(_a) * (_isRY * _r * 0.4), col: _tmpl.col, w: _tmpl.w, h: _tmpl.h, phase: Math.random() * Math.PI * 2 });
-              }
-              _own.islandState._flora = _bf;
-            }
-            if (_own.islandState._flora) {
-              for (let fl of _own.islandState._flora) {
-                _botItems.push({ y: fl.y - 9999, draw: () => drawOneFlora(fl) });
-              }
-            }
-            // Citizens using the REAL drawOneCitizen function
-            if (_own.islandState.citizens) {
-              for (let c of _own.islandState.citizens) {
-                // Update citizen wandering + idle activities
-                c.moveTimer = (c.moveTimer || 0) - 1;
-                if (c._citizenActTimer > 0) c._citizenActTimer--;
-                if (c._citizenActTimer <= 0 && c._citizenAct) c._citizenAct = null;
-                if (c.moveTimer <= 0) {
-                  // Pick a destination based on citizen role
-                  let _blds = _own.islandState.buildings;
-                  let _dest = null;
-                  if (_blds && _blds.length > 0 && Math.random() < 0.6) {
-                    // Role-based building preferences
-                    let _pref = null;
-                    let _v = c.variant || 0;
-                    if (_v === 0) _pref = _blds.find(b => b.type === 'temple' || b.isTemple); // worshipper
-                    else if (_v === 1) _pref = _blds.find(b => b.type === 'forum' || b.type === 'market'); // merchant
-                    else if (_v === 2) _pref = _blds.find(b => b.type === 'castrum'); // soldier
-                    else _pref = _blds.find(b => b.type === 'domus' || b.type === 'villa'); // resident
-                    _dest = _pref || _blds[Math.floor(Math.random() * _blds.length)];
-                    c.targetX = _dest.x + (Math.random()-0.5) * 20;
-                    c.targetY = _dest.y + (Math.random()-0.5) * 10;
-                    c._destType = _dest.type;
-                  } else {
-                    c.targetX = botCX + (Math.random()-0.5) * _isRX * 0.5;
-                    c.targetY = botCY + (Math.random()-0.5) * _isRY * 0.2;
-                    c._destType = null;
-                  }
-                  c.moveTimer = 60 + Math.floor(Math.random() * 120);
-                }
-                let cdx = (c.targetX||botCX) - c.x, cdy = (c.targetY||botCY) - c.y;
-                let cd = Math.sqrt(cdx*cdx + cdy*cdy);
-                if (cd > 3) {
-                  c.x += cdx/cd * (c.speed||0.3); c.y += cdy/cd * (c.speed||0.3);
-                  c.moving = true; c.state = 'walking';
-                  c.facing = cdx > 0 ? 1 : -1;
-                } else {
-                  c.moving = false; c.state = 'idle';
-                  // Trigger idle activity based on destination building
-                  if (!c._citizenAct && Math.random() < 0.03) {
-                    let _act = 'sit';
-                    if (c._destType === 'temple' || c._destType === 'shrine') _act = Math.random() < 0.5 ? 'sit' : 'sweep';
-                    else if (c._destType === 'forum' || c._destType === 'market') _act = 'chat';
-                    else if (c._destType === 'castrum') _act = 'sweep';
-                    else _act = ['sweep', 'sit', 'chat'][Math.floor(Math.random() * 3)];
-                    c._citizenAct = _act;
-                    c._citizenActTimer = 60 + Math.floor(Math.random() * 90);
-                  }
-                }
-                _botItems.push({ y: c.y, draw: () => { if (typeof drawOneCitizen === 'function') drawOneCitizen(c); } });
-              }
-            }
-            // Bot chickens (generated once, cached)
-            if (!_own.islandState._chickens && typeof drawOneChicken === 'function') {
-              let _bch = [];
-              for (let _ci = 0; _ci < 4; _ci++) {
-                _bch.push({ x: botCX - 80 + Math.random() * 40, y: botCY + 10 + Math.random() * 20, facing: Math.random() > 0.5 ? 1 : -1, color: [200 + Math.floor(Math.random()*40), 170 + Math.floor(Math.random()*30), 120 + Math.floor(Math.random()*30)], pecking: false, peckTimer: 0, timer: Math.floor(Math.random() * 60), vx: 0, vy: 0 });
-              }
-              _own.islandState._chickens = _bch;
-            }
-            if (_own.islandState._chickens) {
-              for (let ch of _own.islandState._chickens) {
-                ch.timer--;
-                if (ch.pecking) { ch.peckTimer--; if (ch.peckTimer <= 0) ch.pecking = false; }
-                else if (ch.timer <= 0) {
-                  if (Math.random() < 0.3) { ch.pecking = true; ch.peckTimer = 30 + Math.floor(Math.random() * 30); ch.vx = 0; ch.vy = 0; }
-                  else { ch.vx = (Math.random() - 0.5) * 0.4; ch.vy = (Math.random() - 0.5) * 0.2; ch.facing = ch.vx > 0 ? 1 : -1; }
-                  ch.timer = 30 + Math.floor(Math.random() * 60);
-                }
-                ch.x += ch.vx; ch.y += ch.vy;
-                _botItems.push({ y: ch.y, draw: () => drawOneChicken(ch) });
-              }
-            }
-            // Fountain at center of bot island
-            if (typeof drawFountain === 'function') {
-              _botItems.push({ y: botCY + 35, draw: () => drawFountain() });
-            }
-            // Faction wildlife
-            if (_own.islandState.factionWildlife && _own.islandState.factionWildlife.length > 0 && typeof drawOneFactionCreature === 'function') {
-              for (let w of _own.islandState.factionWildlife) {
-                _botItems.push({ y: w.y, draw: () => drawOneFactionCreature(w) });
-              }
-            }
-            // Bot garrison soldiers patrolling near castrum
-            if (_own.islandState.legia && _own.islandState.legia.army && typeof drawLegionAmbientSoldier === 'function') {
-              let _castB = _own.islandState.buildings ? _own.islandState.buildings.find(b => b.type === 'castrum') : null;
-              let _scx = _castB ? _castB.x : botCX + 100, _scy = _castB ? _castB.y : botCY + 50;
-              for (let _si = 0; _si < Math.min(4, _own.islandState.legia.army.length); _si++) {
-                let _su = _own.islandState.legia.army[_si];
-                if (!_su._bx) { _su._bx = _scx + (Math.random()-0.5) * 60; _su._by = _scy + (Math.random()-0.5) * 30; _su._bt = Math.floor(Math.random() * 120); _su._bs = 'patrol'; _su.facing = Math.random() > 0.5 ? 1 : -1; }
-                _su._bt--;
-                if (_su._bt <= 0) {
-                  _su._bx = _scx + (Math.random()-0.5) * 60; _su._by = _scy + (Math.random()-0.5) * 30;
-                  _su._bt = 60 + Math.floor(Math.random() * 120);
-                  _su._bs = _su._bs === 'patrol' ? 'idle' : 'patrol';
-                }
-                if (_su._bs === 'patrol') {
-                  let _sdx = _su._bx - (_su.x||_scx), _sdy = _su._by - (_su.y||_scy);
-                  let _sd = Math.sqrt(_sdx*_sdx + _sdy*_sdy);
-                  if (_sd > 3) { _su.x = (_su.x||_scx) + _sdx/_sd * 0.8; _su.y = (_su.y||_scy) + _sdy/_sd * 0.5; _su.facing = _sdx > 0 ? 1 : -1; }
-                }
-                _su.state = _su._bs;
-                _botItems.push({ y: _su.y || _scy, draw: () => drawLegionAmbientSoldier(_su) });
-              }
-            }
-            // Sort by Y and draw
-            _botItems.sort((a, b) => a.y - b.y);
-            for (let item of _botItems) item.draw();
-
-            // Temple HP bar (drawn on top, not Y-sorted) — only when damaged
-            let templeB = _own.islandState.buildings.find(b => b.isTemple || b.type === 'temple');
-            if (templeB) {
-              let tHP = _own.islandState.templeHP !== undefined ? _own.islandState.templeHP : 100;
-              if (tHP < 100) {
-                let thx = w2sX(templeB.x), thy = w2sY(templeB.y) - 35;
-                noStroke();
-                fill(0,0,0,150); rect(thx-25, thy, 50, 6, 2);
-                let hpRatio = tHP / 100;
-                fill(hpRatio > 0.5 ? Math.floor((1-hpRatio)*400) : 200, hpRatio > 0.5 ? 200 : Math.floor(hpRatio*400), 50);
-                rect(thx-23, thy+1, 46*hpRatio, 4, 1);
-                fill(255,255,255,200); textAlign(CENTER,BOTTOM); textSize(7);
-                text('Temple '+tHP+'%', thx, thy-1); textAlign(LEFT,TOP);
-                if (tHP < 50) { fill(80,80,80,50); ellipse(thx+Math.sin(frameCount*0.03)*5, thy-10, 15, 8); }
-                if (tHP < 25) { fill(255,100,30,60); ellipse(thx-5, thy-5, 8, 12); }
-              }
-            }
-            // Nation name label + info card above bot island
-            let _nlx = w2sX(botCX), _nly = w2sY(botCY - _isRY * 0.85);
-            if (_nlx > -100 && _nlx < width + 100 && _nly > -50) {
-              noStroke(); textAlign(CENTER, BOTTOM); textSize(11);
-              fill(0,0,0,120);
-              text(getNationName(_owKey), _nlx + 1, _nly + 1);
-              fill(240,220,180,220);
-              text(getNationName(_owKey), _nlx, _nly);
-              // Info card when player is within 600px of bot island center
-              let _pdx = state.player.x - botCX, _pdy = state.player.y - botCY;
-              let _pDist = Math.sqrt(_pdx*_pdx + _pdy*_pdy);
-              if (_pDist < 600) {
-                let _iy = _nly + 4;
-                textSize(8); textAlign(CENTER, TOP);
-                let _rep = _own.reputation || 0;
-                let _repCol = _rep > 10 ? '#88cc88' : _rep < -10 ? '#ff6644' : '#ccbb88';
-                fill(0,0,0,100); rect(_nlx - 55, _iy, 110, 36, 3);
-                fill(200,190,160); textSize(7);
-                text('Military: ' + (_own.military || 0) + '  Gold: ' + (_own.gold || 0), _nlx, _iy + 3);
-                fill(_repCol); text('Rep: ' + _rep + (_own.allied ? ' [ALLY]' : _own.vassal ? ' [VASSAL]' : ''), _nlx, _iy + 12);
-                fill(180,170,140); text((_own.tradeActive ? 'Trading' : 'No trade') + '  Pop: ' + (_own.population || 0), _nlx, _iy + 21);
-              }
-              textAlign(LEFT, TOP);
-            }
-            // Clear bot render flag
-            if (typeof window !== 'undefined') window._botRender = false;
-            // Restore player globals
-            state.islandLevel = _savedLevel;
-            state.faction = _savedFaction;
-            WORLD.islandCX = _savedWorldCX;
-            WORLD.islandCY = _savedWorldCY;
-            state.islandRX = _savedRX;
-            state.islandRY = _savedRY;
           }
           // Bot trade ship — sails around island when bot has gold income
           if (_own.gold > 30 && _own.islandState) {
