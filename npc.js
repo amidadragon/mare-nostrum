@@ -86,19 +86,20 @@ function getNPCDialogue(npc, lines, linesMid, linesHigh, npcName) {
     let memLine = getMemoryGreeting(npcName);
     if (memLine) return memLine;
   }
-  if (npc.hearts >= 7) {
+  if (npc.hearts >= 7 && linesHigh.length > 0) {
     let idx = npc.lineIndex % linesHigh.length;
     npc.lineIndex++;
     return linesHigh[idx];
-  } else if (npc.hearts >= 4) {
+  } else if (npc.hearts >= 4 && linesMid.length > 0) {
     let idx = npc.lineIndex % linesMid.length;
     npc.lineIndex++;
     return linesMid[idx];
-  } else {
+  } else if (lines.length > 0) {
     let idx = npc.lineIndex % lines.length;
     npc.lineIndex++;
     return lines[idx];
   }
+  return '...';
 }
 
 // ─── NPC DAILY WANTS + FAVOR ─────────────────────────────────────────────

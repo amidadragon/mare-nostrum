@@ -173,7 +173,8 @@ function updateTradeRoutes(dt) {
           route.goldEarned += goldGain;
           if (typeof adjustReputation === 'function') adjustReputation(1);
           let demandTag = demandMult > 1 ? ' (DEMAND!)' : '';
-          addFloatingText(width / 2, height * 0.35, '+' + goldGain + 'g from ' + TRADE_GOODS[route.good].name + ' trade' + demandTag, demandMult > 1 ? '#ffdd44' : '#ddcc44');
+          let _tgName = TRADE_GOODS[route.good] ? TRADE_GOODS[route.good].name : route.good;
+          addFloatingText(width / 2, height * 0.35, '+' + goldGain + 'g from ' + _tgName + ' trade' + demandTag, demandMult > 1 ? '#ffdd44' : '#ddcc44');
         }
       }
     }
@@ -381,8 +382,9 @@ function calculateDailyTradeIncome() {
   let income = 0;
   for (let route of state.tradeRoutes) {
     if (!route.active) continue;
+    if (!TRADE_GOODS[route.good]) continue;
     let base = TRADE_GOODS[route.good].goldPerTrip;
-    if (state.colonySpec['conquest'] === 'trading') base *= 2;
+    if (state.colonySpec && state.colonySpec['conquest'] === 'trading') base *= 2;
     base = floor(base * getDemandBonus(route.good));
     income += base;
   }

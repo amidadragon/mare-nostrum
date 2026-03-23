@@ -635,7 +635,7 @@ function loadGame() {
       let _trHP = getPortPosition();
       let _trCP = { x: state.conquest.isleX + state.conquest.isleRX * 0.9, y: state.conquest.isleY + state.conquest.isleRY * 0.7 };
       state.tradeRoutes = d.tradeRoutes.map(function(r) { return { id: r.id || 1, from: r.from || { x: _trHP.x, y: _trHP.y, name: 'Home' }, to: r.to || { x: _trCP.x, y: _trCP.y, name: 'Terra Nova' }, good: r.good, amount: r.amount || 1, shipX: _trHP.x, shipY: _trHP.y, shipAngle: 0, active: r.active !== false, tripTimer: 0, tripPhase: r.tripPhase || 'outbound', goldEarned: r.goldEarned || 0, raided: r.raided || false, raidTimer: 0, raidSmokeParticles: [] }; });
-      if (typeof _nextRouteId !== 'undefined' && state.tradeRoutes.length > 0) _nextRouteId = Math.max.apply(null, state.tradeRoutes.map(function(r) { return r.id; })) + 1;
+      if (typeof _nextRouteId !== 'undefined' && state.tradeRoutes.length > 0) { let _ids = state.tradeRoutes.map(function(r) { return r.id || 0; }); _nextRouteId = Math.max.apply(null, _ids) + 1; if (!isFinite(_nextRouteId)) _nextRouteId = 1; }
     }
     if (d.colonySpec) state.colonySpec = d.colonySpec;
     // Colony management system
