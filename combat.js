@@ -5187,11 +5187,12 @@ function updateInvasion(dt) {
   let nation = state.nations[inv.target];
   if (!nation) return;
 
-  // Find temple position
+  // Find pyramid/base position (invasion target)
   let templeB = (nation.islandState && nation.islandState.buildings) ?
     nation.islandState.buildings.find(b => b.isTemple || b.type === 'temple') : null;
-  let templeX = templeB ? templeB.x : nation.isleX;
-  let templeY = templeB ? templeB.y : nation.isleY - 30;
+  let pyramidPos = nation.islandState && nation.islandState.pyramid ? nation.islandState.pyramid : null;
+  let templeX = templeB ? templeB.x : (pyramidPos ? pyramidPos.x : nation.isleX);
+  let templeY = templeB ? templeB.y : (pyramidPos ? pyramidPos.y : nation.isleY - 30);
 
   // Update each attacker
   for (let a of inv.attackers) {
@@ -5533,7 +5534,7 @@ function drawInvasionHUD() {
   let aliveAtk = inv.attackers.filter(a => a.hp > 0).length;
   let aliveDef = inv.defenders.filter(d => d.hp > 0).length;
 
-  // Temple HP bar (center top)
+  // Pyramid / Base HP bar (center top)
   push(); noStroke();
   fill(0, 0, 0, 180);
   rect(width/2 - 100, 60, 200, 24, 4);

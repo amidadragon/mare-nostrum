@@ -577,6 +577,15 @@ const Debug = {
           else this.addLog('Not connected', '#ff8888');
           break;
 
+        case '/gamestate':
+          this.addLog('Scene: ' + gameScreen + ' | Mode: ' + (state._gameMode || 'campaign'), '#88ccff');
+          this.addLog('Rowing: ' + (state.rowing && state.rowing.active ? 'YES at ' + Math.floor(state.rowing.x) + ',' + Math.floor(state.rowing.y) : 'no'), '#88ccff');
+          this.addLog('ActiveNation: ' + (state._activeNation || 'none') + ' | ActiveExplore: ' + (state._activeExploration || 'none'), '#88ccff');
+          this.addLog('Island Lv: ' + (state.islandLevel || 1) + ' | Day: ' + (state.day || 1) + ' | Gold: ' + (state.gold || 0) + ' | Crystals: ' + (state.crystals || 0), '#88ccff');
+          this.addLog('Legia: castrum Lv' + (state.legia ? state.legia.castrumLevel : 0) + ' | army: ' + (state.legia && state.legia.army ? state.legia.army.length : 0), '#88ccff');
+          this.addLog('TempleHP: ' + (state.templeHP || '?') + '/' + (state.templeMaxHP || '?'), '#88ccff');
+          if (snd) this.addLog('Audio: lyre=' + (snd._lyreMode || '?') + ' ready=' + snd.ready, '#88ccff');
+          break;
         case '/botstatus':
           if (state.nations) {
             for (let _bk of Object.keys(state.nations)) {

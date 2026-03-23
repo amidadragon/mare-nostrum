@@ -1461,23 +1461,8 @@ function keyPressed() {
       if (snd && snd.playNarration) snd.playNarration('first_sail');
       return;
     }
-    // Visitor trade
-    if (state.visitor && !state.visitor.interacted && dist(state.player.x, state.player.y, state.visitor.x, state.visitor.y) < 70) {
-      tradeWithVisitor(); return;
-    }
-    // Temple court visitor trade
-    if (state.templeCourt && state.templeCourt.visitors.length > 0) {
-      let nearCourt = state.templeCourt.visitors.find(v => !v.traded && !v.walking && dist(state.player.x, state.player.y, v.x, v.y) < 60);
-      if (nearCourt) { tradeWithCourtVisitor(nearCourt); return; }
-    }
-    // Treasure dig
-    if (state.activeTreasure && !state.activeTreasure.found) {
-      if (digTreasure()) return;
-    }
-    // Collect bottles
-    let nearBottle = state.bottles.find(b => !b.collected && dist(state.player.x, state.player.y, b.x, b.y) < 40);
-    if (nearBottle) { collectBottle(nearBottle); return; }
-    // E key: mine nearest charged crystal node
+    // E key: mine nearest charged crystal node (HIGH PRIORITY — before visitor/trade)
+    // Crystal harvesting must be frustration-free, never blocked by nearby merchants
     {
       let nearCrystal = state.crystalNodes.find(c =>
         c.charge > 0 && dist(state.player.x, state.player.y, c.x, c.y) < 60
@@ -1508,6 +1493,22 @@ function keyPressed() {
         return;
       }
     }
+    // Visitor trade (lower priority than crystals)
+    if (state.visitor && !state.visitor.interacted && dist(state.player.x, state.player.y, state.visitor.x, state.visitor.y) < 70) {
+      tradeWithVisitor(); return;
+    }
+    // Temple court visitor trade
+    if (state.templeCourt && state.templeCourt.visitors.length > 0) {
+      let nearCourt = state.templeCourt.visitors.find(v => !v.traded && !v.walking && dist(state.player.x, state.player.y, v.x, v.y) < 60);
+      if (nearCourt) { tradeWithCourtVisitor(nearCourt); return; }
+    }
+    // Treasure dig
+    if (state.activeTreasure && !state.activeTreasure.found) {
+      if (digTreasure()) return;
+    }
+    // Collect bottles
+    let nearBottle = state.bottles.find(b => !b.collected && dist(state.player.x, state.player.y, b.x, b.y) < 40);
+    if (nearBottle) { collectBottle(nearBottle); return; }
     // E key: harvest nearest ripe crop
     {
       let nearPlot = state.plots.find(p =>
