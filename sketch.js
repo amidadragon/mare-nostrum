@@ -3655,6 +3655,21 @@ function drawInner() {
                 _botItems.push({ y: h.y, draw: () => drawOneAmbientHouse(h) });
               }
             }
+            // Market clutter on bot island (level 8+)
+            if (!_own.islandState._clutter && _own.islandState.islandLevel >= 8 && typeof drawOneClutter === 'function') {
+              let _bc = [];
+              let _cTypes = ['stall', 'crate', 'barrel', 'crate', 'barrel'];
+              for (let _ci = 0; _ci < Math.min(5, _own.islandState.islandLevel - 7); _ci++) {
+                let _a = Math.PI * 0.5 + Math.PI * _ci / 5;
+                _bc.push({ x: botCX + Math.cos(_a) * 40 + (_ci - 2) * 25, y: botCY + Math.sin(_a) * 15, type: _cTypes[_ci], color: _ci % 3 });
+              }
+              _own.islandState._clutter = _bc;
+            }
+            if (_own.islandState._clutter) {
+              for (let c of _own.islandState._clutter) {
+                _botItems.push({ y: c.y, draw: () => drawOneClutter(c) });
+              }
+            }
             // Citizens using the REAL drawOneCitizen function
             if (_own.islandState.citizens) {
               for (let c of _own.islandState.citizens) {
@@ -3692,6 +3707,16 @@ function drawInner() {
                 if (tHP < 50) { fill(80,80,80,50); ellipse(thx+Math.sin(frameCount*0.03)*5, thy-10, 15, 8); }
                 if (tHP < 25) { fill(255,100,30,60); ellipse(thx-5, thy-5, 8, 12); }
               }
+            }
+            // Nation name label above bot island
+            let _nlx = w2sX(botCX), _nly = w2sY(botCY - _isRY * 0.85);
+            if (_nlx > -100 && _nlx < width + 100 && _nly > -50) {
+              noStroke(); textAlign(CENTER, BOTTOM); textSize(11);
+              fill(0,0,0,120);
+              text(getNationName(_owKey), _nlx + 1, _nly + 1);
+              fill(240,220,180,220);
+              text(getNationName(_owKey), _nlx, _nly);
+              textAlign(LEFT, TOP);
             }
             // Restore player globals
             state.islandLevel = _savedLevel;

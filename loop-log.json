@@ -1,0 +1,38 @@
+[
+  {
+    "cycle": 1,
+    "card": "prev-session",
+    "title": "Bot island parity + counter-attack + combat polish",
+    "result": "pass",
+    "files": ["sketch.js", "bot.js", "combat.js"],
+    "tests": "23/23",
+    "timestamp": "2026-03-23T06:15:00Z"
+  },
+  {
+    "cycle": 2,
+    "card": "69c0cffc50ebd97408ac48ea",
+    "title": "Hide temple HP bar at 100%",
+    "result": "pass",
+    "files": ["sketch.js"],
+    "tests": "23/23",
+    "timestamp": "2026-03-23T06:25:00Z"
+  },
+  {
+    "cycle": 3,
+    "card": "69c0cfff544f3123573f5d81",
+    "title": "Add ambient houses to bot island",
+    "result": "pass",
+    "files": ["sketch.js"],
+    "tests": "23/23",
+    "timestamp": "2026-03-23T06:25:00Z"
+  },
+  {
+    "cycle": 4,
+    "card": "69c0d26f47fb0050a20aa63e",
+    "title": "Fix null-check crashes in bot AI and combat HP bar",
+    "result": "pass",
+    "files": ["bot.js", "combat.js"],
+    "tests": "23/23",
+    "timestamp": "2026-03-23T06:35:00Z"
+  }
+]
