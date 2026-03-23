@@ -5371,56 +5371,96 @@ function _drawSoldierGroup(soldiers, fm) {
     let fDir = s.facing === 'left' ? -1 : 1;
     if (fDir < 0) scale(-1, 1);
 
+    // Hit flash — white overlay when recently struck
+    let hitFlash = (s.flashTimer && s.flashTimer > 0);
+
     if (s.state === 'dead') {
-      // Fallen soldier (horizontal)
+      // Fallen soldier (horizontal) — fade + sink
+      let sinkY = min(3, (s.deathTimer || 0) * 0.05);
+      translate(0, sinkY);
+      rotate(0.3 * fDir);
       fill(fm.tunic[0], fm.tunic[1], fm.tunic[2], alpha);
       rect(-6, 2, 12, 4, 1);
       fill(220, 190, 160, alpha);
       rect(-8, 2, 4, 3, 1);
+      // Blood pool
+      fill(120, 20, 20, alpha * 0.4);
+      ellipse(0, 5, 10 + min(8, (s.deathTimer || 0) * 0.15), 4);
     } else {
       // Shadow
       fill(0, 0, 0, 25);
       ellipse(0, 8, 12, 5);
 
+      // Fighting bob — slight bounce when attacking
+      let fightBob = (s.state === 'fighting' && s.swingAnim > 0) ? -1.5 : 0;
+      translate(0, fightBob);
+
       // Legs with walk animation
       let legOff = s.state === 'walking' ? sin(s.walkFrame || 0) * 2.5 : 0;
-      fill(fm.tunic[0] * 0.7, fm.tunic[1] * 0.7, fm.tunic[2] * 0.7, alpha);
+      let tr = fm.tunic[0], tg = fm.tunic[1], tb = fm.tunic[2];
+      if (hitFlash) { tr = 255; tg = 255; tb = 255; }
+      fill(tr * 0.7, tg * 0.7, tb * 0.7, alpha);
       rect(-3, 2 + legOff, 3, 5, 1);
       rect(1, 2 - legOff, 3, 5, 1);
 
       // Body
-      fill(fm.tunic[0], fm.tunic[1], fm.tunic[2], alpha);
+      fill(tr, tg, tb, alpha);
       rect(-5, -8, 10, 12, 1);
 
-      // Arms + weapon swing
+      // Shield (left arm) for defenders
+      if (s.state === 'defending' || s.state === 'fighting') {
+        fill(fm.helm[0] * 0.8, fm.helm[1] * 0.8, fm.helm[2] * 0.8, alpha);
+        rect(-9, -7, 4, 8, 1);
+        fill(fm.helm[0], fm.helm[1], fm.helm[2], alpha);
+        rect(-8, -5, 2, 4, 0);
+      } else {
+        // Arms
+        let skinR = hitFlash ? 255 : 220, skinG = hitFlash ? 255 : 190, skinB = hitFlash ? 255 : 160;
+        fill(skinR, skinG, skinB, alpha);
+        rect(-7, -5, 3, 6, 1);
+      }
+
+      // Weapon arm + weapon swing
       let armOff = (s.swingAnim && s.swingAnim > 0) ? -6 : 0;
-      fill(220, 190, 160, alpha);
-      rect(-7, -5, 3, 6, 1);
+      let skinR = hitFlash ? 255 : 220, skinG = hitFlash ? 255 : 190, skinB = hitFlash ? 255 : 160;
+      fill(skinR, skinG, skinB, alpha);
       rect(4, -5 + armOff, 3, 6, 1);
 
-      // Weapon (right hand)
+      // Weapon (right hand) — glint on swing
       if (s.swingAnim && s.swingAnim > 0) {
-        fill(180, 180, 180, alpha);
-        rect(5, -12, 2, 8); // sword swinging
+        fill(210, 210, 220, alpha);
+        rect(5, -12, 2, 8);
+        // Sword glint
+        fill(255, 255, 255, 120);
+        rect(5, -12, 2, 2);
       } else {
         fill(180, 180, 180, alpha);
-        rect(6, -6, 2, 6); // sword at rest
+        rect(6, -6, 2, 6);
       }
 
       // Head
-      fill(220, 190, 160, alpha);
+      fill(skinR, skinG, skinB, alpha);
       rect(-3, -14, 7, 7, 2);
 
       // Helm
       fill(fm.helm[0], fm.helm[1], fm.helm[2], alpha);
       rect(-3, -15, 7, 3, 1);
+      // Helm crest for variation
+      fill(fm.helm[0] + 20, fm.helm[1] + 10, fm.helm[2], alpha);
+      rect(-1, -17, 3, 2, 1);
 
       // HP bar (only if damaged)
       if (s.hp < s.maxHp) {
+        let hpRatio = s.hp / s.maxHp;
         fill(40, 40, 40, 180);
         rect(-6, -19, 12, 3);
-        fill(50, 200, 50);
-        rect(-5, -18, 10 * (s.hp / s.maxHp), 1);
+        fill(hpRatio > 0.5 ? 50 : (hpRatio > 0.25 ? 200 : 220), hpRatio > 0.5 ? 200 : (hpRatio > 0.25 ? 140 : 40), 50);
+        rect(-5, -18, 10 * hpRatio, 1);
+      }
+
+      // Hit recoil shake
+      if (hitFlash) {
+        // Already white-tinted above; add screen-shake offset
       }
     }
 

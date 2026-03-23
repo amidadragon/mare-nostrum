@@ -3628,6 +3628,12 @@ function drawInner() {
             for (let b of _own.islandState.buildings) {
               _botItems.push({ y: b.y, draw: () => { if (typeof drawOneBuilding === 'function') drawOneBuilding(b); } });
             }
+            // Trees on bot island
+            if (_own.islandState.trees && typeof drawOneTree === 'function') {
+              for (let t of _own.islandState.trees) {
+                _botItems.push({ y: t.y, draw: () => drawOneTree(t) });
+              }
+            }
             // Citizens using the REAL drawOneCitizen function
             if (_own.islandState.citizens) {
               for (let c of _own.islandState.citizens) {

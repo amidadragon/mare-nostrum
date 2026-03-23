@@ -39,6 +39,11 @@ const BotAI = {
     if (stone < 15) actions.push({ type: 'mine_stone', score: 1.5 * (1 - stone / 15) });
     if (is.buildings && is.buildings.some(b => b.type === 'castrum') && gold >= 10 && (!is.legia || is.legia.army.length < 5))
       actions.push({ type: 'recruit', score: 1.0 + (underAttack ? 3.0 : 0) });
+    // Counter-attack: bot sends raiders when military is strong enough
+    let armySize = is.legia ? (is.legia.army ? is.legia.army.length : 0) : 0;
+    let alreadyRaiding = nation.raidParty && nation.raidParty.length > 0;
+    if (armySize > 5 && !alreadyRaiding && !underAttack && !nation.allied)
+      actions.push({ type: 'counter_attack', score: 1.5 + armySize * 0.1 });
     actions.push({ type: 'patrol', score: 0.1 });
 
     actions.sort((a, b) => b.score - a.score);
@@ -71,6 +76,7 @@ const BotAI = {
       case 'expand': return { type, target: {x: cx-rx*0.7, y: cy}, timer: 0 };
       case 'recruit': { let b = is.buildings ? is.buildings.find(b => b.type==='castrum') : null; return { type, target: b ? {x:b.x,y:b.y} : {x:cx,y:cy}, timer: 0 }; }
       case 'defend': { let a = state.invasion && state.invasion.attackers ? state.invasion.attackers.find(a => a.hp>0) : null; return { type, target: a ? {x:a.x,y:a.y} : {x:cx,y:cy}, timer: 0 }; }
+      case 'counter_attack': return { type, target: {x: cx, y: cy}, timer: 0 };
       default: { let a=Math.random()*Math.PI*2, r=Math.random()*0.4+0.1; return { type:'patrol', target: {x:cx+Math.cos(a)*rx*r*0.6, y:cy+Math.sin(a)*ry*r*0.25}, timer: 0 }; }
     }
   },
@@ -166,6 +172,19 @@ const BotAI = {
           } else { bot.task = null; }
         } else { bot.task = null; }
         break;
+      case 'counter_attack':
+        if (task.timer > 40) {
+          // Launch raid on player using existing nation raid system
+          if (typeof startNationRaid === 'function' && nation.raidParty && nation.raidParty.length === 0) {
+            startNationRaid(nationKey);
+            // Consume some army units
+            if (is.legia && is.legia.army) {
+              let sent = Math.min(3, is.legia.army.length);
+              is.legia.army.splice(0, sent);
+            }
+          }
+          bot.task = null;
+        } break;
       case 'patrol':
         if (task.timer > 80) bot.task = null; break;
     }
