@@ -3583,13 +3583,6 @@ function drawInner() {
           drawIslandAt({ cx: botCX, cy: botCY, rx: _isRX, ry: _isRY, level: _own.islandState ? _own.islandState.islandLevel : (_own.level || 1), seed: _owt.seed, factionKey: _owKey });
           // Draw bot buildings + citizens via state swap
           if (_own.islandState) {
-            // Fix any buildings placed at wrong coordinates (before offset fix)
-            let _bfix = _own.islandState.buildings;
-            if (_bfix && _bfix.length > 0 && Math.abs(_bfix[0].x - botCX) > 800) {
-              // Buildings are at home island coords -- relocate them
-              let dx = botCX - 600, dy = botCY - 400;
-              for (let b of _bfix) { b.x += dx; b.y += dy; }
-            }
             swapToIsland(_own.islandState, botCX, botCY);
             if (state.buildings && state.buildings.length > 0) drawWorldObjectsSorted();
             // Draw citizens on bot island
@@ -8938,36 +8931,14 @@ function selectFaction(faction) {
     state.nations[_nationKeys[0]].isleX = WORLD.islandCX + 1200;
     state.nations[_nationKeys[0]].isleY = WORLD.islandCY;
   }
-  // Create per-island state for each bot nation -- clean level-1 start
+  // Create pre-built bot islands -- real civilizations from the start
   for (let k of Object.keys(state.nations)) {
     let n = state.nations[k];
-    let is = createIslandState(k);
     let cx = n.isleX, cy = n.isleY;
-    let rx = is.islandRX, ry = is.islandRY;
-    // Crystal shrine (west side, same as player)
-    is.crystalNodes = [];
-    for (let i = 0; i < 5; i++) {
-      is.crystalNodes.push({ x: cx - rx * 0.7 + random(-20, 20), y: cy + random(-15, 15), charge: 50, size: 14 });
-    }
-    // Trees (scattered)
-    is.trees = [];
-    for (let i = 0; i < 12; i++) {
-      let a = random(TWO_PI), r = random(0.2, 0.65);
-      is.trees.push({ x: cx + cos(a) * rx * r * 0.8, y: cy + sin(a) * ry * r * 0.35, type: random(['oak','pine','palm']), hp: 3 });
-    }
-    // Farm plots (left side)
-    is.plots = [];
-    for (let i = 0; i < 6; i++) {
-      is.plots.push({ x: cx - rx * 0.4 + (i % 3) * 28, y: cy - ry * 0.05 + floor(i / 3) * 28, crop: null, stage: 'empty', growTimer: 0 });
-    }
-    // NO starter buildings -- bot builds them through gameplay
-    is.buildings = [];
-    is.islandLevel = 1;
-    is.templeHP = 100;
-    n.islandState = is;
+    n.islandState = createPrebuiltIsland(k, cx, cy, 5);
     n.isBot = true;
     n.botDifficulty = 'normal';
-    n.military = 0;
+    n.military = n.islandState.legia.army.length;
     // Create bot AI character
     if (typeof BotAI !== 'undefined') {
       BotAI.create(k, cx, cy);
@@ -17998,6 +17969,83 @@ function createIslandState(faction) {
     // Port
     portLeft: null, portRight: null,
   };
+}
+
+function createPrebuiltIsland(factionKey, cx, cy, targetLevel) {
+  let is = createIslandState(factionKey);
+  let offsetX = cx - 600;
+  let offsetY = cy - 400;
+
+  // Scale island to target level
+  is.islandLevel = targetLevel;
+  for (let lv = 1; lv <= targetLevel; lv++) {
+    if (lv <= 5) { is.islandRX += 35; is.islandRY += 24; }
+    else { is.islandRX += 28; is.islandRY += 18; }
+  }
+
+  // Place all CITY_SLOTS buildings up to target level
+  is.buildings = [];
+  CITY_SLOTS.forEach(function(slot) {
+    if (slot.level <= targetLevel) {
+      is.buildings.push({
+        type: slot.type,
+        x: slot.x + offsetX,
+        y: slot.y + offsetY,
+        w: slot.w, h: slot.h,
+        hp: 100, built: true,
+        isTemple: slot.type === 'temple',
+        id: slot.id, rot: 0
+      });
+    }
+  });
+
+  // Trees
+  is.trees = [];
+  for (let i = 0; i < 15; i++) {
+    let a = Math.random() * Math.PI * 2, r = Math.random() * 0.4 + 0.2;
+    is.trees.push({ x: cx + Math.cos(a) * is.islandRX * r * 0.7, y: cy + Math.sin(a) * is.islandRY * r * 0.3, type: 'oak', hp: 3 });
+  }
+
+  // Crystal nodes
+  is.crystalNodes = [];
+  for (let i = 0; i < 5; i++) {
+    is.crystalNodes.push({ x: cx - is.islandRX * 0.7 + (Math.random() - 0.5) * 40, y: cy + (Math.random() - 0.5) * 30, charge: 50, size: 14 });
+  }
+
+  // Farm plots
+  is.plots = [];
+  for (let i = 0; i < 6; i++) {
+    is.plots.push({ x: cx - is.islandRX * 0.4 + (i % 3) * 28, y: cy - is.islandRY * 0.05 + Math.floor(i / 3) * 28, crop: i < 3 ? 'grain' : null, stage: i < 3 ? 'growing' : 'empty', growTimer: i < 3 ? 150 : 0 });
+  }
+
+  // Citizens (1 per 3 buildings, max 10)
+  is.citizens = [];
+  let numCitizens = Math.min(10, Math.floor(is.buildings.length / 3));
+  for (let i = 0; i < numCitizens; i++) {
+    is.citizens.push({
+      x: cx + (Math.random() - 0.5) * is.islandRX * 0.5,
+      y: cy + (Math.random() - 0.5) * is.islandRY * 0.2,
+      speed: 0.3 + Math.random() * 0.2,
+      targetX: cx, targetY: cy, moveTimer: Math.floor(Math.random() * 120),
+      skin: Math.floor(Math.random() * 5),
+      tunicR: 100 + Math.floor(Math.random() * 80), tunicG: 80 + Math.floor(Math.random() * 60), tunicB: 60 + Math.floor(Math.random() * 40)
+    });
+  }
+
+  // Military
+  is.legia = { army: [], castrumLevel: targetLevel >= 8 ? 1 : 0, morale: 100, recruits: 0, maxRecruits: 10 };
+  if (targetLevel >= 8) {
+    for (let i = 0; i < 4; i++) {
+      is.legia.army.push({ type: 'legionary', hp: 20, maxHp: 20, damage: 5, speed: 1.2, garrison: false });
+    }
+  }
+
+  is.templeHP = 100;
+  is.gold = 50 + targetLevel * 20;
+  is.wood = 30; is.stone = 20; is.crystals = 15;
+  is.harvest = 20; is.fish = 10;
+
+  return is;
 }
 
 function swapToIsland(islandState, cx, cy) {
