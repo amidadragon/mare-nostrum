@@ -3681,17 +3681,38 @@ function drawInner() {
             // Citizens using the REAL drawOneCitizen function
             if (_own.islandState.citizens) {
               for (let c of _own.islandState.citizens) {
-                // Update citizen wandering
+                // Update citizen wandering + idle activities
                 c.moveTimer = (c.moveTimer || 0) - 1;
+                if (c._citizenActTimer > 0) c._citizenActTimer--;
+                if (c._citizenActTimer <= 0 && c._citizenAct) c._citizenAct = null;
                 if (c.moveTimer <= 0) {
-                  c.targetX = botCX + (Math.random()-0.5) * _isRX * 0.5;
-                  c.targetY = botCY + (Math.random()-0.5) * _isRY * 0.2;
+                  // Pick a destination — sometimes near a building for realism
+                  let _blds = _own.islandState.buildings;
+                  if (_blds && _blds.length > 0 && Math.random() < 0.4) {
+                    let _tb = _blds[Math.floor(Math.random() * _blds.length)];
+                    c.targetX = _tb.x + (Math.random()-0.5) * 20;
+                    c.targetY = _tb.y + (Math.random()-0.5) * 10;
+                  } else {
+                    c.targetX = botCX + (Math.random()-0.5) * _isRX * 0.5;
+                    c.targetY = botCY + (Math.random()-0.5) * _isRY * 0.2;
+                  }
                   c.moveTimer = 60 + Math.floor(Math.random() * 120);
                 }
                 let cdx = (c.targetX||botCX) - c.x, cdy = (c.targetY||botCY) - c.y;
                 let cd = Math.sqrt(cdx*cdx + cdy*cdy);
-                if (cd > 3) { c.x += cdx/cd * (c.speed||0.3); c.y += cdy/cd * (c.speed||0.3); c.moving = true; }
-                else c.moving = false;
+                if (cd > 3) {
+                  c.x += cdx/cd * (c.speed||0.3); c.y += cdy/cd * (c.speed||0.3);
+                  c.moving = true; c.state = 'walking';
+                  c.facing = cdx > 0 ? 1 : -1;
+                } else {
+                  c.moving = false; c.state = 'idle';
+                  // Trigger idle activity when stopped
+                  if (!c._citizenAct && Math.random() < 0.02) {
+                    let _acts = ['sweep', 'sit', 'chat'];
+                    c._citizenAct = _acts[Math.floor(Math.random() * _acts.length)];
+                    c._citizenActTimer = 60 + Math.floor(Math.random() * 90);
+                  }
+                }
                 _botItems.push({ y: c.y, draw: () => { if (typeof drawOneCitizen === 'function') drawOneCitizen(c); } });
               }
             }
