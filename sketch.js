@@ -550,7 +550,7 @@ function getFactionTerms() {
   let key = state.faction || 'rome';
   if (_factionTermsCache && _factionTermsCacheKey === key) return _factionTermsCache;
   _factionTermsCacheKey = key;
-  _factionTermsCache = FACTION_TERMS[key] || FACTION_TERMS.rome;
+  _factionTermsCache = FACTION_TERMS[key] || FACTION_TERMS.rome || { leader:'Centurion', soldier:'Legionary', barracks:'Castrum', army:'Legion', elite:'Praetorian', officer:'Decurion', rank2:'Centurion', rank3:'Legate' };
   return _factionTermsCache;
 }
 
@@ -2774,7 +2774,12 @@ function updateCurrentIsland() {
     }
     if (!found) _currentIsland = 'water';
   }
-  if (prev !== _currentIsland) onIslandTransition(prev, _currentIsland);
+  if (prev !== _currentIsland) {
+    state.insideTemple = false;
+    state.insideCastrum = false;
+    if (state.legia) state.legia.legiaUIOpen = false;
+    onIslandTransition(prev, _currentIsland);
+  }
 }
 
 function onIslandTransition(from, to) {
@@ -3197,6 +3202,7 @@ function drawInner() {
       let _rx = state._castrumReturnX, _ry = state._castrumReturnY;
       startDoorTransition(function() {
         state.insideCastrum = false;
+        if (state.legia) state.legia.legiaUIOpen = false;
         state.player.x = _rx; state.player.y = _ry;
         camSmooth.x = _rx; camSmooth.y = _ry - height * 0.12;
       });
@@ -3224,6 +3230,10 @@ function drawInner() {
 
   updateTime(dt);
   updateCurrentIsland();
+  // Safety: ensure castrumLevel matches building state
+  if (state.islandLevel >= 8 && state.legia && state.legia.castrumLevel < 1 && state.buildings.some(b => b.type === 'castrum')) {
+    state.legia.castrumLevel = 1;
+  }
   // Openworld: force-clear legacy teleport flags every frame
   if (state.visitingNation) state.visitingNation = null;
   if (state.vulcan && state.vulcan.active) state.vulcan.active = false;
@@ -14437,6 +14447,7 @@ function keyPressed() {
     }
     if (state.insideCastrum) {
       state.insideCastrum = false;
+      if (state.legia) state.legia.legiaUIOpen = false;
       state.player.x = state._castrumReturnX || (state.legia ? state.legia.castrumX : WORLD.islandCX);
       state.player.y = state._castrumReturnY || (state.legia ? state.legia.castrumY + 50 : WORLD.islandCY);
       camSmooth.x = state.player.x; camSmooth.y = state.player.y - height * 0.12;
