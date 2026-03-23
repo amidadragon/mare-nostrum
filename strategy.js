@@ -41,6 +41,26 @@ const StrategyEngine = {
       this.session.worldTensions + wars * 2 - allies * 1 - 0.5
     ));
 
+    // Catch-up logic: weaker bots get resource bonuses, anti-snowball coalitions
+    let rankings = this.getPowerRankings();
+    let leaderPower = rankings.length > 0 ? rankings[0].power : 100;
+    for (let k of nk) {
+      let n = state.nations[k];
+      if (!n || !n.isBot) continue;
+      let botDiff = (typeof BOT_DIFFICULTY !== 'undefined' && BOT_DIFFICULTY[n.botDifficulty]) ? BOT_DIFFICULTY[n.botDifficulty] : {};
+      let myPower = (n.islandState ? (n.islandState.islandLevel || n.level || 1) : (n.level || 1)) * 10 + (n.gold || 0) * 0.2 + (n.military || 0) * 5;
+      let ratio = myPower / Math.max(1, leaderPower);
+      n._catchupActive = ratio < (botDiff.catchupThreshold || 0.4);
+      // Anti-snowball: non-leaders drift toward each other
+      if (rankings.length > 0 && rankings[0].power > myPower * 2 && !n.vassal) {
+        for (let k2 of nk) {
+          if (k2 !== k && k2 !== rankings[0].key && state.nations[k2] && !state.nations[k2].vassal) {
+            n.relations[k2] = Math.min(100, (n.relations[k2] || 0) + 0.5);
+          }
+        }
+      }
+    }
+
     // Era transition notifications
     let prevEra = this.session.era;
     if (this.session.turn % 30 === 0) {

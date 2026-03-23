@@ -35,6 +35,20 @@ function mousePressed() {
   if (state.introPhase !== 'done') { skipIntro(); return; }
   if (factionSelectActive) {
     if (_pendingFaction) { selectFaction(_pendingFaction); _pendingFaction = null; return; }
+    // Difficulty button clicks
+    if (state._gameMode === 'conquest' || state._gameMode === '1v1') {
+      let diffY = height * 0.08 + 42;
+      let diffs = ['easy', 'normal', 'hard'];
+      let diffW = 70, diffGap = 12;
+      let diffStartX = width / 2 - (diffs.length * (diffW + diffGap) - diffGap) / 2;
+      for (let di = 0; di < diffs.length; di++) {
+        let dx = diffStartX + di * (diffW + diffGap);
+        if (mouseX >= dx && mouseX <= dx + diffW && mouseY >= diffY && mouseY <= diffY + 22) {
+          _selectedBotDifficulty = diffs[di];
+          return;
+        }
+      }
+    }
     if (factionSelectHover) { _pendingFaction = factionSelectHover; }
     return;
   }

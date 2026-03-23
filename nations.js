@@ -134,6 +134,11 @@ function makeNation(key) {
     relations: {},
     wars: [],
     allies: [],
+    // Bot progression fields
+    _lastExpandDay: 0,
+    _victoryFocus: null,
+    _botPhase: 'early',
+    _catchupActive: false,
   };
 }
 
@@ -409,7 +414,7 @@ function updateNationDaily(key) {
     }
   }
 
-  // --- ISLAND STATE TICK (real game systems via state swap) ---
+  // --- STRATEGIC ECONOMY TICK (resource generation + intelligent expansion) ---
   if (!rv.islandState && typeof createIslandState === 'function') {
     rv.islandState = createIslandState(key);
   }
@@ -417,66 +422,101 @@ function updateNationDaily(key) {
     let isCX = rv.isleX || WORLD.islandCX + 1200;
     let isCY = rv.isleY || WORLD.islandCY;
     swapToIsland(rv.islandState, isCX, isCY);
-    // Farm growth
-    if (state.plots) {
-      for (let p of state.plots) {
-        if (p.crop && p.stage === 'growing') {
-          p.growTimer = (p.growTimer || 0) + 60;
-          if (p.growTimer > 300) p.stage = 'ready';
-        }
+    let level = state.islandLevel || 1;
+
+    // Catch-up bonus
+    let catchupMult = (rv._catchupActive && botDiff.catchupBonus) ? botDiff.catchupBonus : 1.0;
+
+    // STRATEGIC RESOURCE GENERATION (calculated, not simulated)
+    let nodeCount = state.crystalNodes ? state.crystalNodes.length : 5;
+    let crystalIncome = Math.floor(nodeCount * 5 * (botDiff.crystalMult || 1) * catchupMult);
+    state.crystals = (state.crystals || 0) + crystalIncome;
+
+    let treeCount = state.trees ? Math.min(state.trees.length, 15) : 8;
+    let woodIncome = Math.floor(treeCount * 1.5 * (botDiff.woodMult || 1) * catchupMult);
+    state.wood = (state.wood || 0) + woodIncome;
+
+    let stoneIncome = Math.floor((2 + level * 0.5) * (botDiff.stoneMult || 1) * catchupMult);
+    state.stone = (state.stone || 0) + stoneIncome;
+
+    let plotCount = state.plots ? state.plots.length : 6;
+    let harvestIncome = Math.floor(plotCount * 1.0 * (botDiff.harvestMult || 1) * catchupMult);
+    state.harvest = (state.harvest || 0) + harvestIncome;
+    state.seeds = Math.max(state.seeds || 0, 3); // ensure seeds don't run out
+
+    let fishIncome = Math.floor((2 + level * 0.3) * (botDiff.fishMult || 1) * catchupMult);
+    state.fish = (state.fish || 0) + fishIncome;
+
+    // Building gold income
+    let buildGold = 3;
+    if (state.buildings) {
+      for (let b of state.buildings) {
+        if (b.type === 'market' || b.type === 'marketplace') buildGold += 2;
+        if (b.type === 'vineyard') buildGold += 1;
+        if (b.type === 'forum') buildGold += 3;
       }
     }
-    // Crystal recharge
+    state.gold = (state.gold || 0) + Math.floor(buildGold * (botDiff.goldMult || 1) * catchupMult);
+
+    // Crystal node recharge
     if (state.crystalNodes) {
       for (let cn of state.crystalNodes) {
         if ((cn.charge || 0) < 50) cn.charge = (cn.charge || 0) + 5;
       }
     }
-    // Tree regrowth (1 new tree per day if < 12)
+
+    // Tree regrowth (2 per day if < 12)
     if (state.trees && state.trees.length < 12) {
-      let a = random(TWO_PI), r = random(0.2, 0.6);
-      let rx = state.islandRX || 500, ry = state.islandRY || 320;
-      state.trees.push({ x: isCX + cos(a) * rx * r * 0.7, y: isCY + sin(a) * ry * r * 0.3, type: 'oak', hp: 3 });
-    }
-    // Gold income from buildings
-    let goldIncome = 0;
-    if (state.buildings) {
-      for (let b of state.buildings) {
-        if (b.type === 'market' || b.type === 'marketplace') goldIncome += 2;
-        if (b.type === 'vineyard') goldIncome += 1;
+      for (let _ti = 0; _ti < 2 && state.trees.length < 12; _ti++) {
+        let a = random(TWO_PI), r = random(0.2, 0.6);
+        let rx = state.islandRX || 500, ry = state.islandRY || 320;
+        state.trees.push({ x: isCX + cos(a) * rx * r * 0.7, y: isCY + sin(a) * ry * r * 0.3, type: 'oak', hp: 3, alive: true, health: 3, maxHealth: 3, size: 0.4 + random(0.3), shakeTimer: 0, regrowTimer: 0 });
       }
     }
-    state.gold = (state.gold || 0) + goldIncome + 3;
-    // Citizen spawning (1 per 3 buildings, max 10)
-    let targetPop = Math.min(10, Math.floor((state.buildings ? state.buildings.length : 0) / 3));
+
+    // Farm growth (advance all plots)
+    if (state.plots) {
+      for (let p of state.plots) {
+        if (p.crop && p.stage === 'growing') {
+          p.growTimer = (p.growTimer || 0) + 80;
+          if (p.growTimer > 200) p.stage = 'ready';
+        }
+        // Auto-replant empty plots
+        if (!p.crop && (state.seeds || 0) > 0) {
+          p.crop = 'grain'; p.stage = 'growing'; p.growTimer = 0;
+        }
+      }
+    }
+
+    // Citizen spawning & movement
+    let targetPop = Math.min(15, 3 + Math.floor(level * 1.2));
     if (!state.citizens) state.citizens = [];
     while (state.citizens.length < targetPop) {
       state.citizens.push({
         x: isCX + random(-80, 80), y: isCY + random(-30, 30),
         speed: 0.3 + random(0.2), targetX: isCX, targetY: isCY,
-        moveTimer: 0, skin: floor(random(5)),
-        tunicR: 100 + floor(random(80)), tunicG: 80 + floor(random(60)), tunicB: 60 + floor(random(40))
+        moveTimer: 0, skin: floor(random(5)), variant: floor(random(4)),
+        facing: random() > 0.5 ? 1 : -1, state: 'walking',
+        walkBobPhase: random(TWO_PI),
+        tunicR: 100 + floor(random(80)), tunicG: 80 + floor(random(60)), tunicB: 60 + floor(random(40)),
+        activity: null, activityTimer: 0
       });
     }
-    // Update citizen positions
-    for (let c of state.citizens) {
-      c.moveTimer--;
-      if (c.moveTimer <= 0) {
-        c.targetX = isCX + random(-100, 100);
-        c.targetY = isCY + random(-40, 40);
-        c.moveTimer = 60 + floor(random(120));
-      }
-      let cdx = c.targetX - c.x, cdy = c.targetY - c.y;
-      let cd = Math.sqrt(cdx*cdx + cdy*cdy);
-      if (cd > 3) { c.x += (cdx/cd) * c.speed; c.y += (cdy/cd) * c.speed; }
-    }
-    // AUTO LEVEL UP: every 5 game-days, bot expands (adds CITY_SLOTS buildings)
-    if ((state.day || 1) % 5 === 0 && (state.islandLevel || 1) < 15) {
-      let oldLevel = state.islandLevel || 1;
-      state.islandLevel = oldLevel + 1;
-      state.islandRX = (state.islandRX || 500) + (oldLevel < 5 ? 35 : 28);
-      state.islandRY = (state.islandRY || 320) + (oldLevel < 5 ? 24 : 18);
-      // Add new buildings from CITY_SLOTS for this level
+
+    // INTELLIGENT EXPANSION DECISION
+    let expandCost = 5 + level * 8;
+    let daysSinceExpand = (state.day || 1) - (rv._lastExpandDay || 0);
+    let expandDelay = botDiff.expandDelayDays !== undefined ? botDiff.expandDelayDays : 3;
+    let canExpand = (state.crystals || 0) >= expandCost && daysSinceExpand >= expandDelay && level < 15;
+
+    if (canExpand) {
+      state.crystals -= expandCost;
+      state.islandLevel = level + 1;
+      let rxGrowth = level < 5 ? 35 : level < 10 ? 28 : 22;
+      let ryGrowth = level < 5 ? 24 : level < 10 ? 18 : 14;
+      state.islandRX = (state.islandRX || 500) + rxGrowth;
+      state.islandRY = (state.islandRY || 320) + ryGrowth;
+      // Place era buildings
       let offsetX = isCX - 600, offsetY = isCY - 400;
       if (typeof CITY_SLOTS !== 'undefined') {
         CITY_SLOTS.forEach(function(slot) {
@@ -489,7 +529,50 @@ function updateNationDaily(key) {
           }
         });
       }
+      // Spawn trees
+      for (let _ti = 0; _ti < 3; _ti++) {
+        let a = random(TWO_PI), r = random(0.3, 0.5);
+        state.trees.push({ x: isCX + cos(a) * state.islandRX * r * 0.7, y: isCY + sin(a) * state.islandRY * r * 0.3, type: 'oak', hp: 3, alive: true, health: 3, maxHealth: 3, size: 0.4 + random(0.3), shakeTimer: 0, regrowTimer: 0 });
+      }
+      if (state.pyramid) state.pyramid.level = state.islandLevel;
+      rv._lastExpandDay = state.day || 1;
+      rv.level = state.islandLevel;
+      rv.population = state.citizens ? state.citizens.length : targetPop;
+      addNotification(name + ' expands to Level ' + state.islandLevel + '!', '#aaddff');
     }
+
+    // MILITARY RECRUITMENT (strategic)
+    let hasCastrum = state.buildings && state.buildings.some(function(b) { return b.type === 'castrum'; });
+    let maxArmy = 3 + Math.floor(level / 2);
+    let recruitRate = botDiff.recruitRate || 1;
+    if (hasCastrum && rv.military < maxArmy && (state.gold || 0) >= 15) {
+      let recruits = Math.min(Math.floor(recruitRate), maxArmy - rv.military, Math.floor((state.gold || 0) / 15));
+      if (recruits > 0) {
+        rv.military += recruits;
+        state.gold -= recruits * 15;
+        rv.gold = state.gold;
+        // Sync to legia army array
+        if (!state.legia) state.legia = { army: [], castrumLevel: 1, morale: 100 };
+        if (!state.legia.army) state.legia.army = [];
+        while (state.legia.army.length < rv.military) {
+          state.legia.army.push({ type: 'legionary', hp: 20, maxHp: 20, damage: 5, speed: 1.2, garrison: false });
+        }
+      }
+    }
+
+    // Sync gold back to nation
+    rv.gold = state.gold || 0;
+
+    // Phase detection
+    rv._botPhase = level <= 5 ? 'early' : level <= 10 ? 'mid' : 'late';
+
+    // Victory focus (based on personality)
+    if (!rv._victoryFocus) {
+      if (rv.personality === 'trader') rv._victoryFocus = 'economic';
+      else if (rv.personality === 'aggressive' || rv.personality === 'raider') rv._victoryFocus = 'military';
+      else rv._victoryFocus = 'expansion';
+    }
+
     swapBack();
   }
 

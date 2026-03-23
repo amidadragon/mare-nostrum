@@ -6,9 +6,27 @@
 // ═══════════════════════════════════════════════════════════
 
 const BOT_DIFFICULTY = {
-  easy:   { goldMult: 0.5, buildMult: 0.5, militaryMult: 0.5, raidMult: 0.3 },
-  normal: { goldMult: 1.0, buildMult: 1.0, militaryMult: 1.0, raidMult: 1.0 },
-  hard:   { goldMult: 1.5, buildMult: 1.5, militaryMult: 1.5, raidMult: 1.5 },
+  easy: {
+    goldMult: 1.0, crystalMult: 2.0, woodMult: 1.0, stoneMult: 1.0,
+    harvestMult: 1.0, fishMult: 1.0,
+    buildMult: 0.8, militaryMult: 0.6, raidMult: 0.3,
+    expandDelayDays: 2, mistakeChance: 0.3, aggressionMult: 0.5, recruitRate: 0.6,
+    catchupThreshold: 0.6, catchupBonus: 1.3,
+  },
+  normal: {
+    goldMult: 1.3, crystalMult: 3.0, woodMult: 1.3, stoneMult: 1.3,
+    harvestMult: 1.3, fishMult: 1.2,
+    buildMult: 1.0, militaryMult: 1.0, raidMult: 1.0,
+    expandDelayDays: 1, mistakeChance: 0.15, aggressionMult: 1.0, recruitRate: 1.0,
+    catchupThreshold: 0.4, catchupBonus: 1.5,
+  },
+  hard: {
+    goldMult: 2.0, crystalMult: 6.0, woodMult: 2.0, stoneMult: 2.0,
+    harvestMult: 2.0, fishMult: 1.5,
+    buildMult: 1.5, militaryMult: 1.5, raidMult: 1.5,
+    expandDelayDays: 0, mistakeChance: 0.05, aggressionMult: 1.5, recruitRate: 2.0,
+    catchupThreshold: 0.3, catchupBonus: 1.8,
+  },
 };
 
 const _BOT_NAMES = [

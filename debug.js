@@ -577,6 +577,19 @@ const Debug = {
           else this.addLog('Not connected', '#ff8888');
           break;
 
+        case '/botstatus':
+          if (state.nations) {
+            for (let _bk of Object.keys(state.nations)) {
+              let _bn = state.nations[_bk];
+              if (!_bn.isBot) continue;
+              let _bis = _bn.islandState;
+              let _blvl = _bis ? (_bis.islandLevel || 1) : (_bn.level || 1);
+              let _bcrys = _bis ? (_bis.crystals || 0) : 0;
+              let _bgold = _bn.gold || 0;
+              this.addLog(_bk.toUpperCase() + ' [' + (_bn.botDifficulty || '?') + '] Lv' + _blvl + ' | ' + _bcrys + 'c ' + _bgold + 'g | army:' + (_bn.military || 0) + ' | phase:' + (_bn._botPhase || '?') + ' | focus:' + (_bn._victoryFocus || '?') + ' | catchup:' + (_bn._catchupActive ? 'YES' : 'no'), '#88ccff');
+            }
+          } else { this.addLog('No nations active', '#ff8888'); }
+          break;
         default:
           // Try eval for advanced debugging
           try {

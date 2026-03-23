@@ -134,6 +134,7 @@ try {
 let factionSelectActive = false;  // true when showing faction choice screen
 let factionSelectHover = null;    // 'rome' | 'carthage' | 'egypt' | 'greece' | null
 let factionSelectFade = 0;        // fade-in alpha
+let _selectedBotDifficulty = 'normal'; // 'easy' | 'normal' | 'hard'
 let _pendingFaction = null;        // confirmation step before faction lock
 
 // Faction constants — bonuses and colors
@@ -1974,16 +1975,32 @@ function _dith(x, y, t) {
 // Called for player island every frame, for bot islands on staggered schedule.
 // All systems read from global `state` which is swapped via swapToIsland/swapBack.
 function updateIslandSystems(dt, isPlayer) {
+  // Bot islands use strategic economy (updateNationDaily), not per-frame simulation.
+  // Only run lightweight visual updates for bots — citizens, wildlife, military ambient.
+  if (!isPlayer) {
+    // Bot leader movement (click-to-move via BotAI)
+    if (typeof updatePlayer === 'function') updatePlayer(dt);
+    if (typeof updatePlayerAnim === 'function') updatePlayerAnim(dt);
+    // Visual systems only
+    if (typeof updateCitizens === 'function' && frameCount % 3 === 0) updateCitizens(dt * 3);
+    if (typeof updateFactionWildlife === 'function' && frameCount % 5 === 0) updateFactionWildlife(dt * 5);
+    if (typeof updateChickens === 'function') updateChickens(dt);
+    if (typeof updateLegionAmbient === 'function') updateLegionAmbient(dt);
+    if (typeof updateTrees === 'function') updateTrees(dt);
+    return;
+  }
+
+  // === PLAYER ISLAND: full simulation ===
   // Time & environment
   if (typeof updateTime === 'function') updateTime(dt);
   if (typeof updateWeather === 'function' && frameCount % 3 === 0) updateWeather(dt * 3);
   if (typeof updateStorm === 'function') updateStorm(dt);
 
-  // Player/leader movement (keyboard for human, bot input for AI)
+  // Player movement
   if (typeof updatePlayer === 'function') updatePlayer(dt);
   if (typeof updatePlayerAnim === 'function') updatePlayerAnim(dt);
 
-  // Companions — autonomous resource gatherers
+  // Companions
   let _pg = state.progression;
   let _full = !_pg || !_pg.gameStarted || _pg.villaCleared;
   if (typeof updateCompanion === 'function' && (_full || (_pg.companionsAwakened && _pg.companionsAwakened.lares))) updateCompanion(dt);
@@ -2017,21 +2034,19 @@ function updateIslandSystems(dt, isPlayer) {
   if (typeof updateFestival === 'function') updateFestival(dt);
   if (typeof updateActiveEvent === 'function') updateActiveEvent(dt);
 
-  // NPC schedules (slow tick)
+  // NPC schedules
   if (typeof updateAllNPCSchedules === 'function' && frameCount % 60 === 0) updateAllNPCSchedules(dt * 60);
 
-  // Player-only systems (UI, narrative, visual effects)
-  if (isPlayer) {
-    if (typeof updateParticles === 'function') updateParticles(dt);
-    if (typeof updateFloatingText === 'function') updateFloatingText(dt);
-    if (typeof updateShake === 'function') updateShake(dt);
-    if (typeof updatePickupMagnetism === 'function') updatePickupMagnetism(dt);
-    if (typeof updateCatAdoption === 'function') updateCatAdoption();
-    if (typeof updateVisitor === 'function') updateVisitor(dt);
-    if (typeof updateTempleCourt === 'function') updateTempleCourt(dt);
-    if (typeof updateDiscoveryEvents === 'function') updateDiscoveryEvents(dt);
-    if (typeof updateNotifications === 'function') updateNotifications(dt);
-  }
+  // Player-only visual systems
+  if (typeof updateParticles === 'function') updateParticles(dt);
+  if (typeof updateFloatingText === 'function') updateFloatingText(dt);
+  if (typeof updateShake === 'function') updateShake(dt);
+  if (typeof updatePickupMagnetism === 'function') updatePickupMagnetism(dt);
+  if (typeof updateCatAdoption === 'function') updateCatAdoption();
+  if (typeof updateVisitor === 'function') updateVisitor(dt);
+  if (typeof updateTempleCourt === 'function') updateTempleCourt(dt);
+  if (typeof updateDiscoveryEvents === 'function') updateDiscoveryEvents(dt);
+  if (typeof updateNotifications === 'function') updateNotifications(dt);
 }
 
 // ═══ CONQUEST MODE: tick all bot islands ═══

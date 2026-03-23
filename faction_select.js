@@ -16,6 +16,28 @@ function drawFactionSelect(dt) {
   text('CHOOSE YOUR ALLEGIANCE', width / 2, height * 0.08);
   textSize(9); fill(160, 150, 130);
   text('This choice shapes your destiny across the Mediterranean', width / 2, height * 0.08 + 26);
+  // Difficulty selection (Conquest mode only)
+  if (state._gameMode === 'conquest' || state._gameMode === '1v1') {
+    if (!_selectedBotDifficulty) _selectedBotDifficulty = 'normal';
+    let diffY = height * 0.08 + 42;
+    let diffs = ['easy', 'normal', 'hard'];
+    let diffLabels = ['EASY', 'NORMAL', 'HARD'];
+    let diffColors = [[100,180,100], [220,190,80], [220,80,60]];
+    let diffW = 70, diffGap = 12;
+    let diffStartX = width / 2 - (diffs.length * (diffW + diffGap) - diffGap) / 2;
+    for (let di = 0; di < diffs.length; di++) {
+      let dx = diffStartX + di * (diffW + diffGap);
+      let selected = _selectedBotDifficulty === diffs[di];
+      let hover = mouseX >= dx && mouseX <= dx + diffW && mouseY >= diffY && mouseY <= diffY + 22;
+      fill(selected ? diffColors[di][0] : 60, selected ? diffColors[di][1] : 50, selected ? diffColors[di][2] : 40, selected ? 220 : (hover ? 160 : 120));
+      rect(dx, diffY, diffW, 22, 3);
+      fill(selected ? 255 : 180); textSize(9); textAlign(CENTER, CENTER);
+      text(diffLabels[di], dx + diffW / 2, diffY + 11);
+    }
+    textAlign(CENTER, TOP);
+    textSize(8); fill(120, 110, 95);
+    text('Bot Difficulty', width / 2, diffY - 12);
+  }
   let fKeys = ['rome', 'carthage', 'egypt', 'greece', 'seapeople', 'persia', 'phoenicia', 'gaul'];
   let cardW = min(140, width * 0.2), cardH = 220, gap = 10;
   let totalW = cardW * 4 + gap * 3;
@@ -220,7 +242,7 @@ function selectFaction(faction) {
     let cx = n.isleX, cy = n.isleY;
     n.islandState = createPrebuiltIsland(k, cx, cy, _botStartLevel);
     n.isBot = true;
-    n.botDifficulty = (state._gameMode === '1v1') ? 'normal' : 'normal';
+    n.botDifficulty = (typeof _selectedBotDifficulty !== 'undefined' && _selectedBotDifficulty) ? _selectedBotDifficulty : 'normal';
     n.military = n.islandState.legia ? n.islandState.legia.army.length : 0;
     // In 1v1 mode, match resources to player (createPrebuiltIsland already scaled)
     if (state._gameMode === '1v1') {
