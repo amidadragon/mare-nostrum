@@ -222,11 +222,10 @@ function selectFaction(faction) {
     n.isBot = true;
     n.botDifficulty = (state._gameMode === '1v1') ? 'normal' : 'normal';
     n.military = n.islandState.legia ? n.islandState.legia.army.length : 0;
-    // In 1v1 mode, give bot same starting resources as player
+    // In 1v1 mode, match resources to player (createPrebuiltIsland already scaled)
     if (state._gameMode === '1v1') {
-      n.gold = 15; n.military = 0;
-      n.islandState.gold = 15; n.islandState.wood = 15;
-      n.islandState.stone = 5; n.islandState.crystals = 5;
+      n.gold = n.islandState.gold || 50; n.military = 0;
+      // Don't override — createPrebuiltIsland already set proper level-scaled resources
     }
     // Create bot AI character
     if (typeof BotAI !== 'undefined') {
