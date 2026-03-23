@@ -3716,15 +3716,25 @@ function drawInner() {
                 if (c._citizenActTimer > 0) c._citizenActTimer--;
                 if (c._citizenActTimer <= 0 && c._citizenAct) c._citizenAct = null;
                 if (c.moveTimer <= 0) {
-                  // Pick a destination — sometimes near a building for realism
+                  // Pick a destination based on citizen role
                   let _blds = _own.islandState.buildings;
-                  if (_blds && _blds.length > 0 && Math.random() < 0.4) {
-                    let _tb = _blds[Math.floor(Math.random() * _blds.length)];
-                    c.targetX = _tb.x + (Math.random()-0.5) * 20;
-                    c.targetY = _tb.y + (Math.random()-0.5) * 10;
+                  let _dest = null;
+                  if (_blds && _blds.length > 0 && Math.random() < 0.6) {
+                    // Role-based building preferences
+                    let _pref = null;
+                    let _v = c.variant || 0;
+                    if (_v === 0) _pref = _blds.find(b => b.type === 'temple' || b.isTemple); // worshipper
+                    else if (_v === 1) _pref = _blds.find(b => b.type === 'forum' || b.type === 'market'); // merchant
+                    else if (_v === 2) _pref = _blds.find(b => b.type === 'castrum'); // soldier
+                    else _pref = _blds.find(b => b.type === 'domus' || b.type === 'villa'); // resident
+                    _dest = _pref || _blds[Math.floor(Math.random() * _blds.length)];
+                    c.targetX = _dest.x + (Math.random()-0.5) * 20;
+                    c.targetY = _dest.y + (Math.random()-0.5) * 10;
+                    c._destType = _dest.type;
                   } else {
                     c.targetX = botCX + (Math.random()-0.5) * _isRX * 0.5;
                     c.targetY = botCY + (Math.random()-0.5) * _isRY * 0.2;
+                    c._destType = null;
                   }
                   c.moveTimer = 60 + Math.floor(Math.random() * 120);
                 }
@@ -3736,10 +3746,14 @@ function drawInner() {
                   c.facing = cdx > 0 ? 1 : -1;
                 } else {
                   c.moving = false; c.state = 'idle';
-                  // Trigger idle activity when stopped
-                  if (!c._citizenAct && Math.random() < 0.02) {
-                    let _acts = ['sweep', 'sit', 'chat'];
-                    c._citizenAct = _acts[Math.floor(Math.random() * _acts.length)];
+                  // Trigger idle activity based on destination building
+                  if (!c._citizenAct && Math.random() < 0.03) {
+                    let _act = 'sit';
+                    if (c._destType === 'temple' || c._destType === 'shrine') _act = Math.random() < 0.5 ? 'sit' : 'sweep';
+                    else if (c._destType === 'forum' || c._destType === 'market') _act = 'chat';
+                    else if (c._destType === 'castrum') _act = 'sweep';
+                    else _act = ['sweep', 'sit', 'chat'][Math.floor(Math.random() * 3)];
+                    c._citizenAct = _act;
                     c._citizenActTimer = 60 + Math.floor(Math.random() * 90);
                   }
                 }
