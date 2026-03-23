@@ -3638,6 +3638,18 @@ function drawInner() {
             let _botItems = [];
             for (let b of _own.islandState.buildings) {
               _botItems.push({ y: b.y, draw: () => { if (typeof drawOneBuilding === 'function') drawOneBuilding(b); } });
+              // DEBUG: bright marker on temple
+              if (b.isTemple || b.type === 'temple') {
+                let _tx = b.x, _ty = b.y;
+                _botItems.push({ y: _ty - 100, draw: () => {
+                  let _sx = w2sX(_tx), _sy = w2sY(_ty);
+                  noStroke(); fill(255, 0, 0, 200);
+                  rect(_sx - 20, _sy - 40, 40, 30, 3);
+                  fill(255, 255, 0); textAlign(CENTER, CENTER); textSize(10);
+                  text('TEMPLE', _sx, _sy - 25);
+                  textAlign(LEFT, TOP);
+                }});
+              }
             }
             // Trees on bot island
             if (_own.islandState.trees && typeof drawOneTree === 'function') {
