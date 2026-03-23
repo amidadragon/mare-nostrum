@@ -223,4 +223,82 @@ const StrategyEngine = {
       textAlign(LEFT, TOP);
     }
   },
+
+  // ═══ VICTORY CONDITIONS (Conquest mode) ═══
+  checkVictory() {
+    if (state._gameMode !== 'conquest' || !state.nations) return null;
+    if (state._victoryShown) return null;
+
+    // EXPANSION VICTORY: first to level 15
+    if ((state.islandLevel || 1) >= 15) {
+      return { winner: state.faction, name: 'You', condition: 'expansion', message: 'Your civilization reached Level 15!' };
+    }
+    for (let k of Object.keys(state.nations)) {
+      let n = state.nations[k];
+      if (n.islandState && (n.islandState.islandLevel || 1) >= 15) {
+        let name = typeof getNationName === 'function' ? getNationName(k) : k;
+        return { winner: k, name: name, condition: 'expansion', isPlayer: false, message: name + ' reached Level 15!' };
+      }
+    }
+
+    // DOMINATION VICTORY: all other nations defeated or vassalized
+    let activeNations = Object.keys(state.nations).filter(k => !state.nations[k].defeated || state.nations[k].vassal);
+    let allVassals = activeNations.every(k => state.nations[k].vassal);
+    if (activeNations.length === 0 || allVassals) {
+      return { winner: state.faction, name: 'You', condition: 'domination', message: 'All nations bow before you!' };
+    }
+
+    // ECONOMIC VICTORY: accumulate 500 gold
+    if ((state.gold || 0) >= 500) {
+      return { winner: state.faction, name: 'You', condition: 'economic', message: 'Your treasury overflows with 500 gold!' };
+    }
+    for (let k of Object.keys(state.nations)) {
+      let n = state.nations[k];
+      if ((n.gold || 0) >= 500) {
+        let name = typeof getNationName === 'function' ? getNationName(k) : k;
+        return { winner: k, name: name, condition: 'economic', isPlayer: false, message: name + ' amassed 500 gold!' };
+      }
+    }
+
+    return null;
+  },
+
+  // ═══ DRAW VICTORY SCREEN ═══
+  drawVictoryScreen(victory) {
+    if (!victory) return;
+    // Darken background
+    fill(0, 0, 0, 180); rect(0, 0, width, height);
+    // Victory panel
+    let px = width / 2 - 180, py = height / 2 - 100;
+    fill(30, 25, 20, 240); rect(px, py, 360, 200, 8);
+    fill(180, 160, 100); rect(px + 2, py + 2, 356, 196, 7);
+    fill(30, 25, 20, 240); rect(px + 6, py + 6, 348, 188, 5);
+    // Title
+    let isWin = victory.winner === state.faction;
+    fill(isWin ? 255 : 200, isWin ? 220 : 80, isWin ? 100 : 80);
+    textSize(22); textAlign(CENTER, TOP);
+    text(isWin ? 'VICTORY!' : 'DEFEAT', width / 2, py + 20);
+    // Condition
+    let condNames = { expansion: 'Expansion Victory', domination: 'Domination Victory', economic: 'Economic Victory' };
+    fill(220, 200, 160); textSize(12);
+    text(condNames[victory.condition] || victory.condition, width / 2, py + 52);
+    // Message
+    fill(200, 190, 170); textSize(10);
+    text(victory.message, width / 2, py + 75);
+    // Winner
+    fill(180, 170, 140); textSize(9);
+    text('Winner: ' + victory.name, width / 2, py + 100);
+    // Rankings
+    let rankings = this.getPowerRankings();
+    fill(160, 150, 130); textSize(8);
+    for (let i = 0; i < Math.min(5, rankings.length); i++) {
+      let r = rankings[i];
+      fill(r.isPlayer ? 255 : 160, r.isPlayer ? 220 : 150, r.isPlayer ? 100 : 130);
+      text((i + 1) + '. ' + r.name + ' — ' + r.power + ' power', width / 2, py + 120 + i * 12);
+    }
+    // Return to menu prompt
+    fill(180, 170, 140, 150 + Math.sin(frameCount * 0.05) * 80); textSize(10);
+    text('Press any key to return to menu', width / 2, py + 180);
+    textAlign(LEFT, TOP);
+  },
 };

@@ -1248,6 +1248,49 @@ function start1v1Game(playerFaction) {
   }
 }
 
+// ═══ CONQUEST MODE — 8 factions, all start equal, race to victory ═══
+function startConquestGame(playerFaction) {
+  initState();
+  state._gameMode = 'conquest';
+  trackMilestone('conquest_start');
+  state.progression.gameStarted = true;
+  state.progression.villaCleared = true;
+  state.progression.tutorialDone = true;
+  state.progression.homeIslandReached = true;
+  state.progression.wreckExplored = true;
+  state.progression.triremeRepaired = true;
+  state.progression.farmCleared = true;
+  state.progression.companionsAwakened = { lares: true, woodcutter: true, harvester: true, centurion: true };
+  state.progression.npcsFound = { marcus: true, vesta: true, felix: true };
+  state.introPhase = null;
+  // Everyone starts at level 1 — build from scratch
+  state.islandLevel = 1;
+  state.islandRX = 500;
+  state.islandRY = 320;
+  state.player.x = WORLD.islandCX;
+  state.player.y = WORLD.islandCY;
+  cam.x = state.player.x; cam.y = state.player.y;
+  camSmooth.x = cam.x; camSmooth.y = cam.y;
+  // Equal starting resources
+  state.wood = 15; state.stone = 10; state.crystals = 8;
+  state.gold = 20; state.seeds = 5; state.harvest = 8;
+  state.solar = 100; state.fish = 3;
+  // Tools unlocked
+  state.tools = { sickle: 1, axe: 1, net: 1 };
+  // Random faction if not specified
+  let factions = ['rome', 'carthage', 'egypt', 'greece', 'seapeople', 'persia', 'phoenicia', 'gaul'];
+  if (!playerFaction) playerFaction = factions[Math.floor(Math.random() * factions.length)];
+  if (typeof selectFaction === 'function') selectFaction(playerFaction);
+  // Build starting island
+  if (typeof buildIsland === 'function') buildIsland();
+  gameScreen = 'game';
+  if (typeof addNotification === 'function') {
+    addNotification('CONQUEST MODE — Rise above all nations!', '#ffdd44');
+    addNotification('Expand, build armies, forge alliances, and dominate.', '#aaddff');
+    addNotification('First to level 15 OR last faction standing wins!', '#88ff88');
+  }
+}
+
 function startNewGame() {
   initState();
   trackMilestone('game_start');
@@ -2102,6 +2145,12 @@ function drawInner() {
     // Strategy power rankings (top-right corner)
     if (typeof StrategyEngine !== 'undefined' && StrategyEngine.session && !photoMode && !screenshotMode && !dialogState.active) {
       StrategyEngine.drawPowerRankings();
+      // Conquest victory check (every 60 frames)
+      if (state._gameMode === 'conquest' && frameCount % 60 === 0 && !state._victoryShown) {
+        let _vic = StrategyEngine.checkVictory();
+        if (_vic) { state._victory = _vic; state._victoryShown = true; }
+      }
+      if (state._victory) StrategyEngine.drawVictoryScreen(state._victory);
     }
     drawTempleRoomHUD();
     if (!screenshotMode) drawCursor();

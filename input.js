@@ -579,6 +579,13 @@ function touchStarted() {
 
 function keyPressed() {
   if (snd) snd.resume();
+  // Victory screen — any key returns to menu
+  if (state._victoryShown && state._victory) {
+    state._victoryShown = false;
+    state._victory = null;
+    gameScreen = 'menu';
+    return;
+  }
   // Faction select keyboard shortcuts
   if (factionSelectActive) {
     if (_pendingFaction) {
