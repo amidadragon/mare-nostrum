@@ -26,21 +26,33 @@ const BotAI = {
     let underAttack = state.invasion && state.invasion.active && state.invasion.target === nationKey;
     let actions = [];
 
+    // Phase-based strategy: early=expand, mid=military, late=dominate
+    let phase = level < 8 ? 'early' : level < 12 ? 'mid' : 'late';
+    let expandBonus = phase === 'early' ? 2.0 : 0.5;
+    let militaryBonus = phase === 'mid' ? 2.0 : (phase === 'late' ? 1.5 : 0.3);
+
     if (underAttack) actions.push({ type: 'defend', score: 10.0 });
-    if (crystals >= expandCost && level < 15) actions.push({ type: 'expand', score: 3.0 + level * 0.2 });
+    // EXPAND: highest priority in early game
+    if (crystals >= expandCost && level < 15) actions.push({ type: 'expand', score: 3.0 + expandBonus });
+    // MINE CRYSTALS: urgent in early game to fuel expansion
     if (is.crystalNodes && is.crystalNodes.some(n => (n.charge||0) > 0) && crystals < expandCost)
-      actions.push({ type: 'mine_crystal', score: 2.5 * (1 - crystals / expandCost) });
-    if (is.trees && is.trees.length > 0 && wood < 30)
-      actions.push({ type: 'chop', score: 2.0 * (1 - wood / 30) });
+      actions.push({ type: 'mine_crystal', score: 2.5 + expandBonus * (1 - crystals / expandCost) });
+    // CHOP: always need wood
+    if (is.trees && is.trees.length > 0 && wood < 40)
+      actions.push({ type: 'chop', score: 1.8 * (1 - wood / 40) });
+    // HARVEST: grab ready crops
     if (is.plots && is.plots.some(p => p.stage === 'ready'))
-      actions.push({ type: 'harvest', score: 1.8 });
+      actions.push({ type: 'harvest', score: 1.5 });
+    // PLANT: keep farms going
     if (is.plots && is.plots.some(p => !p.crop))
-      actions.push({ type: 'plant', score: 1.2 });
-    if (stone < 15) actions.push({ type: 'mine_stone', score: 1.5 * (1 - stone / 15) });
+      actions.push({ type: 'plant', score: 1.0 });
+    // MINE STONE: need for buildings
+    if (stone < 20) actions.push({ type: 'mine_stone', score: 1.3 * (1 - stone / 20) });
+    // RECRUIT: high priority in mid/late game
     let armySize = is.legia ? (is.legia.army ? is.legia.army.length : 0) : 0;
     let maxArmy = Math.min(10, 3 + Math.floor(level / 3));
     if (is.buildings && is.buildings.some(b => b.type === 'castrum') && gold >= 10 && armySize < maxArmy)
-      actions.push({ type: 'recruit', score: 1.0 + (underAttack ? 3.0 : 0) });
+      actions.push({ type: 'recruit', score: 1.0 + militaryBonus + (underAttack ? 3.0 : 0) });
     // Counter-attack: bot sends raiders when military is strong enough
     let alreadyRaiding = nation.raidParty && nation.raidParty.length > 0;
     if (armySize >= 5 && !alreadyRaiding && !underAttack && !nation.allied)
