@@ -45,6 +45,15 @@ const BotAI = {
     let alreadyRaiding = nation.raidParty && nation.raidParty.length > 0;
     if (armySize >= 5 && !alreadyRaiding && !underAttack && !nation.allied)
       actions.push({ type: 'counter_attack', score: 1.5 + armySize * 0.1 });
+    // Trade: bots with market/forum generate gold
+    if (is.buildings && is.buildings.some(b => b.type === 'forum' || b.type === 'market'))
+      actions.push({ type: 'trade', score: 0.8 });
+    // Regrow trees: bots replant when trees are low
+    if (is.trees && is.trees.length < 8 && wood >= 5)
+      actions.push({ type: 'replant', score: 0.6 });
+    // Grow crops: advance farm plot stages
+    if (is.plots && is.plots.some(p => p.crop && p.stage === 'growing'))
+      actions.push({ type: 'tend_crops', score: 0.5 });
     actions.push({ type: 'patrol', score: 0.1 });
 
     actions.sort((a, b) => b.score - a.score);
@@ -86,6 +95,9 @@ const BotAI = {
       case 'recruit': { let b = is.buildings ? is.buildings.find(b => b.type==='castrum') : null; return { type, target: b ? {x:b.x,y:b.y} : {x:cx,y:cy}, timer: 0 }; }
       case 'defend': { let a = state.invasion && state.invasion.attackers ? state.invasion.attackers.find(a => a.hp>0) : null; return { type, target: a ? {x:a.x,y:a.y} : {x:cx,y:cy}, timer: 0 }; }
       case 'counter_attack': return { type, target: {x: cx, y: cy}, timer: 0 };
+      case 'trade': { let b = is.buildings ? is.buildings.find(b => b.type==='forum'||b.type==='market') : null; return { type, target: b ? {x:b.x,y:b.y} : {x:cx,y:cy}, timer: 0 }; }
+      case 'replant': return { type, target: {x: cx+(Math.random()-0.5)*rx*0.4, y: cy+(Math.random()-0.5)*ry*0.15}, timer: 0 };
+      case 'tend_crops': { let p = is.plots && is.plots.find(p => p.crop && p.stage==='growing'); return p ? { type, target: {x:p.x,y:p.y}, timer: 0 } : null; }
       default: { let a=Math.random()*Math.PI*2, r=Math.random()*0.4+0.1; return { type:'patrol', target: {x:cx+Math.cos(a)*rx*r*0.6, y:cy+Math.sin(a)*ry*r*0.25}, timer: 0 }; }
     }
   },
@@ -191,6 +203,34 @@ const BotAI = {
             if (is.legia && is.legia.army) {
               let sent = Math.min(3, is.legia.army.length);
               is.legia.army.splice(0, sent);
+            }
+          }
+          bot.task = null;
+        } break;
+      case 'trade':
+        if (task.timer > 25) {
+          let tradeGold = 3 + Math.floor((is.islandLevel || 1) * 0.5);
+          is.gold = (is.gold || 0) + tradeGold;
+          nation.gold = (nation.gold || 0) + tradeGold;
+          bot.task = null;
+        } break;
+      case 'replant':
+        if (task.timer > 30) {
+          is.wood = Math.max(0, (is.wood || 0) - 5);
+          let a = Math.random() * Math.PI * 2, r = Math.random() * 0.3 + 0.2;
+          let cx = nation.isleX, cy = nation.isleY;
+          if (!is.trees) is.trees = [];
+          is.trees.push({ x: cx + Math.cos(a) * (is.islandRX||400) * r * 0.7, y: cy + Math.sin(a) * (is.islandRY||260) * r * 0.3, type: 'oak', hp: 3, alive: true, health: 3, maxHealth: 3, size: 0.3, shakeTimer: 0, regrowTimer: 0 });
+          bot.task = null;
+        } break;
+      case 'tend_crops':
+        if (task.timer > 20) {
+          if (is.plots) {
+            for (let p of is.plots) {
+              if (p.crop && p.stage === 'growing') {
+                p.growTimer = (p.growTimer || 0) + 60;
+                if (p.growTimer >= 200) { p.stage = 'ready'; }
+              }
             }
           }
           bot.task = null;
