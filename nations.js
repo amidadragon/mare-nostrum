@@ -385,6 +385,10 @@ function updateNationDaily(key) {
   }
 
   // --- ISLAND STATE TICK (bot builds real buildings via state swap) ---
+  // Auto-create islandState if missing (loaded save or not initialized)
+  if (!rv.islandState && typeof createIslandState === 'function') {
+    rv.islandState = createIslandState(key);
+  }
   if (rv.islandState && typeof swapToIsland === 'function') {
     let isCX = rv.isleX || WORLD.islandCX + 1200;
     let isCY = rv.isleY || WORLD.islandCY;
@@ -396,7 +400,10 @@ function updateNationDaily(key) {
       state.islandRY += 20;
     }
     // Place a real building from BLUEPRINTS (cap at 20 per island)
-    if (typeof BLUEPRINTS !== 'undefined' && state.buildings.length < 20 && random() < 0.2 * botDiff.buildMult) {
+    // Build 2-3 buildings per day (bots build fast to populate their islands)
+    let buildCount = floor(random(2, 4));
+    for (let _bi = 0; _bi < buildCount && state.buildings.length < 20; _bi++) {
+    if (typeof BLUEPRINTS !== 'undefined') {
       let bpKeys = Object.keys(BLUEPRINTS).filter(bk => (BLUEPRINTS[bk].minLevel || 1) <= state.islandLevel);
       if (bpKeys.length > 0) {
         let bk = bpKeys[floor(random(bpKeys.length))];
@@ -407,6 +414,7 @@ function updateNationDaily(key) {
         state.buildings.push({ type: bk, x: bx, y: by, w: bp.w || 40, h: bp.h || 40, hp: bp.maxHp || 100, built: true });
       }
     }
+    } // end buildCount loop
     swapBack();
   }
 
