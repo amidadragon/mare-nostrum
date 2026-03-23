@@ -3733,6 +3733,28 @@ function drawInner() {
                 _botItems.push({ y: c.y, draw: () => { if (typeof drawOneCitizen === 'function') drawOneCitizen(c); } });
               }
             }
+            // Bot garrison soldiers patrolling near castrum
+            if (_own.islandState.legia && _own.islandState.legia.army && typeof drawLegionAmbientSoldier === 'function') {
+              let _castB = _own.islandState.buildings ? _own.islandState.buildings.find(b => b.type === 'castrum') : null;
+              let _scx = _castB ? _castB.x : botCX + 100, _scy = _castB ? _castB.y : botCY + 50;
+              for (let _si = 0; _si < Math.min(4, _own.islandState.legia.army.length); _si++) {
+                let _su = _own.islandState.legia.army[_si];
+                if (!_su._bx) { _su._bx = _scx + (Math.random()-0.5) * 60; _su._by = _scy + (Math.random()-0.5) * 30; _su._bt = Math.floor(Math.random() * 120); _su._bs = 'patrol'; _su.facing = Math.random() > 0.5 ? 1 : -1; }
+                _su._bt--;
+                if (_su._bt <= 0) {
+                  _su._bx = _scx + (Math.random()-0.5) * 60; _su._by = _scy + (Math.random()-0.5) * 30;
+                  _su._bt = 60 + Math.floor(Math.random() * 120);
+                  _su._bs = _su._bs === 'patrol' ? 'idle' : 'patrol';
+                }
+                if (_su._bs === 'patrol') {
+                  let _sdx = _su._bx - (_su.x||_scx), _sdy = _su._by - (_su.y||_scy);
+                  let _sd = Math.sqrt(_sdx*_sdx + _sdy*_sdy);
+                  if (_sd > 3) { _su.x = (_su.x||_scx) + _sdx/_sd * 0.8; _su.y = (_su.y||_scy) + _sdy/_sd * 0.5; _su.facing = _sdx > 0 ? 1 : -1; }
+                }
+                _su.state = _su._bs;
+                _botItems.push({ y: _su.y || _scy, draw: () => drawLegionAmbientSoldier(_su) });
+              }
+            }
             // Sort by Y and draw
             _botItems.sort((a, b) => a.y - b.y);
             for (let item of _botItems) item.draw();
