@@ -1927,6 +1927,93 @@ function _dith(x, y, t) {
 // skipCutscene, doFirstRepair, completeSailToHome
 
 
+// ═══ UNIVERSAL ISLAND UPDATE — runs the same simulation for any island ═══
+// Called for player island every frame, for bot islands on staggered schedule.
+// All systems read from global `state` which is swapped via swapToIsland/swapBack.
+function updateIslandSystems(dt, isPlayer) {
+  // Time & environment
+  if (typeof updateTime === 'function') updateTime(dt);
+  if (typeof updateWeather === 'function' && frameCount % 3 === 0) updateWeather(dt * 3);
+  if (typeof updateStorm === 'function') updateStorm(dt);
+
+  // Player/leader movement (keyboard for human, bot input for AI)
+  if (typeof updatePlayer === 'function') updatePlayer(dt);
+  if (typeof updatePlayerAnim === 'function') updatePlayerAnim(dt);
+
+  // Companions — autonomous resource gatherers
+  let _pg = state.progression;
+  let _full = !_pg || !_pg.gameStarted || _pg.villaCleared;
+  if (typeof updateCompanion === 'function' && (_full || (_pg.companionsAwakened && _pg.companionsAwakened.lares))) updateCompanion(dt);
+  if (typeof updateWoodcutter === 'function' && (_full || (_pg.companionsAwakened && _pg.companionsAwakened.woodcutter))) updateWoodcutter(dt);
+  if (typeof updateHarvester === 'function' && (_full || (_pg.companionsAwakened && _pg.companionsAwakened.harvester))) updateHarvester(dt);
+  if (typeof updateQuarrier === 'function') updateQuarrier(dt);
+  if (typeof updateCenturion === 'function' && (_full || (_pg.companionsAwakened && _pg.companionsAwakened.centurion))) updateCenturion(dt);
+  if (typeof updateCook === 'function') updateCook(dt);
+  if (typeof updateFisherman === 'function') updateFisherman(dt);
+
+  // Citizens & wildlife
+  if (typeof updateCitizens === 'function' && frameCount % 3 === 0) updateCitizens(dt * 3);
+  if (typeof updateFactionWildlife === 'function' && frameCount % 5 === 0) updateFactionWildlife(dt * 5);
+  if (typeof updateChickens === 'function') updateChickens(dt);
+  if (typeof updateCats === 'function') updateCats(dt);
+  if (typeof updateCompanionPets === 'function') updateCompanionPets(dt);
+
+  // Resource systems
+  if (typeof updateVestaCrystalGathering === 'function') updateVestaCrystalGathering(dt);
+  if (typeof updateTrees === 'function') updateTrees(dt);
+  if (typeof updateFishing === 'function') updateFishing(dt);
+  if (typeof updateBlessing === 'function') updateBlessing(dt);
+  if (typeof updateHarvestCombo === 'function') updateHarvestCombo(dt);
+  if (typeof updateCooking === 'function') updateCooking(dt);
+
+  // Military
+  if (typeof updateLegia === 'function') updateLegia(dt);
+  if (typeof updateLegionAmbient === 'function') updateLegionAmbient(dt);
+
+  // Events & festivals
+  if (typeof updateFestival === 'function') updateFestival(dt);
+  if (typeof updateActiveEvent === 'function') updateActiveEvent(dt);
+
+  // NPC schedules (slow tick)
+  if (typeof updateAllNPCSchedules === 'function' && frameCount % 60 === 0) updateAllNPCSchedules(dt * 60);
+
+  // Player-only systems (UI, narrative, visual effects)
+  if (isPlayer) {
+    if (typeof updateParticles === 'function') updateParticles(dt);
+    if (typeof updateFloatingText === 'function') updateFloatingText(dt);
+    if (typeof updateShake === 'function') updateShake(dt);
+    if (typeof updatePickupMagnetism === 'function') updatePickupMagnetism(dt);
+    if (typeof updateCatAdoption === 'function') updateCatAdoption();
+    if (typeof updateVisitor === 'function') updateVisitor(dt);
+    if (typeof updateTempleCourt === 'function') updateTempleCourt(dt);
+    if (typeof updateDiscoveryEvents === 'function') updateDiscoveryEvents(dt);
+    if (typeof updateNotifications === 'function') updateNotifications(dt);
+  }
+}
+
+// ═══ CONQUEST MODE: tick all bot islands ═══
+function updateConquestIslands(dt) {
+  if (!state.nations) return;
+  let botKeys = Object.keys(state.nations).filter(k => state.nations[k].isBot && state.nations[k].islandState);
+  if (botKeys.length === 0) return;
+
+  // Staggered: update 1 bot island per frame (round-robin)
+  let idx = frameCount % botKeys.length;
+  let k = botKeys[idx];
+  let nation = state.nations[k];
+  let is = nation.islandState;
+
+  swapToIsland(is, nation.isleX, nation.isleY);
+
+  // Bot AI generates synthetic input for this island's leader
+  if (typeof BotAI !== 'undefined') BotAI.update(k, dt * botKeys.length);
+
+  // Run the same island systems as the player
+  updateIslandSystems(dt * botKeys.length, false);
+
+  swapBack();
+}
+
 function drawInner() {
   // Clear canvas so zoomed-out edges don't show stale frames
   if (camZoom < 0.99) background(10, 18, 35);
@@ -2286,44 +2373,8 @@ function drawInner() {
     if (typeof updateDiving === 'function') updateDiving(dt);
     if (typeof updateInvasion === 'function') updateInvasion(dt);
     updateRivalRaid(dt);
-    // Update bot AI characters — offloaded to Web Worker
-    if (_botWorker && _botWorkerReady && frameCount % 30 === 0) {
-      let _snap = {};
-      for (let k of Object.keys(state.nations || {})) {
-        let n = state.nations[k];
-        if (!n.isBot || !n.islandState) continue;
-        let is = n.islandState;
-        let underAttack = state.invasion && state.invasion.active && state.invasion.target === k;
-        let atkPos = null;
-        if (underAttack && state.invasion.attackers) {
-          let a = state.invasion.attackers.find(function(a) { return a.hp > 0; });
-          if (a) atkPos = { x: a.x, y: a.y };
-        }
-        _snap[k] = {
-          isleX: n.isleX, isleY: n.isleY,
-          islandRX: is.islandRX || 500, islandRY: is.islandRY || 320,
-          islandLevel: is.islandLevel || 1,
-          wood: is.wood || 0, stone: is.stone || 0, gold: is.gold || 0,
-          crystals: is.crystals || 0,
-          trees: is.trees ? is.trees.map(function(t) { return {x:t.x,y:t.y,type:t.type,hp:t.hp}; }) : [],
-          crystalNodes: is.crystalNodes ? is.crystalNodes.map(function(n) { return {x:n.x,y:n.y,charge:n.charge,size:n.size}; }) : [],
-          plots: is.plots ? is.plots.map(function(p) { return {x:p.x,y:p.y,crop:p.crop,stage:p.stage}; }) : [],
-          buildings: is.buildings ? is.buildings.map(function(b) { return {x:b.x,y:b.y,type:b.type}; }) : [],
-          legia: is.legia ? { army: is.legia.army ? is.legia.army.map(function(u) { return {type:u.type}; }) : [] } : null,
-          defeated: n.defeated || false,
-          _underAttack: underAttack || false,
-          _attackerPos: atkPos
-        };
-      }
-      _botWorker.postMessage({ type: 'update', nations: _snap, dt: 1 });
-    } else if (!_botWorker) {
-      // Fallback: run on main thread if Worker not available
-      if (typeof BotAI !== 'undefined') {
-        for (let k of Object.keys(state.nations || {})) {
-          if (state.nations[k].isBot) BotAI.update(k, dt);
-        }
-      }
-    }
+    // Update bot islands — full island simulation with staggered updates
+    updateConquestIslands(dt);
     updateSeaPeopleRaid(dt);
     if (typeof updateNavalCombat === 'function') updateNavalCombat(dt);
     updateNotifications(dt);
@@ -2472,18 +2523,15 @@ function drawInner() {
               if (!state.crystalRainDrops) state.crystalRainDrops = [];
               if (!state.plots) state.plots = [];
               if (!state.crystalShrine) state.crystalShrine = { x: botCX - 200, y: botCY };
-              // Null guards for player-specific objects that drawWorldObjectsSorted reads
-              let _needProg = !state.progression;
-              if (_needProg) state.progression = { gameStarted: true, villaCleared: true, companionsAwakened: {} };
-              let _needHarv = !state.harvester;
-              let _needLegia = !state.legia;
-              if (_needLegia) state.legia = { army: [], soldiers: [], castrumX: botCX + 100, castrumY: botCY + 50, castrumLevel: 0 };
+              // Null guards for safety (createIslandState now provides these, but guard old saves)
+              if (!state.progression) state.progression = { gameStarted: true, villaCleared: true, companionsAwakened: { lares: true, woodcutter: true, harvester: true, centurion: true }, tutorialsSeen: {} };
+              if (!state.legia) state.legia = { army: [], soldiers: [], castrumX: botCX + 100, castrumY: botCY + 50, castrumLevel: 0 };
+              if (!state.companion) state.companion = { x: botCX + 40, y: botCY + 20, vx: 0, vy: 0, speed: 2, task: 'idle', taskTarget: null, carryItem: null, energy: 100, pulsePhase: 0, trailPoints: [] };
+              if (!state.player) state.player = { x: botCX, y: botCY, vx: 0, vy: 0, speed: 3.2, size: 16, facing: 'down', moving: false, targetX: null, targetY: null, hp: 100, maxHp: 100, anim: { emotion: 'determined', emotionTimer: 0, blinkTimer: 240, blinkFrame: 0, bounceY: 0, bounceTimer: 0, walkFrame: 0, walkTimer: 0, helmetOff: false }, level: 1, xp: 0, weapon: 0, armor: 0, skills: {}, skillCooldowns: {} };
               // Force ground re-sort for bot island
               _groundSortFrame = -999;
               // Render everything — SAME function that draws the player island
               drawWorldObjectsSorted();
-              // Restore player state
-              if (_needProg) state.progression = null;
               swapBack();
             }
           }

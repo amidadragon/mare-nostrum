@@ -437,46 +437,104 @@ let _realState = null;
 let _swappedIsland = null;
 
 const _islandFields = [
+  // Island terrain & objects
   'buildings','plots','citizens','trees','crystalNodes',
   'islandLevel','islandRX','islandRY',
+  'pyramid','ruins','resources','factionFlora','factionWildlife',
+  'chickens','crystalShrine','faction','workers',
+  // Resources
   'wood','stone','gold','crystals','ironOre','harvest','fish','seeds',
   'meals','wine','oil',
-  'pyramid','ruins','resources','factionFlora','factionWildlife',
-  'chickens','crystalShrine','faction','workers'
+  // Companions
+  'companion','woodcutter','harvester','quarrier','centurion','cook','fisherman',
+  'cats','companionPets',
+  // NPCs
+  'npc','marcus','vesta','felix','npcFavor',
+  // Military
+  'legia',
+  // Player (leader)
+  'player',
+  // Systems
+  'progression','weather','blessing','harvestCombo','tools','wardrobe',
+  'fishing','festival','time','day',
 ];
 
-function createIslandState(faction) {
+function createIslandState(faction, cx, cy) {
+  // Center defaults to player island center if not specified
+  let icx = cx || 600, icy = cy || 400;
   return {
     faction: faction,
     islandLevel: 1, islandRX: 500, islandRY: 320,
     buildings: [], plots: [], trees: [], crystalNodes: [], citizens: [],
-    // Resources (same starting amounts as player)
+    // Resources
     wood: 10, stone: 5, gold: 10, crystals: 5,
     ironOre: 0, harvest: 5, fish: 2,
     seeds: 3, grapeSeeds: 0, oliveSeeds: 0,
     meals: 0, wine: 0, oil: 0,
-    // Military
-    legia: { army: [], castrumLevel: 0, morale: 100, recruits: 0, maxRecruits: 10 },
-    // Temple
-    templeHP: 100, templeMaxHP: 100,
-    // NPCs
-    npc: { hearts: 0 }, marcus: { hearts: 0 }, vesta: { hearts: 0 }, felix: { hearts: 0 },
-    npcNames: FACTIONS[faction] ? FACTIONS[faction].npcNames : null,
-    // Workers
-    quarrier: null, cutter: null, fisher: null,
-    // Progression
-    foodShortage: 0, day: 1,
-    // Port
-    portLeft: null, portRight: null,
-    // Visual elements (needed for full rendering parity)
+    // Visual elements
     pyramid: null, ruins: [], resources: [],
     factionFlora: [], factionWildlife: [],
     chickens: [], crystalShrine: null,
+    workers: [],
+    // Player (island leader — controlled by keyboard or bot AI)
+    player: {
+      x: icx, y: icy, vx: 0, vy: 0, speed: 3.2, size: 16,
+      facing: 'down', moving: false, targetX: null, targetY: null,
+      dashTimer: 0, dashCooldown: 0, trailPoints: [],
+      hp: 100, maxHp: 100, attackTimer: 0, attackCooldown: 25,
+      attackDamage: 15, attackRange: 42, invincTimer: 0, slashPhase: 0,
+      weapon: 0, armor: 0, potions: 0, hotbarSlot: 0, toolSwing: 0,
+      anim: { emotion: 'determined', emotionTimer: 0, blinkTimer: 240, blinkFrame: 0, bounceY: 0, bounceTimer: 0, walkFrame: 0, walkTimer: 0, helmetOff: false },
+      defense: 2, levelAtk: 1, level: 1, xp: 0, skillPoints: 0, totalXp: 0,
+      comboCount: 0, comboTimer: 0, dodgeTimer: 0, dodgeCooldown: 0, dodgeDir: 0, hitPause: 0,
+      skills: { whirlwind: 0, shieldBash: 0, battleCry: 0, charge: 0, javelin: 0, fortify: 0, crystalBolt: 0, healAura: 0, lightning: 0 },
+      skillCooldowns: {}, fortifyTimer: 0, battleCryTimer: 0,
+    },
+    // Companions (same as player island — autonomous helpers)
+    companion: { x: icx + 40, y: icy + 20, vx: 0, vy: 0, speed: 2.0, task: 'idle', taskTarget: null, carryItem: null, energy: 100, pulsePhase: 0, trailPoints: [] },
+    woodcutter: { x: icx - 40, y: icy - 20, vx: 0, vy: 0, speed: 1.8, task: 'idle', taskTarget: null, chopTimer: 0, energy: 100, pulsePhase: 0, trailPoints: [] },
+    harvester: { x: icx - 140, y: icy + 10, vx: 0, vy: 0, speed: 1.6, task: 'idle', taskTarget: null, carryItem: null, carryCount: 0, timer: 0, energy: 100, pulsePhase: 0, trailPoints: [] },
+    quarrier: { x: icx + 80, y: icy + 30, vx: 0, vy: 0, speed: 1.5, task: 'idle', taskTarget: null, mineTimer: 0, energy: 100, pulsePhase: 0, trailPoints: [], unlocked: true },
+    centurion: { x: icx + 30, y: icy + 10, vx: 0, vy: 0, speed: 2.8, facing: 1, task: 'follow', target: null, attackTimer: 0, attackCooldown: 20, attackDamage: 12, attackRange: 30, hp: 120, maxHp: 120, flashTimer: 0 },
+    cook: { x: icx - 100, y: icy + 40, vx: 0, vy: 0, speed: 1.2, task: 'idle', timer: 0, cookTimer: 0, unlocked: true },
+    fisherman: { x: 0, y: 0, boatX: 0, boatY: 0, timer: 0, catchTimer: 0, unlocked: true, fishCaught: 0 },
+    cats: [],
+    companionPets: {
+      cat: { level: 1, xp: 0, behavior: 'idle', behaviorTimer: 0, giftCooldown: 0, lastGiftDay: -1, nearPlayerTimer: 0, sleepPos: null },
+      tortoise: { level: 1, xp: 0, behavior: 'idle', behaviorTimer: 0, giftCooldown: 0, lastGiftDay: -1, nearPlayerTimer: 0, sleepPos: null, x: icx + 140, y: icy + 20, vx: 0, vy: 0, facing: 1, shellTimer: 0, findTimer: 0, lastFindDay: -1 },
+      crow: { level: 1, xp: 0, behavior: 'idle', behaviorTimer: 0, giftCooldown: 0, lastGiftDay: -1, nearPlayerTimer: 0, sleepPos: null, x: icx, y: icy - 60, vx: 0, vy: 0, facing: 1, circlePhase: 0, cawTimer: 0, bringTimer: 0, lastBringDay: -1, landed: false, perchTarget: null },
+      centurion: { level: 1, xp: 0, behavior: 'idle', behaviorTimer: 0, giftCooldown: 0, lastGiftDay: -1, nearPlayerTimer: 0, sleepPos: null, patrolTimer: 0, saluteTimer: 0, trainTimer: 0, ability: null },
+    },
+    // NPCs
+    npc: { x: icx - 60, y: icy + 20, hearts: 0, dialogTimer: 0, currentLine: -1, lines: [] },
+    marcus: { x: icx + 200, y: icy + 40, hearts: 0, dialogTimer: 0, currentLine: -1, lineIndex: 0, present: false, anim: { blinkTimer: 200, blinkFrame: 0, breathe: 0 } },
+    vesta: { x: icx - 200, y: icy - 5, hearts: 0, dialogTimer: 0, currentLine: -1, lineIndex: 0, task: 'idle', taskTarget: null, timer: 0, carryCount: 0, anim: { blinkTimer: 260, blinkFrame: 0, breathe: 0 } },
+    felix: { x: icx - 100, y: icy - 10, hearts: 0, dialogTimer: 0, currentLine: -1, lineIndex: 0, anim: { blinkTimer: 180, blinkFrame: 0, breathe: 0 } },
+    npcFavor: { livia: 0, marcus: 0, vesta: 0, felix: 0 },
+    npcNames: FACTIONS[faction] ? FACTIONS[faction].npcNames : null,
+    // Military
+    legia: { army: [], castrumLevel: 0, morale: 100, recruits: 0, maxRecruits: 10, trainingQueue: 0, trainingTimer: 0, soldiers: [], castrumX: icx + 100, castrumY: icy + 50 },
+    // Progression (fully unlocked for bot/conquest islands)
+    progression: { gameStarted: true, wreckExplored: true, triremeRepaired: true, homeIslandReached: true, villaCleared: true, farmCleared: true, aqueductRepaired: true, npcsFound: { marcus: true, vesta: true, felix: true }, companionsAwakened: { lares: true, woodcutter: true, harvester: true, centurion: true }, tutorialsSeen: {} },
+    // Systems
+    weather: { type: 'clear', timer: 0, intensity: 0 },
+    blessing: { type: null, timer: 0, cooldown: 0 },
+    harvestCombo: { count: 0, timer: 0, best: 0, bestEver: 0 },
+    tools: { sickle: 0, axe: 0, net: 0 },
+    wardrobe: { tunicColor: 0, headwear: 0 },
+    fishing: { active: false, timer: 0, biteTime: 0, bite: false, caught: false, streak: 0, phase: null, phaseTimer: 0, waitDuration: 0, nibbleTimer: 0, bobberX: 0, bobberY: 0, bobberDip: 0, strikeWindowEnd: 0, missLine: '' },
+    festival: null,
+    time: 6 * 60,
+    day: 1,
+    // Legacy compat
+    templeHP: 100, templeMaxHP: 100,
+    foodShortage: 0,
+    portLeft: null, portRight: null,
   };
 }
 
 function createPrebuiltIsland(factionKey, cx, cy, targetLevel) {
-  let is = createIslandState(factionKey);
+  let is = createIslandState(factionKey, cx, cy);
   let offsetX = cx - 600;
   let offsetY = cy - 400;
 
