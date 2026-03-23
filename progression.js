@@ -112,10 +112,12 @@ function checkResearchVictory() {
 // Victory condition checks for all 4 types
 function checkAllVictoryConditions() {
   if (state.victoryAchieved) return;
-  // Domination: all nations defeated (military <= 0)
+  // Domination: all nations defeated or vassals (must have at least 1 vassal)
   if (state.nations) {
     let nationKeys = Object.keys(state.nations);
-    if (nationKeys.length >= 3 && nationKeys.every(k => state.nations[k] && (state.nations[k].military <= 0 || state.nations[k].vassal))) {
+    let hasVassal = nationKeys.some(k => state.nations[k] && state.nations[k].vassal);
+    let allSubdued = nationKeys.length >= 1 && nationKeys.every(k => state.nations[k] && (state.nations[k].defeated || state.nations[k].vassal));
+    if (hasVassal && allSubdued) {
       state.victoryAchieved = 'domination';
       state.victoryScreen = { type: 'domination', day: state.day, timer: 0 };
       if (snd && snd.playNarration) snd.playNarration('victory');

@@ -2494,6 +2494,12 @@ function drawInner() {
                 _botItems.push({ y: cn.y - 9999, draw: () => drawOneCrystal(cn) });
               }
             }
+            // Farm plots
+            if (_own.islandState.plots && typeof drawOnePlot === 'function') {
+              for (let p of _own.islandState.plots) {
+                _botItems.push({ y: p.y - 9999, draw: () => drawOnePlot(p) });
+              }
+            }
             // Resources (scattered stone/vine/leaf)
             if (_own.islandState.resources && typeof drawOneResource === 'function') {
               for (let r of _own.islandState.resources) {
