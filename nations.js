@@ -1858,56 +1858,9 @@ function generateNationIslandContent(key) {
   return { dock, palace, buildings, npcs, trees, wildlife, flora, hasWalls, hasTowers, style, bannerCol };
 }
 
-function enterNationIsland(key) {
-  let rv = state.nations[key];
-  if (!rv || rv.defeated) return;
-  state.visitingNation = key;
-  // Persistent islands: restore from cache if previously visited
-  if (rv._islandCache) {
-    state.nationIsland = rv._islandCache;
-  } else {
-    state.nationIsland = generateNationIslandContent(key);
-    rv._islandCache = state.nationIsland;
-  }
-  state.rowing.active = false;
-  let ni = state.nationIsland;
-  let p = state.player;
-  p.x = ni.dock.x;
-  p.y = ni.dock.y - 15;
-  p.vx = 0; p.vy = 0;
-  if (p.invincTimer !== undefined) p.invincTimer = 60;
-  cam.x = p.x; cam.y = p.y;
-  _startCamTransition(); camZoomTarget = 1.0;
-  addFloatingText(width / 2, height * 0.25, getNationName(key).toUpperCase(), FACTIONS[key] ? FACTIONS[key].accentColorHex : '#ddaa44');
-  addFloatingText(width / 2, height * 0.3, 'E near Palace for diplomacy  |  E near dock to sail home', '#ccbb88');
-  trackMilestone('visit_nation_' + key);
-}
+function enterNationIsland(key) { console.warn('enterNationIsland deprecated -- openworld mode'); }
 
-function exitNationIsland() {
-  let key = state.visitingNation;
-  if (!key) return;
-  let rv = state.nations[key];
-  // Save island state back to cache so changes persist
-  if (rv && state.nationIsland) {
-    rv._islandCache = state.nationIsland;
-  }
-  state.visitingNation = null;
-  state.nationIsland = null;
-  state.nationDiplomacyOpen = null;
-  let p = state.player;
-  // Put player back in boat near the island
-  state.rowing.active = true;
-  state.rowing.x = rv.isleX;
-  state.rowing.y = rv.isleY + rv.isleRY * 1.1;
-  state.rowing.speed = 0;
-  state.rowing.angle = HALF_PI;
-  state.rowing.wakeTrail = [];
-  p.x = state.rowing.x; p.y = state.rowing.y;
-  p.vx = 0; p.vy = 0;
-  cam.x = p.x; cam.y = p.y;
-  _startCamTransition();
-  addFloatingText(width / 2, height * 0.35, 'Departing ' + getNationName(key), '#ccbb88');
-}
+function exitNationIsland() { console.warn('exitNationIsland deprecated -- openworld mode'); }
 
 function isOnNationIsland(wx, wy) {
   let key = state.visitingNation;
@@ -1975,7 +1928,7 @@ function updateNationIslandVisit(dt) {
 
   // Walk off south edge = exit
   let ry = rv.isleRY * 0.7;
-  if (p.y > rv.isleY + ry * 0.95) exitNationIsland();
+  // openworld: no teleport exit, player walks off naturally
 }
 
 function drawNationIslandFull() {
@@ -2370,10 +2323,7 @@ function handleNationIslandInteract() {
     openNationDiplomacy(state.visitingNation);
     return true;
   }
-  if (dDock < 45) {
-    exitNationIsland();
-    return true;
-  }
+  // openworld: dock exit deprecated, player walks off naturally
   return false;
 }
 

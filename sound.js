@@ -937,11 +937,11 @@ class SoundManager {
     // Detect current island
     let island = 'home';
     if (typeof state !== 'undefined') {
-      if (state.vulcan && state.vulcan.active) island = 'vulcan';
-      else if (state.hyperborea && state.hyperborea.active) island = 'hyperborea';
-      else if (state.plenty && state.plenty.active) island = 'plenty';
-      else if (state.necropolis && state.necropolis.active) island = 'necropolis';
-      else if (state.visitingNation) island = 'nation';
+      if (state._activeExploration === 'vulcan') island = 'vulcan';
+      else if (state._activeExploration === 'hyperborea') island = 'hyperborea';
+      else if (state._activeExploration === 'plenty') island = 'plenty';
+      else if (state._activeExploration === 'necropolis') island = 'necropolis';
+      else if (state._activeNation) island = 'nation';
       if (state.insideTemple) island = 'temple';
     }
     this._islandAmbient = island;
@@ -1082,7 +1082,7 @@ class SoundManager {
         setAmb('wind', ambVol * 0.25);
       }
       else if (island === 'nation') {
-        let nationKey = (typeof state !== 'undefined' && state.visitingNation) ? state.visitingNation : 'rome';
+        let nationKey = (typeof state !== 'undefined' && state._activeNation) ? state._activeNation : 'rome';
         setAmb('ocean', ambVol * 0.6);
         if (nationKey === 'carthage') {
           setAmb('wind', ambVol * 0.35);
@@ -1233,10 +1233,10 @@ class SoundManager {
       else if (state.seaPeopleRaidActive) target = 'music_raid';
       else if (state.festival) target = 'music_festival';
       else if (state.rowing && state.rowing.active) target = 'music_sailing';
-      else if (state.vulcan && state.vulcan.active) target = 'music_vulcan';
-      else if (state.hyperborea && state.hyperborea.active) target = 'music_hyperborea';
-      else if (state.necropolis && state.necropolis.active) target = 'music_necropolis';
-      else if (state.visitingNation) target = 'music_temple';
+      else if (state._activeExploration === 'vulcan') target = 'music_vulcan';
+      else if (state._activeExploration === 'hyperborea') target = 'music_hyperborea';
+      else if (state._activeExploration === 'necropolis') target = 'music_necropolis';
+      else if (state._activeNation) target = 'music_temple';
       else if (state.time >= 1200 || state.time < 300) target = 'music_night';
       // Near temple?
       if (typeof state.buildings !== 'undefined' && state.player) {
@@ -1385,7 +1385,7 @@ class SoundManager {
       if (this._lyreMode !== 'menu' && !this._lyrePendingMode) this.setLyreMode('menu');
     } else if (typeof state !== 'undefined') {
       let target = 'peaceful';
-      if (state.necropolis && state.necropolis.active) target = 'eerie';
+      if (state._activeExploration === 'necropolis') target = 'eerie';
       else if (state.conquest && state.conquest.active) target = 'tense';
       else if (state.festival) target = 'celebration';
       else if (state.rowing && state.rowing.active) target = 'sailing';

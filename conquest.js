@@ -1028,176 +1028,19 @@ function initConquestIsland() {
   }
 }
 
-function enterConquest() {
-  startScreenTransition(null);
-  let c = state.conquest;
-  let p = state.player;
-  c.active = true;
-  if (typeof initFactionAbilities === 'function') initFactionAbilities();
-  // Park ship at south shore dock
-  let dockX = c.isleX;
-  let dockY = c.isleY + c.isleRY * 0.92;
-  state.rowing.active = false;
-  state.rowing.docked = true;
-  state.rowing.x = dockX;
-  state.rowing.y = dockY + 15;
-  c.shipX = dockX;
-  c.shipY = dockY + 15;
-  // Player steps off onto island
-  p.hp = p.maxHp;
-  p.x = dockX;
-  p.y = dockY - 20;
-  p.vx = 0; p.vy = 0;
-  p.invincTimer = 90;
-  c.buildMode = false;
-  c.chopTarget = null;
-  c.chopTimer = 0;
-  // Move centurion to conquest island
-  state.centurion.x = p.x + 20;
-  state.centurion.y = p.y + 10;
-  state.centurion.hp = state.centurion.maxHp;
-  // Deploy army units to conquest island as conquest soldiers
-  if (state.legia && state.legia.army) {
-    let deployed = state.legia.army.filter(u => !u.garrison);
-    if (deployed.length > 0) {
-      let soldierHP = 60 + (state.expeditionUpgrades ? state.expeditionUpgrades.soldierHP : 0) * 20;
-      for (let i = 0; i < deployed.length; i++) {
-        let u = deployed[i];
-        c.soldiers.push({
-          x: p.x + random(-40, 40), y: p.y + random(-20, 30),
-          vx: 0, vy: 0,
-          hp: max(u.hp, soldierHP), maxHp: max(u.maxHp, soldierHP),
-          target: null, state: 'idle', attackTimer: 0,
-          facing: random() > 0.5 ? 1 : -1, flashTimer: 0,
-          _unitType: u.type,
-          _damage: u.damage || 5,
-        });
-      }
-      addFloatingText(width / 2, height * 0.35, deployed.length + ' army units deployed!', '#cc8844');
-    }
-  }
-  // Snap camera
-  cam.x = p.x; cam.y = p.y;
-  camSmooth.x = p.x; camSmooth.y = p.y;
-  initConquestIsland();
+function enterConquest() { console.warn('enterConquest deprecated -- openworld mode'); }
 
-  // Deploy army if marching with soldiers
-  let soldierHP = 60 + state.expeditionUpgrades.soldierHP * 20;
-  let lg = state.legia;
-  if (lg && lg.marching && lg.soldiers && lg.soldiers.length > 0) {
-    // Transfer home island soldiers to conquest soldiers
-    c.soldiers = [];
-    lg.soldiers.forEach((s, i) => {
-      let ang = (i / max(1, lg.soldiers.length)) * TWO_PI;
-      c.soldiers.push({
-        x: p.x + cos(ang) * 30, y: p.y + sin(ang) * 20,
-        vx: 0, vy: 0, hp: s.hp, maxHp: s.maxHp,
-        state: 'follow', target: null,
-        attackTimer: 0, facing: 1, flashTimer: 0,
-        _unitType: 'swordsman',
-      });
-    });
-    lg.soldiers = [];
-    lg.marching = false;
-    lg.expeditionTarget = null;
-    if (c.phase === 'unexplored') { c.phase = 'landing'; c.phaseTimer = 0; }
-    addFloatingText(width / 2, height * 0.35, c.soldiers.length + ' soldiers deployed!', '#ddccaa');
-  } else if (c.soldiers.length === 0 && c.phase === 'unexplored') {
-    // Start with 2 soldiers on first visit (no army)
-    for (let i = 0; i < 2; i++) {
-      let ang = (i / 2) * PI - HALF_PI;
-      c.soldiers.push({
-        x: p.x + cos(ang) * 30, y: p.y + sin(ang) * 30,
-        vx: 0, vy: 0, hp: soldierHP, maxHp: soldierHP,
-        state: 'follow', target: null,
-        attackTimer: 0, facing: 1, flashTimer: 0,
-        _unitType: 'swordsman',
-      });
-    }
-    c.phase = 'landing';
-    c.phaseTimer = 0;
-  }
+function exitConquest(isDeath) { console.warn('exitConquest deprecated -- openworld mode'); }
 
-  // Expedition reset — clean slate for enemies
-  c.expeditionTimer = 0;
-  c.dangerLevel = 0;
-  c.lootBag = [];
-  c.rareSpawnTimer = 0;
-  c.enemies = [];
-  c.spawnTimer = 600; // grace period
-  _conquestProjectiles = [];
-  // V1.2: Reset barracks gen timer if barracks exists
-  if (c.barracksLevel > 0) {
-    let lvIdx = min(c.barracksLevel - 1, EXPEDITION_BARRACKS.levels.length - 1);
-    c.barracksGenTimer = EXPEDITION_BARRACKS.levels[lvIdx].genTime;
-  }
-  // V1.2: Reset tower timers
-  c.towerTimers = {};
-  // V1.2: Init missing state
-  if (!c.unitLevels) c.unitLevels = { swordsman: 1, archer: 1, cavalry: 1 };
-  if (!c.unitXP) c.unitXP = { swordsman: 0, archer: 0, cavalry: 0 };
-  if (!c.towerLevels) c.towerLevels = {};
-  if (!c.stonePile) c.stonePile = 0;
-  // Purge dead/corrupted soldiers and workers
-  c.soldiers = c.soldiers.filter(s => s.hp > 0);
-  c.workers = c.workers.filter(w => w && w.type);
-  // Purge completed blueprints
-  c.blueprintQueue = (c.blueprintQueue || []).filter(b => b.progress < b.maxProgress);
-
-  // Regrow 60% of cleared trees between expeditions
-  if (c.expeditionNum > 0) {
-    let dead = c.trees.filter(t => !t.alive);
-    let regrow = floor(dead.length * 0.6);
-    for (let i = 0; i < regrow && i < dead.length; i++) {
-      dead[i].alive = true;
-      dead[i].hp = dead[i].maxHp;
-    }
-  }
-  // Reset crystal nodes between expeditions
-  if (c.crystalNodes) for (let cn of c.crystalNodes) cn.collected = false;
-  // Reset resource deposits between expeditions
-  if (c.resourceDeposits) for (let rd of c.resourceDeposits) { rd.depleted = false; rd.hp = rd.maxHp; }
-  // Reset fishing spot cooldowns
-  if (c.fishingSpots) for (let fs of c.fishingSpots) fs.cooldown = 0;
-  // Respawn wildlife
-  if (c.wildlife) {
-    for (let w of c.wildlife) {
-      w.timer = floor(random(60, 300));
-      w.x = c.isleX + cos(random(TWO_PI)) * c.isleRX * random(0.15, 0.7);
-      w.y = c.isleY + sin(random(TWO_PI)) * c.isleRY * random(0.15, 0.7);
-    }
-  }
-
-  c.expeditionNum++;
-  // Init fog of war
-  initFogOfWar();
-  // Reveal around landing zone
-  revealFog(p.x, p.y);
-  // Generate daily bounties if not already
-  generateBounties();
-  // Reset bounty progress for new expedition
-  for (let b of state.bountyBoard.bounties) {
-    if (!b.completed) b.progress = 0;
-  }
-  addFloatingText(width / 2, height * 0.2, 'EXPEDITION #' + c.expeditionNum, '#ddcc88');
-  addFloatingText(width / 2, height * 0.28, getPhaseObjective(c.phase), '#bbaa77');
-  triggerScreenShake(3, 8);
-
-  // Track soldiers at start for expedition summary
-  c._soldiersAtStart = c.soldiers.length;
-}
-
-function exitConquest(isDeath) {
+// Legacy expedition loot/summary code preserved as dead code after deprecation
+function _exitConquest_legacy(isDeath) {
   let c = state.conquest;
   let p = state.player;
   c.active = false;
   c.buildMode = false;
-  // Reset combat tracking before clearing enemies to prevent XP exploit
   _combatLastEnemyCount = 0;
-  // Keep soldiers/buildings/trees/workers — persistent state
   c.enemies = [];
   _conquestProjectiles = [];
-  // Board the ship at Terra Nova's dock — position outside collision ellipse
   let dockX = c.isleX;
   let dockY = c.isleY + c.isleRY * 1.05;
   p.x = dockX;
@@ -1208,36 +1051,28 @@ function exitConquest(isDeath) {
   state.rowing.x = dockX;
   state.rowing.y = dockY;
   state.rowing.speed = 0;
-  state.rowing.angle = HALF_PI; // facing south (away from island)
-  // Return centurion to ship
+  state.rowing.angle = HALF_PI;
   state.centurion.x = p.x + 20;
   state.centurion.y = p.y + 10;
   if (p.hp < p.maxHp * 0.5) p.hp = floor(p.maxHp * 0.5);
-  // Snap camera
   cam.x = p.x; cam.y = p.y;
   camSmooth.x = p.x; camSmooth.y = p.y;
 
-  // Bounty: survived without dying
   if (!isDeath) updateBountyProgress('nokill', 1);
-
-  // Advance narrative quest counter for expeditions
   if (typeof advanceMainQuestCounter === 'function') {
     advanceMainQuestCounter('mq_expeditions', 1);
   }
   trackMilestone('first_expedition');
 
-  // Legia: return surviving conquest soldiers to home island
   let lg = state.legia;
   let soldiersAtStart = c._soldiersAtStart || 0;
   let soldiersLost = 0;
   if (lg) {
     let aliveSoldiers = c.soldiers.filter(s => s.hp > 0);
     if (isDeath) {
-      // All soldiers lost on death
       soldiersLost = soldiersAtStart;
       lg.soldiers = [];
     } else {
-      // Surviving conquest soldiers return as home island soldiers
       soldiersLost = soldiersAtStart - aliveSoldiers.length;
       let cx = lg.castrumX || WORLD.islandCX + 200;
       let cy = lg.castrumY || WORLD.islandCY + 100;
@@ -1256,18 +1091,14 @@ function exitConquest(isDeath) {
     c.soldiers = [];
   }
 
-  // Transfer expedition loot
   let lootMult = isDeath ? 0.5 : 1.0;
   let lootBonusMult = 1 + state.expeditionUpgrades.lootBonus * 0.15;
-  // Legia loot bonus: +10% per soldier at start
   if (!isDeath && soldiersAtStart > 0) lootBonusMult *= (1 + soldiersAtStart * 0.10);
   let modGoldMult = getModifier().goldMult || 1.0;
   let baseGold = floor((50 + c.dangerLevel * 20 + c.expeditionNum * 5) * lootMult * modGoldMult);
-  // Legia gold bonus: +15% per soldier at start
   let goldEarned = isDeath ? baseGold : floor(baseGold * (1 + soldiersAtStart * 0.15));
   state.gold += goldEarned; if (typeof trackStat === 'function') trackStat('totalGoldEarned', goldEarned); if (typeof trackStat === 'function') trackStat('expeditionsCompleted', 1);
 
-  // Build loot summary for overlay before consuming lootBag
   let lootSummary = {};
   for (let loot of c.lootBag) {
     let name = {wood:'Wood', iron_ore:'Iron', rare_hide:'Hide', ancient_relic:'Relic', titan_bone:'Bone'}[loot.type] || loot.type;
@@ -1285,7 +1116,6 @@ function exitConquest(isDeath) {
     }
   }
 
-  // Log expedition
   state.expeditionLog.unshift({
     num: c.expeditionNum, danger: c.dangerLevel,
     kills: c.totalKills, gold: goldEarned, died: !!isDeath,
@@ -1293,9 +1123,8 @@ function exitConquest(isDeath) {
   });
   if (state.expeditionLog.length > 5) state.expeditionLog.pop();
 
-  // Set expedition summary overlay (5 seconds)
   state._expedSummary = {
-    timer: 300, // 5 seconds at 60fps
+    timer: 300,
     kills: c.totalKills,
     gold: goldEarned,
     loot: lootSummary,

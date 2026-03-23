@@ -187,11 +187,7 @@ function updatePlayer(dt) {
     p.vy = 0;
   }
 
-  // Imperial Bridge transition: walk onto Terra Nova
-  if (state.imperialBridge.built && state.conquest.colonized && isOnConquestIsland(p.x, p.y)) {
-    enterConquest();
-    return;
-  }
+  // Imperial Bridge transition: openworld -- conquest entry deprecated, player walks seamlessly
 
   // Hard clamp: if somehow off island+shallows and not on bridge, push back
   if (!isWalkable(p.x, p.y)) {

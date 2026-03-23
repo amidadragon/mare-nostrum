@@ -294,30 +294,8 @@ function _getNationTerrainColor(key) {
 // === ISLE OF VULCAN — Volcanic Island (Northwest) ====================
 // ======================================================================
 function isOnVulcanIsland(wx, wy) { let v = state.vulcan; let ex = (wx - v.isleX) / (v.isleRX - 20); let ey = (wy - v.isleY) / (v.isleRY - 20); return ex * ex + ey * ey < 1; }
-function enterVulcan() {
-  let v = state.vulcan, p = state.player;
-  v.active = true; v.returnX = p.x; v.returnY = p.y;
-  state.rowing.active = false;
-  p.x = v.isleX; p.y = v.isleY + v.isleRY * 0.85 - 20;
-  p.vx = 0; p.vy = 0; p.hp = p.maxHp; p.invincTimer = 60;
-  cam.x = p.x; cam.y = p.y; if (typeof _startCamTransition === 'function') _startCamTransition(); else { camSmooth.x = p.x; camSmooth.y = p.y; }
-  if (v.phase === 'unexplored') {
-    v.phase = 'explored';
-    for (let i = 0; i < 5; i++) { let a = (i / 5) * TWO_PI + random(-0.3, 0.3), r = random(0.3, 0.6) * v.isleRX; v.lavaPools.push({ x: v.isleX + cos(a) * r, y: v.isleY + sin(a) * r * 0.7, r: random(18, 35), phase: random(TWO_PI) }); }
-    for (let i = 0; i < 3; i++) { let a = random(TWO_PI), r = random(0.15, 0.4) * v.isleRX; v.hotSprings.push({ x: v.isleX + cos(a) * r, y: v.isleY + sin(a) * r * 0.7, healTimer: 0 }); }
-    for (let i = 0; i < 8; i++) { let a = random(TWO_PI), r = random(0.2, 0.7) * v.isleRX; v.obsidianNodes.push({ x: v.isleX + cos(a) * r, y: v.isleY + sin(a) * r * 0.7, collected: false }); }
-    for (let i = 0; i < 6; i++) { let a = random(TWO_PI), r = random(0.1, 0.5) * v.isleRX; v.smokeVents.push({ x: v.isleX + cos(a) * r, y: v.isleY + sin(a) * r * 0.7, phase: random(TWO_PI) }); }
-  }
-  if (state.narrativeFlags) state.narrativeFlags['discover_vulcan'] = true;
-  trackMilestone('first_island');
-  addFloatingText(width / 2, height * 0.3, 'ISLE OF VULCAN', '#ff5533');
-}
-function exitVulcan() {
-  let v = state.vulcan, p = state.player; v.active = false;
-  p.x = v.isleX; p.y = v.isleY + v.isleRY * 1.05; p.vx = 0; p.vy = 0;
-  state.rowing.active = true; state.rowing.docked = false; state.rowing.x = p.x; state.rowing.y = p.y; state.rowing.speed = 0; state.rowing.angle = HALF_PI;
-  cam.x = p.x; cam.y = p.y; if (typeof _startCamTransition === 'function') _startCamTransition(); else { camSmooth.x = p.x; camSmooth.y = p.y; }
-}
+function enterVulcan() { console.warn('enterVulcan deprecated -- openworld mode'); }
+function exitVulcan() { console.warn('exitVulcan deprecated -- openworld mode'); }
 function updateVulcanIsland(dt) {
   let v = state.vulcan, p = state.player;
   if (v.active) { let dx = 0, dy = 0;
@@ -330,7 +308,7 @@ function updateVulcanIsland(dt) {
   // invincTimer decremented in main loop
   if (frameCount % 3 === 0) v.ambientAsh.push({ x: v.isleX + random(-v.isleRX, v.isleRX), y: v.isleY - v.isleRY, vy: random(0.3, 0.8), vx: random(-0.2, 0.2), life: 180, size: random(1, 3) });
   v.ambientAsh.forEach(a => { a.x += a.vx; a.y += a.vy; a.life -= dt; }); v.ambientAsh = v.ambientAsh.filter(a => a.life > 0);
-  if (v.active && p.y > v.isleY + v.isleRY * 0.88) exitVulcan();
+  // openworld: no teleport exit, player walks off naturally
 }
 function drawVulcanIsland() {
   let v = state.vulcan, ix = w2sX(v.isleX), iy = w2sY(v.isleY);
@@ -562,29 +540,8 @@ function drawVulcanHUD() {
 // === HYPERBOREA — Frozen Island (Far North) ==========================
 // ======================================================================
 function isOnHyperboreIsland(wx, wy) { let h = state.hyperborea; let ex = (wx - h.isleX) / (h.isleRX - 20); let ey = (wy - h.isleY) / (h.isleRY - 20); return ex * ex + ey * ey < 1; }
-function enterHyperborea() {
-  let h = state.hyperborea, p = state.player; h.active = true; h.returnX = p.x; h.returnY = p.y;
-  state.rowing.active = false; p.x = h.isleX; p.y = h.isleY + h.isleRY * 0.85 - 20; p.vx = 0; p.vy = 0; p.hp = p.maxHp; p.invincTimer = 60;
-  cam.x = p.x; cam.y = p.y; if (typeof _startCamTransition === 'function') _startCamTransition(); else { camSmooth.x = p.x; camSmooth.y = p.y; }
-  // Migration: add obelisk for existing saves where island is already explored
-  if (!h.frozenObelisk) h.frozenObelisk = { x: h.isleX, y: h.isleY };
-  if (h.phase === 'unexplored') { h.phase = 'explored';
-    for (let i = 0; i < 4; i++) { let a = (i / 4) * TWO_PI + random(-0.4, 0.4), r = random(0.25, 0.55) * h.isleRX; h.frozenRuins.push({ x: h.isleX + cos(a) * r, y: h.isleY + sin(a) * r * 0.7, looted: false }); }
-    for (let i = 0; i < 7; i++) { let a = random(TWO_PI), r = random(0.2, 0.65) * h.isleRX; h.frostNodes.push({ x: h.isleX + cos(a) * r, y: h.isleY + sin(a) * r * 0.7, collected: false }); }
-    for (let i = 0; i < 6; i++) { let a = random(TWO_PI), r = random(0.1, 0.5) * h.isleRX; h.penguins.push({ x: h.isleX + cos(a) * r, y: h.isleY + sin(a) * r * 0.7, vx: 0, vy: 0, state: 'idle', timer: random(60, 180) }); }
-    // Frozen obelisk at island center
-    h.frozenObelisk = { x: h.isleX, y: h.isleY };
-  }
-  if (state.narrativeFlags) state.narrativeFlags['discover_hyperborea'] = true;
-  trackMilestone('first_island');
-  addFloatingText(width / 2, height * 0.3, 'HYPERBOREA', '#88ddff');
-}
-function exitHyperborea() {
-  let h = state.hyperborea, p = state.player; h.active = false;
-  p.x = h.isleX; p.y = h.isleY + h.isleRY * 1.05; p.vx = 0; p.vy = 0;
-  state.rowing.active = true; state.rowing.docked = false; state.rowing.x = p.x; state.rowing.y = p.y; state.rowing.speed = 0; state.rowing.angle = HALF_PI;
-  cam.x = p.x; cam.y = p.y; if (typeof _startCamTransition === 'function') _startCamTransition(); else { camSmooth.x = p.x; camSmooth.y = p.y; }
-}
+function enterHyperborea() { console.warn('enterHyperborea deprecated -- openworld mode'); }
+function exitHyperborea() { console.warn('exitHyperborea deprecated -- openworld mode'); }
 function updateHyperboreIsland(dt) {
   let h = state.hyperborea, p = state.player;
   if (h.active) { let dx = 0, dy = 0;
@@ -596,7 +553,7 @@ function updateHyperboreIsland(dt) {
   if (frameCount % 2 === 0) h.snowflakes.push({ x: h.isleX + random(-h.isleRX * 1.2, h.isleRX * 1.2), y: h.isleY - h.isleRY * 1.1, vy: random(0.4, 1.0), vx: random(-0.3, 0.1), life: 240, size: random(1, 3) });
   h.snowflakes.forEach(s => { s.x += s.vx; s.y += s.vy; s.life -= dt; }); h.snowflakes = h.snowflakes.filter(s => s.life > 0);
   let hr = state.time / 60; if (hr > 19 || hr < 5) { h.auroraBorealis = min(1, h.auroraBorealis + 0.005 * dt); } else { h.auroraBorealis = max(0, h.auroraBorealis - 0.01 * dt); }
-  if (h.active && p.y > h.isleY + h.isleRY * 0.88) exitHyperborea();
+  // openworld: no teleport exit, player walks off naturally
 }
 function drawHyperboreIsland() {
   let h = state.hyperborea, ix = w2sX(h.isleX), iy = w2sY(h.isleY);
@@ -827,28 +784,8 @@ function drawHyperboreHUD() {
 // === ISLE OF PLENTY — Tropical Paradise (Southeast) ==================
 // ======================================================================
 function isOnPlentyIsland(wx, wy) { let pl = state.plenty; let ex = (wx - pl.isleX) / (pl.isleRX - 20); let ey = (wy - pl.isleY) / (pl.isleRY - 20); return ex * ex + ey * ey < 1; }
-function enterPlenty() {
-  let pl = state.plenty, p = state.player; pl.active = true; pl.returnX = p.x; pl.returnY = p.y;
-  state.rowing.active = false; p.x = pl.isleX; p.y = pl.isleY + pl.isleRY * 0.85 - 20; p.vx = 0; p.vy = 0; p.hp = p.maxHp; p.invincTimer = 60;
-  cam.x = p.x; cam.y = p.y; if (typeof _startCamTransition === 'function') _startCamTransition(); else { camSmooth.x = p.x; camSmooth.y = p.y; }
-  if (pl.phase === 'unexplored') { pl.phase = 'explored';
-    let treeTypes = ['mango', 'banana', 'coconut', 'fig'];
-    for (let i = 0; i < 12; i++) { let a = random(TWO_PI), r = random(0.15, 0.65) * pl.isleRX; pl.fruitTrees.push({ x: pl.isleX + cos(a) * r, y: pl.isleY + sin(a) * r * 0.7, type: treeTypes[i % 4], fruit: true, timer: 0 }); }
-    let cols = ['#ff4444', '#44cc44', '#4488ff', '#ffaa00', '#ff44cc'];
-    for (let i = 0; i < 5; i++) pl.parrots.push({ x: pl.isleX + random(-pl.isleRX * 0.5, pl.isleRX * 0.5), y: pl.isleY + random(-pl.isleRY * 0.4, pl.isleRY * 0.4), vx: random(-0.5, 0.5), vy: random(-0.3, 0.3), color: cols[i], state: 'flying' });
-    pl.waterfalls.push({ x: pl.isleX - pl.isleRX * 0.45, y: pl.isleY - pl.isleRY * 0.2, h: 35 }, { x: pl.isleX + pl.isleRX * 0.35, y: pl.isleY - pl.isleRY * 0.35, h: 28 });
-    for (let i = 0; i < 6; i++) { let a = random(TWO_PI), r = random(0.2, 0.6) * pl.isleRX; pl.spiceNodes.push({ x: pl.isleX + cos(a) * r, y: pl.isleY + sin(a) * r * 0.7, collected: false }); }
-  }
-  if (state.narrativeFlags) state.narrativeFlags['discover_plenty'] = true;
-  trackMilestone('first_island');
-  addFloatingText(width / 2, height * 0.3, 'ISLE OF PLENTY', '#44cc44');
-}
-function exitPlenty() {
-  let pl = state.plenty, p = state.player; pl.active = false;
-  p.x = pl.isleX; p.y = pl.isleY + pl.isleRY * 1.05; p.vx = 0; p.vy = 0;
-  state.rowing.active = true; state.rowing.docked = false; state.rowing.x = p.x; state.rowing.y = p.y; state.rowing.speed = 0; state.rowing.angle = HALF_PI;
-  cam.x = p.x; cam.y = p.y; if (typeof _startCamTransition === 'function') _startCamTransition(); else { camSmooth.x = p.x; camSmooth.y = p.y; }
-}
+function enterPlenty() { console.warn('enterPlenty deprecated -- openworld mode'); }
+function exitPlenty() { console.warn('exitPlenty deprecated -- openworld mode'); }
 function updatePlentyIsland(dt) {
   let pl = state.plenty, p = state.player;
   if (pl.active) { let dx = 0, dy = 0;
@@ -860,7 +797,7 @@ function updatePlentyIsland(dt) {
   if (frameCount % 5 === 0) pl.fallingLeaves.push({ x: pl.isleX + random(-pl.isleRX * 0.8, pl.isleRX * 0.8), y: pl.isleY - pl.isleRY * 0.6, vy: random(0.2, 0.5), vx: random(-0.3, 0.3), life: 200, rot: random(TWO_PI), size: random(2, 4) });
   pl.fallingLeaves.forEach(l => { l.x += l.vx + sin(frameCount * 0.03 + l.rot) * 0.15; l.y += l.vy; l.life -= dt; l.rot += 0.02; }); pl.fallingLeaves = pl.fallingLeaves.filter(l => l.life > 0);
   for (let t of pl.fruitTrees) { if (!t.fruit && t.timer > 0) { t.timer -= dt; if (t.timer <= 0) t.fruit = true; } }
-  if (pl.active && p.y > pl.isleY + pl.isleRY * 0.88) exitPlenty();
+  // openworld: no teleport exit, player walks off naturally
 }
 function drawPlentyIsland() {
   let pl = state.plenty, ix = w2sX(pl.isleX), iy = w2sY(pl.isleY);
@@ -1038,27 +975,8 @@ function drawPlentyHUD() {
 // === NECROPOLIS — Ancient Burial Island (Far Southwest) ==============
 // ======================================================================
 function isOnNecropolisIsland(wx, wy) { let n = state.necropolis; let ex = (wx - n.isleX) / (n.isleRX - 20); let ey = (wy - n.isleY) / (n.isleRY - 20); return ex * ex + ey * ey < 1; }
-function enterNecropolis() {
-  let n = state.necropolis, p = state.player; n.active = true; n.returnX = p.x; n.returnY = p.y;
-  state.rowing.active = false; p.x = n.isleX; p.y = n.isleY + n.isleRY * 0.85 - 20; p.vx = 0; p.vy = 0; p.hp = p.maxHp; p.invincTimer = 90;
-  cam.x = p.x; cam.y = p.y; if (typeof _startCamTransition === 'function') _startCamTransition(); else { camSmooth.x = p.x; camSmooth.y = p.y; }
-  if (n.phase === 'unexplored') { n.phase = 'explored';
-    for (let i = 0; i < 6; i++) { let a = (i / 6) * TWO_PI + random(-0.3, 0.3), r = random(0.2, 0.6) * n.isleRX; n.tombs.push({ x: n.isleX + cos(a) * r, y: n.isleY + sin(a) * r * 0.7, looted: false, trapped: random() < 0.3 }); }
-    for (let i = 0; i < 4; i++) { let a = random(TWO_PI), r = random(0.15, 0.5) * n.isleRX; n.skeletons.push({ x: n.isleX + cos(a) * r, y: n.isleY + sin(a) * r * 0.7, vx: 0, vy: 0, hp: 40, maxHp: 40, attackTimer: 0, facing: 1, flashTimer: 0, state: 'patrol', patrolAngle: random(TWO_PI) }); }
-    let gn = ['Aurelius', 'Cornelia', 'Septimus'], gl = ['The forge of Vulcan... obsidian tempered in soul fire creates weapons beyond mortal craft.', 'Frost crystals from the north... they bind enchantments to steel. Seek Hyperborea.', 'I once sailed to the Isle of Plenty... its spices could preserve food for centuries.'];
-    for (let i = 0; i < 3; i++) { let a = (i / 3) * TWO_PI + PI * 0.3, r = random(0.3, 0.55) * n.isleRX; n.ghostNPCs.push({ x: n.isleX + cos(a) * r, y: n.isleY + sin(a) * r * 0.7, name: gn[i], line: gl[i], talked: false }); }
-    for (let i = 0; i < 5; i++) { let a = random(TWO_PI), r = random(0.2, 0.6) * n.isleRX; n.soulNodes.push({ x: n.isleX + cos(a) * r, y: n.isleY + sin(a) * r * 0.7, collected: false }); }
-  }
-  if (state.narrativeFlags) state.narrativeFlags['discover_necropolis'] = true;
-  trackMilestone('first_island');
-  addFloatingText(width / 2, height * 0.3, 'NECROPOLIS', '#9944cc');
-}
-function exitNecropolis() {
-  let n = state.necropolis, p = state.player; n.active = false; n.skeletons = n.skeletons.filter(s => s.hp > 0);
-  p.x = n.isleX; p.y = n.isleY + n.isleRY * 1.05; p.vx = 0; p.vy = 0;
-  state.rowing.active = true; state.rowing.docked = false; state.rowing.x = p.x; state.rowing.y = p.y; state.rowing.speed = 0; state.rowing.angle = HALF_PI;
-  cam.x = p.x; cam.y = p.y; if (typeof _startCamTransition === 'function') _startCamTransition(); else { camSmooth.x = p.x; camSmooth.y = p.y; }
-}
+function enterNecropolis() { console.warn('enterNecropolis deprecated -- openworld mode'); }
+function exitNecropolis() { console.warn('exitNecropolis deprecated -- openworld mode'); }
 function updateNecropolisIsland(dt) {
   let n = state.necropolis, p = state.player;
   if (n.active) { let dx = 0, dy = 0;
@@ -1077,7 +995,7 @@ function updateNecropolisIsland(dt) {
   if (frameCount % 4 === 0) n.wisps.push({ x: n.isleX + random(-n.isleRX * 0.7, n.isleRX * 0.7), y: n.isleY + random(-n.isleRY * 0.5, n.isleRY * 0.5), vx: random(-0.15, 0.15), vy: random(-0.4, -0.1), life: 150, size: random(2, 5) });
   n.wisps.forEach(w => { w.x += w.vx + sin(frameCount * 0.02 + w.x * 0.01) * 0.1; w.y += w.vy; w.life -= dt; }); n.wisps = n.wisps.filter(w => w.life > 0);
   n.darkAura = 0.3 + sin(frameCount * 0.01) * 0.1;
-  if (n.active && p.y > n.isleY + n.isleRY * 0.88) exitNecropolis();
+  // openworld: no teleport exit, player walks off naturally
 }
 function drawNecropolisIsland() {
   let n = state.necropolis, ix = w2sX(n.isleX), iy = w2sY(n.isleY);

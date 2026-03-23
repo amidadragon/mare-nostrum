@@ -2759,10 +2759,9 @@ function updateCurrentIsland() {
   if (!state || !state.player) return;
   let px = state.player.x, py = state.player.y;
   let prev = _currentIsland;
-  // Skip detection during cutscenes, temple, wreck, or active island modes (old system)
+  // Skip detection during cutscenes, temple, wreck
   if (state.insideTemple || state.cutscene || state.introPhase !== 'done') return;
-  if (state.vulcan.active || state.hyperborea.active || state.plenty.active || state.necropolis.active) return;
-  if (state.conquest.active || state.visitingNation) return;
+  if (state.conquest.active) return;
   if (state.rowing && state.rowing.active) { _currentIsland = 'water'; if (prev !== 'water') onIslandTransition(prev, 'water'); return; }
 
   if (isOnIsland(px, py)) { _currentIsland = 'home'; }
@@ -2807,7 +2806,7 @@ function onIslandTransition(from, to) {
   }
   if (_exploIsles.includes(from)) { state._activeExploration = null; }
   // Seamless nation island entry — generate content at world coords
-  if (to && state.nations && state.nations[to] && !state.visitingNation) {
+  if (to && state.nations && state.nations[to]) {
     let rv = state.nations[to];
     if (rv && !rv.defeated) {
       if (!rv._nationContent) {
@@ -3225,6 +3224,12 @@ function drawInner() {
 
   updateTime(dt);
   updateCurrentIsland();
+  // Openworld: force-clear legacy teleport flags every frame
+  if (state.visitingNation) state.visitingNation = null;
+  if (state.vulcan && state.vulcan.active) state.vulcan.active = false;
+  if (state.hyperborea && state.hyperborea.active) state.hyperborea.active = false;
+  if (state.plenty && state.plenty.active) state.plenty.active = false;
+  if (state.necropolis && state.necropolis.active) state.necropolis.active = false;
   // Safety: if player is lost in deep ocean (not near any island, not rowing), teleport home
   if (state.player && !state.rowing.active && typeof isNearAnyIsland === 'function' &&
       !isNearAnyIsland(state.player.x, state.player.y, 500) && !state.insideTemple && !state.insideCastrum) {
@@ -3284,130 +3289,7 @@ function drawInner() {
     return;
   }
 
-  // === NEW ISLAND ACTIVE MODES ===
-  if (state.vulcan.active) {
-    updatePlayerAnim(dt);
-    updateVulcanIsland(dt);
-    if (typeof updateSecretOverlays === 'function') updateSecretOverlays(dt);
-    updateParticles(dt);
-    updateFloatingText(dt);
-    updateShake(dt);
-    updateCamera();
-    horizonOffset = height * 0.19;
-    push(); translate(width/2,height/2); scale(camZoom); translate(-width/2,-height/2);
-    push(); translate(shakeX, shakeY); drawSky(); drawOcean();
-    if (typeof drawOceanWildlife === 'function') drawOceanWildlife();
-    if (typeof drawAtmosphericHaze === 'function') drawAtmosphericHaze();
-    pop();
-    push(); translate(shakeX, shakeY);
-    drawVulcanIsland();
-    drawVulcanEntities();
-    drawParticles(); drawFloatingText(); pop();
-    pop(); // end zoom
-    drawVulcanHUD();
-    if (typeof drawSecretOverlays === 'function') drawSecretOverlays();
-    drawGameVignette(); drawScreenFlash(); drawCursor(); drawSaveIndicator();
-    return;
-  }
-  if (state.hyperborea.active) {
-    updatePlayerAnim(dt);
-    updateHyperboreIsland(dt);
-    if (typeof updateSecretOverlays === 'function') updateSecretOverlays(dt);
-    updateParticles(dt);
-    updateFloatingText(dt);
-    updateShake(dt);
-    updateCamera();
-    horizonOffset = height * 0.19;
-    push(); translate(width/2,height/2); scale(camZoom); translate(-width/2,-height/2);
-    push(); translate(shakeX, shakeY); drawSky(); drawOcean();
-    if (typeof drawOceanWildlife === 'function') drawOceanWildlife();
-    if (typeof drawAtmosphericHaze === 'function') drawAtmosphericHaze();
-    pop();
-    push(); translate(shakeX, shakeY);
-    drawHyperboreIsland();
-    drawHyperboreEntities();
-    drawParticles(); drawFloatingText(); pop();
-    pop(); // end zoom
-    drawHyperboreHUD();
-    if (typeof drawSecretOverlays === 'function') drawSecretOverlays();
-    drawGameVignette(); drawScreenFlash(); drawCursor(); drawSaveIndicator();
-    return;
-  }
-  if (state.plenty.active) {
-    updatePlayerAnim(dt);
-    updatePlentyIsland(dt);
-    if (typeof updateSecretOverlays === 'function') updateSecretOverlays(dt);
-    updateParticles(dt);
-    updateFloatingText(dt);
-    updateShake(dt);
-    updateCamera();
-    horizonOffset = height * 0.19;
-    push(); translate(width/2,height/2); scale(camZoom); translate(-width/2,-height/2);
-    push(); translate(shakeX, shakeY); drawSky(); drawOcean();
-    if (typeof drawOceanWildlife === 'function') drawOceanWildlife();
-    if (typeof drawAtmosphericHaze === 'function') drawAtmosphericHaze();
-    pop();
-    push(); translate(shakeX, shakeY);
-    drawPlentyIsland();
-    drawPlentyEntities();
-    drawParticles(); drawFloatingText(); pop();
-    pop(); // end zoom
-    drawPlentyHUD();
-    if (typeof drawSecretOverlays === 'function') drawSecretOverlays();
-    drawGameVignette(); drawScreenFlash(); drawCursor(); drawSaveIndicator();
-    return;
-  }
-  if (state.necropolis.active) {
-    // Necropolis handles its own player movement + combat in updateNecropolisIsland
-    updatePlayerAnim(dt);
-    updateNecropolisIsland(dt);
-    if (typeof updateSecretOverlays === 'function') updateSecretOverlays(dt);
-    updateParticles(dt);
-    updateFloatingText(dt);
-    updateShake(dt);
-    updateCamera();
-    horizonOffset = height * 0.19;
-    push(); translate(width/2,height/2); scale(camZoom); translate(-width/2,-height/2);
-    push(); translate(shakeX, shakeY); drawSky(); drawOcean();
-    if (typeof drawOceanWildlife === 'function') drawOceanWildlife();
-    if (typeof drawAtmosphericHaze === 'function') drawAtmosphericHaze();
-    pop();
-    push(); translate(shakeX, shakeY);
-    drawNecropolisIsland();
-    drawNecropolisEntities();
-    drawParticles(); drawFloatingText(); pop();
-    pop(); // end zoom
-    drawNecropolisHUD();
-    if (typeof drawSecretOverlays === 'function') drawSecretOverlays();
-    drawGameVignette(); drawScreenFlash(); drawCursor(); drawSaveIndicator();
-    return;
-  }
-
-  // === VISITING NATION ISLAND ===
-  if (state.visitingNation) {
-    updatePlayerAnim(dt);
-    updateNationIslandVisit(dt);
-    if (typeof updatePlayerEscort === 'function') updatePlayerEscort(dt);
-    updateParticles(dt);
-    updateFloatingText(dt);
-    updateShake(dt);
-    updateCamera();
-    horizonOffset = height * 0.19;
-    push(); translate(width/2,height/2); scale(camZoom); translate(-width/2,-height/2);
-    push(); translate(shakeX, shakeY); drawSky(); drawOcean();
-    if (typeof drawOceanWildlife === 'function') drawOceanWildlife();
-    if (typeof drawAtmosphericHaze === 'function') drawAtmosphericHaze();
-    pop();
-    push(); translate(shakeX, shakeY);
-    drawNationIslandFull();
-    drawNationIslandEntities();
-    drawParticles(); drawFloatingText(); pop();
-    pop(); // end zoom
-    drawNationIslandHUD();
-    if (state.nationDiplomacyOpen) drawNationDiplomacyUI();
-    drawGameVignette(); drawScreenFlash(); drawCursor(); drawSaveIndicator();
-    return;
-  }
+  // Legacy island active modes removed -- V4.0 seamless system handles rendering
 
   if (state.conquest.active) {
     // === CONQUEST MODE ===
@@ -14532,7 +14414,7 @@ function keyPressed() {
     if (!state.tutorialGoalComplete && state.tutorialGoalStep < TUTORIAL_STEPS.length && state.progression.homeIslandReached) { skipTutorial(); addNotification('Tutorial skipped', '#aaaaaa'); return; }
     if (typeof worldMapOpen !== 'undefined' && worldMapOpen) { worldMapOpen = false; return; }
     if (state.nationDiplomacyOpen) { closeNationDiplomacy(); return; }
-    if (state.visitingNation) { exitNationIsland(); return; }
+    // openworld: visitingNation ESC deprecated
     if (state.wreck._visiting) {
       state.wreck._visiting = false;
       state.rowing.active = true;
@@ -14594,32 +14476,7 @@ function keyPressed() {
     return;
   }
 
-  // ─── NEW ISLAND [E] INTERACTIONS ───
-  if (state.vulcan.active) {
-    if (key === 'e' || key === 'E') handleVulcanInteract();
-    return;
-  }
-  if (state.hyperborea.active) {
-    if (key === 'e' || key === 'E') handleHyperboreInteract();
-    return;
-  }
-  if (state.plenty.active) {
-    if (key === 'e' || key === 'E') handlePlentyInteract();
-    return;
-  }
-  if (state.necropolis.active) {
-    if (key === 'e' || key === 'E') handleNecropolisInteract();
-    return;
-  }
-  if (state.visitingNation) {
-    if (state.nationDiplomacyOpen) {
-      handleNationDiplomacyKey(key, keyCode);
-      return;
-    }
-    if (key === 'e' || key === 'E') handleNationIslandInteract();
-    if (keyCode === 27) exitNationIsland();
-    return;
-  }
+  // Legacy island [E] interactions removed -- V4.0 seamless handlers below
 
   // Seamless nation island E-key (new system)
   if (state._activeNation && !state.visitingNation) {
@@ -14959,8 +14816,6 @@ function keyPressed() {
     // Dive — E near water, but NOT if near the rowboat
     if (typeof startDive === 'function' && !state.rowing.active && !state.buildMode &&
         !state.conquest.active &&
-        !(state.vulcan && state.vulcan.active) && !(state.hyperborea && state.hyperborea.active) &&
-        !(state.plenty && state.plenty.active) && !(state.necropolis && state.necropolis.active) &&
         !state._activeExploration) {
       let _port = typeof getPortPosition === 'function' ? getPortPosition() : { x: 0, y: 0 };
       let _nearBoat = dist(state.player.x, state.player.y, _port.x + 80, _port.y + 20) < 70;

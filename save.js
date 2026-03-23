@@ -705,6 +705,11 @@ function loadGame() {
     state.nationDiplomacyOpen = null;
     state.visitingNation = null;
     state.nationIsland = null;
+    // Openworld: reset all legacy active flags on load
+    if (state.vulcan) state.vulcan.active = false;
+    if (state.hyperborea) state.hyperborea.active = false;
+    if (state.plenty) state.plenty.active = false;
+    if (state.necropolis) state.necropolis.active = false;
     // Island exploration phases — prevents re-generating content on revisit
     if (d.vulcanPhase) state.vulcan.phase = d.vulcanPhase;
     if (d.hyperboreaPhase) state.hyperborea.phase = d.hyperboreaPhase;
