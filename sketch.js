@@ -135,6 +135,7 @@ let factionSelectActive = false;  // true when showing faction choice screen
 let factionSelectHover = null;    // 'rome' | 'carthage' | 'egypt' | 'greece' | null
 let factionSelectFade = 0;        // fade-in alpha
 let _selectedBotDifficulty = 'normal'; // 'easy' | 'normal' | 'hard'
+let _seaMapOpen = false; // M key toggles sea minimap
 let _pendingFaction = null;        // confirmation step before faction lock
 
 // Faction constants — bonuses and colors
@@ -2157,6 +2158,7 @@ function drawInner() {
     pop();
     pop();
     drawHUD();
+    drawSeaMap();
     // Strategy power rankings (top-right corner)
     if (typeof StrategyEngine !== 'undefined' && StrategyEngine.session && !photoMode && !screenshotMode && !dialogState.active) {
       StrategyEngine.drawPowerRankings();
@@ -7105,6 +7107,112 @@ function updateChickens(dt) {
     if (abs(ch.x - farmCX) > 100) ch.vx *= -1;
     if (abs(ch.y - farmCY) > 60) ch.vy *= -1;
   });
+}
+
+// ═══ SEA MAP — minimap showing island positions (M key) ═══
+function drawSeaMap() {
+  if (!_seaMapOpen) return;
+  let mapW = min(400, width - 40), mapH = min(350, height - 40);
+  let mx = (width - mapW) / 2, my = (height - mapH) / 2;
+  let worldRadius = 7000; // matches sailing boundary
+  let scale = min(mapW, mapH) * 0.4 / worldRadius;
+  let centerX = mx + mapW / 2, centerY = my + mapH / 2;
+
+  // Background
+  noStroke();
+  fill(0, 0, 0, 180); rect(0, 0, width, height);
+  fill(15, 30, 55); rect(mx, my, mapW, mapH, 6);
+  fill(20, 45, 75); rect(mx + 3, my + 3, mapW - 6, mapH - 6, 4);
+
+  // Ocean grid circles
+  stroke(30, 55, 90, 80); strokeWeight(0.5); noFill();
+  for (let r = 1000; r <= 6000; r += 1000) {
+    ellipse(centerX, centerY, r * scale * 2, r * scale * 2);
+  }
+  noStroke();
+
+  // Compass rose
+  fill(80, 100, 130); textSize(8); textAlign(CENTER, CENTER);
+  text('N', centerX, my + 14);
+  text('S', centerX, my + mapH - 10);
+  text('W', mx + 10, centerY);
+  text('E', mx + mapW - 10, centerY);
+
+  // Title
+  fill(220, 200, 160); textSize(13); textAlign(CENTER, TOP);
+  text('SEA CHART', centerX, my + 8);
+
+  // Home island
+  let homeSX = centerX, homeSY = centerY;
+  fill(100, 200, 100); ellipse(homeSX, homeSY, 10, 8);
+  fill(220, 220, 180); textSize(7); textAlign(CENTER, TOP);
+  text('HOME', homeSX, homeSY + 6);
+
+  // Player boat (if sailing)
+  if (state.rowing && state.rowing.active) {
+    let bx = centerX + (state.rowing.x - WORLD.islandCX) * scale;
+    let by = centerY + (state.rowing.y - WORLD.islandCY) * scale;
+    fill(255, 255, 100); noStroke();
+    // Arrow pointing in sailing direction
+    push(); translate(bx, by); rotate(state.rowing.angle || 0);
+    triangle(0, -4, -3, 3, 3, 3);
+    pop();
+  }
+
+  // Nation islands
+  if (state.nations) {
+    for (let k of Object.keys(state.nations)) {
+      let n = state.nations[k];
+      if (!n || n.defeated) continue;
+      let ix = centerX + ((n.isleX || 0) - WORLD.islandCX) * scale;
+      let iy = centerY + ((n.isleY || 0) - WORLD.islandCY) * scale;
+      // Faction color
+      let fc = (typeof FACTIONS !== 'undefined' && FACTIONS[k] && FACTIONS[k].color) ? FACTIONS[k].color : [180, 150, 100];
+      let isLevel = n.islandState ? (n.islandState.islandLevel || 1) : (n.level || 1);
+      // Dot size based on level
+      let dotR = 4 + isLevel * 0.4;
+      // Stance color ring
+      let stance = n.stance || 'neutral';
+      if (stance === 'allied' || n.allied) { stroke(80, 200, 80); strokeWeight(1.5); }
+      else if (n.wars && n.wars.length > 0) { stroke(220, 60, 60); strokeWeight(1.5); }
+      else if (n.vassal) { stroke(200, 200, 80); strokeWeight(1); }
+      else { noStroke(); }
+      fill(fc[0], fc[1], fc[2]);
+      ellipse(ix, iy, dotR * 2, dotR * 1.6);
+      noStroke();
+      // Label
+      let facName = (typeof FACTIONS !== 'undefined' && FACTIONS[k]) ? FACTIONS[k].name : k;
+      fill(220, 210, 190); textSize(6); textAlign(CENTER, TOP);
+      text(facName, ix, iy + dotR + 2);
+      fill(180, 170, 150); textSize(5);
+      text('Lv' + isLevel + ' \u2694' + (n.military || 0), ix, iy + dotR + 10);
+    }
+  }
+
+  // Exploration islands (Vulcan, Hyperborea, Plenty, Necropolis)
+  let exploreIslands = [
+    { key: 'vulcan', name: 'Vulcan', color: [200, 80, 40] },
+    { key: 'hyperborea', name: 'Hyperborea', color: [100, 180, 220] },
+    { key: 'plenty', name: 'Plenty', color: [80, 180, 80] },
+    { key: 'necropolis', name: 'Necropolis', color: [140, 100, 160] },
+  ];
+  for (let ei of exploreIslands) {
+    let eState = state[ei.key];
+    if (!eState) continue;
+    let eix = centerX + ((eState.isleX || 0) - WORLD.islandCX) * scale;
+    let eiy = centerY + ((eState.isleY || 0) - WORLD.islandCY) * scale;
+    if (eix < mx || eix > mx + mapW || eiy < my || eiy > my + mapH) continue;
+    fill(ei.color[0], ei.color[1], ei.color[2], 180);
+    noStroke();
+    rect(eix - 3, eiy - 3, 6, 6, 1);
+    fill(ei.color[0], ei.color[1], ei.color[2]); textSize(5); textAlign(CENTER, TOP);
+    text(ei.name, eix, eiy + 5);
+  }
+
+  // Legend
+  fill(160, 150, 130); textSize(7); textAlign(CENTER, BOTTOM);
+  text('[M] Close   [ESC] Close', centerX, my + mapH - 6);
+  textAlign(LEFT, TOP);
 }
 
 function drawOneWorker(w) {

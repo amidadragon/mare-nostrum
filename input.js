@@ -817,6 +817,7 @@ function keyPressed() {
       return;
     }
     if (wardrobeOpen) { wardrobeOpen = false; return; }
+    if (typeof _seaMapOpen !== 'undefined' && _seaMapOpen) { _seaMapOpen = false; return; }
     if (dialogState.active) { dialogState.active = false; return; }
     if (state.expeditionModifierSelect) { state.expeditionModifierSelect = false; return; }
     if (state.upgradeShopOpen) { state.upgradeShopOpen = false; return; }
@@ -1919,6 +1920,13 @@ function keyPressed() {
       wardrobeOpen = !wardrobeOpen;
       return;
     }
+  }
+
+  // Sea map toggle (M key)
+  if (key === 'm' || key === 'M') {
+    _seaMapOpen = !_seaMapOpen;
+    if (snd) snd.playSFX('page_turn');
+    return;
   }
 
   // Inventory toggle (I key)

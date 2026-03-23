@@ -191,7 +191,7 @@ function updateRowing(dt) {
   state.player.y = r.y;
 
   // Boundary: don't let boat go too far from island (islands surround home)
-  let maxDist = state.islandRX * 8.5; // expanded for distant islands (Necropolis ~3500px)
+  let maxDist = Math.max(state.islandRX * 8.5, 7000); // world radius covers all nation islands (4000-6000px)
   let bDist = dist(r.x, r.y, WORLD.islandCX, WORLD.islandCY);
   if (bDist > maxDist) {
     let ang = atan2(r.y - WORLD.islandCY, r.x - WORLD.islandCX);

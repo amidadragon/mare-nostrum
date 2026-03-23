@@ -227,12 +227,8 @@ function selectFaction(faction) {
   if (snd && snd.playNarration) snd.playNarration(faction + '_intro');
   // Initialize all rival nations (everyone except player's faction)
   initNations();
-  // Place first bot island nearby (east of home) -- others stay at default positions for now
+  // All nations at their NATION_DEFAULTS positions (4000-6000px from home)
   let _nationKeys = Object.keys(state.nations);
-  if (_nationKeys.length > 0) {
-    state.nations[_nationKeys[0]].isleX = WORLD.islandCX + 1200;
-    state.nations[_nationKeys[0]].isleY = WORLD.islandCY;
-  }
   // Create bot islands — level depends on game mode
   // 1v1 mode: bot starts at level 5 (visible civilization from the start)
   // Default mode: bot starts at level 12 (established civilization)

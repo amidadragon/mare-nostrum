@@ -27,21 +27,21 @@ const NATION_BUILDING_TYPES = ['hut', 'hut', 'market', 'wall', 'barracks', 'towe
 
 const NATION_DEFAULTS = {
   carthage: { gold: 100, military: 3, population: 5, personality: 'trader',
-              position: { angle: -0.785, dist: 2800 }, isleRX: 400, isleRY: 280 }, // NE
+              position: { angle: -0.6, dist: 4500 }, isleRX: 400, isleRY: 280 },    // NE
   egypt:    { gold: 120, military: 2, population: 5, personality: 'balanced',
-              position: { angle: 1.571, dist: 2800 }, isleRX: 420, isleRY: 290 },  // S
+              position: { angle: 1.4, dist: 5000 }, isleRX: 420, isleRY: 290 },     // SE
   greece:   { gold: 80,  military: 4, population: 5, personality: 'balanced',
-              position: { angle: 0, dist: 2800 }, isleRX: 390, isleRY: 270 },      // E
+              position: { angle: 0.2, dist: 4200 }, isleRX: 390, isleRY: 270 },     // E
   rome:      { gold: 100, military: 3, population: 5, personality: 'balanced',
-              position: { angle: 3.927, dist: 2800 }, isleRX: 400, isleRY: 280 },  // NW (fallback if not player)
+              position: { angle: 3.8, dist: 4500 }, isleRX: 400, isleRY: 280 },     // NW
   seapeople: { gold: 60,  military: 5, population: 4, personality: 'raider',
-              position: { angle: 2.356, dist: 3000 }, isleRX: 350, isleRY: 250 },  // SW
+              position: { angle: 2.5, dist: 5500 }, isleRX: 350, isleRY: 250 },     // SW far
   persia:    { gold: 150, military: 3, population: 6, personality: 'trader',
-              position: { angle: 0.785, dist: 3200 }, isleRX: 430, isleRY: 300 },  // NE far
+              position: { angle: 0.9, dist: 5800 }, isleRX: 430, isleRY: 300 },     // E far
   phoenicia: { gold: 130, military: 2, population: 5, personality: 'trader',
-              position: { angle: -1.571, dist: 2800 }, isleRX: 380, isleRY: 260 }, // N
+              position: { angle: -1.3, dist: 4800 }, isleRX: 380, isleRY: 260 },    // N
   gaul:      { gold: 70,  military: 4, population: 5, personality: 'aggressive',
-              position: { angle: 3.14, dist: 3000 }, isleRX: 410, isleRY: 290 },   // W
+              position: { angle: 3.0, dist: 5200 }, isleRX: 410, isleRY: 290 },     // W far
 };
 
 const FACTION_RELATIONS = {
