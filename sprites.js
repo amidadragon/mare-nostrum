@@ -122,15 +122,9 @@ function drawPlayerSprite(x, y, faction, facing, anim, frame) {
 }
 
 function drawBuildingSprite(x, y, type, faction) {
-  // Skip sprites on bot island — use rect-based rendering for visual consistency
-  if (typeof window !== 'undefined' && window._botRender) return false;
-  let sheetName = 'building_' + type + '_' + faction;
-  if (!SpriteManager.has(sheetName)) {
-    sheetName = 'building_' + type;
-    if (!SpriteManager.has(sheetName)) return false;
-  }
-  SpriteManager.drawFrame(sheetName, 0, 0, x, y);
-  return true;
+  // DISABLED: sprites are WIP (V2.2) — use rect-based rendering for all buildings
+  // Sprites were causing invisible buildings (temple, forum, etc.)
+  return false;
 }
 
 // Props & Items (64x64 per frame, generated from 3D pipeline)
