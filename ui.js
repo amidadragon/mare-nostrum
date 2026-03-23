@@ -4167,6 +4167,18 @@ function drawCompassHUD() {
     fill(red(c), green(c), blue(c), alpha * 0.6);
     rect(xPos - 1, barY + barH - 3, 2, 2);
   }
+  // Show nearest island name + distance below compass
+  let _nearest = null, _nearDist = Infinity;
+  for (let isle of islands) {
+    let _dx = isle.x - px, _dy = isle.y - py;
+    let _d = sqrt(_dx * _dx + _dy * _dy);
+    if (_d < _nearDist && _d > 50) { _nearest = isle; _nearDist = _d; }
+  }
+  if (_nearest && _nearDist < 3000) {
+    let _nc = color(_nearest.col);
+    fill(red(_nc), green(_nc), blue(_nc), 180); textSize(9); textAlign(CENTER, TOP);
+    text(_nearest.icon + ' ' + _nearest.name + ' — ' + floor(_nearDist) + 'm', barX + barW / 2, barY + barH + 3);
+  }
   textAlign(LEFT, TOP); pop();
 }
 
