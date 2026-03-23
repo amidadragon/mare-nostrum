@@ -3600,6 +3600,43 @@ function drawInner() {
                 pop();
               }
             }
+            // Draw named NPCs on bot island
+            let _npcs = _own.islandState.npcs;
+            if (_npcs) {
+              let _nfm = (typeof FACTION_MILITARY !== 'undefined' && FACTION_MILITARY[_owKey]) ?
+                FACTION_MILITARY[_owKey] : { tunic: [160,50,40], helm: [175,150,60] };
+              for (let _npc of _npcs) {
+                let nx = w2sX(_npc.x), ny = w2sY(_npc.y);
+                if (nx < -30 || nx > width + 30) continue;
+                // Wander slowly
+                _npc.moveTimer--;
+                if (_npc.moveTimer <= 0) {
+                  _npc.targetX = _npc.x + (Math.random()-0.5) * 60;
+                  _npc.targetY = _npc.y + (Math.random()-0.5) * 30;
+                  _npc.moveTimer = 60 + Math.floor(Math.random() * 120);
+                }
+                let ndx = _npc.targetX - _npc.x, ndy = _npc.targetY - _npc.y;
+                let nd = Math.sqrt(ndx*ndx + ndy*ndy);
+                if (nd > 3) { _npc.x += ndx/nd * 0.3; _npc.y += ndy/nd * 0.3; _npc.moving = true; }
+                else _npc.moving = false;
+
+                push(); noStroke(); translate(Math.floor(nx), Math.floor(ny));
+                fill(0,0,0,25); ellipse(0, 8, 14, 5); // shadow
+                // Bigger sprite than citizens (NPCs are important)
+                fill(_nfm.tunic[0], _nfm.tunic[1], _nfm.tunic[2]);
+                rect(-5, -10, 10, 14, 2); // body
+                fill(220,190,160);
+                rect(-4, -17, 8, 8, 2); // head
+                fill(_nfm.helm[0], _nfm.helm[1], _nfm.helm[2]);
+                rect(-4, -18, 8, 3, 1); // hair/helm
+                // Name label
+                fill(255,220,150,200); textAlign(CENTER,BOTTOM); textSize(7);
+                let _npcName = _npc.role === 'livia' ? 'Elder' : _npc.role === 'marcus' ? 'Commander' : _npc.role === 'vesta' ? 'Priestess' : 'Scout';
+                text(_npcName, 0, -20);
+                textAlign(LEFT,TOP);
+                pop();
+              }
+            }
             swapBack();
           }
           // Bot AI: create, update, and draw
@@ -8935,7 +8972,7 @@ function selectFaction(faction) {
   for (let k of Object.keys(state.nations)) {
     let n = state.nations[k];
     let cx = n.isleX, cy = n.isleY;
-    n.islandState = createPrebuiltIsland(k, cx, cy, 5);
+    n.islandState = createPrebuiltIsland(k, cx, cy, 12);
     n.isBot = true;
     n.botDifficulty = 'normal';
     n.military = n.islandState.legia.army.length;
@@ -18039,6 +18076,14 @@ function createPrebuiltIsland(factionKey, cx, cy, targetLevel) {
       is.legia.army.push({ type: 'legionary', hp: 20, maxHp: 20, damage: 5, speed: 1.2, garrison: false });
     }
   }
+
+  // 4 Named NPCs (at faction-specific positions)
+  is.npcs = [
+    { name: 'npc1', x: cx - 80, y: cy - 20, role: 'livia', hearts: 2, facing: 'right', moving: false, targetX: cx - 60, targetY: cy - 10, moveTimer: 60 },
+    { name: 'npc2', x: cx + 100, y: cy + 10, role: 'marcus', hearts: 1, facing: 'left', moving: false, targetX: cx + 80, targetY: cy, moveTimer: 90 },
+    { name: 'npc3', x: cx - 30, y: cy - 50, role: 'vesta', hearts: 1, facing: 'down', moving: false, targetX: cx - 20, targetY: cy - 40, moveTimer: 120 },
+    { name: 'npc4', x: cx + 50, y: cy + 30, role: 'felix', hearts: 0, facing: 'right', moving: false, targetX: cx + 60, targetY: cy + 20, moveTimer: 70 },
+  ];
 
   is.templeHP = 100;
   is.gold = 50 + targetLevel * 20;
