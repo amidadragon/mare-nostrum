@@ -84,7 +84,11 @@ const BotAI = {
     // Slowly recharge crystal nodes (1 charge per 200 frames)
     if (nation.islandState.crystalNodes && dt > 0) {
       for (let cn of nation.islandState.crystalNodes) {
-        if ((cn.charge || 0) < 50) cn.charge = Math.min(50, (cn.charge || 0) + 0.25);
+        if ((cn.charge || 0) < 50) cn.charge = Math.min(50, (cn.charge || 0) + 0.3);
+        // Passive crystal drip from charged nodes
+        if ((cn.charge || 0) > 30 && Math.random() < 0.002) {
+          nation.islandState.crystals = (nation.islandState.crystals || 0) + 1;
+        }
       }
     }
     // Auto-farm: crops grow and auto-harvest generates food
