@@ -2487,6 +2487,30 @@ function drawInner() {
               swapBack();
             }
           }
+          // Faction banner at bot island entrance (visible from distance)
+          {
+            let _bfx = w2sX(botCX + _isRX * 0.45), _bfy = w2sY(botCY + _isRY * 0.25);
+            if (_bfx > -30 && _bfx < width + 30) {
+              push(); translate(Math.floor(_bfx), Math.floor(_bfy)); noStroke();
+              // Flag pole
+              fill(100, 80, 50); rect(-1, -30, 2, 32);
+              // Banner with faction color
+              let _fc = typeof getFactionBuildingColors === 'function' ? getFactionBuildingColors() : { wall: [180,150,100], trim: [140,120,80] };
+              fill(_fc.wall[0], _fc.wall[1], _fc.wall[2], 220);
+              let _wave = Math.sin(frameCount * 0.04 + botCX) * 2;
+              beginShape();
+              vertex(1, -28); vertex(14 + _wave, -25); vertex(13 + _wave, -18); vertex(1, -15);
+              endShape(CLOSE);
+              // Banner trim
+              fill(_fc.trim[0], _fc.trim[1], _fc.trim[2], 200);
+              rect(1, -28, 2, 13);
+              // Faction initial
+              fill(255, 255, 255, 180); textSize(6); textAlign(CENTER, CENTER);
+              text(_owKey.charAt(0).toUpperCase(), 7 + _wave * 0.5, -21);
+              textAlign(LEFT, TOP);
+              pop();
+            }
+          }
           // Bot trade ship — sails around island when bot has gold income
           if (_own.gold > 30 && _own.islandState) {
             if (!_own.islandState._tradeShip) {
