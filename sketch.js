@@ -8872,26 +8872,22 @@ function selectFaction(faction) {
   initNations();
   // Initialize personal rival
   initPersonalRival(faction);
-  // Sea People special start — skip wreck, start on ship
-  if (faction === 'seapeople') {
-    state.progression.triremeRepaired = true;
-    state.progression.homeIslandReached = true; // must be true or game falls into wreck mode on dock
-    state.rowing.active = true;
-    state.rowing.x = WORLD.islandCX - 800;
-    state.rowing.y = WORLD.islandCY;
-    state.rowing.angle = 0;
-    state.rowing.speed = 0;
-    state.player.x = state.rowing.x;
-    state.player.y = state.rowing.y;
-    cam.x = state.rowing.x; cam.y = state.rowing.y;
-    camSmooth.x = cam.x; camSmooth.y = cam.y;
-    state.wood = 3; state.stone = 1; state.fish = 2; state.gold = 10;
-    addFloatingText(width / 2, height * 0.45, 'You begin at sea. Raid an island to settle!', '#2a8a6a');
-    return;
+  // ALL factions: skip wreck, spawn directly on home island
+  state.progression.triremeRepaired = true;
+  state.progression.homeIslandReached = true;
+  state.progression.villaCleared = true;
+  state.introPhase = 'done';
+  state.wreckPhase = 'done';
+  state.isInitialized = true;
+  state.player.x = WORLD.islandCX;
+  state.player.y = WORLD.islandCY;
+  cam.x = state.player.x; cam.y = state.player.y;
+  camSmooth.x = cam.x; camSmooth.y = cam.y;
+  // Build the starting island
+  if (!state.buildings || state.buildings.length === 0) {
+    if (typeof buildIsland === 'function') buildIsland();
   }
-  if (state.cutscene === null && state.progression.homeIslandReached) {
-    state.cutscene = 'home_sunrise'; state.cutsceneTimer = 0;
-  }
+  addFloatingText(width / 2, height * 0.45, 'Welcome to your island!', '#ffcc44');
 }
 
 function drawForumBanner() {
