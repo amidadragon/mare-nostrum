@@ -123,6 +123,35 @@ const BotAI = {
       // Windmill boosts harvest
       if (hasWindmill) is.harvest = (is.harvest || 0) + 1;
     }
+    // Auto-expand: when bot has enough crystals, expand without walking
+    if (is && (is.islandLevel || 1) < 15 && Math.random() < 0.003) {
+      let expandCost = 5 + (is.islandLevel || 1) * 8;
+      if ((is.crystals || 0) >= expandCost && typeof swapToIsland === 'function') {
+        swapToIsland(is, nation.isleX, nation.isleY);
+        state.crystals -= expandCost;
+        state.islandLevel = (state.islandLevel || 1) + 1;
+        state.islandRX = (state.islandRX || 500) + 30;
+        state.islandRY = (state.islandRY || 320) + 20;
+        if (typeof placeEraBuildings === 'function') placeEraBuildings(state.islandLevel);
+        // New trees with proper props
+        if (!state.trees) state.trees = [];
+        for (let ti = 0; ti < 2; ti++) {
+          let a = Math.random() * Math.PI * 2, r = Math.random() * 0.3 + 0.4;
+          state.trees.push({ x: nation.isleX + Math.cos(a) * state.islandRX * r * 0.7, y: nation.isleY + Math.sin(a) * state.islandRY * r * 0.3, type: 'oak', hp: 3, alive: true, health: 3, maxHealth: 3, size: 0.4 + Math.random() * 0.3, shakeTimer: 0, regrowTimer: 0 });
+        }
+        // New citizens
+        if (!state.citizens) state.citizens = [];
+        let _nc = Math.min(2, Math.floor(state.islandLevel / 4));
+        for (let ci = 0; ci < _nc; ci++) {
+          state.citizens.push({ x: nation.isleX + (Math.random()-0.5)*80, y: nation.isleY + (Math.random()-0.5)*30, speed: 0.3 + Math.random()*0.2, targetX: nation.isleX, targetY: nation.isleY, moveTimer: 60, skin: Math.floor(Math.random()*5), variant: Math.floor(Math.random()*4), facing: Math.random()>0.5?1:-1, state: 'walking', walkBobPhase: Math.random()*Math.PI*2, tunicR: 100+Math.floor(Math.random()*80), tunicG: 80+Math.floor(Math.random()*60), tunicB: 60+Math.floor(Math.random()*40), activity: null, activityTimer: 0 });
+        }
+        if (state.pyramid) state.pyramid.level = state.islandLevel;
+        let _eName = typeof getNationName === 'function' ? getNationName(nationKey) : nationKey;
+        if (typeof addNotification === 'function') addNotification(_eName + ' grows to level ' + state.islandLevel + '!', '#aaddff');
+        if (typeof spawnParticles === 'function') spawnParticles(nation.isleX, nation.isleY, 'build', 8);
+        swapBack();
+      }
+    }
     // Population growth: spawn new citizens when food + housing available
     if (is && is.citizens && Math.random() < 0.002) {
       let maxPop = 5 + (is.islandLevel || 1) * 2;
