@@ -37,12 +37,13 @@ const BotAI = {
     if (is.plots && is.plots.some(p => !p.crop))
       actions.push({ type: 'plant', score: 1.2 });
     if (stone < 15) actions.push({ type: 'mine_stone', score: 1.5 * (1 - stone / 15) });
-    if (is.buildings && is.buildings.some(b => b.type === 'castrum') && gold >= 10 && (!is.legia || is.legia.army.length < 5))
+    let armySize = is.legia ? (is.legia.army ? is.legia.army.length : 0) : 0;
+    let maxArmy = Math.min(10, 3 + Math.floor(level / 3));
+    if (is.buildings && is.buildings.some(b => b.type === 'castrum') && gold >= 10 && armySize < maxArmy)
       actions.push({ type: 'recruit', score: 1.0 + (underAttack ? 3.0 : 0) });
     // Counter-attack: bot sends raiders when military is strong enough
-    let armySize = is.legia ? (is.legia.army ? is.legia.army.length : 0) : 0;
     let alreadyRaiding = nation.raidParty && nation.raidParty.length > 0;
-    if (armySize > 5 && !alreadyRaiding && !underAttack && !nation.allied)
+    if (armySize >= 5 && !alreadyRaiding && !underAttack && !nation.allied)
       actions.push({ type: 'counter_attack', score: 1.5 + armySize * 0.1 });
     actions.push({ type: 'patrol', score: 0.1 });
 
