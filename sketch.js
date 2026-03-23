@@ -2641,6 +2641,16 @@ function drawInner() {
                 _botItems.push({ y: ch.y, draw: () => drawOneChicken(ch) });
               }
             }
+            // Fountain at center of bot island
+            if (typeof drawFountain === 'function') {
+              _botItems.push({ y: botCY + 35, draw: () => drawFountain() });
+            }
+            // Faction wildlife
+            if (_own.islandState.factionWildlife && _own.islandState.factionWildlife.length > 0 && typeof drawOneFactionCreature === 'function') {
+              for (let w of _own.islandState.factionWildlife) {
+                _botItems.push({ y: w.y, draw: () => drawOneFactionCreature(w) });
+              }
+            }
             // Bot garrison soldiers patrolling near castrum
             if (_own.islandState.legia && _own.islandState.legia.army && typeof drawLegionAmbientSoldier === 'function') {
               let _castB = _own.islandState.buildings ? _own.islandState.buildings.find(b => b.type === 'castrum') : null;

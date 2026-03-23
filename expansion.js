@@ -551,8 +551,20 @@ function createPrebuiltIsland(factionKey, cx, cy, targetLevel) {
       is.factionFlora.push({ x: cx + Math.cos(fa) * is.islandRX * fd, y: cy + Math.sin(fa) * is.islandRY * fd * 0.4, col: tmpl.col, w: tmpl.w, h: tmpl.h, phase: Math.random() * Math.PI * 2 });
     }
   }
-  // Faction wildlife
+  // Faction wildlife (3-5 creatures per island)
   is.factionWildlife = [];
+  if (typeof FACTION_WILDLIFE !== 'undefined') {
+    let _fw = FACTION_WILDLIFE[factionKey] || FACTION_WILDLIFE.rome;
+    for (let wi = 0; wi < Math.min(4, _fw.length + 1); wi++) {
+      let tmpl = _fw[wi % _fw.length];
+      let wa = Math.random() * Math.PI * 2, wd = (Math.random() * 0.3 + 0.2) * is.islandRX;
+      is.factionWildlife.push({
+        x: cx + Math.cos(wa) * wd, y: cy + Math.sin(wa) * wd * (is.islandRY / is.islandRX),
+        vx: 0, vy: 0, type: tmpl.type, speed: tmpl.speed, size: tmpl.size,
+        timer: Math.random() * 200 + 60, phase: Math.random() * Math.PI * 2, facing: Math.random() > 0.5 ? 1 : -1,
+      });
+    }
+  }
 
   // Scale starting resources with level
   is.crystals = 20 + targetLevel * 8;
