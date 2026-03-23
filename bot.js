@@ -91,6 +91,32 @@ const BotAI = {
       bot.taskCooldown = 20;
     }
     if (bot.task) this.executeTask(nationKey, bot, nation, dt);
+
+    // Festival system: celebrate milestones
+    if (!nation._festivalTimer) nation._festivalTimer = 0;
+    nation._festivalTimer--;
+    if (nation._festivalTimer <= 0) {
+      nation._festivalTimer = 1800 + Math.floor(Math.random() * 600); // every ~30-40 game-seconds
+      let is = nation.islandState;
+      if (is && is.islandLevel >= 5) {
+        nation._festival = { active: true, timer: 180, type: ['harvest', 'solstice', 'victory', 'prayer'][Math.floor(Math.random() * 4)] };
+        let _name = typeof getNationName === 'function' ? getNationName(nationKey) : nationKey;
+        let _fNames = { harvest: 'Harvest Festival', solstice: 'Solstice Celebration', victory: 'Victory Games', prayer: 'Day of Prayer' };
+        if (typeof addNotification === 'function' && Math.random() < 0.3) // 30% chance to notify (not spammy)
+          addNotification(_name + ' celebrates ' + (_fNames[nation._festival.type] || 'a festival') + '!', '#ffcc44');
+        // Festival bonus: +gold, +population morale
+        nation.gold = (nation.gold || 0) + 10;
+        if (is.gold !== undefined) is.gold += 10;
+      }
+    }
+    // Draw festival effects (firework particles near temple)
+    if (nation._festival && nation._festival.active) {
+      nation._festival.timer--;
+      if (nation._festival.timer <= 0) { nation._festival.active = false; }
+      else if (nation._festival.timer % 20 === 0 && typeof spawnParticles === 'function') {
+        spawnParticles(nation.isleX + (Math.random()-0.5)*60, nation.isleY - 20, 'divine', 3);
+      }
+    }
   },
 
   createTask(type, nationKey, nation) {
