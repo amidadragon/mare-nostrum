@@ -3581,115 +3581,49 @@ function drawInner() {
           let _isRX = _own.islandState ? _own.islandState.islandRX || 400 : 400;
           let _isRY = _own.islandState ? _own.islandState.islandRY || 260 : 260;
           drawIslandAt({ cx: botCX, cy: botCY, rx: _isRX, ry: _isRY, level: _own.islandState ? _own.islandState.islandLevel : (_own.level || 1), seed: _owt.seed, factionKey: _owKey });
-          // Draw bot buildings + citizens via state swap
-          if (_own.islandState) {
-            swapToIsland(_own.islandState, botCX, botCY);
-            if (state.buildings && state.buildings.length > 0) drawWorldObjectsSorted();
-            // Draw citizens on bot island
-            if (state.citizens) {
-              for (let _ci = 0; _ci < state.citizens.length; _ci++) {
-                let c = state.citizens[_ci];
-                let csx = w2sX(c.x), csy = w2sY(c.y);
-                if (csx < -30 || csx > width + 30) continue;
-                push(); noStroke();
-                fill(0,0,0,20); ellipse(csx, csy+6, 8, 4);
-                fill(c.tunicR||140, c.tunicG||100, c.tunicB||70);
-                rect(csx-3, csy-6, 6, 8, 1);
-                fill(210,180,150);
-                rect(csx-2, csy-10, 5, 5, 1);
-                pop();
+          // Draw bot buildings using the REAL drawOneBuilding function (no state swap needed)
+          if (_own.islandState && _own.islandState.buildings) {
+            // Y-sort all bot entities for proper depth
+            let _botItems = [];
+            for (let b of _own.islandState.buildings) {
+              _botItems.push({ y: b.y, draw: () => { if (typeof drawOneBuilding === 'function') drawOneBuilding(b); } });
+            }
+            // Citizens using the REAL drawOneCitizen function
+            if (_own.islandState.citizens) {
+              for (let c of _own.islandState.citizens) {
+                // Update citizen wandering
+                c.moveTimer = (c.moveTimer || 0) - 1;
+                if (c.moveTimer <= 0) {
+                  c.targetX = botCX + (Math.random()-0.5) * _isRX * 0.5;
+                  c.targetY = botCY + (Math.random()-0.5) * _isRY * 0.2;
+                  c.moveTimer = 60 + Math.floor(Math.random() * 120);
+                }
+                let cdx = (c.targetX||botCX) - c.x, cdy = (c.targetY||botCY) - c.y;
+                let cd = Math.sqrt(cdx*cdx + cdy*cdy);
+                if (cd > 3) { c.x += cdx/cd * (c.speed||0.3); c.y += cdy/cd * (c.speed||0.3); c.moving = true; }
+                else c.moving = false;
+                _botItems.push({ y: c.y, draw: () => { if (typeof drawOneCitizen === 'function') drawOneCitizen(c); } });
               }
             }
-            // Draw named NPCs on bot island
-            let _npcs = _own.islandState.npcs;
-            if (_npcs) {
-              let _nfm = (typeof FACTION_MILITARY !== 'undefined' && FACTION_MILITARY[_owKey]) ?
-                FACTION_MILITARY[_owKey] : { tunic: [160,50,40], helm: [175,150,60] };
-              for (let _npc of _npcs) {
-                let nx = w2sX(_npc.x), ny = w2sY(_npc.y);
-                if (nx < -30 || nx > width + 30) continue;
-                // Wander slowly
-                _npc.moveTimer--;
-                if (_npc.moveTimer <= 0) {
-                  _npc.targetX = _npc.x + (Math.random()-0.5) * 60;
-                  _npc.targetY = _npc.y + (Math.random()-0.5) * 30;
-                  _npc.moveTimer = 60 + Math.floor(Math.random() * 120);
-                }
-                let ndx = _npc.targetX - _npc.x, ndy = _npc.targetY - _npc.y;
-                let nd = Math.sqrt(ndx*ndx + ndy*ndy);
-                if (nd > 3) { _npc.x += ndx/nd * 0.3; _npc.y += ndy/nd * 0.3; _npc.moving = true; }
-                else _npc.moving = false;
+            // Sort by Y and draw
+            _botItems.sort((a, b) => a.y - b.y);
+            for (let item of _botItems) item.draw();
 
-                push(); noStroke(); translate(Math.floor(nx), Math.floor(ny));
-                fill(0,0,0,25); ellipse(0, 8, 14, 5); // shadow
-                // Bigger sprite than citizens (NPCs are important)
-                fill(_nfm.tunic[0], _nfm.tunic[1], _nfm.tunic[2]);
-                rect(-5, -10, 10, 14, 2); // body
-                fill(220,190,160);
-                rect(-4, -17, 8, 8, 2); // head
-                fill(_nfm.helm[0], _nfm.helm[1], _nfm.helm[2]);
-                rect(-4, -18, 8, 3, 1); // hair/helm
-                // Name label
-                fill(255,220,150,200); textAlign(CENTER,BOTTOM); textSize(7);
-                let _npcName = _npc.role === 'livia' ? 'Elder' : _npc.role === 'marcus' ? 'Commander' : _npc.role === 'vesta' ? 'Priestess' : 'Scout';
-                text(_npcName, 0, -20);
-                textAlign(LEFT,TOP);
-                pop();
-              }
-            }
-            // Update + draw workers
-            let _workers = _own.islandState.workers;
-            if (_workers) {
-              let is = _own.islandState;
-              for (let w of _workers) {
-                let wdx = w.targetX - w.x, wdy = w.targetY - w.y;
-                let wd = Math.sqrt(wdx*wdx + wdy*wdy);
-                if (wd > 5) { w.x += (wdx/wd) * w.speed; w.y += (wdy/wd) * w.speed; w.state = 'walking'; }
-                else {
-                  w.timer++; w.state = 'working';
-                  if (w.timer > 120) {
-                    w.timer = 0;
-                    if (w.role === 'cutter' && is.trees && is.trees.length > 0) { let t = is.trees[Math.floor(Math.random() * is.trees.length)]; w.targetX = t.x; w.targetY = t.y; }
-                    else if (w.role === 'quarrier') { w.targetX = botCX + (Math.random()-0.5) * _isRX * 0.4; w.targetY = botCY + (Math.random()-0.5) * _isRY * 0.15; }
-                    else if (w.role === 'priestess' && is.crystalNodes) { let n = is.crystalNodes[Math.floor(Math.random() * is.crystalNodes.length)]; if (n) { w.targetX = n.x; w.targetY = n.y; } }
-                    else if (w.role === 'farmer' && is.plots) { let p = is.plots[Math.floor(Math.random() * is.plots.length)]; if (p) { w.targetX = p.x; w.targetY = p.y; } }
-                  }
-                }
-                let wx = w2sX(w.x), wy = w2sY(w.y);
-                if (wx < -30 || wx > width + 30) continue;
-                push(); noStroke(); translate(Math.floor(wx), Math.floor(wy));
-                fill(0,0,0,20); ellipse(0, 7, 10, 4);
-                let wCol = w.role === 'cutter' ? [140,100,60] : w.role === 'quarrier' ? [120,120,130] : w.role === 'priestess' ? [200,200,220] : [100,140,80];
-                fill(wCol[0], wCol[1], wCol[2]); rect(-3, -7, 7, 10, 1);
-                fill(210,180,150); rect(-2, -12, 5, 6, 1);
-                if (w.state === 'working') {
-                  fill(150,150,150);
-                  if (w.role === 'cutter') rect(4, -8, 2, 6);
-                  else if (w.role === 'quarrier') rect(4, -8, 2, 6);
-                  else if (w.role === 'priestess') { fill(100,200,255); ellipse(5, -6, 4, 4); }
-                  else { fill(80,140,50); rect(4, -4, 2, 5); }
-                }
-                fill(255,255,255,150); textAlign(CENTER,BOTTOM); textSize(6);
-                text(w.role === 'cutter' ? 'Cutter' : w.role === 'quarrier' ? 'Quarrier' : w.role === 'priestess' ? 'Priestess' : 'Farmer', 0, -14);
-                textAlign(LEFT,TOP); pop();
-              }
-            }
-            // Temple HP bar
-            let templeB = _own.islandState.buildings ? _own.islandState.buildings.find(b => b.isTemple || b.type === 'temple') : null;
+            // Temple HP bar (drawn on top, not Y-sorted)
+            let templeB = _own.islandState.buildings.find(b => b.isTemple || b.type === 'temple');
             if (templeB) {
               let thx = w2sX(templeB.x), thy = w2sY(templeB.y) - 35;
               let tHP = _own.islandState.templeHP || 100;
-              fill(0,0,0,150); noStroke(); rect(thx - 25, thy, 50, 6, 2);
+              noStroke();
+              fill(0,0,0,150); rect(thx-25, thy, 50, 6, 2);
               let hpRatio = tHP / 100;
-              let hpR = hpRatio > 0.5 ? Math.floor((1 - hpRatio) * 2 * 200) : 200;
-              let hpG = hpRatio > 0.5 ? 200 : Math.floor(hpRatio * 2 * 200);
-              fill(hpR, hpG, 50); rect(thx - 23, thy + 1, 46 * hpRatio, 4, 1);
+              fill(hpRatio > 0.5 ? Math.floor((1-hpRatio)*400) : 200, hpRatio > 0.5 ? 200 : Math.floor(hpRatio*400), 50);
+              rect(thx-23, thy+1, 46*hpRatio, 4, 1);
               fill(255,255,255,200); textAlign(CENTER,BOTTOM); textSize(7);
-              text('Temple ' + tHP + '%', thx, thy - 1); textAlign(LEFT,TOP);
-              if (tHP < 50) { fill(80,80,80, 40 + Math.sin(frameCount * 0.05) * 20); ellipse(thx + Math.sin(frameCount * 0.03) * 5, thy - 10, 15, 8); }
-              if (tHP < 25) { fill(255, 100, 30, 60 + Math.sin(frameCount * 0.1) * 30); ellipse(thx - 5, thy - 5, 8, 12); ellipse(thx + 8, thy - 3, 6, 10); }
+              text('Temple '+tHP+'%', thx, thy-1); textAlign(LEFT,TOP);
+              if (tHP < 50) { fill(80,80,80,50); ellipse(thx+Math.sin(frameCount*0.03)*5, thy-10, 15, 8); }
+              if (tHP < 25) { fill(255,100,30,60); ellipse(thx-5, thy-5, 8, 12); }
             }
-            swapBack();
           }
           // Critter pet following bot leader
           let _critter = _own.islandState ? _own.islandState.critter : null;
