@@ -17528,13 +17528,16 @@ function placeEraBuildings(lvl) {
   let ry = getSurfaceRY();
   let cx = WORLD.islandCX;
   let cy = WORLD.islandCY;
-  // Farm is always in the far left zone
-  let farmCX = WORLD.islandCX - 340, farmCY = WORLD.islandCY - 5;
+  // Farm is always in the far left zone (relative to current island center)
+  let farmCX = cx - 340, farmCY = cy - 5;
 
-  // Place all CITY_SLOTS for this level (absolute coordinates, no drift)
+  // Place all CITY_SLOTS for this level
+  // Offset positions for bot islands (CITY_SLOTS are authored for home island at 600,400)
+  let offsetX = WORLD.islandCX - 600;
+  let offsetY = WORLD.islandCY - 400;
   CITY_SLOTS.forEach(slot => {
     if (slot.level !== lvl) return;
-    let bld = { x: slot.x, y: slot.y, w: slot.w, h: slot.h, type: slot.type, rot: 0 };
+    let bld = { x: slot.x + offsetX, y: slot.y + offsetY, w: slot.w, h: slot.h, type: slot.type, rot: 0 };
     // Force-place decorative ground tiles (floors, mosaics) and castrum compound
     // parts that intentionally overlap parent structures
     let forcePlace = slot.type === 'floor' || slot.type === 'mosaic' || slot.type === 'castrum'
