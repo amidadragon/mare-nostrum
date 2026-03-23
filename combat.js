@@ -5164,13 +5164,17 @@ function startInvasion(nationKey) {
     });
   }
 
-  let defenderCount = max(3, nation.military || 3);
+  // Use bot's actual army for defenders (stronger if they've recruited)
+  let botArmy = (nation.islandState && nation.islandState.legia && nation.islandState.legia.army) ? nation.islandState.legia.army : [];
+  let defenderCount = max(3, botArmy.length > 0 ? botArmy.length : (nation.military || 3));
   for (let i = 0; i < defenderCount; i++) {
+    let unit = botArmy[i] || {};
     state.invasion.defenders.push({
       x: ix + random(-60, 60),
       y: iy + random(-40, 40),
-      hp: 15, maxHp: 15, damage: 4, speed: 1.0,
-      type: 'legionary', state: 'defending', target: null,
+      hp: unit.maxHp || 15, maxHp: unit.maxHp || 15,
+      damage: unit.damage || 4, speed: unit.speed || 1.0,
+      type: unit.type || 'legionary', state: 'defending', target: null,
     });
   }
 
