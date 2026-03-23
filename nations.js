@@ -579,10 +579,12 @@ function updateNationDaily(key) {
         if (other.wars.includes(wk)) rv.relations[k2] = min(100, (rv.relations[k2] || 0) + 0.5);
       }
     }
-    // AI-to-AI trade
-    if (rv.personality === 'trader' && rel > 10 && random() < 0.05) {
-      rv.gold += 5; other.gold += 5;
+    // AI-to-AI trade (all personalities, not just trader)
+    if (rel > 0 && random() < (rv.personality === 'trader' ? 0.08 : 0.03)) {
+      let tradeAmt = 3 + floor(rv.level * 0.5);
+      rv.gold += tradeAmt; other.gold += tradeAmt;
       rv.relations[k2] = min(100, (rv.relations[k2] || 0) + 1);
+      other.relations[key] = min(100, (other.relations[key] || 0) + 1);
     }
     // AI-to-AI alliance
     if (rel > 50 && !(rv.allies && rv.allies.includes(k2)) && random() < 0.02) {
@@ -591,6 +593,27 @@ function updateNationDaily(key) {
       rv.allies.push(k2);
       if (!other.allies.includes(key)) other.allies.push(key);
       addNotification(name + ' and ' + getNationName(k2) + ' form an alliance!', '#88cc88');
+    }
+    // Allied resource sharing
+    if (rv.allies && rv.allies.includes(k2) && random() < 0.02) {
+      rv.gold += 3; other.gold += 3;
+      rv.military = max(rv.military, rv.military + (random() < 0.1 ? 1 : 0));
+    }
+    // AI-to-AI war declaration (aggressive nations with high military)
+    if (rel < -20 && rv.military > 5 && rv.military > other.military * 1.5 && !(rv.wars && rv.wars.includes(k2)) && random() < 0.02) {
+      if (!rv.wars) rv.wars = [];
+      if (!other.wars) other.wars = [];
+      rv.wars.push(k2); other.wars.push(key);
+      addNotification(name + ' declares war on ' + getNationName(k2) + '!', '#ff4444');
+    }
+    // AI-to-AI war resolution (weaker side surrenders)
+    if (rv.wars && rv.wars.includes(k2) && random() < 0.01) {
+      if (rv.military < other.military * 0.5 && rv.military > 0) {
+        rv.military = max(0, rv.military - 2); other.gold += 20;
+        rv.wars = rv.wars.filter(w => w !== k2); if (other.wars) other.wars = other.wars.filter(w => w !== key);
+        rv.relations[k2] = min(100, (rv.relations[k2] || 0) + 20);
+        addNotification(name + ' surrenders to ' + getNationName(k2) + '!', '#ffaa44');
+      }
     }
   }
 
