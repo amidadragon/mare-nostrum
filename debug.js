@@ -66,6 +66,9 @@ const Debug = {
           state.player.attackDamage = 999;
           this.addLog('GOD MODE — invincible, max damage', '#ffdd44');
           break;
+        case '/1v1':
+          if (typeof start1v1Game === 'function') { start1v1Game(); this.addLog('1v1 MODE — You vs AI, both level 1, random factions!', '#ffdd44'); }
+          break;
 
         case '/gold':
           let g = parseInt(args[0]) || 9999;

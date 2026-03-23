@@ -211,14 +211,23 @@ function selectFaction(faction) {
     state.nations[_nationKeys[0]].isleX = WORLD.islandCX + 1200;
     state.nations[_nationKeys[0]].isleY = WORLD.islandCY;
   }
-  // Create pre-built bot islands -- real civilizations from the start
+  // Create bot islands — level depends on game mode
+  // 1v1 mode: bot starts at level 1 (same as player), grows in real-time
+  // Default mode: bot starts at level 12 (established civilization)
+  let _botStartLevel = (state._gameMode === '1v1') ? 1 : 12;
   for (let k of Object.keys(state.nations)) {
     let n = state.nations[k];
     let cx = n.isleX, cy = n.isleY;
-    n.islandState = createPrebuiltIsland(k, cx, cy, 12);
+    n.islandState = createPrebuiltIsland(k, cx, cy, _botStartLevel);
     n.isBot = true;
-    n.botDifficulty = 'normal';
-    n.military = n.islandState.legia.army.length;
+    n.botDifficulty = (state._gameMode === '1v1') ? 'normal' : 'normal';
+    n.military = n.islandState.legia ? n.islandState.legia.army.length : 0;
+    // In 1v1 mode, give bot minimal starting resources (same as player)
+    if (_botStartLevel <= 2) {
+      n.gold = 10; n.military = 0;
+      n.islandState.gold = 10; n.islandState.wood = 10;
+      n.islandState.stone = 5; n.islandState.crystals = 5;
+    }
     // Create bot AI character
     if (typeof BotAI !== 'undefined') {
       BotAI.create(k, cx, cy);

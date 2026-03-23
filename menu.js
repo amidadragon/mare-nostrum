@@ -514,7 +514,7 @@ function drawMenuScreen() {
   if (!hasSave && _rs) { try { localStorage.removeItem('sunlitIsles_save'); } catch(e) {} }
   let items = ['NEW VOYAGE'];
   if (hasSave) items.splice(1, 0, 'CONTINUE');
-  items.push('MULTIPLAYER', 'SETTINGS', 'CREDITS');
+  items.push('1v1 BATTLE', 'MULTIPLAYER', 'SETTINGS', 'CREDITS');
   let itemCount = items.length;
 
   let menuStartY = floor(h * 0.68);
@@ -1386,8 +1386,9 @@ function handleMenuClick() {
   if (!hasSave && _rs) { try { localStorage.removeItem('sunlitIsles_save'); } catch(e) {} }
   let btns = ['new'];
   if (hasSave) btns.splice(1, 0, 'load');
-  btns.push('multiplayer', 'settings', 'credits');
+  btns.push('1v1', 'multiplayer', 'settings', 'credits');
   let action = btns[menuHover];
+  if (action === '1v1') { menuFadeOut = 1; menuFadeAction = function() { if (typeof start1v1Game === 'function') start1v1Game(); }; return; }
   if (action === 'multiplayer') { gameScreen = 'multiplayer'; state._mpMenuOpen = true; return; }
   if (action === 'settings') { gameScreen = 'settings'; return; }
   if (action === 'credits') { gameScreen = 'credits'; return; }

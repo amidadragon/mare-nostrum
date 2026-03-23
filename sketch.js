@@ -1206,6 +1206,39 @@ function setup() {
   if (loadEl) { loadEl.style.opacity = '0'; setTimeout(() => loadEl.remove(), 800); }
 }
 
+// ═══ 1v1 STRATEGY MODE — Player vs AI, both start at level 1 ═══
+function start1v1Game(playerFaction) {
+  initState();
+  state._gameMode = '1v1';
+  trackMilestone('1v1_start');
+  state.progression.gameStarted = true;
+  state.progression.villaCleared = true;
+  state.progression.tutorialDone = true;
+  state.introPhase = null;
+  // Player starts on home island at level 1
+  state.islandLevel = 1;
+  state.player.x = WORLD.islandCX;
+  state.player.y = WORLD.islandCY;
+  cam.x = state.player.x; cam.y = state.player.y;
+  camSmooth.x = cam.x; camSmooth.y = cam.y;
+  // Minimal starting resources
+  state.wood = 10; state.stone = 5; state.crystals = 5;
+  state.gold = 10; state.seeds = 3; state.harvest = 5;
+  state.solar = 50;
+  // Random faction if not specified
+  let factions = ['rome', 'carthage', 'egypt', 'greece', 'seapeople', 'persia', 'phoenicia', 'gaul'];
+  if (!playerFaction) playerFaction = factions[Math.floor(Math.random() * factions.length)];
+  // Select faction (this inits nations + bot islands at level 1 via _gameMode)
+  if (typeof selectFaction === 'function') selectFaction(playerFaction);
+  // Place initial buildings for level 1
+  if (typeof placeEraBuildings === 'function') placeEraBuildings(1);
+  gameScreen = 'game';
+  if (typeof addNotification === 'function') {
+    addNotification('1v1 Strategy Mode — Race to dominance!', '#ffdd44');
+    addNotification('Build, expand, and conquer your rival civilization!', '#aaddff');
+  }
+}
+
 function startNewGame() {
   initState();
   trackMilestone('game_start');
