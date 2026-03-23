@@ -18124,9 +18124,18 @@ function createPrebuiltIsland(factionKey, cx, cy, targetLevel) {
       x: cx + (Math.random() - 0.5) * is.islandRX * 0.5,
       y: cy + (Math.random() - 0.5) * is.islandRY * 0.2,
       speed: 0.3 + Math.random() * 0.2,
-      targetX: cx, targetY: cy, moveTimer: Math.floor(Math.random() * 120),
+      targetX: cx + (Math.random() - 0.5) * 100,
+      targetY: cy + (Math.random() - 0.5) * 40,
+      moveTimer: Math.floor(Math.random() * 120),
       skin: Math.floor(Math.random() * 5),
-      tunicR: 100 + Math.floor(Math.random() * 80), tunicG: 80 + Math.floor(Math.random() * 60), tunicB: 60 + Math.floor(Math.random() * 40)
+      variant: Math.floor(Math.random() * 4), // citizen type variant
+      facing: Math.random() > 0.5 ? 1 : -1,
+      state: 'walking',
+      walkBobPhase: Math.random() * Math.PI * 2,
+      tunicR: 100 + Math.floor(Math.random() * 80),
+      tunicG: 80 + Math.floor(Math.random() * 60),
+      tunicB: 60 + Math.floor(Math.random() * 40),
+      activity: null, activityTimer: 0,
     });
   }
 

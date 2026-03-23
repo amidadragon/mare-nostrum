@@ -708,6 +708,7 @@ function drawStarField(alpha) {
 function drawStars(alpha) { drawStarField(alpha); }
 
 function drawDriftClouds(bright) {
+  return; // DISABLED -- dark blobs, not clouds
   if (typeof drawDriftClouds._prevCamY === 'undefined') drawDriftClouds._prevCamY = camSmooth.y;
   let camDY = camSmooth.y - drawDriftClouds._prevCamY;
   drawDriftClouds._prevCamY = camSmooth.y;
