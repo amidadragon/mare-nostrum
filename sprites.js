@@ -122,6 +122,8 @@ function drawPlayerSprite(x, y, faction, facing, anim, frame) {
 }
 
 function drawBuildingSprite(x, y, type, faction) {
+  // Skip sprites on bot island — use rect-based rendering for visual consistency
+  if (typeof window !== 'undefined' && window._botRender) return false;
   let sheetName = 'building_' + type + '_' + faction;
   if (!SpriteManager.has(sheetName)) {
     sheetName = 'building_' + type;

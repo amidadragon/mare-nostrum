@@ -3631,6 +3631,9 @@ function drawInner() {
             WORLD.islandCY = botCY;
             state.islandRX = _isRX;
             state.islandRY = _isRY;
+            // Force rect-based rendering for bot buildings (skip sprites)
+            let _savedSM = (typeof SpriteManager !== 'undefined') ? SpriteManager : null;
+            if (_savedSM) { window._botRender = true; }
             // Y-sort all bot entities for proper depth
             let _botItems = [];
             for (let b of _own.islandState.buildings) {
@@ -3821,6 +3824,8 @@ function drawInner() {
               }
               textAlign(LEFT, TOP);
             }
+            // Clear bot render flag
+            if (typeof window !== 'undefined') window._botRender = false;
             // Restore player globals
             state.islandLevel = _savedLevel;
             state.faction = _savedFaction;
