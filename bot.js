@@ -106,6 +106,23 @@ const BotAI = {
         }
       }
     }
+    // Passive resource generation from buildings (workers produce resources)
+    if (is && is.buildings && Math.random() < 0.008) {
+      let hasGranary = is.buildings.some(b => b.type === 'granary');
+      let hasForge = is.buildings.some(b => b.type === 'forge');
+      let hasWindmill = is.buildings.some(b => b.type === 'windmill');
+      let citizenWorkers = is.citizens ? Math.floor(is.citizens.length * 0.3) : 1;
+      // Trees regrow wood passively
+      is.wood = (is.wood || 0) + Math.max(1, citizenWorkers);
+      // Stone from quarries/mines
+      is.stone = (is.stone || 0) + Math.max(1, Math.floor(citizenWorkers * 0.5));
+      // Granary boosts food
+      if (hasGranary) is.harvest = (is.harvest || 0) + 2;
+      // Forge generates iron
+      if (hasForge) is.ironOre = (is.ironOre || 0) + 1;
+      // Windmill boosts harvest
+      if (hasWindmill) is.harvest = (is.harvest || 0) + 1;
+    }
     // Population growth: spawn new citizens when food + housing available
     if (is && is.citizens && Math.random() < 0.002) {
       let maxPop = 5 + (is.islandLevel || 1) * 2;
