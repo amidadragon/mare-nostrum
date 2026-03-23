@@ -3584,8 +3584,19 @@ function drawInner() {
             drawWorldObjectsSorted();
             swapBack();
           }
-          // Draw bot AI character
-          if (typeof BotAI !== 'undefined') BotAI.draw(_owKey);
+          // Draw bot AI character (auto-create if missing)
+          if (typeof BotAI !== 'undefined') {
+            if (!BotAI.bots[_owKey]) {
+              BotAI.create(_owKey, botCX, botCY);
+              BotAI.initIslandResources(_owKey);
+            }
+            // Make sure bot is on the correct island position
+            if (BotAI.bots[_owKey] && Math.abs(BotAI.bots[_owKey].x - botCX) > 1000) {
+              BotAI.bots[_owKey].x = botCX;
+              BotAI.bots[_owKey].y = botCY;
+            }
+            BotAI.draw(_owKey);
+          }
         }
       }
       if (!_frameBudget.throttled || frameCount % 2 === 0) drawShoreWaves();
