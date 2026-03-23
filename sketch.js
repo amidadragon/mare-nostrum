@@ -3917,7 +3917,7 @@ function drawInner() {
       state.gold -= goldLost;
       p.hp = floor(p.maxHp * 0.5);
       p._dead = false;
-      exitConquest(true);
+      // exitConquest deprecated -- openworld
       p.x = WORLD.islandCX;
       p.y = WORLD.islandCY;
       cam.x = p.x; cam.y = p.y;
@@ -13824,7 +13824,7 @@ function mousePressed() {
           state.meals -= supplyCost.meals;
           state.expeditionModifierSelect = false;
           addFloatingText(width / 2, height * 0.38, getModifier().name + ' Expedition', getModifier().color);
-          enterConquest();
+          // enterConquest() deprecated -- openworld seamless
         } else {
           state.expeditionModifier = mods[i];
         }
@@ -14571,7 +14571,7 @@ function keyPressed() {
       state.expeditionModifierSelect = false;
       let modName = getModifier().name;
       addFloatingText(width / 2, height * 0.38, modName + ' Expedition', getModifier().color);
-      enterConquest();
+      // enterConquest() deprecated -- openworld seamless
       return;
     }
     return; // block other keys while selecting
@@ -14614,7 +14614,7 @@ function keyPressed() {
       let shipX = cq.shipX || cq.isleX;
       let shipY = cq.shipY || (cq.isleY + cq.isleRY * 0.92 + 15);
       let dShip = dist(state.player.x, state.player.y, shipX, shipY);
-      if (dShip < 60) { exitConquest(); return; }
+      // exitConquest deprecated -- openworld
       // V1.2: E key — upgrade tower
       for (let b of cq.buildings) {
         if (b.type === 'watchtower' && dist(state.player.x, state.player.y, b.x, b.y) < 45) {
@@ -15008,7 +15008,7 @@ function keyPressed() {
       if (r.nearIsle === 'conquest') {
         if (state.conquest.colonized) {
           // Colonized — free, peaceful entry
-          enterConquest();
+          // enterConquest() deprecated -- openworld seamless
           return;
         }
         // Open modifier selection UI

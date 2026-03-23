@@ -1702,7 +1702,7 @@ function updateConquest(dt) {
   if (p.hp <= 0) {
     p.hp = floor(p.maxHp * 0.5);
     triggerScreenShake(8, 20);
-    exitConquest(true);
+    // exitConquest deprecated -- openworld
   }
 }
 
