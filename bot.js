@@ -9,7 +9,7 @@ const BotAI = {
   create(nationKey, cx, cy) {
     this.bots[nationKey] = {
       x: cx, y: cy, facing: 'down', moving: false,
-      task: null, taskCooldown: 0, speed: 2.5,
+      task: null, taskCooldown: 0, speed: 4.5,
       faction: nationKey, walkFrame: 0,
     };
   },
@@ -91,43 +91,17 @@ const BotAI = {
         }
       }
     }
-    // Auto-farm: crops grow and auto-harvest generates food
+    // Crop growth only: plots grow naturally (same rate as player)
     let is = nation.islandState;
     if (is && is.plots) {
       for (let p of is.plots) {
         if (p.crop && p.stage === 'growing') {
-          p.growTimer = (p.growTimer || 0) + 0.5; // auto-grow slowly
+          p.growTimer = (p.growTimer || 0) + 0.3;
           if (p.growTimer >= 200) p.stage = 'ready';
-        }
-        if (p.stage === 'ready' && Math.random() < 0.01) {
-          // Auto-harvest ready crops
-          is.harvest = (is.harvest || 0) + 2;
-          p.stage = 'empty'; p.crop = null;
-        }
-        if (!p.crop && Math.random() < 0.005) {
-          // Auto-replant empty plots
-          p.crop = 'grain'; p.stage = 'growing'; p.growTimer = 0;
         }
       }
     }
-    // Background economy: minimal passive resources for off-screen nations
-    // Bot leader uses REAL functions (chopTree, trainUnit, etc.) when on-screen
-    if (is && is.buildings && Math.random() < 0.004) {
-      let hasGranary = is.buildings.some(b => b.type === 'granary');
-      let hasForge = is.buildings.some(b => b.type === 'forge');
-      let hasWindmill = is.buildings.some(b => b.type === 'windmill');
-      let citizenWorkers = is.citizens ? Math.floor(is.citizens.length * 0.3) : 1;
-      // Trees regrow wood passively
-      is.wood = (is.wood || 0) + Math.max(1, citizenWorkers);
-      // Stone from quarries/mines
-      is.stone = (is.stone || 0) + Math.max(1, Math.floor(citizenWorkers * 0.5));
-      // Granary boosts food
-      if (hasGranary) is.harvest = (is.harvest || 0) + 2;
-      // Forge generates iron
-      if (hasForge) is.ironOre = (is.ironOre || 0) + 1;
-      // Windmill boosts harvest
-      if (hasWindmill) is.harvest = (is.harvest || 0) + 1;
-    }
+    // NO fake passive economy — bot leader uses REAL game functions
     // Auto-expand: when bot has enough crystals, expand without walking
     if (is && (is.islandLevel || 1) < 15 && Math.random() < 0.008) {
       let expandCost = 5 + (is.islandLevel || 1) * 8;
@@ -290,7 +264,7 @@ const BotAI = {
 
     switch (task.type) {
       case 'chop':
-        if (task.timer > 35) {
+        if (task.timer > 15) {
           // Use REAL chopTree() via state swap
           if (typeof swapToIsland === 'function') {
             swapToIsland(is, nation.isleX, nation.isleY);
@@ -306,7 +280,7 @@ const BotAI = {
           bot.task = null;
         } break;
       case 'mine_crystal':
-        if (task.timer > 45) {
+        if (task.timer > 8) {
           is.crystals = (is.crystals||0) + 3;
           let n = is.crystalNodes ? is.crystalNodes.find(n => Math.abs(n.x-task.target.x)<20 && Math.abs(n.y-task.target.y)<20 && (n.charge||0)>0) : null;
           if (n) n.charge = Math.max(0, (n.charge||0)-20);
@@ -314,13 +288,13 @@ const BotAI = {
           bot.task = null;
         } break;
       case 'mine_stone':
-        if (task.timer > 40) {
+        if (task.timer > 8) {
           is.stone = (is.stone||0) + 2;
           if (typeof addFloatingText === 'function') addFloatingText(w2sX(bot.x), w2sY(bot.y) - 20, '+2 stone', '#aaaaaa');
           bot.task = null;
         } break;
       case 'harvest':
-        if (task.timer > 20) {
+        if (task.timer > 8) {
           is.harvest = (is.harvest||0) + 3;
           let p = is.plots ? is.plots.find(p => p.stage==='ready' && Math.abs(p.x-task.target.x)<20) : null;
           if (p) { p.stage = 'empty'; p.crop = null; }
@@ -328,13 +302,13 @@ const BotAI = {
           bot.task = null;
         } break;
       case 'plant':
-        if (task.timer > 18) {
+        if (task.timer > 8) {
           let p = is.plots ? is.plots.find(p => !p.crop && Math.abs(p.x-task.target.x)<20) : null;
           if (p) { p.crop = 'grain'; p.stage = 'growing'; p.growTimer = 0; }
           bot.task = null;
         } break;
       case 'expand':
-        if (task.timer > 50) {
+        if (task.timer > 22) {
           // REAL expansion via state swap -- placeEraBuildings handles building layout
           if (typeof swapToIsland === 'function') {
             swapToIsland(is, nation.isleX, nation.isleY);
@@ -375,7 +349,7 @@ const BotAI = {
           bot.task = null;
         } break;
       case 'recruit':
-        if (task.timer > 30) {
+        if (task.timer > 12) {
           // Use REAL trainUnit() via state swap
           if (typeof swapToIsland === 'function' && typeof trainUnit === 'function') {
             swapToIsland(is, nation.isleX, nation.isleY);
@@ -413,13 +387,13 @@ const BotAI = {
         break;
       case 'counter_attack':
         // Warning at 20 frames (halfway through preparation)
-        if (task.timer > 20 && !task._warned) {
+        if (task.timer > 8 && !task._warned) {
           task._warned = true;
           let _wName = typeof getNationName === 'function' ? getNationName(nationKey) : nationKey;
           if (typeof addNotification === 'function') addNotification(_wName + ' is mustering forces for an attack!', '#ff8844');
           if (typeof snd !== 'undefined' && snd && snd.playSFX) snd.playSFX('war_horn');
         }
-        if (task.timer > 40) {
+        if (task.timer > 8) {
           // Launch raid on player using existing nation raid system
           if (typeof startNationRaid === 'function' && nation.raidParty && nation.raidParty.length === 0) {
             startNationRaid(nationKey);
@@ -432,7 +406,7 @@ const BotAI = {
           bot.task = null;
         } break;
       case 'trade':
-        if (task.timer > 25) {
+        if (task.timer > 10) {
           let tradeGold = 3 + Math.floor((is.islandLevel || 1) * 0.5);
           is.gold = (is.gold || 0) + tradeGold;
           nation.gold = (nation.gold || 0) + tradeGold;
@@ -444,7 +418,7 @@ const BotAI = {
           bot.task = null;
         } break;
       case 'replant':
-        if (task.timer > 30) {
+        if (task.timer > 12) {
           is.wood = Math.max(0, (is.wood || 0) - 5);
           let a = Math.random() * Math.PI * 2, r = Math.random() * 0.3 + 0.2;
           let cx = nation.isleX, cy = nation.isleY;
@@ -453,7 +427,7 @@ const BotAI = {
           bot.task = null;
         } break;
       case 'tend_crops':
-        if (task.timer > 20) {
+        if (task.timer > 8) {
           if (is.plots) {
             for (let p of is.plots) {
               if (p.crop && p.stage === 'growing') {
@@ -465,7 +439,7 @@ const BotAI = {
           bot.task = null;
         } break;
       case 'build':
-        if (task.timer > 35) {
+        if (task.timer > 15) {
           // Use REAL placeBuildingChecked() via state swap
           let _bType = 'wall';
           if (!is.buildings.some(b => b.type === 'watchtower')) _bType = 'watchtower';
