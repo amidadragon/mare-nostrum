@@ -134,6 +134,8 @@ const BotAI = {
         if (task.timer > 35) {
           is.wood = (is.wood||0) + 3;
           if (is.trees) { let i = is.trees.findIndex(t => Math.abs(t.x-task.target.x)<20 && Math.abs(t.y-task.target.y)<20); if (i>=0) is.trees.splice(i,1); }
+          if (typeof addFloatingText === 'function') addFloatingText(w2sX(bot.x), w2sY(bot.y) - 20, '+3 wood', '#cc8844');
+          if (typeof spawnParticles === 'function') spawnParticles(bot.x, bot.y, 'burst', 3);
           bot.task = null;
         } break;
       case 'mine_crystal':
@@ -141,15 +143,21 @@ const BotAI = {
           is.crystals = (is.crystals||0) + 3;
           let n = is.crystalNodes ? is.crystalNodes.find(n => Math.abs(n.x-task.target.x)<20 && Math.abs(n.y-task.target.y)<20 && (n.charge||0)>0) : null;
           if (n) n.charge = Math.max(0, (n.charge||0)-20);
+          if (typeof addFloatingText === 'function') addFloatingText(w2sX(bot.x), w2sY(bot.y) - 20, '+3 crystals', '#66ccdd');
           bot.task = null;
         } break;
       case 'mine_stone':
-        if (task.timer > 40) { is.stone = (is.stone||0) + 2; bot.task = null; } break;
+        if (task.timer > 40) {
+          is.stone = (is.stone||0) + 2;
+          if (typeof addFloatingText === 'function') addFloatingText(w2sX(bot.x), w2sY(bot.y) - 20, '+2 stone', '#aaaaaa');
+          bot.task = null;
+        } break;
       case 'harvest':
         if (task.timer > 20) {
           is.harvest = (is.harvest||0) + 3;
           let p = is.plots ? is.plots.find(p => p.stage==='ready' && Math.abs(p.x-task.target.x)<20) : null;
           if (p) { p.stage = 'empty'; p.crop = null; }
+          if (typeof addFloatingText === 'function') addFloatingText(w2sX(bot.x), w2sY(bot.y) - 20, '+3 harvest', '#88cc44');
           bot.task = null;
         } break;
       case 'plant':
