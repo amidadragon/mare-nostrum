@@ -100,16 +100,21 @@ const BotAI = {
         nation.population = is.citizens.length;
       }
     }
-    // Passive income: small gold trickle from population
-    if (is && is.citizens && is.citizens.length > 0 && Math.random() < 0.005) {
+    // Passive income: gold trickle from population (faster in 1v1)
+    let _incomeRate = (state._gameMode === '1v1') ? 0.01 : 0.005;
+    if (is && is.citizens && is.citizens.length > 0 && Math.random() < _incomeRate) {
       nation.islandState.gold = (nation.islandState.gold || 0) + 1;
       nation.gold = (nation.gold || 0) + 1;
     }
+    // Faster AI in 1v1 mode (cooldown 8 vs 20)
+    let _cd = (state._gameMode === '1v1') ? 8 : 20;
     bot.taskCooldown = Math.max(0, (bot.taskCooldown || 0) - dt);
     if (!bot.task && bot.taskCooldown <= 0) {
       let actions = this.scoreActions(nationKey);
-      bot.task = this.createTask(actions[0].type, nationKey, nation);
-      bot.taskCooldown = 20;
+      // In 1v1, sometimes pick 2nd best action for variety
+      let pick = (state._gameMode === '1v1' && actions.length > 1 && Math.random() < 0.2) ? 1 : 0;
+      bot.task = this.createTask(actions[pick].type, nationKey, nation);
+      bot.taskCooldown = _cd;
     }
     if (bot.task) this.executeTask(nationKey, bot, nation, dt);
 
