@@ -1543,10 +1543,10 @@ function drawIsland() {
   // Rocky shoreline detail — stones along the coast
   drawShoreline(ix, iy, iw, ih);
 
-  // Edge warning glow when player is near deep water (skip when rowing)
+  // Edge warning glow -- only on HOME island (skip when on other islands, swimming, rowing)
   let playerEdge = islandEdgeDist(state.player.x, state.player.y);
-  let isSwimming = typeof isNearAnyIsland === 'function' && isNearAnyIsland(state.player.x, state.player.y) && !isOnIsland(state.player.x, state.player.y);
-  if (!state.rowing.active && !(state.diving && state.diving.active) && !isSwimming && playerEdge > 0.05 && !isOnBridge(state.player.x, state.player.y) && !isInShallows(state.player.x, state.player.y)) {
+  let _onHome = typeof _currentIsland !== 'undefined' && _currentIsland === 'home';
+  if (_onHome && !state.rowing.active && !(state.diving && state.diving.active) && playerEdge > 0.05 && !isOnBridge(state.player.x, state.player.y) && !isInShallows(state.player.x, state.player.y)) {
     let warn = map(playerEdge, 0.05, 0.15, 0, 1);
     noFill();
     stroke(255, 60, 40, 80 * warn);

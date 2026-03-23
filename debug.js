@@ -199,6 +199,38 @@ const Debug = {
           setTimeout(() => location.reload(), 500);
           break;
 
+        case '/invade':
+          // Force-start invasion on first bot island
+          if (state.nations) {
+            let targetKey = Object.keys(state.nations)[0];
+            if (targetKey && typeof startInvasion === 'function') {
+              // Give player some soldiers if none
+              if (!state.legia.army || state.legia.army.length === 0) {
+                for (let i = 0; i < 8; i++) state.legia.army.push({ type: 'legionary', hp: 20, maxHp: 20, damage: 5, speed: 1.2, garrison: false });
+                state.legia.castrumLevel = Math.max(state.legia.castrumLevel, 1);
+              }
+              startInvasion(targetKey);
+              this.addLog('INVASION STARTED on ' + targetKey + '!', '#ff4444');
+              // Teleport player to bot island to watch
+              let n = state.nations[targetKey];
+              state.player.x = n.isleX;
+              state.player.y = n.isleY + 100;
+              cam.x = state.player.x; cam.y = state.player.y;
+              camSmooth.x = cam.x; camSmooth.y = cam.y;
+            } else {
+              this.addLog('No nations to invade', '#ff8888');
+            }
+          }
+          break;
+
+        case '/army':
+          // Give player 10 soldiers instantly
+          if (!state.legia) state.legia = { army: [], castrumLevel: 1, morale: 100 };
+          for (let i = 0; i < 10; i++) state.legia.army.push({ type: 'legionary', hp: 20, maxHp: 20, damage: 5, speed: 1.2, garrison: false });
+          state.legia.castrumLevel = Math.max(state.legia.castrumLevel || 0, 1);
+          this.addLog('10 soldiers recruited!', '#88ff88');
+          break;
+
         case '/home':
           state.player.x = WORLD.islandCX;
           state.player.y = WORLD.islandCY;
