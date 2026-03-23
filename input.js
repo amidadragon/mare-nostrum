@@ -1415,15 +1415,17 @@ function keyPressed() {
         return;
       }
       if (state.nations && state.nations[r.nearIsle]) {
-        // Seamless disembark — don't teleport, just step onto the island
+        // Dock at nation island — enter foreign island visit mode
         let _nv = state.nations[r.nearIsle];
         state.rowing.active = false;
+        state._activeNation = r.nearIsle; // Mark as visiting foreign island
         let _dockAng = atan2(r.y - _nv.isleY, r.x - _nv.isleX);
         state.player.x = _nv.isleX + cos(_dockAng) * _nv.isleRX * 0.6;
         state.player.y = _nv.isleY + sin(_dockAng) * _nv.isleRY * 0.6;
         state.player.vx = 0; state.player.vy = 0;
         cam.x = state.player.x; cam.y = state.player.y;
         _startCamTransition(); camZoomTarget = 1.0;
+        addNotification('Arrived at ' + (typeof getNationName === 'function' ? getNationName(r.nearIsle) : r.nearIsle), '#aaddff');
         // Set invasion target if player has army
         if (state.legia && state.legia.army && state.legia.army.length > 0 && !_nv.defeated && !_nv.vassal) {
           state._invasionTarget = r.nearIsle;
@@ -1444,6 +1446,26 @@ function keyPressed() {
     if (typeof openShipyard === 'function' && !state.rowing.active) {
       let _syB = (state.buildings || []).find(b => b.type === 'shipyard' && dist(state.player.x, state.player.y, b.x, b.y) < 60);
       if (_syB) { openShipyard(); return; }
+    }
+    // Board boat from nation island — E at island edge to re-embark
+    if (state._activeNation && state.nations[state._activeNation]) {
+      let _anv = state.nations[state._activeNation];
+      let _edx = (state.player.x - _anv.isleX) / (_anv.isleRX || 400);
+      let _edy = (state.player.y - _anv.isleY) / (_anv.isleRY || 280);
+      let _edist = _edx * _edx + _edy * _edy;
+      if (_edist > 0.5) { // near edge of island
+        state.rowing.active = true;
+        state.rowing.x = state.player.x;
+        state.rowing.y = state.player.y;
+        state.rowing.angle = atan2(state.player.y - _anv.isleY, state.player.x - _anv.isleX);
+        state.rowing.speed = 0;
+        state.rowing.oarPhase = 0;
+        state.rowing.wakeTrail = [];
+        state._activeNation = null;
+        state._invasionTarget = null;
+        addFloatingText(width / 2, height * 0.35, 'Setting sail!', C.solarBright);
+        return;
+      }
     }
     // Check if near rowboat at pier (pier extends left from port) — gate behind villa
     let _canBoard = !state.progression.gameStarted || state.progression.villaCleared;
