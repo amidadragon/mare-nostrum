@@ -887,6 +887,9 @@ function getEraPalette() {
 
 // ─── STATE ────────────────────────────────────────────────────────────────
 let state;
+let _botWorker = null;
+let _botWorkerResults = {};
+let _botWorkerReady = false;
 let cam = { x: 600, y: 400 };
 let camSmooth = { x: 600, y: 400 };
 let camZoom = 1.0;
@@ -3446,10 +3449,42 @@ function drawInner() {
     if (typeof updateDiving === 'function') updateDiving(dt);
     if (typeof updateInvasion === 'function') updateInvasion(dt);
     updateRivalRaid(dt);
-    // Update bot AI characters
-    if (typeof BotAI !== 'undefined') {
+    // Update bot AI characters — offloaded to Web Worker
+    if (_botWorker && _botWorkerReady && frameCount % 30 === 0) {
+      let _snap = {};
       for (let k of Object.keys(state.nations || {})) {
-        if (state.nations[k].isBot) BotAI.update(k, dt);
+        let n = state.nations[k];
+        if (!n.isBot || !n.islandState) continue;
+        let is = n.islandState;
+        let underAttack = state.invasion && state.invasion.active && state.invasion.target === k;
+        let atkPos = null;
+        if (underAttack && state.invasion.attackers) {
+          let a = state.invasion.attackers.find(function(a) { return a.hp > 0; });
+          if (a) atkPos = { x: a.x, y: a.y };
+        }
+        _snap[k] = {
+          isleX: n.isleX, isleY: n.isleY,
+          islandRX: is.islandRX || 500, islandRY: is.islandRY || 320,
+          islandLevel: is.islandLevel || 1,
+          wood: is.wood || 0, stone: is.stone || 0, gold: is.gold || 0,
+          crystals: is.crystals || 0,
+          trees: is.trees ? is.trees.map(function(t) { return {x:t.x,y:t.y,type:t.type,hp:t.hp}; }) : [],
+          crystalNodes: is.crystalNodes ? is.crystalNodes.map(function(n) { return {x:n.x,y:n.y,charge:n.charge,size:n.size}; }) : [],
+          plots: is.plots ? is.plots.map(function(p) { return {x:p.x,y:p.y,crop:p.crop,stage:p.stage}; }) : [],
+          buildings: is.buildings ? is.buildings.map(function(b) { return {x:b.x,y:b.y,type:b.type}; }) : [],
+          legia: is.legia ? { army: is.legia.army ? is.legia.army.map(function(u) { return {type:u.type}; }) : [] } : null,
+          defeated: n.defeated || false,
+          _underAttack: underAttack || false,
+          _attackerPos: atkPos
+        };
+      }
+      _botWorker.postMessage({ type: 'update', nations: _snap, dt: 1 });
+    } else if (!_botWorker) {
+      // Fallback: run on main thread if Worker not available
+      if (typeof BotAI !== 'undefined') {
+        for (let k of Object.keys(state.nations || {})) {
+          if (state.nations[k].isBot) BotAI.update(k, dt);
+        }
       }
     }
     updateSeaPeopleRaid(dt);
@@ -3648,13 +3683,24 @@ function drawInner() {
             else { fill(140,100,60); ellipse(0,0,9,6); fill(120,80,40); ellipse(-5,-1,4,4); }
             pop();
           }
-          // Bot AI: create, update, and draw
+          // Bot AI: create and draw (update runs in Web Worker)
           if (typeof BotAI !== 'undefined') {
             if (!BotAI.bots[_owKey]) BotAI.create(_owKey, botCX, botCY);
             let _bot = BotAI.bots[_owKey];
             if (_bot && Math.abs(_bot.x - botCX) > 1000) { _bot.x = botCX; _bot.y = botCY; }
             _own.isBot = true;
-            BotAI.update(_owKey, 1);
+            // Sync position from worker results
+            if (_botWorkerResults[_owKey]) {
+              let wr = _botWorkerResults[_owKey];
+              _bot.x = wr.x; _bot.y = wr.y;
+              _bot.facing = wr.facing; _bot.moving = wr.moving;
+              _bot.walkFrame = wr.walkFrame;
+              if (!_bot.task) _bot.task = wr.taskType ? { type: wr.taskType } : null;
+              else if (wr.taskType) _bot.task.type = wr.taskType;
+              else _bot.task = null;
+            } else if (!_botWorker) {
+              BotAI.update(_owKey, 1);
+            }
             BotAI.draw(_owKey);
           }
         }
@@ -8990,6 +9036,8 @@ function selectFaction(faction) {
       BotAI.create(k, cx, cy);
     }
   }
+  // Initialize bot Web Worker
+  initBotWorker();
   // Initialize personal rival
   initPersonalRival(faction);
   // ALL factions: skip wreck, spawn directly on home island
@@ -18116,6 +18164,118 @@ function createPrebuiltIsland(factionKey, cx, cy, targetLevel) {
   is.harvest = 20; is.fish = 10;
 
   return is;
+}
+
+// ─── BOT WEB WORKER ───────────────────────────────────────────────────────
+function initBotWorker() {
+  if (typeof Worker === 'undefined') return;
+  try {
+    _botWorker = new Worker('bot_worker.js');
+    _botWorker.onmessage = function(e) {
+      if (e.data.type === 'ready') {
+        _botWorkerReady = true;
+      }
+      if (e.data.type === 'result') {
+        _botWorkerResults = e.data.bots;
+        if (e.data.mutations) {
+          for (let m of e.data.mutations) applyBotMutation(m);
+        }
+      }
+    };
+    _botWorker.onerror = function(err) {
+      console.warn('Bot worker error, falling back to main thread:', err.message);
+      _botWorker = null;
+      _botWorkerReady = false;
+    };
+    // Send init with nation positions
+    let initData = {};
+    for (let k of Object.keys(state.nations || {})) {
+      let n = state.nations[k];
+      if (n.isBot) initData[k] = { isleX: n.isleX, isleY: n.isleY };
+    }
+    _botWorker.postMessage({ type: 'init', nations: initData });
+  } catch(e) {
+    console.warn('Failed to create bot worker:', e);
+    _botWorker = null;
+  }
+}
+
+function applyBotMutation(m) {
+  let nation = state.nations[m.nation];
+  if (!nation || !nation.islandState) return;
+  let is = nation.islandState;
+  switch (m.type) {
+    case 'chop':
+      is.wood = (is.wood || 0) + (m.woodGain || 3);
+      if (is.trees && m.target) {
+        let i = is.trees.findIndex(function(t) { return Math.abs(t.x - m.target.x) < 20 && Math.abs(t.y - m.target.y) < 20; });
+        if (i >= 0) is.trees.splice(i, 1);
+      }
+      break;
+    case 'mine_crystal':
+      is.crystals = (is.crystals || 0) + (m.crystalGain || 3);
+      if (is.crystalNodes && m.target) {
+        let n = is.crystalNodes.find(function(nd) { return Math.abs(nd.x - m.target.x) < 20 && Math.abs(nd.y - m.target.y) < 20 && (nd.charge || 0) > 0; });
+        if (n) n.charge = Math.max(0, (n.charge || 0) - (m.chargeDrain || 20));
+      }
+      break;
+    case 'mine_stone':
+      is.stone = (is.stone || 0) + (m.stoneGain || 2);
+      break;
+    case 'harvest':
+      is.harvest = (is.harvest || 0) + (m.harvestGain || 3);
+      if (is.plots && m.target) {
+        let p = is.plots.find(function(pl) { return pl.stage === 'ready' && Math.abs(pl.x - m.target.x) < 20; });
+        if (p) { p.stage = 'empty'; p.crop = null; }
+      }
+      break;
+    case 'plant':
+      if (is.plots && m.target) {
+        let p = is.plots.find(function(pl) { return !pl.crop && Math.abs(pl.x - m.target.x) < 20; });
+        if (p) { p.crop = 'grain'; p.stage = 'growing'; p.growTimer = 0; }
+      }
+      break;
+    case 'expand':
+      if (typeof swapToIsland === 'function') {
+        swapToIsland(is, nation.isleX, nation.isleY);
+        let cost = 5 + (state.islandLevel || 1) * 8;
+        if ((state.crystals || 0) >= cost) {
+          state.crystals -= cost;
+          state.islandLevel = (state.islandLevel || 1) + 1;
+          state.islandRX = (state.islandRX || 500) + 30;
+          state.islandRY = (state.islandRY || 320) + 20;
+          if (typeof placeEraBuildings === 'function') placeEraBuildings(state.islandLevel);
+          if (!state.trees) state.trees = [];
+          for (let i = 0; i < 3; i++) {
+            let a = Math.random() * Math.PI * 2, r = Math.random() * 0.3 + 0.4;
+            state.trees.push({ x: nation.isleX + Math.cos(a) * state.islandRX * r * 0.7, y: nation.isleY + Math.sin(a) * state.islandRY * r * 0.3, type: 'oak', hp: 3 });
+          }
+        }
+        swapBack();
+      }
+      break;
+    case 'recruit':
+      if ((is.gold || 0) >= 10) {
+        is.gold -= 10;
+        if (!is.legia) is.legia = { army: [], castrumLevel: 1, morale: 100 };
+        if (!is.legia.army) is.legia.army = [];
+        is.legia.army.push({ type: 'legionary', hp: 20, maxHp: 20, damage: 5, speed: 1.2, garrison: false });
+        is.legia.castrumLevel = Math.max(is.legia.castrumLevel || 0, 1);
+      }
+      break;
+    case 'defend_hit':
+      if (state.invasion && state.invasion.active && state.invasion.target === m.nation) {
+        let atk = state.invasion.attackers ? state.invasion.attackers.find(function(a) { return a.hp > 0; }) : null;
+        if (atk) {
+          atk.hp -= (m.damage || 8);
+          if (typeof addFloatingText === 'function' && typeof w2sX === 'function') {
+            addFloatingText(w2sX(atk.x), w2sY(atk.y) - 15, '-' + (m.damage || 8), '#ff8800');
+          }
+          if (atk.hp <= 0) { atk.state = 'dead'; atk.deathTimer = 0; }
+        }
+      }
+      break;
+  }
 }
 
 function swapToIsland(islandState, cx, cy) {
