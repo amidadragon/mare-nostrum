@@ -8917,6 +8917,12 @@ function selectFaction(faction) {
   if (snd && snd.playNarration) snd.playNarration(faction + '_intro');
   // Initialize all rival nations (everyone except player's faction)
   initNations();
+  // Place first bot island nearby (east of home) -- others stay at default positions for now
+  let _nationKeys = Object.keys(state.nations);
+  if (_nationKeys.length > 0) {
+    state.nations[_nationKeys[0]].isleX = WORLD.islandCX + 1200;
+    state.nations[_nationKeys[0]].isleY = WORLD.islandCY;
+  }
   // Create per-island state for each bot nation with starter buildings
   for (let k of Object.keys(state.nations)) {
     let is = createIslandState(k);
