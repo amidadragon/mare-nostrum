@@ -256,6 +256,13 @@ const BotAI = {
         } else { bot.task = null; }
         break;
       case 'counter_attack':
+        // Warning at 20 frames (halfway through preparation)
+        if (task.timer > 20 && !task._warned) {
+          task._warned = true;
+          let _wName = typeof getNationName === 'function' ? getNationName(nationKey) : nationKey;
+          if (typeof addNotification === 'function') addNotification(_wName + ' is mustering forces for an attack!', '#ff8844');
+          if (typeof snd !== 'undefined' && snd && snd.playSFX) snd.playSFX('war_horn');
+        }
         if (task.timer > 40) {
           // Launch raid on player using existing nation raid system
           if (typeof startNationRaid === 'function' && nation.raidParty && nation.raidParty.length === 0) {
