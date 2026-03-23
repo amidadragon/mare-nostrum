@@ -3584,17 +3584,24 @@ function drawInner() {
             drawWorldObjectsSorted();
             swapBack();
           }
-          // Draw bot AI character (auto-create if missing)
+          // Bot AI: create, update, and draw
           if (typeof BotAI !== 'undefined') {
+            // Auto-create if missing
             if (!BotAI.bots[_owKey]) {
               BotAI.create(_owKey, botCX, botCY);
               BotAI.initIslandResources(_owKey);
             }
-            // Make sure bot is on the correct island position
-            if (BotAI.bots[_owKey] && Math.abs(BotAI.bots[_owKey].x - botCX) > 1000) {
-              BotAI.bots[_owKey].x = botCX;
-              BotAI.bots[_owKey].y = botCY;
+            // Fix position if too far from island
+            let _bot = BotAI.bots[_owKey];
+            if (_bot && Math.abs(_bot.x - botCX) > 1000) {
+              _bot.x = botCX;
+              _bot.y = botCY;
             }
+            // Ensure isBot flag
+            _own.isBot = true;
+            // Update bot AI every frame (runs here to guarantee it fires when visible)
+            BotAI.update(_owKey, 1);
+            // Draw bot character
             BotAI.draw(_owKey);
           }
         }

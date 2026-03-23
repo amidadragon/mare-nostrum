@@ -14,7 +14,7 @@ const BotAI = {
       moving: false,
       task: null,        // current task: {type, target:{x,y}, timer, data}
       taskCooldown: 0,   // frames before picking next task
-      speed: 1.5,
+      speed: 3.0,
       faction: nationKey,
       // Walk animation
       walkFrame: 0,
