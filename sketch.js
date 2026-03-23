@@ -3583,6 +3583,13 @@ function drawInner() {
           drawIslandAt({ cx: botCX, cy: botCY, rx: _isRX, ry: _isRY, level: _own.islandState ? _own.islandState.islandLevel : (_own.level || 1), seed: _owt.seed, factionKey: _owKey });
           // Draw bot buildings + citizens via state swap
           if (_own.islandState) {
+            // Fix any buildings placed at wrong coordinates (before offset fix)
+            let _bfix = _own.islandState.buildings;
+            if (_bfix && _bfix.length > 0 && Math.abs(_bfix[0].x - botCX) > 800) {
+              // Buildings are at home island coords -- relocate them
+              let dx = botCX - 600, dy = botCY - 400;
+              for (let b of _bfix) { b.x += dx; b.y += dy; }
+            }
             swapToIsland(_own.islandState, botCX, botCY);
             if (state.buildings && state.buildings.length > 0) drawWorldObjectsSorted();
             // Draw citizens on bot island
