@@ -34,5 +34,23 @@
     "files": ["bot.js", "combat.js"],
     "tests": "23/23",
     "timestamp": "2026-03-23T06:35:00Z"
+  },
+  {
+    "cycle": 5,
+    "card": "combined",
+    "title": "Bot island market clutter + nation name label",
+    "result": "pass",
+    "files": ["sketch.js"],
+    "tests": "23/23",
+    "timestamp": "2026-03-23T06:40:00Z"
+  },
+  {
+    "cycle": 6,
+    "card": "69c0d4659f9db175d946e4ed",
+    "title": "Fix crash risks in economy, NPC, save",
+    "result": "pass",
+    "files": ["economy.js", "npc.js", "save.js"],
+    "tests": "23/23",
+    "timestamp": "2026-03-23T06:50:00Z"
   }
 ]
