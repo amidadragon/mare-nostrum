@@ -3581,30 +3581,34 @@ function drawInner() {
           let _isRX = _own.islandState ? _own.islandState.islandRX || 400 : 400;
           let _isRY = _own.islandState ? _own.islandState.islandRY || 260 : 260;
           drawIslandAt({ cx: botCX, cy: botCY, rx: _isRX, ry: _isRY, level: _own.islandState ? _own.islandState.islandLevel : (_own.level || 1), seed: _owt.seed, factionKey: _owKey });
-          // Draw bot buildings via state swap
-          if (_own.islandState && _own.islandState.buildings.length > 0) {
+          // Draw bot buildings + citizens via state swap
+          if (_own.islandState) {
             swapToIsland(_own.islandState, botCX, botCY);
-            drawWorldObjectsSorted();
+            if (state.buildings && state.buildings.length > 0) drawWorldObjectsSorted();
+            // Draw citizens on bot island
+            if (state.citizens) {
+              for (let _ci = 0; _ci < state.citizens.length; _ci++) {
+                let c = state.citizens[_ci];
+                let csx = w2sX(c.x), csy = w2sY(c.y);
+                if (csx < -30 || csx > width + 30) continue;
+                push(); noStroke();
+                fill(0,0,0,20); ellipse(csx, csy+6, 8, 4);
+                fill(c.tunicR||140, c.tunicG||100, c.tunicB||70);
+                rect(csx-3, csy-6, 6, 8, 1);
+                fill(210,180,150);
+                rect(csx-2, csy-10, 5, 5, 1);
+                pop();
+              }
+            }
             swapBack();
           }
           // Bot AI: create, update, and draw
           if (typeof BotAI !== 'undefined') {
-            // Auto-create if missing
-            if (!BotAI.bots[_owKey]) {
-              BotAI.create(_owKey, botCX, botCY);
-              BotAI.initIslandResources(_owKey);
-            }
-            // Fix position if too far from island
+            if (!BotAI.bots[_owKey]) BotAI.create(_owKey, botCX, botCY);
             let _bot = BotAI.bots[_owKey];
-            if (_bot && Math.abs(_bot.x - botCX) > 1000) {
-              _bot.x = botCX;
-              _bot.y = botCY;
-            }
-            // Ensure isBot flag
+            if (_bot && Math.abs(_bot.x - botCX) > 1000) { _bot.x = botCX; _bot.y = botCY; }
             _own.isBot = true;
-            // Update bot AI every frame (runs here to guarantee it fires when visible)
             BotAI.update(_owKey, 1);
-            // Draw bot character
             BotAI.draw(_owKey);
           }
         }
@@ -8927,33 +8931,39 @@ function selectFaction(faction) {
     state.nations[_nationKeys[0]].isleX = WORLD.islandCX + 1200;
     state.nations[_nationKeys[0]].isleY = WORLD.islandCY;
   }
-  // Create per-island state for each bot nation with starter buildings
+  // Create per-island state for each bot nation -- clean level-1 start
   for (let k of Object.keys(state.nations)) {
-    let is = createIslandState(k);
     let n = state.nations[k];
+    let is = createIslandState(k);
     let cx = n.isleX, cy = n.isleY;
-    // TEMPLE -- every island must have one (center-north)
-    is.buildings.push({ type: 'temple', x: cx, y: cy - (is.islandRY || 320) * 0.15, w: 70, h: 50, hp: 100, built: true, isTemple: true });
-    // CASTRUM -- military building (center-east)
-    is.buildings.push({ type: 'castrum', x: cx + (is.islandRX || 500) * 0.3, y: cy, w: 60, h: 50, hp: 100, built: true });
-    // Place 8 more starter buildings (houses, market, etc.)
-    let bpKeys = Object.keys(BLUEPRINTS).filter(bk => (BLUEPRINTS[bk].minLevel || 1) <= 5 && bk !== 'temple' && bk !== 'castrum');
-    for (let i = 0; i < 8; i++) {
-      let bk = bpKeys[floor(random(bpKeys.length))];
-      let bp = BLUEPRINTS[bk];
-      let ang = random(TWO_PI), rd = random(0.2, 0.5);
-      let bx = cx + cos(ang) * (is.islandRX || 500) * rd * 0.8;
-      let by = cy + sin(ang) * (is.islandRY || 320) * rd * 0.35;
-      is.buildings.push({ type: bk, x: bx, y: by, w: bp.w || 40, h: bp.h || 40, hp: 100, built: true });
+    let rx = is.islandRX, ry = is.islandRY;
+    // Crystal shrine (west side, same as player)
+    is.crystalNodes = [];
+    for (let i = 0; i < 5; i++) {
+      is.crystalNodes.push({ x: cx - rx * 0.7 + random(-20, 20), y: cy + random(-15, 15), charge: 50, size: 14 });
     }
-    // Give bot a military force
-    n.military = 5 + floor(random(3));
-    is.islandLevel = 3;
+    // Trees (scattered)
+    is.trees = [];
+    for (let i = 0; i < 12; i++) {
+      let a = random(TWO_PI), r = random(0.2, 0.65);
+      is.trees.push({ x: cx + cos(a) * rx * r * 0.8, y: cy + sin(a) * ry * r * 0.35, type: random(['oak','pine','palm']), hp: 3 });
+    }
+    // Farm plots (left side)
+    is.plots = [];
+    for (let i = 0; i < 6; i++) {
+      is.plots.push({ x: cx - rx * 0.4 + (i % 3) * 28, y: cy - ry * 0.05 + floor(i / 3) * 28, crop: null, stage: 'empty', growTimer: 0 });
+    }
+    // NO starter buildings -- bot builds them through gameplay
+    is.buildings = [];
+    is.islandLevel = 1;
+    is.templeHP = 100;
     n.islandState = is;
-    // Create bot AI character on this island
+    n.isBot = true;
+    n.botDifficulty = 'normal';
+    n.military = 0;
+    // Create bot AI character
     if (typeof BotAI !== 'undefined') {
-      BotAI.create(k, n.isleX, n.isleY);
-      BotAI.initIslandResources(k);
+      BotAI.create(k, cx, cy);
     }
   }
   // Initialize personal rival
@@ -17957,13 +17967,26 @@ const _islandFields = [
 function createIslandState(faction) {
   return {
     faction: faction,
-    buildings: [], plots: [], citizens: [], trees: [], crystalNodes: [],
-    islandLevel: 3, islandRX: 500, islandRY: 320,
+    islandLevel: 1, islandRX: 500, islandRY: 320,
+    buildings: [], plots: [], trees: [], crystalNodes: [], citizens: [],
+    // Resources (same starting amounts as player)
     wood: 10, stone: 5, gold: 10, crystals: 5,
-    ironOre: 0, harvest: 5, fish: 2, seeds: 3,
+    ironOre: 0, harvest: 5, fish: 2,
+    seeds: 3, grapeSeeds: 0, oliveSeeds: 0,
     meals: 0, wine: 0, oil: 0,
+    // Military
+    legia: { army: [], castrumLevel: 0, morale: 100, recruits: 0, maxRecruits: 10 },
+    // Temple
     templeHP: 100, templeMaxHP: 100,
+    // NPCs
+    npc: { hearts: 0 }, marcus: { hearts: 0 }, vesta: { hearts: 0 }, felix: { hearts: 0 },
     npcNames: FACTIONS[faction] ? FACTIONS[faction].npcNames : null,
+    // Workers
+    quarrier: null, cutter: null, fisher: null,
+    // Progression
+    foodShortage: 0, day: 1,
+    // Port
+    portLeft: null, portRight: null,
   };
 }
 

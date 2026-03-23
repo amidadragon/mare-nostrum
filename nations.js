@@ -384,8 +384,7 @@ function updateNationDaily(key) {
     }
   }
 
-  // --- ISLAND STATE TICK (bot builds real buildings via state swap) ---
-  // Auto-create islandState if missing (loaded save or not initialized)
+  // --- ISLAND STATE TICK (real game systems via state swap) ---
   if (!rv.islandState && typeof createIslandState === 'function') {
     rv.islandState = createIslandState(key);
   }
@@ -393,28 +392,59 @@ function updateNationDaily(key) {
     let isCX = rv.isleX || WORLD.islandCX + 1200;
     let isCY = rv.isleY || WORLD.islandCY;
     swapToIsland(rv.islandState, isCX, isCY);
-    // Expand island sometimes
-    if (rv.islandState.islandLevel < 10 && rv.gold >= 50 && random() < 0.15) {
-      state.islandLevel++;
-      state.islandRX += 30;
-      state.islandRY += 20;
-    }
-    // Place a real building from BLUEPRINTS (cap at 20 per island)
-    // Build 2-3 buildings per day (bots build fast to populate their islands)
-    let buildCount = floor(random(2, 4));
-    for (let _bi = 0; _bi < buildCount && state.buildings.length < 20; _bi++) {
-    if (typeof BLUEPRINTS !== 'undefined') {
-      let bpKeys = Object.keys(BLUEPRINTS).filter(bk => (BLUEPRINTS[bk].minLevel || 1) <= state.islandLevel);
-      if (bpKeys.length > 0) {
-        let bk = bpKeys[floor(random(bpKeys.length))];
-        let bp = BLUEPRINTS[bk];
-        let ang = random(TWO_PI), rd = random(0.3, 0.7);
-        let bx = isCX + cos(ang) * state.islandRX * rd * 0.8;
-        let by = isCY + sin(ang) * state.islandRY * rd * 0.5;
-        state.buildings.push({ type: bk, x: bx, y: by, w: bp.w || 40, h: bp.h || 40, hp: bp.maxHp || 100, built: true });
+    // Farm growth
+    if (state.plots) {
+      for (let p of state.plots) {
+        if (p.crop && p.stage === 'growing') {
+          p.growTimer = (p.growTimer || 0) + 60;
+          if (p.growTimer > 300) p.stage = 'ready';
+        }
       }
     }
-    } // end buildCount loop
+    // Crystal recharge
+    if (state.crystalNodes) {
+      for (let cn of state.crystalNodes) {
+        if ((cn.charge || 0) < 50) cn.charge = (cn.charge || 0) + 5;
+      }
+    }
+    // Tree regrowth (1 new tree per day if < 12)
+    if (state.trees && state.trees.length < 12) {
+      let a = random(TWO_PI), r = random(0.2, 0.6);
+      let rx = state.islandRX || 500, ry = state.islandRY || 320;
+      state.trees.push({ x: isCX + cos(a) * rx * r * 0.7, y: isCY + sin(a) * ry * r * 0.3, type: 'oak', hp: 3 });
+    }
+    // Gold income from buildings
+    let goldIncome = 0;
+    if (state.buildings) {
+      for (let b of state.buildings) {
+        if (b.type === 'market' || b.type === 'marketplace') goldIncome += 2;
+        if (b.type === 'vineyard') goldIncome += 1;
+      }
+    }
+    state.gold = (state.gold || 0) + goldIncome + 3;
+    // Citizen spawning (1 per 3 buildings, max 10)
+    let targetPop = Math.min(10, Math.floor((state.buildings ? state.buildings.length : 0) / 3));
+    if (!state.citizens) state.citizens = [];
+    while (state.citizens.length < targetPop) {
+      state.citizens.push({
+        x: isCX + random(-80, 80), y: isCY + random(-30, 30),
+        speed: 0.3 + random(0.2), targetX: isCX, targetY: isCY,
+        moveTimer: 0, skin: floor(random(5)),
+        tunicR: 100 + floor(random(80)), tunicG: 80 + floor(random(60)), tunicB: 60 + floor(random(40))
+      });
+    }
+    // Update citizen positions
+    for (let c of state.citizens) {
+      c.moveTimer--;
+      if (c.moveTimer <= 0) {
+        c.targetX = isCX + random(-100, 100);
+        c.targetY = isCY + random(-40, 40);
+        c.moveTimer = 60 + floor(random(120));
+      }
+      let cdx = c.targetX - c.x, cdy = c.targetY - c.y;
+      let cd = Math.sqrt(cdx*cdx + cdy*cdy);
+      if (cd > 3) { c.x += (cdx/cd) * c.speed; c.y += (cdy/cd) * c.speed; }
+    }
     swapBack();
   }
 
