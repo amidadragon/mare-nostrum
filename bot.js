@@ -86,7 +86,7 @@ const BotAI = {
       for (let cn of nation.islandState.crystalNodes) {
         if ((cn.charge || 0) < 50) cn.charge = Math.min(50, (cn.charge || 0) + 0.3);
         // Passive crystal drip from charged nodes
-        if ((cn.charge || 0) > 20 && Math.random() < 0.005) {
+        if ((cn.charge || 0) > 10 && Math.random() < 0.008) {
           nation.islandState.crystals = (nation.islandState.crystals || 0) + 1;
         }
       }
@@ -158,7 +158,7 @@ const BotAI = {
       }
     }
     // Auto-recruit: bots train soldiers when they have castrum + gold
-    if (is && is.buildings && is.buildings.some(b => b.type === 'castrum') && Math.random() < 0.004) {
+    if (is && is.buildings && is.buildings.some(b => b.type === 'castrum') && Math.random() < 0.008) {
       let armySize = is.legia && is.legia.army ? is.legia.army.length : 0;
       let maxArmy = Math.min(10, 3 + Math.floor((is.islandLevel || 1) / 3));
       if (armySize < maxArmy && (is.gold || 0) >= 10) {
