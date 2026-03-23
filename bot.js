@@ -288,10 +288,18 @@ const BotAI = {
     switch (task.type) {
       case 'chop':
         if (task.timer > 35) {
-          is.wood = (is.wood||0) + 3;
-          if (is.trees) { let i = is.trees.findIndex(t => Math.abs(t.x-task.target.x)<20 && Math.abs(t.y-task.target.y)<20); if (i>=0) is.trees.splice(i,1); }
-          if (typeof addFloatingText === 'function') addFloatingText(w2sX(bot.x), w2sY(bot.y) - 20, '+3 wood', '#cc8844');
-          if (typeof spawnParticles === 'function') spawnParticles(bot.x, bot.y, 'burst', 3);
+          // Use REAL chopTree() via state swap
+          if (typeof swapToIsland === 'function') {
+            swapToIsland(is, nation.isleX, nation.isleY);
+            let tree = state.trees ? state.trees.find(t => Math.abs(t.x-task.target.x)<20 && Math.abs(t.y-task.target.y)<20 && t.alive) : null;
+            if (tree && typeof chopTree === 'function') { chopTree(tree); }
+            else { state.wood = (state.wood||0) + 3; } // fallback
+            swapBack();
+          } else {
+            is.wood = (is.wood||0) + 3;
+            if (is.trees) { let i = is.trees.findIndex(t => Math.abs(t.x-task.target.x)<20 && Math.abs(t.y-task.target.y)<20); if (i>=0) is.trees.splice(i,1); }
+          }
+          if (typeof addFloatingText === 'function') addFloatingText(w2sX(bot.x), w2sY(bot.y) - 20, '+wood', '#cc8844');
           bot.task = null;
         } break;
       case 'mine_crystal':
@@ -365,17 +373,25 @@ const BotAI = {
         } break;
       case 'recruit':
         if (task.timer > 30) {
-          if ((is.gold||0) >= 10) {
-            is.gold -= 10;
-            nation.gold = Math.max(0, (nation.gold || 0) - 10);
-            if (!is.legia) is.legia = { army: [], castrumLevel: 1, morale: 100 };
-            if (!is.legia.army) is.legia.army = [];
-            is.legia.army.push({ type: 'legionary', hp: 20, maxHp: 20, damage: 5, speed: 1.2, garrison: false });
-            is.legia.castrumLevel = Math.max(is.legia.castrumLevel||0, 1);
-            if (is.legia.army.length % 3 === 0 && typeof addNotification === 'function') {
-              let _name = typeof getNationName === 'function' ? getNationName(nationKey) : nationKey;
-              addNotification(_name + ' army grows to ' + is.legia.army.length + ' soldiers', '#cc8844');
+          // Use REAL trainUnit() via state swap
+          if (typeof swapToIsland === 'function' && typeof trainUnit === 'function') {
+            swapToIsland(is, nation.isleX, nation.isleY);
+            if (!state.legia) state.legia = { army: [], castrumLevel: 1, morale: 100, trainingQueue: 0, trainingTimer: 0, recruits: 0, maxRecruits: 10, castrumX: nation.isleX + 100, castrumY: nation.isleY + 50 };
+            trainUnit('legionary');
+            nation.military = state.legia.army ? state.legia.army.length : 0;
+            swapBack();
+          } else {
+            // Fallback
+            if ((is.gold||0) >= 10) {
+              is.gold -= 10; nation.gold = Math.max(0, (nation.gold || 0) - 10);
+              if (!is.legia) is.legia = { army: [], castrumLevel: 1, morale: 100 };
+              if (!is.legia.army) is.legia.army = [];
+              is.legia.army.push({ type: 'legionary', hp: 20, maxHp: 20, damage: 5, speed: 1.2, garrison: false });
             }
+          }
+          if (is.legia && is.legia.army && is.legia.army.length % 3 === 0 && typeof addNotification === 'function') {
+            let _name = typeof getNationName === 'function' ? getNationName(nationKey) : nationKey;
+            addNotification(_name + ' army grows to ' + (is.legia.army ? is.legia.army.length : 0) + ' soldiers', '#cc8844');
           }
           bot.task = null;
         } break;
@@ -447,16 +463,25 @@ const BotAI = {
         } break;
       case 'build':
         if (task.timer > 35) {
-          // Pick what to build based on what's missing
+          // Use REAL placeBuildingChecked() via state swap
           let _bType = 'wall';
           if (!is.buildings.some(b => b.type === 'watchtower')) _bType = 'watchtower';
           else if (!is.buildings.some(b => b.type === 'forge')) _bType = 'forge';
           else if (!is.buildings.some(b => b.type === 'windmill')) _bType = 'windmill';
           else _bType = ['wall', 'domus', 'well'][Math.floor(Math.random() * 3)];
           let _bw = _bType === 'wall' ? 30 : 24, _bh = _bType === 'wall' ? 8 : 20;
-          is.buildings.push({ type: _bType, x: task.target.x, y: task.target.y, w: _bw, h: _bh, hp: 100, built: true, rot: 0, buildProgress: 0 });
-          is.wood = Math.max(0, (is.wood || 0) - 10);
-          is.stone = Math.max(0, (is.stone || 0) - 5);
+          let _bld = { type: _bType, x: task.target.x, y: task.target.y, w: _bw, h: _bh, hp: 100, built: true, rot: 0, buildProgress: 0 };
+          if (typeof swapToIsland === 'function' && typeof placeBuildingChecked === 'function') {
+            swapToIsland(is, nation.isleX, nation.isleY);
+            state.wood = Math.max(0, (state.wood||0) - 10);
+            state.stone = Math.max(0, (state.stone||0) - 5);
+            placeBuildingChecked(_bld);
+            swapBack();
+          } else {
+            is.buildings.push(_bld);
+            is.wood = Math.max(0, (is.wood || 0) - 10);
+            is.stone = Math.max(0, (is.stone || 0) - 5);
+          }
           if (typeof addFloatingText === 'function') addFloatingText(w2sX(bot.x), w2sY(bot.y) - 20, 'Built ' + _bType, '#aaddff');
           if (typeof spawnParticles === 'function') spawnParticles(task.target.x, task.target.y, 'build', 5);
           bot.task = null;
