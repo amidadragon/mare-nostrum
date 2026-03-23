@@ -2786,6 +2786,7 @@ function onIslandTransition(from, to) {
   // Clear active nation when leaving any nation island
   if (state._activeNation && from && state.nations && state.nations[from]) {
     state._activeNation = null;
+    state._invasionTarget = null;
   }
   if (to === 'water' || to === from) return;
   // Seamless exploration island entry
@@ -3443,6 +3444,7 @@ function drawInner() {
     updateLegionAmbient(dt);
     if (typeof updatePlayerEscort === 'function') updatePlayerEscort(dt);
     if (typeof updateDiving === 'function') updateDiving(dt);
+    if (typeof updateInvasion === 'function') updateInvasion(dt);
     updateRivalRaid(dt);
     // Update bot AI characters
     if (typeof BotAI !== 'undefined') {
@@ -3509,6 +3511,7 @@ function drawInner() {
     drawRivalIsleDistant();
     // Seamless nation island content (when player is standing on a nation island)
     if (state._activeNation) drawActiveNationContent();
+    if (typeof drawInvasion === 'function') drawInvasion();
     // Seamless exploration island content
     if (state._activeExploration) {
       if (state._activeExploration === 'vulcan') { drawVulcanEntities(); }
@@ -3895,6 +3898,7 @@ function drawInner() {
       if (typeof drawRecipeBookUI === 'function') drawRecipeBookUI();
       drawLegiaUI();
       if (typeof drawArmyBattle === 'function') drawArmyBattle();
+      if (typeof drawInvasionHUD === 'function') drawInvasionHUD();
       drawRivalDiplomacyUI();
       if (state._activeNation && state.nationDiplomacyOpen) drawNationDiplomacyUI();
       if (state._activeExploration) {
@@ -14566,6 +14570,12 @@ function keyPressed() {
   // Seamless nation island E-key (new system)
   if (state._activeNation && !state.visitingNation) {
     if (state.nationDiplomacyOpen) { handleNationDiplomacyKey(key, keyCode); return; }
+    // Invasion E-key
+    if ((key === 'e' || key === 'E') && state._invasionTarget && typeof startInvasion === 'function') {
+      startInvasion(state._invasionTarget);
+      state._invasionTarget = null;
+      return;
+    }
     if (key === 'e' || key === 'E') { if (handleActiveNationInteract()) return; }
   }
 
@@ -15125,6 +15135,10 @@ function keyPressed() {
         state.player.vx = 0; state.player.vy = 0;
         cam.x = state.player.x; cam.y = state.player.y;
         _startCamTransition(); camZoomTarget = 1.0;
+        // Set invasion target if player has army
+        if (state.legia && state.legia.army && state.legia.army.length > 0 && !_nv.defeated && !_nv.vassal) {
+          state._invasionTarget = r.nearIsle;
+        }
         return;
       }
       // Otherwise disembark — snap player back to pier
@@ -17942,6 +17956,7 @@ function createIslandState(faction) {
     wood: 10, stone: 5, gold: 10, crystals: 5,
     ironOre: 0, harvest: 5, fish: 2, seeds: 3,
     meals: 0, wine: 0, oil: 0,
+    templeHP: 100, templeMaxHP: 100,
     npcNames: FACTIONS[faction] ? FACTIONS[faction].npcNames : null,
   };
 }
