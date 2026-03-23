@@ -1392,7 +1392,52 @@ function nationPeaceTreaty(key) {
 }
 
 function drawNationDiplomacyUI() {
-  return;
+  let key = state.nationDiplomacyOpen;
+  if (!key || !state.nations[key]) return;
+  let rv = state.nations[key];
+  let name = getNationName(key);
+
+  // Panel background
+  let pw = 280, ph = 220;
+  let px = width / 2 - pw / 2, py = height / 2 - ph / 2 - 30;
+  noStroke();
+  fill(20, 15, 10, 220); rect(px, py, pw, ph, 5);
+  stroke(160, 140, 90, 180); strokeWeight(1); noFill();
+  rect(px, py, pw, ph, 5); noStroke();
+
+  // Title
+  fill(240, 220, 170); textAlign(CENTER, TOP); textSize(14);
+  text(name + ' — Diplomacy', px + pw / 2, py + 8);
+
+  // Stats
+  textSize(9); textAlign(LEFT, TOP);
+  let sx = px + 15, sy = py + 32;
+  let rep = rv.reputation || 0;
+  let repCol = rep > 10 ? [100, 200, 100] : rep < -10 ? [220, 80, 60] : [200, 190, 140];
+  fill(repCol[0], repCol[1], repCol[2]);
+  text('Reputation: ' + rep, sx, sy);
+  fill(200, 190, 140);
+  text('Military: ' + (rv.military || 0) + '   Gold: ' + (rv.gold || 0) + '   Pop: ' + (rv.population || 0), sx, sy + 14);
+  text('Status: ' + (rv.allied ? 'ALLIED' : rv.vassal ? 'VASSAL' : rv.defeated ? 'DEFEATED' : 'Independent'), sx, sy + 28);
+
+  // Actions
+  sy += 50;
+  fill(180, 170, 140); textSize(10);
+  let actions = [
+    { key: '1', label: 'Trade (25g → +5 rep)', enabled: state.gold >= 25 },
+    { key: '2', label: 'Gift (50g → +15 rep)', enabled: state.gold >= 50 },
+    { key: '3', label: 'Propose Alliance (rep > 30)', enabled: rep > 30 && !rv.allied },
+    { key: '4', label: 'Demand Tribute (rep > 20)', enabled: rep > 20 },
+    { key: '5', label: 'Declare War', enabled: !rv.allied },
+    { key: 'E', label: 'Invade (need army)', enabled: state.legia && state.legia.army && state.legia.army.length > 0 && !rv.defeated },
+  ];
+  for (let a of actions) {
+    fill(a.enabled ? 220 : 100, a.enabled ? 210 : 90, a.enabled ? 170 : 70);
+    text('[' + a.key + '] ' + a.label, sx, sy);
+    sy += 16;
+  }
+  fill(140, 130, 110); text('[ESC] Close', sx, sy + 4);
+  textAlign(LEFT, TOP);
 }
 
 function handleNationDiplomacyKey(k, kCode) {
@@ -1404,13 +1449,10 @@ function handleNationDiplomacyKey(k, kCode) {
   if (k === '3') { nationAlly(key); return true; }
   if (k === '4') { nationDemandTribute(key); return true; }
   if (k === '5') { declareWarOnNation(key); return true; }
-  if (k === '6') { nationPeaceTreaty(key); return true; }
-  if (k === '7') {
-    if (typeof launchRaidOnNation === 'function') { closeNationDiplomacy(); launchRaidOnNation(key); }
-    return true;
-  }
-  if (k === '8') {
-    if (typeof launchInvasionOnNation === 'function') { closeNationDiplomacy(); launchInvasionOnNation(key); }
+  if (k === 'e' || k === 'E') {
+    if (state._invasionTarget && typeof startInvasion === 'function') {
+      closeNationDiplomacy(); startInvasion(state._invasionTarget); state._invasionTarget = null;
+    }
     return true;
   }
   return true;

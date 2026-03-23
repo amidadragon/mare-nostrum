@@ -818,10 +818,9 @@ function keyPressed() {
   // Seamless nation island E-key (new system)
   if (state._activeNation && !state.visitingNation) {
     if (state.nationDiplomacyOpen) { handleNationDiplomacyKey(key, keyCode); return; }
-    // Invasion E-key
-    if ((key === 'e' || key === 'E') && state._invasionTarget && typeof startInvasion === 'function') {
-      startInvasion(state._invasionTarget);
-      state._invasionTarget = null;
+    // Bot island E-key: open diplomacy panel (invasion is option inside)
+    if ((key === 'e' || key === 'E') && state._invasionTarget && typeof openNationDiplomacy === 'function') {
+      openNationDiplomacy(state._invasionTarget);
       return;
     }
     if (key === 'e' || key === 'E') { if (handleActiveNationInteract()) return; }
