@@ -3786,6 +3786,32 @@ function drawInner() {
             state.islandRX = _savedRX;
             state.islandRY = _savedRY;
           }
+          // Bot trade ship — sails around island when bot has gold income
+          if (_own.gold > 30 && _own.islandState) {
+            if (!_own.islandState._tradeShip) {
+              _own.islandState._tradeShip = { angle: 0, active: true };
+            }
+            let _ts = _own.islandState._tradeShip;
+            _ts.angle += 0.003;
+            let _tsR = _isRX * 0.65;
+            let _tsx = botCX + Math.cos(_ts.angle) * _tsR;
+            let _tsy = botCY + Math.sin(_ts.angle) * (_isRY * 0.35) + _isRY * 0.15;
+            let _tssx = w2sX(_tsx), _tssy = w2sY(_tsy);
+            if (_tssx > -30 && _tssx < width + 30) {
+              push(); translate(Math.floor(_tssx), Math.floor(_tssy)); noStroke();
+              let _tsFacing = Math.cos(_ts.angle + 0.1) < Math.cos(_ts.angle) ? -1 : 1;
+              scale(_tsFacing, 1);
+              // Hull
+              fill(120, 80, 40); rect(-8, -2, 16, 4, 1);
+              fill(100, 65, 30); rect(-6, -3, 12, 2);
+              // Sail
+              fill(230, 220, 200); rect(-1, -10, 2, 8);
+              fill(240, 235, 220, 200); rect(0, -9, 6, 5, 1);
+              // Wake
+              fill(200, 220, 240, 60); ellipse(7, 1, 4, 2);
+              pop();
+            }
+          }
           // Critter pet following bot leader
           let _critter = _own.islandState ? _own.islandState.critter : null;
           if (_critter && typeof BotAI !== 'undefined' && BotAI.bots[_owKey]) {
