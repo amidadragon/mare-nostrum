@@ -2041,6 +2041,9 @@ function updateRivalRaid(dt) { updateNationRaids(dt); }
 function drawRivalRaiders() { drawNationRaiders(); }
 function drawRivalIsleDistant() {
   if (!state.nations) return;
+  // Only show distant nation labels when traveling or visiting — not on home island
+  let _onHome = !state.rowing || !state.rowing.active;
+  if (_onHome && !state._activeNation && !state._activeExploration) return;
   let nk = Object.keys(state.nations);
   for (let k of nk) {
     let n = state.nations[k];

@@ -2555,8 +2555,11 @@ function drawInner() {
     translate(shakeX, shakeY + floatOffset);
     if (!state.rowing || !state.rowing.active || _homeDist < 300) {
       drawIsland();
-      // Open world: render first bot nation island nearby with state swap
-      if (state.nations) {
+      // Foreign islands: ONLY render when traveling (rowing) or visiting another island.
+      // Home island view is isolated — no bot/nation islands visible.
+      let _isTraveling = state.rowing && state.rowing.active;
+      let _isVisitingForeign = state._activeNation || state._activeExploration;
+      if ((_isTraveling || _isVisitingForeign) && state.nations) {
         let _owKey = Object.keys(state.nations)[0];
         if (_owKey) {
           let _own = state.nations[_owKey];
