@@ -55,6 +55,14 @@ const BotAI = {
     if (!bot) return;
     let nation = state.nations[nationKey];
     if (!nation || !nation.islandState) return;
+    // Sync nation gold to island state so bot can spend it
+    if (nation.gold > 0 && (nation.islandState.gold || 0) < nation.gold) {
+      nation.islandState.gold = nation.gold;
+    }
+    // Sync military count from island army
+    if (nation.islandState.legia && nation.islandState.legia.army) {
+      nation.military = Math.max(nation.military || 0, nation.islandState.legia.army.length);
+    }
     bot.taskCooldown = Math.max(0, (bot.taskCooldown || 0) - dt);
     if (!bot.task && bot.taskCooldown <= 0) {
       let actions = this.scoreActions(nationKey);
@@ -152,6 +160,7 @@ const BotAI = {
         if (task.timer > 30) {
           if ((is.gold||0) >= 10) {
             is.gold -= 10;
+            nation.gold = Math.max(0, (nation.gold || 0) - 10);
             if (!is.legia) is.legia = { army: [], castrumLevel: 1, morale: 100 };
             if (!is.legia.army) is.legia.army = [];
             is.legia.army.push({ type: 'legionary', hp: 20, maxHp: 20, damage: 5, speed: 1.2, garrison: false });
