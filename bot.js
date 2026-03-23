@@ -86,7 +86,7 @@ const BotAI = {
       for (let cn of nation.islandState.crystalNodes) {
         if ((cn.charge || 0) < 50) cn.charge = Math.min(50, (cn.charge || 0) + 0.3);
         // Passive crystal drip from charged nodes
-        if ((cn.charge || 0) > 30 && Math.random() < 0.002) {
+        if ((cn.charge || 0) > 20 && Math.random() < 0.005) {
           nation.islandState.crystals = (nation.islandState.crystals || 0) + 1;
         }
       }
@@ -129,7 +129,7 @@ const BotAI = {
       if (hasWindmill) is.harvest = (is.harvest || 0) + 1;
     }
     // Auto-expand: when bot has enough crystals, expand without walking
-    if (is && (is.islandLevel || 1) < 15 && Math.random() < 0.003) {
+    if (is && (is.islandLevel || 1) < 15 && Math.random() < 0.008) {
       let expandCost = 5 + (is.islandLevel || 1) * 8;
       if ((is.crystals || 0) >= expandCost && typeof swapToIsland === 'function') {
         swapToIsland(is, nation.isleX, nation.isleY);
