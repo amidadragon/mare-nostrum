@@ -173,10 +173,20 @@ const BotAI = {
               if (!state.trees) state.trees = [];
               for (let i = 0; i < 3; i++) {
                 let a = Math.random()*Math.PI*2, r = Math.random()*0.3+0.4;
-                state.trees.push({ x: nation.isleX+Math.cos(a)*state.islandRX*r*0.7, y: nation.isleY+Math.sin(a)*state.islandRY*r*0.3, type: 'oak', hp: 3 });
+                state.trees.push({ x: nation.isleX+Math.cos(a)*state.islandRX*r*0.7, y: nation.isleY+Math.sin(a)*state.islandRY*r*0.3, type: 'oak', hp: 3, alive: true, health: 3, maxHealth: 3, size: 0.4 + Math.random()*0.3, shakeTimer: 0, regrowTimer: 0 });
               }
+              // Spawn new citizens with expansion
+              if (!state.citizens) state.citizens = [];
+              let _newCitz = Math.min(3, Math.floor(state.islandLevel / 4));
+              for (let ci = 0; ci < _newCitz; ci++) {
+                state.citizens.push({ x: nation.isleX + (Math.random()-0.5)*100, y: nation.isleY + (Math.random()-0.5)*40, speed: 0.3 + Math.random()*0.2, targetX: nation.isleX, targetY: nation.isleY, moveTimer: 60, skin: Math.floor(Math.random()*5), variant: Math.floor(Math.random()*4), facing: Math.random()>0.5?1:-1, state: 'walking', walkBobPhase: Math.random()*Math.PI*2, tunicR: 100+Math.floor(Math.random()*80), tunicG: 80+Math.floor(Math.random()*60), tunicB: 60+Math.floor(Math.random()*40), activity: null, activityTimer: 0 });
+              }
+              // Update pyramid level
+              if (state.pyramid) state.pyramid.level = state.islandLevel;
+              // Construction particles
+              if (typeof spawnParticles === 'function') spawnParticles(nation.isleX, nation.isleY, 'build', 12);
               let _name = typeof getNationName === 'function' ? getNationName(nationKey) : nationKey;
-              if (typeof addNotification === 'function') addNotification(_name + ' expands to level ' + state.islandLevel + '!', '#aaddff');
+              if (typeof addNotification === 'function') addNotification(_name + ' expands to level ' + state.islandLevel + '! New buildings + ' + _newCitz + ' citizens', '#aaddff');
             }
             swapBack();
           }
