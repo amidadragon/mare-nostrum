@@ -663,6 +663,20 @@ function updateNationDaily(key) {
         addNotification(name + ' surrenders to ' + getNationName(k2) + '!', '#ffaa44');
       }
     }
+    // Peace treaty: both sides exhausted, negotiate end of war
+    if (rv.wars && rv.wars.includes(k2) && rv.military <= 2 && other.military <= 2 && random() < 0.03) {
+      rv.wars = rv.wars.filter(w => w !== k2);
+      if (other.wars) other.wars = other.wars.filter(w => w !== key);
+      rv.relations[k2] = 0; other.relations[key] = 0;
+      addNotification(name + ' and ' + getNationName(k2) + ' sign a peace treaty', '#88cc88');
+    }
+    // Trade agreement: friendly nations boost each other's economy
+    if (rel > 20 && !rv.tradeAgreements) rv.tradeAgreements = [];
+    if (rel > 20 && rv.tradeAgreements && !rv.tradeAgreements.includes(k2) && random() < 0.01) {
+      rv.tradeAgreements.push(k2);
+      rv.gold += 5; other.gold += 5;
+      if (random() < 0.3) addNotification(name + ' signs trade deal with ' + getNationName(k2), '#ddcc44');
+    }
   }
 
   // Population growth (capped by level)
