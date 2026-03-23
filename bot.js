@@ -218,6 +218,7 @@ const BotAI = {
       // In 1v1, sometimes pick 2nd best action for variety
       let pick = (state._gameMode === '1v1' && actions.length > 1 && Math.random() < 0.2) ? 1 : 0;
       bot.task = this.createTask(actions[pick].type, nationKey, nation);
+      if (!bot.task) bot.task = { type: 'patrol', target: { x: nation.isleX, y: nation.isleY }, timer: 0 };
       bot.taskCooldown = _cd;
     }
     if (bot.task) this.executeTask(nationKey, bot, nation, dt);
@@ -272,6 +273,7 @@ const BotAI = {
 
   executeTask(nationKey, bot, nation, dt) {
     let task = bot.task, is = nation.islandState;
+    if (!task || !task.target) { bot.task = null; return; }
     let dx = task.target.x - bot.x, dy = task.target.y - bot.y;
     let d = Math.sqrt(dx*dx + dy*dy);
 
