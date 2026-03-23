@@ -106,6 +106,8 @@ const BotAI = {
       nation.islandState.gold = (nation.islandState.gold || 0) + 1;
       nation.gold = (nation.gold || 0) + 1;
     }
+    // Track player level for race comparisons
+    state._realPlayerLevel = state.islandLevel;
     // Faster AI in 1v1 mode (cooldown 8 vs 20)
     let _cd = (state._gameMode === '1v1') ? 8 : 20;
     bot.taskCooldown = Math.max(0, (bot.taskCooldown || 0) - dt);
@@ -247,7 +249,14 @@ const BotAI = {
               // Construction particles
               if (typeof spawnParticles === 'function') spawnParticles(nation.isleX, nation.isleY, 'build', 12);
               let _name = typeof getNationName === 'function' ? getNationName(nationKey) : nationKey;
-              if (typeof addNotification === 'function') addNotification(_name + ' expands to level ' + state.islandLevel + '! New buildings + ' + _newCitz + ' citizens', '#aaddff');
+              if (typeof addNotification === 'function') {
+                let _ahead = state.islandLevel > (nation._prevPlayerLevel || 1);
+                let _raceMsg = (state._gameMode === '1v1') ? (_ahead ? ' — AHEAD of you!' : '') : '';
+                addNotification(_name + ' expands to level ' + state.islandLevel + '!' + _raceMsg, _ahead ? '#ff8844' : '#aaddff');
+                if (_ahead && state._gameMode === '1v1' && typeof snd !== 'undefined' && snd && snd.playSFX) snd.playSFX('war_horn');
+              }
+              // Track player level for comparison (read from real state after swap)
+              nation._prevPlayerLevel = state._realPlayerLevel;
             }
             swapBack();
           }

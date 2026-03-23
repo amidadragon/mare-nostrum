@@ -2483,6 +2483,23 @@ function drawInner() {
             if (_own.islandState.ruins && typeof drawRuins === 'function') {
               _botItems.push({ y: botCY - 30, draw: () => { let _sr = state.ruins; state.ruins = _own.islandState.ruins; drawRuins(); state.ruins = _sr; } });
             }
+            // Crystal shrine (altar)
+            if (_own.islandState.crystalShrine && typeof drawCrystalShrine === 'function') {
+              let _savedShrine = state.crystalShrine;
+              _botItems.push({ y: _own.islandState.crystalShrine.y, draw: () => { state.crystalShrine = _own.islandState.crystalShrine; drawCrystalShrine(); state.crystalShrine = _savedShrine; } });
+            }
+            // Crystal nodes
+            if (_own.islandState.crystalNodes && typeof drawOneCrystal === 'function') {
+              for (let cn of _own.islandState.crystalNodes) {
+                _botItems.push({ y: cn.y - 9999, draw: () => drawOneCrystal(cn) });
+              }
+            }
+            // Resources (scattered stone/vine/leaf)
+            if (_own.islandState.resources && typeof drawOneResource === 'function') {
+              for (let r of _own.islandState.resources) {
+                if (!r.collected) _botItems.push({ y: r.y - 9999, draw: () => drawOneResource(r) });
+              }
+            }
             for (let b of _own.islandState.buildings) {
               _botItems.push({ y: b.y, draw: () => { if (typeof drawOneBuilding === 'function') drawOneBuilding(b); } });
             }

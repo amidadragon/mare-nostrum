@@ -566,9 +566,9 @@ function createPrebuiltIsland(factionKey, cx, cy, targetLevel) {
     is.plots.push({ x: cx - is.islandRX * 0.4 + (i % 3) * 28, y: cy - is.islandRY * 0.05 + Math.floor(i / 3) * 28, crop: i < 3 ? 'grain' : null, stage: i < 3 ? 'growing' : 'empty', growTimer: i < 3 ? 150 : 0 });
   }
 
-  // Citizens (1 per 3 buildings, max 10)
+  // Citizens (1 per 3 buildings, min 3, max 10+)
   is.citizens = [];
-  let numCitizens = Math.min(10, Math.floor(is.buildings.length / 3));
+  let numCitizens = Math.max(3, Math.min(10 + targetLevel, Math.floor(is.buildings.length / 3) + 2));
   for (let i = 0; i < numCitizens; i++) {
     is.citizens.push({
       x: cx + (Math.random() - 0.5) * is.islandRX * 0.5,
