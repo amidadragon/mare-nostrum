@@ -3678,6 +3678,23 @@ function drawInner() {
                 _botItems.push({ y: c.y, draw: () => drawOneClutter(c) });
               }
             }
+            // Faction flora on bot island (generated once, cached)
+            if (!_own.islandState._flora && typeof FACTION_FLORA !== 'undefined' && typeof drawOneFlora === 'function') {
+              let _ffl = FACTION_FLORA[_owKey] || FACTION_FLORA.rome;
+              let _bf = [];
+              for (let _fi = 0; _fi < 12; _fi++) {
+                let _a = Math.PI * 2 * _fi / 12 + 0.7;
+                let _r = 0.15 + Math.random() * 0.45;
+                let _tmpl = _ffl[_fi % _ffl.length];
+                _bf.push({ x: botCX + Math.cos(_a) * (_isRX * _r), y: botCY + Math.sin(_a) * (_isRY * _r * 0.4), col: _tmpl.col, w: _tmpl.w, h: _tmpl.h, phase: Math.random() * Math.PI * 2 });
+              }
+              _own.islandState._flora = _bf;
+            }
+            if (_own.islandState._flora) {
+              for (let fl of _own.islandState._flora) {
+                _botItems.push({ y: fl.y - 9999, draw: () => drawOneFlora(fl) });
+              }
+            }
             // Citizens using the REAL drawOneCitizen function
             if (_own.islandState.citizens) {
               for (let c of _own.islandState.citizens) {
