@@ -2560,13 +2560,18 @@ function drawInner() {
       let _isTraveling = state.rowing && state.rowing.active;
       let _isVisitingForeign = state._activeNation || state._activeExploration;
       if ((_isTraveling || _isVisitingForeign) && state.nations) {
-        let _owKey = Object.keys(state.nations)[0];
+        // Render ALL nation islands at their real world positions
+        let _nationKeys = Object.keys(state.nations);
+        for (let _nki = 0; _nki < _nationKeys.length; _nki++) {
+        let _owKey = _nationKeys[_nki];
         if (_owKey) {
           let _own = state.nations[_owKey];
-          let botCX = WORLD.islandCX + 1200;
-          let botCY = WORLD.islandCY;
-          _own.isleX = botCX;
-          _own.isleY = botCY;
+          if (!_own || _own.defeated) continue;
+          let botCX = _own.isleX || WORLD.islandCX + 1200;
+          let botCY = _own.isleY || WORLD.islandCY;
+          // Screen-cull: skip islands far off-screen
+          let _bsx = w2sX(botCX), _bsy = w2sY(botCY);
+          if (_bsx < -600 || _bsx > width + 600 || _bsy < -400 || _bsy > height + 400) continue;
           let _owt = (typeof FACTION_TERRAIN !== 'undefined') ? (FACTION_TERRAIN[_owKey] || FACTION_TERRAIN.rome) : { seed: 42 };
           let _isRX = _own.islandState ? _own.islandState.islandRX || 400 : 400;
           let _isRY = _own.islandState ? _own.islandState.islandRY || 260 : 260;
@@ -2688,6 +2693,7 @@ function drawInner() {
             BotAI.draw(_owKey);
           }
         }
+        } // end for-loop over nation keys
       }
       if (!_frameBudget.throttled || frameCount % 2 === 0) drawShoreWaves();
       drawAmbientHouses();
