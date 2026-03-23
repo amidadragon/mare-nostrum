@@ -367,6 +367,31 @@ function updateNationDaily(key) {
     if (other && other.vassal && other._vassalOf === key) rv.gold += 5 + other.level;
   }
 
+  // Vassal rebellion: defeated nations can recover and revolt
+  if (rv.vassal && rv._vassalOf && random() < 0.005) {
+    let overlord = state.nations[rv._vassalOf];
+    // Revolt when overlord is weak or vassal rebuilds strength
+    if (overlord && (overlord.military <= 2 || rv.military >= 3)) {
+      rv.vassal = false; rv.defeated = false; rv._vassalOf = null;
+      rv.aggression = min(1, (rv.aggression || 0.5) + 0.3);
+      if (overlord) {
+        if (!rv.wars) rv.wars = [];
+        if (!overlord.wars) overlord.wars = [];
+        rv.wars.push(rv._vassalOf || key);
+        rv.relations[rv._vassalOf || key] = -50;
+      }
+      addNotification(name + ' REVOLTS and declares independence!', '#ff8844');
+    }
+  }
+  // Defeated nations slowly rebuild military
+  if (rv.defeated && !rv.vassal && rv.military < 3 && rv.gold >= 20 && random() < 0.02) {
+    rv.military++; rv.gold -= 20;
+  }
+  // Vassals slowly rebuild too (preparing for revolt)
+  if (rv.vassal && rv.military < 2 && rv.gold >= 15 && random() < 0.01) {
+    rv.military++; rv.gold -= 15;
+  }
+
   // Strategic building
   let buildCost = 30 + rv.level * 5;
   if (random() < pers.buildChance * 0.5 * botDiff.buildMult && rv.gold >= buildCost) {
