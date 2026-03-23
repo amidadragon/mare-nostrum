@@ -2555,8 +2555,26 @@ function drawInner() {
     }
     push();
     translate(shakeX, shakeY + floatOffset);
-    if (!state.rowing || !state.rowing.active || _homeDist < 300) {
-      drawIsland();
+    // Home island: always render when on it, LOD when sailing away
+    let _isSailing = state.rowing && state.rowing.active;
+    if (!_isSailing || _homeDist < 800) {
+      drawIsland(); // Full home island render (on island or close while sailing)
+    } else if (_homeDist < 2000) {
+      // Medium LOD for home island while sailing away
+      drawIsland(); // Still draw terrain (it's the player's base, keep visible longer)
+    } else if (_homeDist < 4000) {
+      // Far LOD — simplified silhouette of home island
+      let _hsx = w2sX(WORLD.islandCX), _hsy = w2sY(WORLD.islandCY);
+      let _hrx = Math.max(10, Math.floor(state.islandRX * 0.12));
+      let _hry = Math.max(5, Math.floor(state.islandRY * 0.06));
+      let _hAlpha = Math.max(40, 180 - Math.floor(_homeDist * 0.03));
+      noStroke();
+      fill(80, 120, 70, _hAlpha); ellipse(_hsx, _hsy, _hrx * 2, _hry * 2);
+      fill(120, 160, 100, _hAlpha * 0.7); ellipse(_hsx, _hsy - 2, _hrx * 1.4, _hry * 0.8);
+      fill(220, 200, 160, _hAlpha); textSize(7); textAlign(CENTER, BOTTOM);
+      text('HOME', _hsx, _hsy - _hry - 4); textAlign(LEFT, TOP);
+    }
+    {
       // ═══ LOD WORLD: render all nation islands based on distance ═══
       // Tier 1 (>2000px): silhouette ellipse + faction label
       // Tier 2 (800-2000px): terrain + building blocks

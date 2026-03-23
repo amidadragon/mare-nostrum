@@ -1474,10 +1474,13 @@ function keyPressed() {
     let boatWorldY = port.y + 20;
     if (_canBoard && dist(state.player.x, state.player.y, boatWorldX, boatWorldY) < 60) {
       state.rowing.active = true;
-      state.rowing.x = boatWorldX;
-      state.rowing.y = boatWorldY;
+      // Start boat OUTSIDE the island surface to avoid collision trap
+      let _surfRX = typeof getSurfaceRX === 'function' ? getSurfaceRX() : state.islandRX * 0.9;
+      let _surfRY = typeof getSurfaceRY === 'function' ? getSurfaceRY() : state.islandRY * 0.36;
+      state.rowing.x = WORLD.islandCX + _surfRX * 1.15;
+      state.rowing.y = WORLD.islandCY + _surfRY * 0.3;
       state.rowing.angle = 0; // facing right (east, away from island)
-      state.rowing.speed = 0;
+      state.rowing.speed = 1.5; // initial push away from island
       state.rowing.oarPhase = 0;
       state.rowing.wakeTrail = [];
       addFloatingText(width / 2, height * 0.35, 'Rowing the Navis Parva! WASD to sail, E to dock', C.solarBright);
