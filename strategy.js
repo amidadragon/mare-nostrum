@@ -189,8 +189,10 @@ const StrategyEngine = {
     if (state.nations) {
       for (let k of Object.keys(state.nations)) {
         let n = state.nations[k];
-        if (n.defeated) continue;
-        let power = (n.level || 1) * 10 + (n.gold || 0) * 0.2 + (n.military || 0) * 5 + (n.population || 0) * 2;
+        if (n.defeated && !n.vassal) continue;
+        let _nLvl = n.islandState ? (n.islandState.islandLevel || n.level || 1) : (n.level || 1);
+        let power = _nLvl * 10 + (n.gold || 0) * 0.2 + (n.military || 0) * 5 + (n.population || 0) * 2;
+        if (n.vassal) power = Math.floor(power * 0.5); // vassals count at half power
         let name = typeof getNationName === 'function' ? getNationName(k) : k;
         rankings.push({ key: k, name: name, power: Math.floor(power), isPlayer: false });
       }
@@ -203,23 +205,22 @@ const StrategyEngine = {
   drawPowerRankings() {
     if (!this.session) return;
     let rankings = this.getPowerRankings();
-    let x = width - 140, y = 100;
+    let x = width - 135, y = 140;
+    let panelH = 18 + Math.min(5, rankings.length) * 13;
     noStroke();
-    fill(0, 0, 0, 140); rect(x - 5, y - 5, 140, 15 + rankings.length * 14, 3);
+    fill(0, 0, 0, 130); rect(x - 5, y - 5, 135, panelH, 3);
     fill(220, 200, 160); textSize(8); textAlign(LEFT, TOP);
-    text('POWER RANKINGS', x, y);
-    for (let i = 0; i < Math.min(8, rankings.length); i++) {
+    let eraNames = ['', 'Bronze', 'Iron', 'Classical', 'Imperial'];
+    text('RANKINGS (' + (eraNames[this.session.era] || '?') + ')', x, y);
+    for (let i = 0; i < Math.min(5, rankings.length); i++) {
       let r = rankings[i];
-      let ry = y + 14 + i * 13;
+      let ry = y + 13 + i * 12;
+      let prefix = i === 0 ? '\u2655 ' : (i + 1) + '. ';
       fill(r.isPlayer ? 255 : 180, r.isPlayer ? 220 : 170, r.isPlayer ? 100 : 140, r.isPlayer ? 255 : 200);
-      text((i + 1) + '. ' + r.name, x, ry);
+      text(prefix + r.name, x, ry);
       textAlign(RIGHT, TOP);
-      text(r.power, x + 130, ry);
+      text(r.power, x + 125, ry);
       textAlign(LEFT, TOP);
     }
-    // Era indicator
-    let eraNames = ['', 'Bronze', 'Iron', 'Classical', 'Imperial'];
-    fill(200, 190, 140, 150); textSize(7);
-    text('Era: ' + (eraNames[this.session.era] || 'Bronze'), x, y + 16 + Math.min(8, rankings.length) * 13);
   },
 };
