@@ -191,6 +191,14 @@ const Debug = {
           }
           break;
 
+        case '/clear':
+          localStorage.removeItem('sunlitIsles_save');
+          localStorage.removeItem('sunlitIsles_backup');
+          localStorage.removeItem('mare_nostrum_analytics');
+          this.addLog('Save data cleared! Reload to start fresh.', '#ff8888');
+          setTimeout(() => location.reload(), 500);
+          break;
+
         case '/home':
           state.player.x = WORLD.islandCX;
           state.player.y = WORLD.islandCY;
