@@ -3581,8 +3581,13 @@ function drawInner() {
           let _isRX = _own.islandState ? _own.islandState.islandRX || 400 : 400;
           let _isRY = _own.islandState ? _own.islandState.islandRY || 260 : 260;
           drawIslandAt({ cx: botCX, cy: botCY, rx: _isRX, ry: _isRY, level: _own.islandState ? _own.islandState.islandLevel : (_own.level || 1), seed: _owt.seed, factionKey: _owKey });
-          // Draw bot buildings using the REAL drawOneBuilding function (no state swap needed)
+          // Draw bot buildings using the REAL drawOneBuilding function
           if (_own.islandState && _own.islandState.buildings) {
+            // Temporarily set globals so drawOneBuilding reads correct era/faction
+            let _savedLevel = state.islandLevel;
+            let _savedFaction = state.faction;
+            state.islandLevel = _own.islandState.islandLevel || 5;
+            state.faction = _owKey;
             // Y-sort all bot entities for proper depth
             let _botItems = [];
             for (let b of _own.islandState.buildings) {
@@ -3624,6 +3629,9 @@ function drawInner() {
               if (tHP < 50) { fill(80,80,80,50); ellipse(thx+Math.sin(frameCount*0.03)*5, thy-10, 15, 8); }
               if (tHP < 25) { fill(255,100,30,60); ellipse(thx-5, thy-5, 8, 12); }
             }
+            // Restore player globals
+            state.islandLevel = _savedLevel;
+            state.faction = _savedFaction;
           }
           // Critter pet following bot leader
           let _critter = _own.islandState ? _own.islandState.critter : null;

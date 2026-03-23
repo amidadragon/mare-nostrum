@@ -445,6 +445,26 @@ function updateNationDaily(key) {
       let cd = Math.sqrt(cdx*cdx + cdy*cdy);
       if (cd > 3) { c.x += (cdx/cd) * c.speed; c.y += (cdy/cd) * c.speed; }
     }
+    // AUTO LEVEL UP: every 5 game-days, bot expands (adds CITY_SLOTS buildings)
+    if ((state.day || 1) % 5 === 0 && (state.islandLevel || 1) < 15) {
+      let oldLevel = state.islandLevel || 1;
+      state.islandLevel = oldLevel + 1;
+      state.islandRX = (state.islandRX || 500) + (oldLevel < 5 ? 35 : 28);
+      state.islandRY = (state.islandRY || 320) + (oldLevel < 5 ? 24 : 18);
+      // Add new buildings from CITY_SLOTS for this level
+      let offsetX = isCX - 600, offsetY = isCY - 400;
+      if (typeof CITY_SLOTS !== 'undefined') {
+        CITY_SLOTS.forEach(function(slot) {
+          if (slot.level === state.islandLevel) {
+            state.buildings.push({
+              type: slot.type, x: slot.x + offsetX, y: slot.y + offsetY,
+              w: slot.w, h: slot.h, hp: 100, built: true,
+              isTemple: slot.type === 'temple', id: slot.id, rot: 0
+            });
+          }
+        });
+      }
+    }
     swapBack();
   }
 
