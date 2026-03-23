@@ -1215,23 +1215,25 @@ function start1v1Game(playerFaction) {
   state.progression.villaCleared = true;
   state.progression.tutorialDone = true;
   state.introPhase = null;
-  // Player starts on home island at level 1
-  state.islandLevel = 1;
+  // Player starts on home island at level 3 (has basic buildings)
+  state.islandLevel = 3;
+  state.islandRX = 500 + 35 * 3;
+  state.islandRY = 320 + 24 * 3;
   state.player.x = WORLD.islandCX;
   state.player.y = WORLD.islandCY;
   cam.x = state.player.x; cam.y = state.player.y;
   camSmooth.x = cam.x; camSmooth.y = cam.y;
-  // Minimal starting resources
-  state.wood = 10; state.stone = 5; state.crystals = 5;
-  state.gold = 10; state.seeds = 3; state.harvest = 5;
-  state.solar = 50;
+  // Starting resources — enough to build and grow
+  state.wood = 20; state.stone = 10; state.crystals = 10;
+  state.gold = 20; state.seeds = 5; state.harvest = 8;
+  state.solar = 80;
   // Random faction if not specified
   let factions = ['rome', 'carthage', 'egypt', 'greece', 'seapeople', 'persia', 'phoenicia', 'gaul'];
   if (!playerFaction) playerFaction = factions[Math.floor(Math.random() * factions.length)];
-  // Select faction (this inits nations + bot islands at level 1 via _gameMode)
+  // Select faction (this inits nations + bot islands at level 3 via _gameMode)
   if (typeof selectFaction === 'function') selectFaction(playerFaction);
-  // Place initial buildings for level 1
-  if (typeof placeEraBuildings === 'function') placeEraBuildings(1);
+  // Place buildings for levels 1-3
+  if (typeof placeEraBuildings === 'function') { placeEraBuildings(1); placeEraBuildings(2); placeEraBuildings(3); }
   gameScreen = 'game';
   if (typeof addNotification === 'function') {
     addNotification('1v1 Strategy Mode — Race to dominance!', '#ffdd44');
