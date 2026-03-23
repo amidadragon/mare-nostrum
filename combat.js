@@ -5181,80 +5181,162 @@ function updateInvasion(dt) {
   if (!state.invasion || !state.invasion.active) return;
   let inv = state.invasion;
   let nation = state.nations[inv.target];
-  if (!nation) { inv.active = false; return; }
-  let is = nation.islandState || {};
-  if (is.templeHP == null) { is.templeHP = 100; is.templeMaxHP = 100; }
-  // Find the actual temple building on the island
+  if (!nation) return;
+
+  // Find temple position
   let templeB = (nation.islandState && nation.islandState.buildings) ?
     nation.islandState.buildings.find(b => b.isTemple || b.type === 'temple') : null;
   let templeX = templeB ? templeB.x : nation.isleX;
   let templeY = templeB ? templeB.y : nation.isleY - 30;
 
+  // Update each attacker
   for (let a of inv.attackers) {
-    if (a.hp <= 0) continue;
-    let nearestDef = null, nearDist = 999;
+    if (a.hp <= 0) { a.state = 'dead'; a.deathTimer = (a.deathTimer || 0) + dt; continue; }
+    a.attackTimer = max(0, (a.attackTimer || 0) - dt);
+
+    // Find nearest alive defender
+    let nearest = null, nearDist = 150;
     for (let d of inv.defenders) {
       if (d.hp <= 0) continue;
-      let dd = dist(a.x, a.y, d.x, d.y);
-      if (dd < nearDist) { nearestDef = d; nearDist = dd; }
+      let dd = sqrt((a.x-d.x)*(a.x-d.x) + (a.y-d.y)*(a.y-d.y));
+      if (dd < nearDist) { nearest = d; nearDist = dd; }
     }
-    if (nearestDef && nearDist < 30) {
+
+    if (nearest && nearDist < 25) {
+      // ATTACK
       a.state = 'fighting';
-      if (frameCount % 30 === 0) {
-        nearestDef.hp -= a.damage;
-        if (nearestDef.hp <= 0) spawnParticles(nearestDef.x, nearestDef.y, 'hit', 3);
+      a.facing = nearest.x > a.x ? 'right' : 'left';
+      if (a.attackTimer <= 0) {
+        nearest.hp -= a.damage;
+        a.attackTimer = 25; // cooldown
+        a.swingAnim = 8; // frames of swing animation
+        if (typeof addFloatingText === 'function')
+          addFloatingText(w2sX(nearest.x), w2sY(nearest.y) - 15, '-' + a.damage, '#ff4444');
+        if (typeof spawnParticles === 'function')
+          spawnParticles(nearest.x, nearest.y, 'hit', 2);
+        if (nearest.hp <= 0) {
+          nearest.state = 'dead';
+          nearest.deathTimer = 0;
+        }
       }
-    } else if (nearestDef && nearDist < 100) {
-      let dx = nearestDef.x - a.x, dy = nearestDef.y - a.y;
-      let d = sqrt(dx * dx + dy * dy);
-      a.x += (dx / d) * a.speed * dt; a.y += (dy / d) * a.speed * dt;
-      a.state = 'advancing';
+    } else if (nearest && nearDist < 150) {
+      // CHASE
+      a.state = 'walking';
+      let dx = nearest.x - a.x, dy = nearest.y - a.y;
+      let d = sqrt(dx*dx + dy*dy);
+      a.x += (dx/d) * a.speed * dt;
+      a.y += (dy/d) * a.speed * dt;
+      a.facing = dx > 0 ? 'right' : 'left';
+      a.walkFrame = (a.walkFrame || 0) + dt * 0.15;
     } else {
+      // No defenders -- advance to temple
       let dx = templeX - a.x, dy = templeY - a.y;
-      let d = sqrt(dx * dx + dy * dy);
+      let d = sqrt(dx*dx + dy*dy);
       if (d > 20) {
-        a.x += (dx / d) * a.speed * dt; a.y += (dy / d) * a.speed * dt;
+        a.state = 'walking';
+        a.x += (dx/d) * a.speed * dt;
+        a.y += (dy/d) * a.speed * dt;
+        a.facing = dx > 0 ? 'right' : 'left';
+        a.walkFrame = (a.walkFrame || 0) + dt * 0.15;
       } else {
+        // AT TEMPLE -- attack it
         a.state = 'attacking_temple';
-        if (frameCount % 60 === 0) {
-          is.templeHP = max(0, is.templeHP - a.damage);
-          addFloatingText(w2sX(templeX), w2sY(templeY) - 20, '-' + a.damage, '#ff4444');
+        if (a.attackTimer <= 0) {
+          let tHP = nation.islandState ? nation.islandState.templeHP : 100;
+          tHP = max(0, tHP - a.damage);
+          if (nation.islandState) nation.islandState.templeHP = tHP;
+          a.attackTimer = 30;
+          a.swingAnim = 8;
+          if (typeof addFloatingText === 'function')
+            addFloatingText(w2sX(templeX), w2sY(templeY) - 20, '-' + a.damage, '#ff6644');
         }
       }
     }
+    a.swingAnim = max(0, (a.swingAnim || 0) - dt);
   }
 
+  // Update each defender (same logic but they stay near temple)
   for (let d of inv.defenders) {
-    if (d.hp <= 0) continue;
-    let nearestAtk = null, nearDist = 999;
+    if (d.hp <= 0) { d.state = 'dead'; d.deathTimer = (d.deathTimer || 0) + dt; continue; }
+    d.attackTimer = max(0, (d.attackTimer || 0) - dt);
+
+    let nearest = null, nearDist = 120;
     for (let a of inv.attackers) {
       if (a.hp <= 0) continue;
-      let dd = dist(d.x, d.y, a.x, a.y);
+      let dd = sqrt((d.x-a.x)*(d.x-a.x) + (d.y-a.y)*(d.y-a.y));
+      if (dd < nearDist) { nearest = a; nearDist = dd; }
+    }
+
+    if (nearest && nearDist < 25) {
+      d.state = 'fighting';
+      d.facing = nearest.x > d.x ? 'right' : 'left';
+      if (d.attackTimer <= 0) {
+        nearest.hp -= d.damage;
+        d.attackTimer = 30;
+        d.swingAnim = 8;
+        if (typeof addFloatingText === 'function')
+          addFloatingText(w2sX(nearest.x), w2sY(nearest.y) - 15, '-' + d.damage, '#ff4444');
+        if (nearest.hp <= 0) { nearest.state = 'dead'; nearest.deathTimer = 0; }
+      }
+    } else if (nearest) {
+      d.state = 'walking';
+      let dx = nearest.x - d.x, dy = nearest.y - d.y;
+      let dd = sqrt(dx*dx + dy*dy);
+      d.x += (dx/dd) * d.speed * dt;
+      d.y += (dy/dd) * d.speed * dt;
+      d.facing = dx > 0 ? 'right' : 'left';
+      d.walkFrame = (d.walkFrame || 0) + dt * 0.15;
+    } else {
+      d.state = 'idle';
+    }
+    d.swingAnim = max(0, (d.swingAnim || 0) - dt);
+  }
+
+  // Make bot character fight too
+  if (typeof BotAI !== 'undefined' && BotAI.bots[inv.target]) {
+    let bot = BotAI.bots[inv.target];
+    bot.task = { type: 'defend', target: { x: templeX, y: templeY }, timer: 0 };
+    let nearestAtk = null, nearDist = 100;
+    for (let a of inv.attackers) {
+      if (a.hp <= 0) continue;
+      let dd = sqrt((bot.x-a.x)*(bot.x-a.x) + (bot.y-a.y)*(bot.y-a.y));
       if (dd < nearDist) { nearestAtk = a; nearDist = dd; }
     }
     if (nearestAtk && nearDist < 30) {
-      if (frameCount % 35 === 0) nearestAtk.hp -= d.damage;
-    } else if (nearestAtk && nearDist < 120) {
-      let dx = nearestAtk.x - d.x, dy = nearestAtk.y - d.y;
-      let dd = sqrt(dx * dx + dy * dy);
-      d.x += (dx / dd) * d.speed * dt; d.y += (dy / dd) * d.speed * dt;
+      if (frameCount % 20 === 0) {
+        nearestAtk.hp -= 8;
+        if (typeof addFloatingText === 'function')
+          addFloatingText(w2sX(nearestAtk.x), w2sY(nearestAtk.y) - 15, '-8', '#ff8800');
+        if (nearestAtk.hp <= 0) { nearestAtk.state = 'dead'; nearestAtk.deathTimer = 0; }
+      }
+    } else if (nearestAtk) {
+      let dx = nearestAtk.x - bot.x, dy = nearestAtk.y - bot.y;
+      let dd = sqrt(dx*dx + dy*dy);
+      bot.x += (dx/dd) * 2.5;
+      bot.y += (dy/dd) * 2.5;
     }
   }
 
-  let aliveAttackers = inv.attackers.filter(a => a.hp > 0).length;
+  // Victory / Defeat check
+  let aliveAtk = inv.attackers.filter(a => a.hp > 0).length;
+  let aliveDef = inv.defenders.filter(d => d.hp > 0).length;
+  let tHP = nation.islandState ? (nation.islandState.templeHP || 0) : 100;
 
-  if (is.templeHP <= 0) {
+  if (tHP <= 0) {
     inv.active = false;
     nation.defeated = true;
     nation.vassal = true;
     nation._vassalOf = state.faction || 'rome';
-    addNotification('VICTORY! ' + getNationName(inv.target) + ' is conquered!', '#ffdd44');
-    addFloatingText(width / 2, height * 0.3, 'ISLAND CONQUERED!', '#ffcc44');
+    if (typeof addNotification === 'function')
+      addNotification('VICTORY! ' + getNationName(inv.target) + ' conquered!', '#ffdd44');
+    if (typeof addFloatingText === 'function')
+      addFloatingText(width/2, height*0.3, 'ISLAND CONQUERED!', '#ffcc44');
     state._invasionTarget = null;
-  } else if (aliveAttackers === 0) {
+  } else if (aliveAtk === 0) {
     inv.active = false;
     state.legia.army = [];
-    addNotification('Invasion failed! Army lost.', '#ff4444');
+    if (typeof addNotification === 'function')
+      addNotification('Invasion failed! Army lost.', '#ff4444');
     state._invasionTarget = null;
   }
 }
@@ -5266,64 +5348,130 @@ function drawInvasion() {
   let playerFM = FACTION_MILITARY[fk] || FACTION_MILITARY.rome;
   let enemyFM = FACTION_MILITARY[inv.target] || playerFM;
 
-  for (let a of inv.attackers) {
-    if (a.hp <= 0) continue;
-    let sx = w2sX(a.x), sy = w2sY(a.y);
-    push(); noStroke();
-    fill(playerFM.tunic[0], playerFM.tunic[1], playerFM.tunic[2]);
-    rect(sx - 3, sy - 8, 6, 10, 1);
-    fill(220, 190, 160);
-    rect(sx - 2, sy - 12, 5, 5, 1);
-    fill(255, 0, 0); rect(sx - 5, sy - 15, 10, 2);
-    fill(0, 255, 0); rect(sx - 5, sy - 15, 10 * (a.hp / a.maxHp), 2);
-    pop();
-  }
+  // Draw all soldiers
+  _drawSoldierGroup(inv.attackers, playerFM);
+  _drawSoldierGroup(inv.defenders, enemyFM);
+}
 
-  for (let d of inv.defenders) {
-    if (d.hp <= 0) continue;
-    let sx = w2sX(d.x), sy = w2sY(d.y);
-    push(); noStroke();
-    fill(enemyFM.tunic[0], enemyFM.tunic[1], enemyFM.tunic[2]);
-    rect(sx - 3, sy - 8, 6, 10, 1);
-    fill(220, 190, 160);
-    rect(sx - 2, sy - 12, 5, 5, 1);
-    fill(255, 0, 0); rect(sx - 5, sy - 15, 10, 2);
-    fill(0, 255, 0); rect(sx - 5, sy - 15, 10 * (d.hp / d.maxHp), 2);
+function _drawSoldierGroup(soldiers, fm) {
+  for (let s of soldiers) {
+    let sx = w2sX(s.x), sy = w2sY(s.y);
+    if (sx < -50 || sx > width + 50 || sy < -50 || sy > height + 50) continue;
+
+    let alpha = 255;
+    if (s.state === 'dead') {
+      alpha = max(0, 255 - (s.deathTimer || 0) * 3);
+      if (alpha <= 0) continue;
+    }
+
+    push();
+    translate(floor(sx), floor(sy));
+    noStroke();
+
+    let fDir = s.facing === 'left' ? -1 : 1;
+    if (fDir < 0) scale(-1, 1);
+
+    if (s.state === 'dead') {
+      // Fallen soldier (horizontal)
+      fill(fm.tunic[0], fm.tunic[1], fm.tunic[2], alpha);
+      rect(-6, 2, 12, 4, 1);
+      fill(220, 190, 160, alpha);
+      rect(-8, 2, 4, 3, 1);
+    } else {
+      // Shadow
+      fill(0, 0, 0, 25);
+      ellipse(0, 8, 12, 5);
+
+      // Legs with walk animation
+      let legOff = s.state === 'walking' ? sin(s.walkFrame || 0) * 2.5 : 0;
+      fill(fm.tunic[0] * 0.7, fm.tunic[1] * 0.7, fm.tunic[2] * 0.7, alpha);
+      rect(-3, 2 + legOff, 3, 5, 1);
+      rect(1, 2 - legOff, 3, 5, 1);
+
+      // Body
+      fill(fm.tunic[0], fm.tunic[1], fm.tunic[2], alpha);
+      rect(-5, -8, 10, 12, 1);
+
+      // Arms + weapon swing
+      let armOff = (s.swingAnim && s.swingAnim > 0) ? -6 : 0;
+      fill(220, 190, 160, alpha);
+      rect(-7, -5, 3, 6, 1);
+      rect(4, -5 + armOff, 3, 6, 1);
+
+      // Weapon (right hand)
+      if (s.swingAnim && s.swingAnim > 0) {
+        fill(180, 180, 180, alpha);
+        rect(5, -12, 2, 8); // sword swinging
+      } else {
+        fill(180, 180, 180, alpha);
+        rect(6, -6, 2, 6); // sword at rest
+      }
+
+      // Head
+      fill(220, 190, 160, alpha);
+      rect(-3, -14, 7, 7, 2);
+
+      // Helm
+      fill(fm.helm[0], fm.helm[1], fm.helm[2], alpha);
+      rect(-3, -15, 7, 3, 1);
+
+      // HP bar (only if damaged)
+      if (s.hp < s.maxHp) {
+        fill(40, 40, 40, 180);
+        rect(-6, -19, 12, 3);
+        fill(50, 200, 50);
+        rect(-5, -18, 10 * (s.hp / s.maxHp), 1);
+      }
+    }
+
     pop();
   }
 }
 
 function drawInvasionHUD() {
-  if (!state.invasion || !state.invasion.active) {
-    if (state._invasionTarget && state._activeNation === state._invasionTarget) {
-      fill(255, 100, 60, 200 + sin(frameCount * 0.1) * 40);
-      noStroke(); textAlign(CENTER); textSize(14);
-      text('[E] Invade!', width / 2, height * 0.42);
-      fill(255, 200, 150, 150); textSize(10);
-      text(getArmyCount() + ' soldiers ready', width / 2, height * 0.46);
+  if (!state.invasion) return;
+  let inv = state.invasion;
+
+  // Before invasion: show prompt
+  if (!inv.active && state._invasionTarget) {
+    let nation = state.nations[state._invasionTarget];
+    if (nation && state.legia && state.legia.army && state.legia.army.length > 0) {
+      fill(255, 100, 60, 200 + sin(frameCount * 0.08) * 40);
+      textAlign(CENTER, CENTER); textSize(14); noStroke();
+      text('[E] INVADE ' + getNationName(state._invasionTarget).toUpperCase() + '!', width/2, height * 0.45);
+      fill(200, 180, 140, 160); textSize(10);
+      text('Your army: ' + state.legia.army.length + ' soldiers', width/2, height * 0.49);
+      textAlign(LEFT, TOP);
     }
     return;
   }
-  let inv = state.invasion;
+
+  if (!inv.active) return;
+
+  // Battle HUD
   let nation = state.nations[inv.target];
-  if (!nation) return;
-  let is = nation.islandState || {};
-  let thp = is.templeHP != null ? is.templeHP : 100;
-  let tmhp = is.templeMaxHP || 100;
+  let tHP = nation && nation.islandState ? (nation.islandState.templeHP || 0) : 0;
+  let aliveAtk = inv.attackers.filter(a => a.hp > 0).length;
+  let aliveDef = inv.defenders.filter(d => d.hp > 0).length;
 
-  let bx = width / 2 - 60, by = 50;
-  fill(0, 0, 0, 180); noStroke();
-  rect(bx - 2, by - 2, 124, 18, 3);
-  fill(200, 50, 30);
-  rect(bx, by, 120 * (thp / tmhp), 14, 2);
-  fill(255); textSize(10); textAlign(CENTER, CENTER);
-  text('Temple: ' + thp + '/' + tmhp, width / 2, by + 7);
+  // Temple HP bar (center top)
+  push(); noStroke();
+  fill(0, 0, 0, 180);
+  rect(width/2 - 100, 60, 200, 24, 4);
+  fill(180, 40, 30);
+  rect(width/2 - 96, 64, 192 * (tHP / 100), 16, 2);
+  fill(255); textAlign(CENTER, CENTER); textSize(11);
+  text('Temple HP: ' + tHP + '/100', width/2, 72);
 
-  let alive = inv.attackers.filter(a => a.hp > 0).length;
-  let defAlive = inv.defenders.filter(d => d.hp > 0).length;
-  fill(100, 255, 100); textAlign(LEFT); textSize(10);
-  text('Attackers: ' + alive, bx, by + 22);
-  fill(255, 100, 100); textAlign(RIGHT);
-  text('Defenders: ' + defAlive, bx + 120, by + 22);
+  // Army counts
+  fill(0, 0, 0, 150);
+  rect(width/2 - 100, 88, 95, 18, 3);
+  rect(width/2 + 5, 88, 95, 18, 3);
+  fill(100, 200, 100); textSize(9);
+  text('Attackers: ' + aliveAtk, width/2 - 52, 97);
+  fill(200, 100, 100);
+  text('Defenders: ' + aliveDef, width/2 + 52, 97);
+
   textAlign(LEFT, TOP);
+  pop();
 }
