@@ -175,6 +175,8 @@ const BotAI = {
                 let a = Math.random()*Math.PI*2, r = Math.random()*0.3+0.4;
                 state.trees.push({ x: nation.isleX+Math.cos(a)*state.islandRX*r*0.7, y: nation.isleY+Math.sin(a)*state.islandRY*r*0.3, type: 'oak', hp: 3 });
               }
+              let _name = typeof getNationName === 'function' ? getNationName(nationKey) : nationKey;
+              if (typeof addNotification === 'function') addNotification(_name + ' expands to level ' + state.islandLevel + '!', '#aaddff');
             }
             swapBack();
           }
@@ -189,6 +191,10 @@ const BotAI = {
             if (!is.legia.army) is.legia.army = [];
             is.legia.army.push({ type: 'legionary', hp: 20, maxHp: 20, damage: 5, speed: 1.2, garrison: false });
             is.legia.castrumLevel = Math.max(is.legia.castrumLevel||0, 1);
+            if (is.legia.army.length % 3 === 0 && typeof addNotification === 'function') {
+              let _name = typeof getNationName === 'function' ? getNationName(nationKey) : nationKey;
+              addNotification(_name + ' army grows to ' + is.legia.army.length + ' soldiers', '#cc8844');
+            }
           }
           bot.task = null;
         } break;
@@ -223,6 +229,11 @@ const BotAI = {
           let tradeGold = 3 + Math.floor((is.islandLevel || 1) * 0.5);
           is.gold = (is.gold || 0) + tradeGold;
           nation.gold = (nation.gold || 0) + tradeGold;
+          if (!nation._tradeNotified && typeof addNotification === 'function') {
+            let _name = typeof getNationName === 'function' ? getNationName(nationKey) : nationKey;
+            addNotification(_name + ' establishes trade routes', '#ddcc44');
+            nation._tradeNotified = true;
+          }
           bot.task = null;
         } break;
       case 'replant':
