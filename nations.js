@@ -1956,7 +1956,37 @@ function showVictoryScreen(type) {
 // Legacy compat stubs for old function names
 function updateRivalRaid(dt) { updateNationRaids(dt); }
 function drawRivalRaiders() { drawNationRaiders(); }
-function drawRivalIsleDistant() { return; }
+function drawRivalIsleDistant() {
+  if (!state.nations) return;
+  let nk = Object.keys(state.nations);
+  for (let k of nk) {
+    let n = state.nations[k];
+    if (!n || n.defeated) continue;
+    let sx = w2sX(n.isleX), sy = w2sY(n.isleY);
+    // Only show label if island edge is near screen
+    if (sx < -200 || sx > width + 200 || sy < -100 || sy > height + 100) continue;
+    let name = typeof getNationName === 'function' ? getNationName(k) : k;
+    let labelX = constrain(sx, 30, width - 30);
+    let labelY = constrain(sy - 40, 20, height - 20);
+    // Distance-based alpha
+    let dx = n.isleX - WORLD.islandCX, dy = n.isleY - WORLD.islandCY;
+    let d = sqrt(dx * dx + dy * dy);
+    let alpha = map(constrain(d, 400, 2000), 400, 2000, 220, 80);
+    noStroke();
+    fill(0, 0, 0, alpha * 0.4);
+    textAlign(CENTER, BOTTOM); textSize(10);
+    text(name, labelX + 1, labelY + 1);
+    // Faction stance color
+    let stanceCol = typeof getNationStanceColor === 'function' ? getNationStanceColor(n) : '#ccbb88';
+    let c = color(stanceCol);
+    fill(red(c), green(c), blue(c), alpha);
+    text(name, labelX, labelY);
+    // Military indicator
+    fill(red(c), green(c), blue(c), alpha * 0.6); textSize(7);
+    text('Lv' + (n.islandState ? (n.islandState.islandLevel || n.level || 1) : (n.level || 1)) + ' \u2694' + (n.military || 0), labelX, labelY + 10);
+    textAlign(LEFT, TOP);
+  }
+}
 function openRivalDiplomacy() { openNationDiplomacy('carthage'); }
 function closeRivalDiplomacy() { closeNationDiplomacy(); }
 function drawRivalDiplomacyUI() { drawNationDiplomacyUI(); }
