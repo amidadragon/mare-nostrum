@@ -3241,7 +3241,9 @@ function drawInner() {
   if (state.plenty && state.plenty.active) state.plenty.active = false;
   if (state.necropolis && state.necropolis.active) state.necropolis.active = false;
   // Safety: if player is lost in deep ocean (not near any island, not rowing), teleport home
-  if (state.player && !state.rowing.active && typeof isNearAnyIsland === 'function' &&
+  // Skip during wreck beach (player is at -4800,0 which is far from all islands)
+  let _onWreck = (state.progression.gameStarted && !state.progression.homeIslandReached) || (state.wreck && state.wreck._visiting);
+  if (state.player && !state.rowing.active && !_onWreck && typeof isNearAnyIsland === 'function' &&
       !isNearAnyIsland(state.player.x, state.player.y, 500) && !state.insideTemple && !state.insideCastrum) {
     state.player.x = WORLD.islandCX;
     state.player.y = WORLD.islandCY;
