@@ -3754,7 +3754,7 @@ function drawInner() {
                 if (tHP < 25) { fill(255,100,30,60); ellipse(thx-5, thy-5, 8, 12); }
               }
             }
-            // Nation name label above bot island
+            // Nation name label + info card above bot island
             let _nlx = w2sX(botCX), _nly = w2sY(botCY - _isRY * 0.85);
             if (_nlx > -100 && _nlx < width + 100 && _nly > -50) {
               noStroke(); textAlign(CENTER, BOTTOM); textSize(11);
@@ -3762,6 +3762,20 @@ function drawInner() {
               text(getNationName(_owKey), _nlx + 1, _nly + 1);
               fill(240,220,180,220);
               text(getNationName(_owKey), _nlx, _nly);
+              // Info card when player is within 600px of bot island center
+              let _pdx = state.player.x - botCX, _pdy = state.player.y - botCY;
+              let _pDist = Math.sqrt(_pdx*_pdx + _pdy*_pdy);
+              if (_pDist < 600) {
+                let _iy = _nly + 4;
+                textSize(8); textAlign(CENTER, TOP);
+                let _rep = _own.reputation || 0;
+                let _repCol = _rep > 10 ? '#88cc88' : _rep < -10 ? '#ff6644' : '#ccbb88';
+                fill(0,0,0,100); rect(_nlx - 55, _iy, 110, 36, 3);
+                fill(200,190,160); textSize(7);
+                text('Military: ' + (_own.military || 0) + '  Gold: ' + (_own.gold || 0), _nlx, _iy + 3);
+                fill(_repCol); text('Rep: ' + _rep + (_own.allied ? ' [ALLY]' : _own.vassal ? ' [VASSAL]' : ''), _nlx, _iy + 12);
+                fill(180,170,140); text((_own.tradeActive ? 'Trading' : 'No trade') + '  Pop: ' + (_own.population || 0), _nlx, _iy + 21);
+              }
               textAlign(LEFT, TOP);
             }
             // Restore player globals
