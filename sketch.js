@@ -2555,36 +2555,41 @@ function drawInner() {
     translate(shakeX, shakeY + floatOffset);
     if (!state.rowing || !state.rowing.active || _homeDist < 300) {
       drawIsland();
-      // Foreign islands: ONLY render when traveling (rowing) or visiting another island.
-      // Home island view is isolated — no bot/nation islands visible.
-      let _isTraveling = state.rowing && state.rowing.active;
-      let _isVisitingForeign = state._activeNation || state._activeExploration;
-      if ((_isTraveling || _isVisitingForeign) && state.nations) {
-        // Render ALL nation islands at their real world positions
+      // ═══ LOD WORLD: render all nation islands based on distance ═══
+      // Tier 1 (>2000px): silhouette ellipse + faction label
+      // Tier 2 (800-2000px): terrain + building blocks
+      // Tier 3 (<800px or visiting): full drawWorldObjectsSorted via state swap
+      if (state.nations) {
+        let _camX = camSmooth.x || state.player.x;
+        let _camY = camSmooth.y || state.player.y;
         let _nationKeys = Object.keys(state.nations);
         for (let _nki = 0; _nki < _nationKeys.length; _nki++) {
-        let _owKey = _nationKeys[_nki];
-        if (_owKey) {
+          let _owKey = _nationKeys[_nki];
           let _own = state.nations[_owKey];
           if (!_own || _own.defeated) continue;
           let botCX = _own.isleX || WORLD.islandCX + 1200;
           let botCY = _own.isleY || WORLD.islandCY;
           // Screen-cull: skip islands far off-screen
           let _bsx = w2sX(botCX), _bsy = w2sY(botCY);
-          if (_bsx < -600 || _bsx > width + 600 || _bsy < -400 || _bsy > height + 400) continue;
-          let _owt = (typeof FACTION_TERRAIN !== 'undefined') ? (FACTION_TERRAIN[_owKey] || FACTION_TERRAIN.rome) : { seed: 42 };
+          if (_bsx < -800 || _bsx > width + 800 || _bsy < -600 || _bsy > height + 600) continue;
           let _isRX = _own.islandState ? _own.islandState.islandRX || 400 : 400;
           let _isRY = _own.islandState ? _own.islandState.islandRY || 260 : 260;
-          drawIslandAt({ cx: botCX, cy: botCY, rx: _isRX, ry: _isRY, level: _own.islandState ? _own.islandState.islandLevel : (_own.level || 1), seed: _owt.seed, factionKey: _owKey });
-          // Draw bot buildings using the REAL drawOneBuilding function
-          if (_own.islandState && _own.islandState.buildings) {
-            // ═══ USE REAL RENDERING PIPELINE — same code path as player island ═══
-            // Swap full island state, call drawWorldObjectsSorted(), swap back.
-            // This guarantees 100% visual parity — no manual element-by-element rendering.
-            if (typeof swapToIsland === 'function') {
+          // Calculate world distance from camera to island center
+          let _dx = botCX - _camX, _dy = botCY - _camY;
+          let _dist = Math.sqrt(_dx * _dx + _dy * _dy);
+          let _isVisiting = state._activeNation === _owKey;
+          let _facData = (typeof FACTIONS !== 'undefined' && FACTIONS[_owKey]) ? FACTIONS[_owKey] : null;
+          let _facName = _facData ? _facData.name : _owKey;
+          let _facColor = _facData && _facData.color ? _facData.color : [180, 150, 100];
+          let _isLevel = _own.islandState ? (_own.islandState.islandLevel || 1) : (_own.level || 1);
+
+          if (_isVisiting || _dist < 800) {
+            // ═══ TIER 3: FULL RENDER (close or visiting) ═══
+            let _owt = (typeof FACTION_TERRAIN !== 'undefined') ? (FACTION_TERRAIN[_owKey] || FACTION_TERRAIN.rome) : { seed: 42 };
+            drawIslandAt({ cx: botCX, cy: botCY, rx: _isRX, ry: _isRY, level: _isLevel, seed: _owt.seed, factionKey: _owKey });
+            if (_own.islandState && _own.islandState.buildings && typeof swapToIsland === 'function') {
               swapToIsland(_own.islandState, botCX, botCY);
               state.faction = _owKey;
-              // Ensure all required state exists for rendering (null guards)
               if (!state.pyramid) state.pyramid = { x: botCX, y: botCY - 40, level: state.islandLevel || 1 };
               if (!state.resources) state.resources = [];
               if (!state.factionFlora) state.factionFlora = [];
@@ -2595,105 +2600,71 @@ function drawInner() {
               if (!state.crystalRainDrops) state.crystalRainDrops = [];
               if (!state.plots) state.plots = [];
               if (!state.crystalShrine) state.crystalShrine = { x: botCX - 200, y: botCY };
-              // Null guards for safety (createIslandState now provides these, but guard old saves)
               if (!state.progression) state.progression = { gameStarted: true, villaCleared: true, companionsAwakened: { lares: true, woodcutter: true, harvester: true, centurion: true }, tutorialsSeen: {} };
               if (!state.legia) state.legia = { army: [], soldiers: [], castrumX: botCX + 100, castrumY: botCY + 50, castrumLevel: 0 };
               if (!state.companion) state.companion = { x: botCX + 40, y: botCY + 20, vx: 0, vy: 0, speed: 2, task: 'idle', taskTarget: null, carryItem: null, energy: 100, pulsePhase: 0, trailPoints: [] };
               if (!state.player) state.player = { x: botCX, y: botCY, vx: 0, vy: 0, speed: 3.2, size: 16, facing: 'down', moving: false, targetX: null, targetY: null, hp: 100, maxHp: 100, anim: { emotion: 'determined', emotionTimer: 0, blinkTimer: 240, blinkFrame: 0, bounceY: 0, bounceTimer: 0, walkFrame: 0, walkTimer: 0, helmetOff: false }, level: 1, xp: 0, weapon: 0, armor: 0, skills: {}, skillCooldowns: {} };
-              // Force ground re-sort for bot island
               _groundSortFrame = -999;
-              // Render everything — SAME function that draws the player island
               drawWorldObjectsSorted();
               swapBack();
             }
-          }
-          // Faction banner at bot island entrance (visible from distance)
-          {
-            let _bfx = w2sX(botCX + _isRX * 0.45), _bfy = w2sY(botCY + _isRY * 0.25);
-            if (_bfx > -30 && _bfx < width + 30) {
-              push(); translate(Math.floor(_bfx), Math.floor(_bfy)); noStroke();
-              // Flag pole
-              fill(100, 80, 50); rect(-1, -30, 2, 32);
-              // Banner with faction color
-              let _fc = typeof getFactionBuildingColors === 'function' ? getFactionBuildingColors() : { wall: [180,150,100], trim: [140,120,80] };
-              fill(_fc.wall[0], _fc.wall[1], _fc.wall[2], 220);
-              let _wave = Math.sin(frameCount * 0.04 + botCX) * 2;
-              beginShape();
-              vertex(1, -28); vertex(14 + _wave, -25); vertex(13 + _wave, -18); vertex(1, -15);
-              endShape(CLOSE);
-              // Banner trim
-              fill(_fc.trim[0], _fc.trim[1], _fc.trim[2], 200);
-              rect(1, -28, 2, 13);
-              // Faction initial
-              fill(255, 255, 255, 180); textSize(6); textAlign(CENTER, CENTER);
-              text(_owKey.charAt(0).toUpperCase(), 7 + _wave * 0.5, -21);
-              textAlign(LEFT, TOP);
-              pop();
+            // Bot AI draw
+            if (typeof BotAI !== 'undefined') {
+              if (!BotAI.bots[_owKey]) BotAI.create(_owKey, botCX, botCY);
+              _own.isBot = true;
+              BotAI.draw(_owKey);
             }
-          }
-          // Bot trade ship — sails around island when bot has gold income
-          if (_own.gold > 30 && _own.islandState) {
-            if (!_own.islandState._tradeShip) {
-              _own.islandState._tradeShip = { angle: 0, active: true };
+
+          } else if (_dist < 2000) {
+            // ═══ TIER 2: MEDIUM LOD (terrain + building blocks + banner) ═══
+            let _owt = (typeof FACTION_TERRAIN !== 'undefined') ? (FACTION_TERRAIN[_owKey] || FACTION_TERRAIN.rome) : { seed: 42 };
+            drawIslandAt({ cx: botCX, cy: botCY, rx: _isRX, ry: _isRY, level: _isLevel, seed: _owt.seed, factionKey: _owKey });
+            // Draw buildings as colored blocks (no state swap needed)
+            if (_own.islandState && _own.islandState.buildings) {
+              noStroke();
+              for (let _bi = 0; _bi < _own.islandState.buildings.length; _bi++) {
+                let _b = _own.islandState.buildings[_bi];
+                let _bbx = w2sX(_b.x), _bby = w2sY(_b.y);
+                if (_bbx < -30 || _bbx > width + 30) continue;
+                let _bAlpha = Math.max(80, 200 - Math.floor(_dist * 0.08));
+                fill(_facColor[0], _facColor[1], _facColor[2], _bAlpha);
+                rect(Math.floor(_bbx - (_b.w || 20) / 2), Math.floor(_bby - (_b.h || 16)), _b.w || 20, _b.h || 16, 2);
+              }
             }
-            let _ts = _own.islandState._tradeShip;
-            _ts.angle += 0.003;
-            let _tsR = _isRX * 0.65;
-            let _tsx = botCX + Math.cos(_ts.angle) * _tsR;
-            let _tsy = botCY + Math.sin(_ts.angle) * (_isRY * 0.35) + _isRY * 0.15;
-            let _tssx = w2sX(_tsx), _tssy = w2sY(_tsy);
-            if (_tssx > -30 && _tssx < width + 30) {
-              push(); translate(Math.floor(_tssx), Math.floor(_tssy)); noStroke();
-              let _tsFacing = Math.cos(_ts.angle + 0.1) < Math.cos(_ts.angle) ? -1 : 1;
-              scale(_tsFacing, 1);
-              // Hull
-              fill(120, 80, 40); rect(-8, -2, 16, 4, 1);
-              fill(100, 65, 30); rect(-6, -3, 12, 2);
-              // Sail
-              fill(230, 220, 200); rect(-1, -10, 2, 8);
-              fill(240, 235, 220, 200); rect(0, -9, 6, 5, 1);
-              // Wake
-              fill(200, 220, 240, 60); ellipse(7, 1, 4, 2);
-              pop();
-            }
-          }
-          // Critter pet following bot leader
-          let _critter = _own.islandState ? _own.islandState.critter : null;
-          if (_critter && typeof BotAI !== 'undefined' && BotAI.bots[_owKey]) {
-            let bot = BotAI.bots[_owKey];
-            let cdx = bot.x - _critter.x, cdy = bot.y - _critter.y;
-            let cd = Math.sqrt(cdx*cdx + cdy*cdy);
-            if (cd > 20) { _critter.x += cdx/cd * 1.5; _critter.y += cdy/cd * 1.5; }
-            let cx2 = w2sX(_critter.x), cy2 = w2sY(_critter.y);
-            push(); noStroke(); translate(Math.floor(cx2), Math.floor(cy2));
-            if (_critter.type === 'cat') { fill(200,160,100); ellipse(0,0,6,4); fill(180,140,80); ellipse(-3,-1,3,3); }
-            else if (_critter.type === 'wolf') { fill(130,130,130); ellipse(0,0,8,5); fill(110,110,110); ellipse(-4,-1,4,3); }
-            else if (_critter.type === 'owl') { fill(160,140,100); ellipse(0,-2,5,5); fill(200,180,120); rect(-2,-4,4,3); }
-            else { fill(140,100,60); ellipse(0,0,9,6); fill(120,80,40); ellipse(-5,-1,4,4); }
+            // Faction banner
+            let _bfx = w2sX(botCX), _bfy = w2sY(botCY - _isRY * 0.3);
+            push(); noStroke();
+            fill(100, 80, 50); rect(Math.floor(_bfx) - 1, Math.floor(_bfy) - 30, 2, 32);
+            fill(_facColor[0], _facColor[1], _facColor[2], 200);
+            let _wave = Math.sin(frameCount * 0.04 + botCX) * 2;
+            rect(Math.floor(_bfx) + 1, Math.floor(_bfy) - 28, 12 + _wave, 10);
+            fill(255, 255, 255, 180); textSize(8); textAlign(CENTER, BOTTOM);
+            text(_facName, Math.floor(_bfx), Math.floor(_bfy) - 32);
+            textSize(7); fill(200, 190, 160, 160);
+            text('Lv' + _isLevel + ' \u2694' + (_own.military || 0), Math.floor(_bfx), Math.floor(_bfy) - 22);
+            textAlign(LEFT, TOP);
             pop();
-          }
-          // Bot AI: create and draw (update runs in Web Worker)
-          if (typeof BotAI !== 'undefined') {
-            if (!BotAI.bots[_owKey]) BotAI.create(_owKey, botCX, botCY);
-            let _bot = BotAI.bots[_owKey];
-            if (_bot && Math.abs(_bot.x - botCX) > 1000) { _bot.x = botCX; _bot.y = botCY; }
-            _own.isBot = true;
-            // Sync position from worker results
-            if (_botWorkerResults[_owKey]) {
-              let wr = _botWorkerResults[_owKey];
-              _bot.x = wr.x; _bot.y = wr.y;
-              _bot.facing = wr.facing; _bot.moving = wr.moving;
-              _bot.walkFrame = wr.walkFrame;
-              if (!_bot.task) _bot.task = wr.taskType ? { type: wr.taskType } : null;
-              else if (wr.taskType) _bot.task.type = wr.taskType;
-              else _bot.task = null;
-            } else if (!_botWorker) {
-              BotAI.update(_owKey, 1);
-            }
-            BotAI.draw(_owKey);
+
+          } else {
+            // ═══ TIER 1: FAR LOD (silhouette + label) ═══
+            let _alpha = Math.max(40, Math.min(160, 300 - Math.floor(_dist * 0.06)));
+            noStroke();
+            // Island silhouette ellipse
+            let _sx = Math.floor(_bsx), _sy = Math.floor(_bsy);
+            let _srx = Math.max(8, Math.floor(_isRX * 0.15)), _sry = Math.max(4, Math.floor(_isRY * 0.08));
+            fill(_facColor[0] * 0.4, _facColor[1] * 0.4, _facColor[2] * 0.4, _alpha);
+            ellipse(_sx, _sy, _srx * 2, _sry * 2);
+            fill(_facColor[0] * 0.6, _facColor[1] * 0.6, _facColor[2] * 0.6, _alpha * 0.7);
+            ellipse(_sx, _sy - 2, _srx * 1.6, _sry * 1.2);
+            // Label
+            fill(_facColor[0], _facColor[1], _facColor[2], _alpha);
+            textSize(7); textAlign(CENTER, BOTTOM);
+            text(_facName, _sx, _sy - _sry - 4);
+            textSize(6); fill(200, 190, 170, _alpha * 0.7);
+            text('Lv' + _isLevel, _sx, _sy - _sry + 4);
+            textAlign(LEFT, TOP);
           }
         }
-        } // end for-loop over nation keys
       }
       if (!_frameBudget.throttled || frameCount % 2 === 0) drawShoreWaves();
       drawAmbientHouses();

@@ -2041,7 +2041,9 @@ function updateRivalRaid(dt) { updateNationRaids(dt); }
 function drawRivalRaiders() { drawNationRaiders(); }
 function drawRivalIsleDistant() {
   if (!state.nations) return;
-  // Show distant nation labels as waypoint markers (always visible for navigation)
+  // LOD system in sketch.js handles island rendering — this function draws extra labels only during travel
+  let _onHome = !state.rowing || !state.rowing.active;
+  if (_onHome && !state._activeNation && !state._activeExploration) return;
   let nk = Object.keys(state.nations);
   for (let k of nk) {
     let n = state.nations[k];
