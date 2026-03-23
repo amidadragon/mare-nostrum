@@ -73,6 +73,17 @@ const BotAI = {
     if (nation.islandState.legia && nation.islandState.legia.army) {
       nation.military = Math.max(nation.military || 0, nation.islandState.legia.army.length);
     }
+    // Slowly recharge crystal nodes (1 charge per 200 frames)
+    if (nation.islandState.crystalNodes && dt > 0) {
+      for (let cn of nation.islandState.crystalNodes) {
+        if ((cn.charge || 0) < 50) cn.charge = Math.min(50, (cn.charge || 0) + 0.25);
+      }
+    }
+    // Passive income: small gold trickle from population
+    if (nation.islandState.citizens && nation.islandState.citizens.length > 0 && Math.random() < 0.005) {
+      nation.islandState.gold = (nation.islandState.gold || 0) + 1;
+      nation.gold = (nation.gold || 0) + 1;
+    }
     bot.taskCooldown = Math.max(0, (bot.taskCooldown || 0) - dt);
     if (!bot.task && bot.taskCooldown <= 0) {
       let actions = this.scoreActions(nationKey);

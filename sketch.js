@@ -13103,6 +13103,12 @@ function createPrebuiltIsland(factionKey, cx, cy, targetLevel) {
     is.crystalNodes.push({ x: cx - is.islandRX * 0.7 + (Math.random() - 0.5) * 40, y: cy + (Math.random() - 0.5) * 30, charge: 50, size: 14 });
   }
 
+  // Scale starting resources with level
+  is.crystals = 20 + targetLevel * 8;
+  is.wood = 30 + targetLevel * 3;
+  is.stone = 15 + targetLevel * 2;
+  is.gold = 50 + targetLevel * 10;
+
   // Farm plots
   is.plots = [];
   for (let i = 0; i < 6; i++) {
