@@ -3618,11 +3618,19 @@ function drawInner() {
           drawIslandAt({ cx: botCX, cy: botCY, rx: _isRX, ry: _isRY, level: _own.islandState ? _own.islandState.islandLevel : (_own.level || 1), seed: _owt.seed, factionKey: _owKey });
           // Draw bot buildings using the REAL drawOneBuilding function
           if (_own.islandState && _own.islandState.buildings) {
-            // Temporarily set globals so drawOneBuilding reads correct era/faction
+            // Temporarily set globals so drawOneBuilding/drawOneTree read correct era/faction/island
             let _savedLevel = state.islandLevel;
             let _savedFaction = state.faction;
+            let _savedWorldCX = WORLD.islandCX;
+            let _savedWorldCY = WORLD.islandCY;
+            let _savedRX = state.islandRX;
+            let _savedRY = state.islandRY;
             state.islandLevel = _own.islandState.islandLevel || 5;
             state.faction = _owKey;
+            WORLD.islandCX = botCX;
+            WORLD.islandCY = botCY;
+            state.islandRX = _isRX;
+            state.islandRY = _isRY;
             // Y-sort all bot entities for proper depth
             let _botItems = [];
             for (let b of _own.islandState.buildings) {
@@ -3721,6 +3729,10 @@ function drawInner() {
             // Restore player globals
             state.islandLevel = _savedLevel;
             state.faction = _savedFaction;
+            WORLD.islandCX = _savedWorldCX;
+            WORLD.islandCY = _savedWorldCY;
+            state.islandRX = _savedRX;
+            state.islandRY = _savedRY;
           }
           // Critter pet following bot leader
           let _critter = _own.islandState ? _own.islandState.critter : null;
@@ -18155,7 +18167,7 @@ function createPrebuiltIsland(factionKey, cx, cy, targetLevel) {
   is.trees = [];
   for (let i = 0; i < 15; i++) {
     let a = Math.random() * Math.PI * 2, r = Math.random() * 0.4 + 0.2;
-    is.trees.push({ x: cx + Math.cos(a) * is.islandRX * r * 0.7, y: cy + Math.sin(a) * is.islandRY * r * 0.3, type: 'oak', hp: 3 });
+    is.trees.push({ x: cx + Math.cos(a) * is.islandRX * r * 0.7, y: cy + Math.sin(a) * is.islandRY * r * 0.3, type: 'oak', hp: 3, alive: true, health: 3, maxHealth: 3, size: 0.8 + Math.random() * 0.5, shakeTimer: 0, regrowTimer: 0 });
   }
 
   // Crystal nodes
