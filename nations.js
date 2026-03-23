@@ -606,9 +606,32 @@ function updateNationDaily(key) {
       rv.wars.push(k2); other.wars.push(key);
       addNotification(name + ' declares war on ' + getNationName(k2) + '!', '#ff4444');
     }
-    // AI-to-AI war resolution (weaker side surrenders)
+    // AI-to-AI battle: warring nations fight — soldiers die each tick
+    if (rv.wars && rv.wars.includes(k2) && rv.military > 0 && other.military > 0 && random() < 0.03) {
+      // Battle round: both sides take casualties
+      let rvDmg = max(1, floor(other.military * 0.3 * (0.5 + random() * 0.5)));
+      let otherDmg = max(1, floor(rv.military * 0.3 * (0.5 + random() * 0.5)));
+      rv.military = max(0, rv.military - rvDmg);
+      other.military = max(0, other.military - otherDmg);
+      // Sync to island army
+      if (rv.islandState && rv.islandState.legia && rv.islandState.legia.army) {
+        while (rv.islandState.legia.army.length > rv.military) rv.islandState.legia.army.pop();
+      }
+      if (other.islandState && other.islandState.legia && other.islandState.legia.army) {
+        while (other.islandState.legia.army.length > other.military) other.islandState.legia.army.pop();
+      }
+      if (random() < 0.15) addNotification(name + ' clashes with ' + getNationName(k2) + '! (-' + rvDmg + '/' + '-' + otherDmg + ' troops)', '#ee6644');
+    }
+    // AI-to-AI war resolution: defeated nation becomes vassal
     if (rv.wars && rv.wars.includes(k2) && random() < 0.01) {
-      if (rv.military < other.military * 0.5 && rv.military > 0) {
+      if (rv.military <= 0 && other.military > 0) {
+        // rv is defeated — becomes vassal of other
+        rv.defeated = true; rv.vassal = true; rv._vassalOf = k2;
+        other.gold += floor(rv.gold * 0.5); rv.gold = floor(rv.gold * 0.5);
+        rv.wars = rv.wars.filter(w => w !== k2); if (other.wars) other.wars = other.wars.filter(w => w !== key);
+        rv.relations[k2] = 30;
+        addNotification(getNationName(k2) + ' conquers ' + name + '!', '#ffcc44');
+      } else if (rv.military < other.military * 0.5 && rv.military > 0) {
         rv.military = max(0, rv.military - 2); other.gold += 20;
         rv.wars = rv.wars.filter(w => w !== k2); if (other.wars) other.wars = other.wars.filter(w => w !== key);
         rv.relations[k2] = min(100, (rv.relations[k2] || 0) + 20);
