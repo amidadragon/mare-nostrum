@@ -152,6 +152,19 @@ const BotAI = {
         swapBack();
       }
     }
+    // Auto-recruit: bots train soldiers when they have castrum + gold
+    if (is && is.buildings && is.buildings.some(b => b.type === 'castrum') && Math.random() < 0.004) {
+      let armySize = is.legia && is.legia.army ? is.legia.army.length : 0;
+      let maxArmy = Math.min(10, 3 + Math.floor((is.islandLevel || 1) / 3));
+      if (armySize < maxArmy && (is.gold || 0) >= 10) {
+        is.gold -= 10;
+        nation.gold = Math.max(0, (nation.gold || 0) - 10);
+        if (!is.legia) is.legia = { army: [], castrumLevel: 1, morale: 100 };
+        if (!is.legia.army) is.legia.army = [];
+        is.legia.army.push({ type: 'legionary', hp: 20, maxHp: 20, damage: 5, speed: 1.2, garrison: false });
+        nation.military = is.legia.army.length;
+      }
+    }
     // Population growth: spawn new citizens when food + housing available
     if (is && is.citizens && Math.random() < 0.002) {
       let maxPop = 5 + (is.islandLevel || 1) * 2;
