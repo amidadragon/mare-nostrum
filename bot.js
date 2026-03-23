@@ -87,8 +87,26 @@ const BotAI = {
         if ((cn.charge || 0) < 50) cn.charge = Math.min(50, (cn.charge || 0) + 0.25);
       }
     }
-    // Population growth: spawn new citizens when food + housing available
+    // Auto-farm: crops grow and auto-harvest generates food
     let is = nation.islandState;
+    if (is && is.plots) {
+      for (let p of is.plots) {
+        if (p.crop && p.stage === 'growing') {
+          p.growTimer = (p.growTimer || 0) + 0.5; // auto-grow slowly
+          if (p.growTimer >= 200) p.stage = 'ready';
+        }
+        if (p.stage === 'ready' && Math.random() < 0.01) {
+          // Auto-harvest ready crops
+          is.harvest = (is.harvest || 0) + 2;
+          p.stage = 'empty'; p.crop = null;
+        }
+        if (!p.crop && Math.random() < 0.005) {
+          // Auto-replant empty plots
+          p.crop = 'grain'; p.stage = 'growing'; p.growTimer = 0;
+        }
+      }
+    }
+    // Population growth: spawn new citizens when food + housing available
     if (is && is.citizens && Math.random() < 0.002) {
       let maxPop = 5 + (is.islandLevel || 1) * 2;
       let domusCount = is.buildings ? is.buildings.filter(b => b.type === 'domus' || b.type === 'villa').length : 0;
