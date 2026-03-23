@@ -3559,18 +3559,25 @@ function drawInner() {
     translate(shakeX, shakeY + floatOffset);
     if (!state.rowing || !state.rowing.active || _homeDist < 300) {
       drawIsland();
-      // Open world: render first bot nation island nearby for testing
+      // Open world: render first bot nation island nearby with state swap
       if (state.nations) {
         let _owKey = Object.keys(state.nations)[0];
         if (_owKey) {
           let _own = state.nations[_owKey];
-          // Place first bot island east of home island (close enough to sail to)
           let botCX = WORLD.islandCX + 1200;
           let botCY = WORLD.islandCY;
           _own.isleX = botCX;
           _own.isleY = botCY;
           let _owt = (typeof FACTION_TERRAIN !== 'undefined') ? (FACTION_TERRAIN[_owKey] || FACTION_TERRAIN.rome) : { seed: 42 };
-          drawIslandAt({ cx: botCX, cy: botCY, rx: 400, ry: 260, level: _own.level || 1, seed: _owt.seed, factionKey: _owKey });
+          let _isRX = _own.islandState ? _own.islandState.islandRX || 400 : 400;
+          let _isRY = _own.islandState ? _own.islandState.islandRY || 260 : 260;
+          drawIslandAt({ cx: botCX, cy: botCY, rx: _isRX, ry: _isRY, level: _own.islandState ? _own.islandState.islandLevel : (_own.level || 1), seed: _owt.seed, factionKey: _owKey });
+          // Draw bot buildings via state swap
+          if (_own.islandState && _own.islandState.buildings.length > 0) {
+            swapToIsland(_own.islandState, botCX, botCY);
+            drawWorldObjectsSorted();
+            swapBack();
+          }
         }
       }
       if (!_frameBudget.throttled || frameCount % 2 === 0) drawShoreWaves();
@@ -8884,6 +8891,10 @@ function selectFaction(faction) {
   if (snd && snd.playNarration) snd.playNarration(faction + '_intro');
   // Initialize all rival nations (everyone except player's faction)
   initNations();
+  // Create per-island state for each bot nation
+  for (let k of Object.keys(state.nations)) {
+    state.nations[k].islandState = createIslandState(k);
+  }
   // Initialize personal rival
   initPersonalRival(faction);
   // ALL factions: skip wreck, spawn directly on home island
@@ -17856,6 +17867,54 @@ function expandIsland() {
 
   addFloatingText(width / 2, height * 0.35, '⚡ ISLAND EXPANDED LV.' + state.islandLevel, C.crystalGlow);
   spawnIslandLevelUp();
+}
+
+// ─── PER-ISLAND STATE SYSTEM ──────────────────────────────────────────────
+// Each island (player + bots) gets its own state instance.
+// The same game engine runs for all via state swapping.
+
+let _realState = null;
+let _swappedIsland = null;
+
+const _islandFields = [
+  'buildings','plots','citizens','trees','crystalNodes',
+  'islandLevel','islandRX','islandRY',
+  'wood','stone','gold','crystals','ironOre','harvest','fish','seeds',
+  'meals','wine','oil'
+];
+
+function createIslandState(faction) {
+  return {
+    faction: faction,
+    buildings: [], plots: [], citizens: [], trees: [], crystalNodes: [],
+    islandLevel: 3, islandRX: 500, islandRY: 320,
+    wood: 10, stone: 5, gold: 10, crystals: 5,
+    ironOre: 0, harvest: 5, fish: 2, seeds: 3,
+    meals: 0, wine: 0, oil: 0,
+    npcNames: FACTIONS[faction] ? FACTIONS[faction].npcNames : null,
+  };
+}
+
+function swapToIsland(islandState, cx, cy) {
+  if (_realState) return; // already swapped
+  _realState = { cx: WORLD.islandCX, cy: WORLD.islandCY };
+  for (let f of _islandFields) _realState[f] = state[f];
+  for (let f of _islandFields) state[f] = islandState[f] != null ? islandState[f] : state[f];
+  WORLD.islandCX = cx;
+  WORLD.islandCY = cy;
+  _swappedIsland = islandState;
+}
+
+function swapBack() {
+  if (!_realState) return;
+  if (_swappedIsland) {
+    for (let f of _islandFields) _swappedIsland[f] = state[f];
+  }
+  for (let f of _islandFields) state[f] = _realState[f];
+  WORLD.islandCX = _realState.cx;
+  WORLD.islandCY = _realState.cy;
+  _realState = null;
+  _swappedIsland = null;
 }
 
 // ─── COORD HELPERS ────────────────────────────────────────────────────────

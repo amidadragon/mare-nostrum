@@ -384,6 +384,32 @@ function updateNationDaily(key) {
     }
   }
 
+  // --- ISLAND STATE TICK (bot builds real buildings via state swap) ---
+  if (rv.islandState && typeof swapToIsland === 'function') {
+    let isCX = rv.isleX || WORLD.islandCX + 1200;
+    let isCY = rv.isleY || WORLD.islandCY;
+    swapToIsland(rv.islandState, isCX, isCY);
+    // Expand island sometimes
+    if (rv.islandState.islandLevel < 10 && rv.gold >= 50 && random() < 0.15) {
+      state.islandLevel++;
+      state.islandRX += 30;
+      state.islandRY += 20;
+    }
+    // Place a real building from BLUEPRINTS (cap at 20 per island)
+    if (typeof BLUEPRINTS !== 'undefined' && state.buildings.length < 20 && random() < 0.2 * botDiff.buildMult) {
+      let bpKeys = Object.keys(BLUEPRINTS).filter(bk => (BLUEPRINTS[bk].minLevel || 1) <= state.islandLevel);
+      if (bpKeys.length > 0) {
+        let bk = bpKeys[floor(random(bpKeys.length))];
+        let bp = BLUEPRINTS[bk];
+        let ang = random(TWO_PI), rd = random(0.3, 0.7);
+        let bx = isCX + cos(ang) * state.islandRX * rd * 0.8;
+        let by = isCY + sin(ang) * state.islandRY * rd * 0.5;
+        state.buildings.push({ type: bk, x: bx, y: by, w: bp.w || 40, h: bp.h || 40, hp: bp.maxHp || 100, built: true });
+      }
+    }
+    swapBack();
+  }
+
   // --- MILITARY AI ---
   let atWar = rv.wars && rv.wars.length > 0;
   let recruitChance = pers.militaryChance * (atWar ? 0.8 : 0.4) * botDiff.militaryMult;
