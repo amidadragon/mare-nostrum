@@ -5327,16 +5327,51 @@ function updateInvasion(dt) {
     nation.defeated = true;
     nation.vassal = true;
     nation._vassalOf = state.faction || 'rome';
-    if (typeof addNotification === 'function')
-      addNotification('VICTORY! ' + getNationName(inv.target) + ' conquered!', '#ffdd44');
+    // Conquest rewards: loot gold, gain tribute, boost reputation
+    let lootGold = Math.floor((nation.gold || 0) * 0.5);
+    state.gold = (state.gold || 0) + lootGold;
+    nation.gold = Math.floor((nation.gold || 0) * 0.5);
+    let lootWood = Math.floor((nation.islandState && nation.islandState.wood || 0) * 0.3);
+    let lootStone = Math.floor((nation.islandState && nation.islandState.stone || 0) * 0.3);
+    state.wood = (state.wood || 0) + lootWood;
+    state.stone = (state.stone || 0) + lootStone;
+    // XP reward
+    if (state.player) state.player.xp = (state.player.xp || 0) + 200;
+    // Reputation boost with other nations (they fear you)
+    if (state.nations) {
+      for (let k of Object.keys(state.nations)) {
+        if (k !== inv.target) {
+          state.nations[k].reputation = Math.max(-100, (state.nations[k].reputation || 0) - 10);
+          if (state.nations[k].military <= (nation.military || 0)) {
+            // Weaker nations become more submissive
+            state.nations[k].aggression = Math.max(0, (state.nations[k].aggression || 0.5) - 0.2);
+          }
+        }
+      }
+    }
+    // Strategy engine update
+    if (typeof StrategyEngine !== 'undefined' && StrategyEngine.session) {
+      StrategyEngine.session.events.push({ day: state.day, type: 'conquest', target: inv.target });
+    }
+    let _cName = typeof getNationName === 'function' ? getNationName(inv.target) : inv.target;
+    if (typeof addNotification === 'function') {
+      addNotification('VICTORY! ' + _cName + ' conquered! +' + lootGold + 'g +' + lootWood + ' wood +' + lootStone + ' stone', '#ffdd44');
+      addNotification(_cName + ' is now your vassal — pays tribute daily', '#ddcc44');
+    }
     if (typeof addFloatingText === 'function')
       addFloatingText(width/2, height*0.3, 'ISLAND CONQUERED!', '#ffcc44');
+    if (typeof spawnParticles === 'function') spawnParticles(width/2, height*0.4, 'divine', 20);
+    if (typeof trackMilestone === 'function') trackMilestone('nation_conquered_' + inv.target);
     state._invasionTarget = null;
   } else if (aliveAtk === 0) {
     inv.active = false;
     state.legia.army = [];
+    // Defeat consequences: reputation penalty, enemy emboldened
+    nation.reputation = Math.max(-100, (nation.reputation || 0) - 15);
+    nation.aggression = Math.min(1, (nation.aggression || 0.5) + 0.3);
+    nation.military = (nation.military || 0) + 2; // defender reinforcements
     if (typeof addNotification === 'function')
-      addNotification('Invasion failed! Army lost.', '#ff4444');
+      addNotification('Invasion failed! Army lost. ' + (typeof getNationName === 'function' ? getNationName(inv.target) : inv.target) + ' is emboldened!', '#ff4444');
     state._invasionTarget = null;
   }
 }
