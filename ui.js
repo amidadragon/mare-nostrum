@@ -4253,7 +4253,23 @@ function drawWorldMap() {
     text(isle.icon, ix, iy - 1);
     fill(red(c), green(c), blue(c), 220); textSize(8); textAlign(CENTER, TOP);
     text(isle.name, ix, iy + sz * 0.4 + 2);
-    if (isle.nation) { fill(red(c), green(c), blue(c), 200); ellipse(ix + sz * 0.5 + 4, iy - 2, 5, 5); }
+    if (isle.nation && state.nations) {
+      // Show relationship + military strength for nations
+      let _nk2 = Object.keys(state.nations).find(k => (typeof getNationName === 'function' ? getNationName(k) : k) === isle.name);
+      if (_nk2 && state.nations[_nk2]) {
+        let _nv2 = state.nations[_nk2];
+        // Military indicator (swords)
+        let _mil = _nv2.military || 0;
+        fill(200, 180, 140, 160); textSize(6); textAlign(CENTER, TOP);
+        text('\u2694' + _mil, ix, iy + sz * 0.4 + 11);
+        // Relationship ring
+        if (_nv2.allied) { stroke(80, 200, 80, 150); strokeWeight(1.5); noFill(); ellipse(ix, iy, sz + 10, (sz + 10) * 0.65); noStroke(); }
+        else if (_nv2.vassal) { stroke(200, 200, 80, 150); strokeWeight(1.5); noFill(); ellipse(ix, iy, sz + 10, (sz + 10) * 0.65); noStroke(); }
+        else if ((_nv2.reputation || 0) < -20) { stroke(220, 60, 60, 120); strokeWeight(1.5); noFill(); ellipse(ix, iy, sz + 10, (sz + 10) * 0.65); noStroke(); }
+        // War indicator
+        if (_nv2.wars && _nv2.wars.length > 0) { fill(255, 60, 40, 200); textSize(8); text('\u2620', ix + sz * 0.6, iy - sz * 0.3); }
+      }
+    }
     if (isle.isHuman) { fill(80, 200, 255, 180); textSize(6); textAlign(CENTER, TOP); text('PLAYER', ix, iy + sz * 0.4 + 10); }
   }
   if (state.rowing && state.rowing.active) {
