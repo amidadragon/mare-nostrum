@@ -3634,6 +3634,27 @@ function drawInner() {
                 _botItems.push({ y: t.y, draw: () => drawOneTree(t) });
               }
             }
+            // Ambient houses on bot island (generated once, cached)
+            if (!_own.islandState._ambientHouses && _own.islandState.islandLevel >= 5 && typeof drawOneAmbientHouse === 'function') {
+              let _bah = [];
+              let _bRX = _own.islandState.islandRX || 400;
+              let _bRY = _own.islandState.islandRY || 260;
+              let _hCount = Math.min(8, Math.floor((_own.islandState.islandLevel - 4) * 1.5));
+              for (let _hi = 0; _hi < _hCount; _hi++) {
+                let _a = Math.PI * 2 * _hi / _hCount + 0.3;
+                let _r = 0.25 + Math.random() * 0.25;
+                let _hx = botCX + Math.cos(_a) * _bRX * _r * 0.6;
+                let _hy = botCY + Math.sin(_a) * _bRY * _r * 0.3;
+                let _hv = _hi % 4;
+                _bah.push({ x: _hx, y: _hy, w: 20 + (_hv % 3) * 3, h: 16 + (_hv % 3) * 2, variant: _hv });
+              }
+              _own.islandState._ambientHouses = _bah;
+            }
+            if (_own.islandState._ambientHouses) {
+              for (let h of _own.islandState._ambientHouses) {
+                _botItems.push({ y: h.y, draw: () => drawOneAmbientHouse(h) });
+              }
+            }
             // Citizens using the REAL drawOneCitizen function
             if (_own.islandState.citizens) {
               for (let c of _own.islandState.citizens) {
@@ -3655,20 +3676,22 @@ function drawInner() {
             _botItems.sort((a, b) => a.y - b.y);
             for (let item of _botItems) item.draw();
 
-            // Temple HP bar (drawn on top, not Y-sorted)
+            // Temple HP bar (drawn on top, not Y-sorted) — only when damaged
             let templeB = _own.islandState.buildings.find(b => b.isTemple || b.type === 'temple');
             if (templeB) {
-              let thx = w2sX(templeB.x), thy = w2sY(templeB.y) - 35;
-              let tHP = _own.islandState.templeHP || 100;
-              noStroke();
-              fill(0,0,0,150); rect(thx-25, thy, 50, 6, 2);
-              let hpRatio = tHP / 100;
-              fill(hpRatio > 0.5 ? Math.floor((1-hpRatio)*400) : 200, hpRatio > 0.5 ? 200 : Math.floor(hpRatio*400), 50);
-              rect(thx-23, thy+1, 46*hpRatio, 4, 1);
-              fill(255,255,255,200); textAlign(CENTER,BOTTOM); textSize(7);
-              text('Temple '+tHP+'%', thx, thy-1); textAlign(LEFT,TOP);
-              if (tHP < 50) { fill(80,80,80,50); ellipse(thx+Math.sin(frameCount*0.03)*5, thy-10, 15, 8); }
-              if (tHP < 25) { fill(255,100,30,60); ellipse(thx-5, thy-5, 8, 12); }
+              let tHP = _own.islandState.templeHP !== undefined ? _own.islandState.templeHP : 100;
+              if (tHP < 100) {
+                let thx = w2sX(templeB.x), thy = w2sY(templeB.y) - 35;
+                noStroke();
+                fill(0,0,0,150); rect(thx-25, thy, 50, 6, 2);
+                let hpRatio = tHP / 100;
+                fill(hpRatio > 0.5 ? Math.floor((1-hpRatio)*400) : 200, hpRatio > 0.5 ? 200 : Math.floor(hpRatio*400), 50);
+                rect(thx-23, thy+1, 46*hpRatio, 4, 1);
+                fill(255,255,255,200); textAlign(CENTER,BOTTOM); textSize(7);
+                text('Temple '+tHP+'%', thx, thy-1); textAlign(LEFT,TOP);
+                if (tHP < 50) { fill(80,80,80,50); ellipse(thx+Math.sin(frameCount*0.03)*5, thy-10, 15, 8); }
+                if (tHP < 25) { fill(255,100,30,60); ellipse(thx-5, thy-5, 8, 12); }
+              }
             }
             // Restore player globals
             state.islandLevel = _savedLevel;
