@@ -3,19 +3,80 @@
 // remain in sketch.js and are accessed here as globals.
 
 const TUNIC_COLORS = [
-  { name: 'Natural',  rgb: [220, 200, 170] },
-  { name: 'Saffron',  rgb: [240, 180, 60] },
-  { name: 'Indigo',   rgb: [80, 100, 200] },
-  { name: 'Scarlet',  rgb: [200, 60, 60] },
-  { name: 'Forest',   rgb: [80, 140, 80] },
-  { name: 'Bone',     rgb: [240, 235, 220] },
+  // Free (always available)
+  { name: 'Natural',  rgb: [220, 200, 170], price: 0 },
+  { name: 'Saffron',  rgb: [240, 180, 60],  price: 0 },
+  { name: 'Indigo',   rgb: [80, 100, 200],  price: 0 },
+  { name: 'Scarlet',  rgb: [200, 60, 60],   price: 0 },
+  { name: 'Forest',   rgb: [80, 140, 80],   price: 0 },
+  { name: 'Bone',     rgb: [240, 235, 220],  price: 0 },
+  // Premium (cost Sesterces)
+  { name: 'Royal Purple', rgb: [120, 40, 160], price: 50 },
+  { name: 'Gold Thread',  rgb: [220, 190, 80], price: 75 },
+  { name: 'Sea Foam',     rgb: [100, 200, 190], price: 50 },
+  { name: 'Midnight',     rgb: [30, 30, 60],   price: 50 },
+  { name: 'Crimson',      rgb: [160, 20, 30],  price: 75 },
+  { name: 'Desert Sand',  rgb: [210, 180, 130], price: 25 },
+  { name: 'Storm Grey',   rgb: [120, 130, 140], price: 25 },
+  { name: 'Tyrian',       rgb: [150, 30, 100], price: 100 },
+  { name: 'Phoenix',      rgb: [230, 100, 30], price: 75 },
+  { name: 'Obsidian',     rgb: [40, 35, 30],   price: 100 },
 ];
 
 const HEADWEAR = [
-  { name: 'None',         unlocked: function() { return true; } },
-  { name: 'Laurel Crown', unlocked: function() { return (state.islandLevel || 0) >= 10; } },
-  { name: 'Bronze Helm',  unlocked: function() { return (state.player.totalXp || 0) >= 500 || (state.codex && state.codex.enemies && Object.values(state.codex.enemies).reduce(function(s,e) { return s + (e.count || 0); }, 0) >= 50); } },
+  { name: 'None',           price: 0, unlocked: function() { return true; } },
+  { name: 'Laurel Crown',   price: 0, unlocked: function() { return (state.islandLevel || 0) >= 10; } },
+  { name: 'Bronze Helm',    price: 0, unlocked: function() { return (state.player.totalXp || 0) >= 500 || (state.codex && state.codex.enemies && Object.values(state.codex.enemies).reduce(function(s,e) { return s + (e.count || 0); }, 0) >= 50); } },
+  // Premium headwear
+  { name: 'Golden Laurel',  price: 100, unlocked: function() { return _isCosmeticOwned('hw_golden_laurel'); } },
+  { name: 'War Mask',       price: 75,  unlocked: function() { return _isCosmeticOwned('hw_war_mask'); } },
+  { name: 'Pharaoh Crown',  price: 150, unlocked: function() { return _isCosmeticOwned('hw_pharaoh_crown'); } },
+  { name: 'Druid Antlers',  price: 100, unlocked: function() { return _isCosmeticOwned('hw_druid_antlers'); } },
+  { name: 'Centurion Crest', price: 125, unlocked: function() { return _isCosmeticOwned('hw_centurion_crest'); } },
+  { name: 'Pirate Bandana', price: 50,  unlocked: function() { return _isCosmeticOwned('hw_pirate_bandana'); } },
+  { name: 'Flower Crown',   price: 75,  unlocked: function() { return _isCosmeticOwned('hw_flower_crown'); } },
+  { name: 'Iron Crown',     price: 200, unlocked: function() { return _isCosmeticOwned('hw_iron_crown'); } },
 ];
+
+// Cosmetics currency & ownership
+function _isCosmeticOwned(id) {
+  return state.cosmetics && state.cosmetics.owned && state.cosmetics.owned.indexOf(id) >= 0;
+}
+
+function _buyCosmeticTunic(index) {
+  if (!state.cosmetics) state.cosmetics = { sesterces: 0, owned: [] };
+  let tc = TUNIC_COLORS[index];
+  if (!tc || tc.price <= 0) return false;
+  if (state.cosmetics.sesterces < tc.price) return false;
+  let id = 'tunic_' + index;
+  if (state.cosmetics.owned.indexOf(id) >= 0) return false;
+  state.cosmetics.sesterces -= tc.price;
+  state.cosmetics.owned.push(id);
+  return true;
+}
+
+function _buyCosmeticHeadwear(index) {
+  if (!state.cosmetics) state.cosmetics = { sesterces: 0, owned: [] };
+  let hw = HEADWEAR[index];
+  if (!hw || hw.price <= 0) return false;
+  if (state.cosmetics.sesterces < hw.price) return false;
+  let id = 'hw_' + hw.name.toLowerCase().replace(/\s+/g, '_');
+  if (state.cosmetics.owned.indexOf(id) >= 0) return false;
+  state.cosmetics.sesterces -= hw.price;
+  state.cosmetics.owned.push(id);
+  return true;
+}
+
+function _isTunicOwned(index) {
+  if (index < 6) return true; // first 6 are free
+  return state.cosmetics && state.cosmetics.owned && state.cosmetics.owned.indexOf('tunic_' + index) >= 0;
+}
+
+function earnSesterces(amount, reason) {
+  if (!state.cosmetics) state.cosmetics = { sesterces: 0, owned: [] };
+  state.cosmetics.sesterces += amount;
+  if (typeof addNotification === 'function') addNotification('+' + amount + ' Sesterces' + (reason ? ' — ' + reason : ''), '#ddaa44');
+}
 
 let wardrobeOpen = false;
 
@@ -334,7 +395,7 @@ function triggerPlayerAlert() {
 function drawWardrobe() {
   if (!wardrobeOpen) return;
 
-  let pw = min(220, width - 20), ph = min(280, height - 20);
+  let pw = min(320, width - 20), ph = min(380, height - 20);
   let px = max(10, width / 2 - pw / 2);
   let py = max(10, height / 2 - ph / 2);
 
@@ -347,51 +408,69 @@ function drawWardrobe() {
   fill(65, 52, 38);
   rect(px + 4, py + 4, pw - 8, ph - 8, 4);
 
+  // Sesterces balance
+  let sesterces = (state.cosmetics && state.cosmetics.sesterces) || 0;
+
   fill(220, 200, 160);
   textSize(14);
   textAlign(CENTER);
   text('WARDROBE', px + pw / 2, py + 24);
+  fill(220, 190, 80); textSize(9);
+  text(sesterces + ' Sesterces', px + pw / 2, py + 38);
 
   fill(180, 165, 135);
   textSize(10);
-  text('Tunic', px + pw / 2, py + 46);
+  text('Tunic', px + pw / 2, py + 54);
 
-  let swatchSize = 24;
-  let swatchGap = 8;
-  let swatchStartX = px + (pw - (TUNIC_COLORS.length * (swatchSize + swatchGap) - swatchGap)) / 2;
+  // Tunic swatches — 2 rows for 16 colors
+  let swatchSize = 20;
+  let swatchGap = 6;
+  let colsPerRow = 8;
+  let rowWidth = colsPerRow * (swatchSize + swatchGap) - swatchGap;
+  let swatchStartX = px + (pw - rowWidth) / 2;
 
   for (let i = 0; i < TUNIC_COLORS.length; i++) {
-    let sx = swatchStartX + i * (swatchSize + swatchGap);
-    let sy = py + 54;
+    let row = Math.floor(i / colsPerRow);
+    let col = i % colsPerRow;
+    let sx = swatchStartX + col * (swatchSize + swatchGap);
+    let sy = py + 62 + row * (swatchSize + 14);
     let tc = TUNIC_COLORS[i];
+    let owned = _isTunicOwned(i);
 
-    fill(tc.rgb[0], tc.rgb[1], tc.rgb[2]);
+    if (owned) {
+      fill(tc.rgb[0], tc.rgb[1], tc.rgb[2]);
+    } else {
+      fill(tc.rgb[0] * 0.4, tc.rgb[1] * 0.4, tc.rgb[2] * 0.4);
+    }
     ellipse(sx + swatchSize / 2, sy + swatchSize / 2, swatchSize, swatchSize);
 
     if (state.wardrobe.tunicColor === i) {
-      noFill();
-      stroke(220, 190, 80);
-      strokeWeight(2);
+      noFill(); stroke(220, 190, 80); strokeWeight(2);
       ellipse(sx + swatchSize / 2, sy + swatchSize / 2, swatchSize + 4, swatchSize + 4);
       noStroke();
     }
 
-    fill(160, 145, 120);
-    textSize(7);
-    text(tc.name, sx + swatchSize / 2, sy + swatchSize + 10);
+    if (!owned && tc.price > 0) {
+      fill(220, 190, 80, 200); textSize(6); textAlign(CENTER);
+      text(tc.price, sx + swatchSize / 2, sy + swatchSize + 4);
+    }
   }
 
   fill(180, 165, 135);
   textSize(10);
-  text('Headwear', px + pw / 2, py + 110);
+  text('Headwear', px + pw / 2, py + 130);
 
-  let hwSize = 40;
-  let hwGap = 16;
-  let hwStartX = px + (pw - (HEADWEAR.length * (hwSize + hwGap) - hwGap)) / 2;
+  let hwSize = 28;
+  let hwGap = 8;
+  let hwCols = Math.min(6, HEADWEAR.length);
+  let hwRowW = hwCols * (hwSize + hwGap) - hwGap;
+  let hwStartX = px + (pw - hwRowW) / 2;
 
   for (let i = 0; i < HEADWEAR.length; i++) {
-    let hx = hwStartX + i * (hwSize + hwGap);
-    let hy = py + 120;
+    let hwRow = Math.floor(i / hwCols);
+    let hwCol = i % hwCols;
+    let hx = hwStartX + hwCol * (hwSize + hwGap);
+    let hy = py + 140 + hwRow * (hwSize + 18);
     let hw = HEADWEAR[i];
     let isUnlocked = hw.unlocked();
 
@@ -449,10 +528,10 @@ function drawWardrobe() {
 
   fill(180, 165, 135);
   textSize(10);
-  text('Preview', px + pw / 2, py + 195);
+  text('Preview', px + pw / 2, py + 260);
 
   push();
-  translate(px + pw / 2, py + 235);
+  translate(px + pw / 2, py + 300);
   scale(2);
   drawPlayerPreview();
   pop();

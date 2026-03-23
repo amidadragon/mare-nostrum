@@ -91,26 +91,42 @@ function mousePressed() {
   if (typeof handleLegionButtonClick === 'function' && handleLegionButtonClick(mouseX, mouseY)) return;
   // Wardrobe click handling
   if (wardrobeOpen) {
-    let pw = 220, ph = 280;
-    let px = width / 2 - pw / 2;
-    let py = height / 2 - ph / 2;
-    let swatchSize = 24, swatchGap = 8;
-    let swatchStartX = px + (pw - (TUNIC_COLORS.length * (swatchSize + swatchGap) - swatchGap)) / 2;
+    let pw = min(320, width - 20), ph = min(380, height - 20);
+    let px = max(10, width / 2 - pw / 2);
+    let py = max(10, height / 2 - ph / 2);
+    // Tunic clicks (2 rows of 8)
+    let swatchSize = 20, swatchGap = 6, colsPerRow = 8;
+    let rowWidth = colsPerRow * (swatchSize + swatchGap) - swatchGap;
+    let swatchStartX = px + (pw - rowWidth) / 2;
     for (let i = 0; i < TUNIC_COLORS.length; i++) {
-      let sx = swatchStartX + i * (swatchSize + swatchGap) + swatchSize / 2;
-      let sy = py + 54 + swatchSize / 2;
+      let row = Math.floor(i / colsPerRow), col = i % colsPerRow;
+      let sx = swatchStartX + col * (swatchSize + swatchGap) + swatchSize / 2;
+      let sy = py + 62 + row * (swatchSize + 14) + swatchSize / 2;
       if (dist(mouseX, mouseY, sx, sy) < swatchSize / 2 + 2) {
-        state.wardrobe.tunicColor = i;
+        if (typeof _isTunicOwned === 'function' && _isTunicOwned(i)) {
+          state.wardrobe.tunicColor = i;
+        } else if (typeof _buyCosmeticTunic === 'function' && _buyCosmeticTunic(i)) {
+          state.wardrobe.tunicColor = i;
+          if (typeof addFloatingText === 'function') addFloatingText(width / 2, height * 0.3, 'Unlocked!', '#ffdd44');
+        }
         return;
       }
     }
-    let hwSize = 40, hwGap = 16;
-    let hwStartX = px + (pw - (HEADWEAR.length * (hwSize + hwGap) - hwGap)) / 2;
+    // Headwear clicks (2 rows of 6)
+    let hwSize = 28, hwGap = 8, hwCols = Math.min(6, HEADWEAR.length);
+    let hwRowW = hwCols * (hwSize + hwGap) - hwGap;
+    let hwStartX = px + (pw - hwRowW) / 2;
     for (let i = 0; i < HEADWEAR.length; i++) {
-      let hx = hwStartX + i * (hwSize + hwGap);
-      let hy = py + 120;
+      let hwRow = Math.floor(i / hwCols), hwCol = i % hwCols;
+      let hx = hwStartX + hwCol * (hwSize + hwGap);
+      let hy = py + 140 + hwRow * (hwSize + 18);
       if (mouseX > hx && mouseX < hx + hwSize && mouseY > hy && mouseY < hy + hwSize) {
-        if (HEADWEAR[i].unlocked()) state.wardrobe.headwear = i;
+        if (HEADWEAR[i].unlocked()) {
+          state.wardrobe.headwear = i;
+        } else if (HEADWEAR[i].price > 0 && typeof _buyCosmeticHeadwear === 'function' && _buyCosmeticHeadwear(i)) {
+          state.wardrobe.headwear = i;
+          if (typeof addFloatingText === 'function') addFloatingText(width / 2, height * 0.3, 'Unlocked!', '#ffdd44');
+        }
         return;
       }
     }

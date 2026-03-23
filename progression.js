@@ -279,6 +279,7 @@ function initState() {
     god: { faction: null, prayerCooldown: 0, ultimateCharge: 0, blessingActive: null, blessingTimer: 0 },
 
     wardrobe: { tunicColor: 0, headwear: 0 },
+    cosmetics: { sesterces: 0, owned: [] },
 
     rowing: {
       active: false,

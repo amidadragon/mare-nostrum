@@ -274,6 +274,11 @@ function expandIsland() {
   state.islandLevel++;
   triggerIslandMilestone(state.islandLevel);
   addNotification('Island expanded to Level ' + state.islandLevel, '#ffdd66');
+  // Earn Sesterces for expansion milestones
+  if (typeof earnSesterces === 'function') {
+    let _sesReward = state.islandLevel >= 15 ? 25 : state.islandLevel >= 10 ? 15 : state.islandLevel >= 5 ? 10 : 5;
+    earnSesterces(_sesReward, 'Level ' + state.islandLevel);
+  }
   // Island grows less per level at higher tiers
   let rxGrowth = state.islandLevel <= 5 ? 35 : state.islandLevel <= 10 ? 28 : state.islandLevel <= 15 ? 22 : state.islandLevel <= 20 ? 16 : 12;
   let ryGrowth = state.islandLevel <= 5 ? 24 : state.islandLevel <= 10 ? 18 : state.islandLevel <= 15 ? 14 : state.islandLevel <= 20 ? 10 : 8;
