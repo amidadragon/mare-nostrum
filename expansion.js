@@ -442,7 +442,7 @@ const _islandFields = [
   'wood','stone','gold','crystals','ironOre','harvest','fish','seeds',
   'meals','wine','oil',
   'pyramid','ruins','resources','factionFlora','factionWildlife',
-  'chickens','crystalShrine','faction'
+  'chickens','crystalShrine','faction','workers'
 ];
 
 function createIslandState(faction) {

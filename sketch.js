@@ -5556,6 +5556,13 @@ function drawWorldObjectsSorted() {
       }
     }
   }
+  // Island workers (bot island NPCs: cutter, quarrier, priestess, farmer)
+  if (state.workers) {
+    for (let _wi = 0; _wi < state.workers.length; _wi++) {
+      let w = state.workers[_wi];
+      if (isOnScreen(w.x, w.y, 40)) _sortItems.push({ y: w.y, draw: () => drawOneWorker(w) });
+    }
+  }
   // Legion soldiers on home island (ambient garrison) — cull offscreen
   // Patrol soldiers derived from army[] garrison + legacy soldiers[]
   { let _ps = (typeof getPatrolSoldiers === 'function' ? getPatrolSoldiers() : []).concat(state.legia && state.legia.soldiers ? state.legia.soldiers : []); _ps.forEach(s => { if (isOnScreen(s.x, s.y, 40)) _sortItems.push({ y: s.y, draw: () => drawLegionAmbientSoldier(s) }); }); }
@@ -7006,6 +7013,58 @@ function updateChickens(dt) {
     if (abs(ch.x - farmCX) > 100) ch.vx *= -1;
     if (abs(ch.y - farmCY) > 60) ch.vy *= -1;
   });
+}
+
+function drawOneWorker(w) {
+  let sx = w2sX(w.x), sy = w2sY(w.y);
+  if (sx < -30 || sx > width + 30 || sy < -30 || sy > height + 30) return;
+  push(); translate(Math.floor(sx), Math.floor(sy)); noStroke();
+  let fDir = (w.targetX || w.x) >= w.x ? 1 : -1;
+  let walking = w.state === 'walking' || w.state === 'moving';
+  let step = walking ? sin(frameCount * 0.15 + (w.x * 0.1)) * 2 : 0;
+  let bob = walking ? abs(sin(frameCount * 0.15 + (w.x * 0.1))) * 0.5 : 0;
+  // Role colors
+  let tunic, tool;
+  if (w.role === 'cutter')    { tunic = [120, 80, 50]; tool = 'axe'; }
+  else if (w.role === 'quarrier')  { tunic = [100, 100, 110]; tool = 'pick'; }
+  else if (w.role === 'priestess') { tunic = [180, 160, 220]; tool = 'staff'; }
+  else if (w.role === 'farmer')    { tunic = [90, 130, 70]; tool = 'hoe'; }
+  else { tunic = [140, 120, 100]; tool = null; }
+  scale(fDir, 1);
+  // Shadow
+  fill(0, 0, 0, 25); ellipse(0, 4, 10, 4);
+  // Legs
+  fill(200, 170, 140);
+  rect(-2, -1 - bob, 2, 4); rect(1 + step * 0.2, -1 + bob, 2, 4);
+  // Tunic
+  fill(tunic[0], tunic[1], tunic[2]); rect(-4, -8, 8, 8);
+  // Arms + tool
+  fill(200, 170, 140); rect(-5, -6, 2, 5); rect(4, -6, 2, 5);
+  if (tool === 'axe' && w.state === 'working') {
+    fill(120, 100, 80); rect(5, -8, 1, 6); fill(160, 160, 170); rect(5, -9, 3, 2);
+  } else if (tool === 'pick' && w.state === 'working') {
+    fill(120, 100, 80); rect(5, -8, 1, 6); fill(140, 140, 150); rect(4, -9, 4, 1);
+  } else if (tool === 'staff') {
+    fill(160, 140, 80); rect(5, -10, 1, 10); fill(180, 220, 255); ellipse(6, -10, 3, 3);
+  } else if (tool === 'hoe' && w.state === 'working') {
+    fill(120, 100, 80); rect(5, -8, 1, 6); fill(140, 140, 140); rect(4, -8, 3, 1);
+  }
+  // Head
+  fill(200, 170, 140); rect(-3, -14, 6, 6, 1);
+  // Hair by role
+  if (w.role === 'priestess') { fill(200, 180, 140); rect(-3, -15, 6, 2); }
+  else { fill(60, 40, 25); rect(-3, -15, 6, 2); }
+  // Eyes
+  fill(40, 30, 20); rect(-1, -12, 1, 1); rect(2, -12, 1, 1);
+  // Role label when working
+  if (w.state === 'working') {
+    scale(fDir, 1); // undo facing for text
+    fill(255, 255, 255, 160); textAlign(CENTER, BOTTOM); textSize(6);
+    let labels = { cutter: 'Chopping', quarrier: 'Mining', priestess: 'Praying', farmer: 'Farming' };
+    text(labels[w.role] || '', 0, -18);
+    textAlign(LEFT, TOP);
+  }
+  pop();
 }
 
 function drawOneChicken(ch) {
