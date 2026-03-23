@@ -97,10 +97,6 @@ const BotAI = {
     if (nation.islandState.crystalNodes && dt > 0) {
       for (let cn of nation.islandState.crystalNodes) {
         if ((cn.charge || 0) < 50) cn.charge = Math.min(50, (cn.charge || 0) + 0.3);
-        // Passive crystal drip from charged nodes
-        if ((cn.charge || 0) > 10 && Math.random() < 0.008) {
-          nation.islandState.crystals = (nation.islandState.crystals || 0) + 1;
-        }
       }
     }
     // Crop growth only: plots grow naturally (same rate as player)
@@ -113,67 +109,7 @@ const BotAI = {
         }
       }
     }
-    // NO fake passive economy — bot leader uses REAL game functions
-    // Auto-expand: when bot has enough crystals, expand without walking
-    if (is && (is.islandLevel || 1) < 15 && Math.random() < 0.008) {
-      let expandCost = 5 + (is.islandLevel || 1) * 8;
-      if ((is.crystals || 0) >= expandCost && typeof swapToIsland === 'function') {
-        swapToIsland(is, nation.isleX, nation.isleY);
-        state.crystals -= expandCost;
-        state.islandLevel = (state.islandLevel || 1) + 1;
-        state.islandRX = (state.islandRX || 500) + 30;
-        state.islandRY = (state.islandRY || 320) + 20;
-        if (typeof placeEraBuildings === 'function') placeEraBuildings(state.islandLevel);
-        // New trees with proper props
-        if (!state.trees) state.trees = [];
-        for (let ti = 0; ti < 2; ti++) {
-          let a = Math.random() * Math.PI * 2, r = Math.random() * 0.3 + 0.4;
-          state.trees.push({ x: nation.isleX + Math.cos(a) * state.islandRX * r * 0.7, y: nation.isleY + Math.sin(a) * state.islandRY * r * 0.3, type: 'oak', hp: 3, alive: true, health: 3, maxHealth: 3, size: 0.4 + Math.random() * 0.3, shakeTimer: 0, regrowTimer: 0 });
-        }
-        // New citizens
-        if (!state.citizens) state.citizens = [];
-        let _nc = Math.min(2, Math.floor(state.islandLevel / 4));
-        for (let ci = 0; ci < _nc; ci++) {
-          state.citizens.push({ x: nation.isleX + (Math.random()-0.5)*80, y: nation.isleY + (Math.random()-0.5)*30, speed: 0.3 + Math.random()*0.2, targetX: nation.isleX, targetY: nation.isleY, moveTimer: 60, skin: Math.floor(Math.random()*5), variant: Math.floor(Math.random()*4), facing: Math.random()>0.5?1:-1, state: 'walking', walkBobPhase: Math.random()*Math.PI*2, tunicR: 100+Math.floor(Math.random()*80), tunicG: 80+Math.floor(Math.random()*60), tunicB: 60+Math.floor(Math.random()*40), activity: null, activityTimer: 0 });
-        }
-        if (state.pyramid) state.pyramid.level = state.islandLevel;
-        let _eName = typeof getNationName === 'function' ? getNationName(nationKey) : nationKey;
-        if (typeof addNotification === 'function') addNotification(_eName + ' grows to level ' + state.islandLevel + '!', '#aaddff');
-        if (typeof spawnParticles === 'function') spawnParticles(nation.isleX, nation.isleY, 'build', 8);
-        swapBack();
-      }
-    }
-    // Auto-recruit: bots train soldiers when they have castrum + gold
-    if (is && is.buildings && is.buildings.some(b => b.type === 'castrum') && Math.random() < 0.008) {
-      let armySize = is.legia && is.legia.army ? is.legia.army.length : 0;
-      let maxArmy = Math.min(10, 3 + Math.floor((is.islandLevel || 1) / 3));
-      if (armySize < maxArmy && (is.gold || 0) >= 10) {
-        is.gold -= 10;
-        nation.gold = Math.max(0, (nation.gold || 0) - 10);
-        if (!is.legia) is.legia = { army: [], castrumLevel: 1, morale: 100 };
-        if (!is.legia.army) is.legia.army = [];
-        is.legia.army.push({ type: 'legionary', hp: 20, maxHp: 20, damage: 5, speed: 1.2, garrison: false });
-        nation.military = is.legia.army.length;
-      }
-    }
-    // Population growth: spawn new citizens when food + housing available
-    if (is && is.citizens && Math.random() < 0.002) {
-      let maxPop = 5 + (is.islandLevel || 1) * 2;
-      let domusCount = is.buildings ? is.buildings.filter(b => b.type === 'domus' || b.type === 'villa').length : 0;
-      maxPop += domusCount * 3;
-      if (is.citizens.length < maxPop && (is.harvest || 0) > 0) {
-        is.harvest = Math.max(0, (is.harvest || 0) - 1);
-        let cx = nation.isleX, cy = nation.isleY;
-        is.citizens.push({ x: cx + (Math.random()-0.5)*80, y: cy + (Math.random()-0.5)*30, speed: 0.3 + Math.random()*0.2, targetX: cx, targetY: cy, moveTimer: 60, skin: Math.floor(Math.random()*5), variant: Math.floor(Math.random()*4), facing: Math.random()>0.5?1:-1, state: 'walking', walkBobPhase: Math.random()*Math.PI*2, tunicR: 100+Math.floor(Math.random()*80), tunicG: 80+Math.floor(Math.random()*60), tunicB: 60+Math.floor(Math.random()*40), activity: null, activityTimer: 0 });
-        nation.population = is.citizens.length;
-      }
-    }
-    // Passive income: gold trickle from population (faster in 1v1)
-    let _incomeRate = (state._gameMode === '1v1') ? 0.01 : 0.005;
-    if (is && is.citizens && is.citizens.length > 0 && Math.random() < _incomeRate) {
-      nation.islandState.gold = (nation.islandState.gold || 0) + 1;
-      nation.gold = (nation.gold || 0) + 1;
-    }
+    // NO passive economy — bot earns everything through task-based actions
     // Auto-raid: launch attack on player when strong enough
     let _armySz = is && is.legia && is.legia.army ? is.legia.army.length : 0;
     let _alreadyRaiding = nation.raidParty && nation.raidParty.length > 0;
@@ -221,9 +157,7 @@ const BotAI = {
         let _fNames = { harvest: 'Harvest Festival', solstice: 'Solstice Celebration', victory: 'Victory Games', prayer: 'Day of Prayer' };
         if (typeof addNotification === 'function' && Math.random() < 0.3) // 30% chance to notify (not spammy)
           addNotification(_name + ' celebrates ' + (_fNames[nation._festival.type] || 'a festival') + '!', '#ffcc44');
-        // Festival bonus: +gold, +population morale
-        nation.gold = (nation.gold || 0) + 10;
-        if (is.gold !== undefined) is.gold += 10;
+        // Festival is celebration only — no free resources
       }
     }
     // Draw festival effects (firework particles near temple)
@@ -282,41 +216,78 @@ const BotAI = {
             swapToIsland(is, nation.isleX, nation.isleY);
             let tree = state.trees ? state.trees.find(t => Math.abs(t.x-task.target.x)<20 && Math.abs(t.y-task.target.y)<20 && t.alive) : null;
             if (tree && typeof chopTree === 'function') { chopTree(tree); }
-            else { state.wood = (state.wood||0) + 3; } // fallback
             swapBack();
-          } else {
-            is.wood = (is.wood||0) + 3;
-            if (is.trees) { let i = is.trees.findIndex(t => Math.abs(t.x-task.target.x)<20 && Math.abs(t.y-task.target.y)<20); if (i>=0) is.trees.splice(i,1); }
+            if (typeof addFloatingText === 'function') addFloatingText(w2sX(bot.x), w2sY(bot.y) - 20, '+wood', '#cc8844');
           }
-          if (typeof addFloatingText === 'function') addFloatingText(w2sX(bot.x), w2sY(bot.y) - 20, '+wood', '#cc8844');
           bot.task = null;
         } break;
       case 'mine_crystal':
         if (task.timer > 8) {
-          is.crystals = (is.crystals||0) + 3;
-          let n = is.crystalNodes ? is.crystalNodes.find(n => Math.abs(n.x-task.target.x)<20 && Math.abs(n.y-task.target.y)<20 && (n.charge||0)>0) : null;
-          if (n) n.charge = Math.max(0, (n.charge||0)-20);
-          if (typeof addFloatingText === 'function') addFloatingText(w2sX(bot.x), w2sY(bot.y) - 20, '+3 crystals', '#66ccdd');
+          if (typeof swapToIsland === 'function') {
+            swapToIsland(is, nation.isleX, nation.isleY);
+            let node = state.crystalNodes ? state.crystalNodes.find(n => Math.abs(n.x-task.target.x)<20 && Math.abs(n.y-task.target.y)<20 && (n.charge||0)>0) : null;
+            if (node) {
+              let gain = (node.charge || 0) >= 30 ? 2 : 1;
+              state.crystals = (state.crystals||0) + gain;
+              node.charge = 0;
+              node.respawnTimer = 800;
+              if (typeof addFloatingText === 'function') addFloatingText(w2sX(bot.x), w2sY(bot.y) - 20, '+' + gain + ' crystals', '#66ccdd');
+              if (typeof spawnParticles === 'function') spawnParticles(node.x, node.y, 'crystal', 4);
+            }
+            swapBack();
+          }
           bot.task = null;
         } break;
       case 'mine_stone':
         if (task.timer > 8) {
-          is.stone = (is.stone||0) + 2;
-          if (typeof addFloatingText === 'function') addFloatingText(w2sX(bot.x), w2sY(bot.y) - 20, '+2 stone', '#aaaaaa');
+          if (typeof swapToIsland === 'function') {
+            swapToIsland(is, nation.isleX, nation.isleY);
+            // Find a stone resource on the island, or mine from terrain
+            let stoneRes = state.resources ? state.resources.find(r => (r.type === 'stone' || r.type === 'crystal_shard') && r.active !== false) : null;
+            if (stoneRes) {
+              stoneRes.active = false;
+              stoneRes.respawnTimer = 600;
+              state.stone = (state.stone||0) + 1;
+              if (typeof addFloatingText === 'function') addFloatingText(w2sX(bot.x), w2sY(bot.y) - 20, '+1 stone', '#aaaaaa');
+            } else {
+              // Quarry from terrain (same as player mining bare ground)
+              state.stone = (state.stone||0) + 1;
+              if (typeof addFloatingText === 'function') addFloatingText(w2sX(bot.x), w2sY(bot.y) - 20, '+1 stone', '#aaaaaa');
+            }
+            if (typeof spawnParticles === 'function') spawnParticles(bot.x, bot.y, 'collect', 3);
+            swapBack();
+          }
           bot.task = null;
         } break;
       case 'harvest':
         if (task.timer > 8) {
-          is.harvest = (is.harvest||0) + 3;
-          let p = is.plots ? is.plots.find(p => p.stage==='ready' && Math.abs(p.x-task.target.x)<20) : null;
-          if (p) { p.stage = 'empty'; p.crop = null; }
-          if (typeof addFloatingText === 'function') addFloatingText(w2sX(bot.x), w2sY(bot.y) - 20, '+3 harvest', '#88cc44');
+          if (typeof swapToIsland === 'function') {
+            swapToIsland(is, nation.isleX, nation.isleY);
+            let plot = state.plots ? state.plots.find(p => p.stage==='ready' && Math.abs(p.x-task.target.x)<20) : null;
+            if (plot) {
+              let gain = 1 + Math.floor((state.islandLevel || 1) / 5); // level scaling like player
+              state.harvest = (state.harvest||0) + gain;
+              state.seeds = (state.seeds||0) + 1; // return a seed
+              plot.stage = 'empty'; plot.crop = null; plot.growTimer = 0;
+              if (typeof addFloatingText === 'function') addFloatingText(w2sX(bot.x), w2sY(bot.y) - 20, '+' + gain + ' harvest', '#88cc44');
+              if (typeof spawnParticles === 'function') spawnParticles(plot.x, plot.y, 'harvest', 4);
+            }
+            swapBack();
+          }
           bot.task = null;
         } break;
       case 'plant':
         if (task.timer > 8) {
-          let p = is.plots ? is.plots.find(p => !p.crop && Math.abs(p.x-task.target.x)<20) : null;
-          if (p) { p.crop = 'grain'; p.stage = 'growing'; p.growTimer = 0; }
+          if (typeof swapToIsland === 'function') {
+            swapToIsland(is, nation.isleX, nation.isleY);
+            let plot = state.plots ? state.plots.find(p => !p.crop && Math.abs(p.x-task.target.x)<20) : null;
+            if (plot && (state.seeds || 0) > 0) {
+              state.seeds--;
+              plot.crop = 'grain'; plot.stage = 'growing'; plot.growTimer = 0;
+              if (typeof addFloatingText === 'function') addFloatingText(w2sX(bot.x), w2sY(bot.y) - 20, 'Planted', '#88cc44');
+            }
+            swapBack();
+          }
           bot.task = null;
         } break;
       case 'expand':
@@ -369,14 +340,6 @@ const BotAI = {
             trainUnit('legionary');
             nation.military = state.legia.army ? state.legia.army.length : 0;
             swapBack();
-          } else {
-            // Fallback
-            if ((is.gold||0) >= 10) {
-              is.gold -= 10; nation.gold = Math.max(0, (nation.gold || 0) - 10);
-              if (!is.legia) is.legia = { army: [], castrumLevel: 1, morale: 100 };
-              if (!is.legia.army) is.legia.army = [];
-              is.legia.army.push({ type: 'legionary', hp: 20, maxHp: 20, damage: 5, speed: 1.2, garrison: false });
-            }
           }
           if (is.legia && is.legia.army && is.legia.army.length % 3 === 0 && typeof addNotification === 'function') {
             let _name = typeof getNationName === 'function' ? getNationName(nationKey) : nationKey;
@@ -419,9 +382,18 @@ const BotAI = {
         } break;
       case 'trade':
         if (task.timer > 10) {
-          let tradeGold = 3 + Math.floor((is.islandLevel || 1) * 0.5);
-          is.gold = (is.gold || 0) + tradeGold;
-          nation.gold = (nation.gold || 0) + tradeGold;
+          if (typeof swapToIsland === 'function') {
+            swapToIsland(is, nation.isleX, nation.isleY);
+            // Trade generates gold based on market/forum level — requires harvest as trade goods
+            let tradeGold = 2 + Math.floor((state.islandLevel || 1) * 0.3);
+            let tradeCost = Math.min(2, state.harvest || 0); // spend harvest as trade goods
+            if (tradeCost > 0) {
+              state.harvest -= tradeCost;
+              state.gold = (state.gold || 0) + tradeGold;
+            }
+            swapBack();
+          }
+          nation.gold = is.gold || 0; // sync
           if (!nation._tradeNotified && typeof addNotification === 'function') {
             let _name = typeof getNationName === 'function' ? getNationName(nationKey) : nationKey;
             addNotification(_name + ' establishes trade routes', '#ddcc44');
@@ -431,22 +403,32 @@ const BotAI = {
         } break;
       case 'replant':
         if (task.timer > 12) {
-          is.wood = Math.max(0, (is.wood || 0) - 5);
-          let a = Math.random() * Math.PI * 2, r = Math.random() * 0.3 + 0.2;
-          let cx = nation.isleX, cy = nation.isleY;
-          if (!is.trees) is.trees = [];
-          is.trees.push({ x: cx + Math.cos(a) * (is.islandRX||400) * r * 0.7, y: cy + Math.sin(a) * (is.islandRY||260) * r * 0.3, type: 'oak', hp: 3, alive: true, health: 3, maxHealth: 3, size: 0.3, shakeTimer: 0, regrowTimer: 0 });
+          if (typeof swapToIsland === 'function') {
+            swapToIsland(is, nation.isleX, nation.isleY);
+            if ((state.wood || 0) >= 3) {
+              state.wood -= 3;
+              let a = Math.random() * Math.PI * 2, r = Math.random() * 0.3 + 0.2;
+              if (!state.trees) state.trees = [];
+              state.trees.push({ x: nation.isleX + Math.cos(a) * (state.islandRX||400) * r * 0.7, y: nation.isleY + Math.sin(a) * (state.islandRY||260) * r * 0.3, type: 'oak', hp: 3, alive: true, health: 3, maxHealth: 3, size: 0.3, shakeTimer: 0, regrowTimer: 0 });
+              if (typeof addFloatingText === 'function') addFloatingText(w2sX(bot.x), w2sY(bot.y) - 20, 'Planted tree', '#66aa44');
+            }
+            swapBack();
+          }
           bot.task = null;
         } break;
       case 'tend_crops':
         if (task.timer > 8) {
-          if (is.plots) {
-            for (let p of is.plots) {
-              if (p.crop && p.stage === 'growing') {
-                p.growTimer = (p.growTimer || 0) + 60;
-                if (p.growTimer >= 200) { p.stage = 'ready'; }
+          if (typeof swapToIsland === 'function') {
+            swapToIsland(is, nation.isleX, nation.isleY);
+            if (state.plots) {
+              for (let p of state.plots) {
+                if (p.crop && p.stage === 'growing') {
+                  p.growTimer = (p.growTimer || 0) + 60;
+                  if (p.growTimer >= 200) { p.stage = 'ready'; }
+                }
               }
             }
+            swapBack();
           }
           bot.task = null;
         } break;
@@ -466,10 +448,6 @@ const BotAI = {
             state.stone = Math.max(0, (state.stone||0) - 5);
             placeBuildingChecked(_bld);
             swapBack();
-          } else {
-            is.buildings.push(_bld);
-            is.wood = Math.max(0, (is.wood || 0) - 10);
-            is.stone = Math.max(0, (is.stone || 0) - 5);
           }
           if (typeof addFloatingText === 'function') addFloatingText(w2sX(bot.x), w2sY(bot.y) - 20, 'Built ' + _bType, '#aaddff');
           if (typeof spawnParticles === 'function') spawnParticles(task.target.x, task.target.y, 'build', 5);
