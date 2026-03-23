@@ -3444,6 +3444,12 @@ function drawInner() {
     if (typeof updatePlayerEscort === 'function') updatePlayerEscort(dt);
     if (typeof updateDiving === 'function') updateDiving(dt);
     updateRivalRaid(dt);
+    // Update bot AI characters
+    if (typeof BotAI !== 'undefined') {
+      for (let k of Object.keys(state.nations || {})) {
+        if (state.nations[k].isBot) BotAI.update(k, dt);
+      }
+    }
     updateSeaPeopleRaid(dt);
     if (typeof updateNavalCombat === 'function') updateNavalCombat(dt);
     updateNotifications(dt);
@@ -3578,6 +3584,8 @@ function drawInner() {
             drawWorldObjectsSorted();
             swapBack();
           }
+          // Draw bot AI character
+          if (typeof BotAI !== 'undefined') BotAI.draw(_owKey);
         }
       }
       if (!_frameBudget.throttled || frameCount % 2 === 0) drawShoreWaves();
@@ -8908,6 +8916,11 @@ function selectFaction(faction) {
     }
     is.islandLevel = 3;
     n.islandState = is;
+    // Create bot AI character on this island
+    if (typeof BotAI !== 'undefined') {
+      BotAI.create(k, n.isleX, n.isleY);
+      BotAI.initIslandResources(k);
+    }
   }
   // Initialize personal rival
   initPersonalRival(faction);
