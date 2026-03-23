@@ -813,7 +813,11 @@ function keyPressed() {
     return;
   }
 
-  // Legacy island [E] interactions removed -- V4.0 seamless handlers below
+  // SPACE BAR ATTACK — works everywhere (island, bot island, open world)
+  if ((key === ' ' || key === 'j' || key === 'J') && !state.buildMode && gameScreen === 'game') {
+    if (typeof playerAttack === 'function') playerAttack();
+    return;
+  }
 
   // Seamless nation island E-key (new system)
   if (state._activeNation && !state.visitingNation) {
