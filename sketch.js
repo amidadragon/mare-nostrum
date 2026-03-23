@@ -3637,7 +3637,74 @@ function drawInner() {
                 pop();
               }
             }
+            // Update + draw workers
+            let _workers = _own.islandState.workers;
+            if (_workers) {
+              let is = _own.islandState;
+              for (let w of _workers) {
+                let wdx = w.targetX - w.x, wdy = w.targetY - w.y;
+                let wd = Math.sqrt(wdx*wdx + wdy*wdy);
+                if (wd > 5) { w.x += (wdx/wd) * w.speed; w.y += (wdy/wd) * w.speed; w.state = 'walking'; }
+                else {
+                  w.timer++; w.state = 'working';
+                  if (w.timer > 120) {
+                    w.timer = 0;
+                    if (w.role === 'cutter' && is.trees && is.trees.length > 0) { let t = is.trees[Math.floor(Math.random() * is.trees.length)]; w.targetX = t.x; w.targetY = t.y; }
+                    else if (w.role === 'quarrier') { w.targetX = botCX + (Math.random()-0.5) * _isRX * 0.4; w.targetY = botCY + (Math.random()-0.5) * _isRY * 0.15; }
+                    else if (w.role === 'priestess' && is.crystalNodes) { let n = is.crystalNodes[Math.floor(Math.random() * is.crystalNodes.length)]; if (n) { w.targetX = n.x; w.targetY = n.y; } }
+                    else if (w.role === 'farmer' && is.plots) { let p = is.plots[Math.floor(Math.random() * is.plots.length)]; if (p) { w.targetX = p.x; w.targetY = p.y; } }
+                  }
+                }
+                let wx = w2sX(w.x), wy = w2sY(w.y);
+                if (wx < -30 || wx > width + 30) continue;
+                push(); noStroke(); translate(Math.floor(wx), Math.floor(wy));
+                fill(0,0,0,20); ellipse(0, 7, 10, 4);
+                let wCol = w.role === 'cutter' ? [140,100,60] : w.role === 'quarrier' ? [120,120,130] : w.role === 'priestess' ? [200,200,220] : [100,140,80];
+                fill(wCol[0], wCol[1], wCol[2]); rect(-3, -7, 7, 10, 1);
+                fill(210,180,150); rect(-2, -12, 5, 6, 1);
+                if (w.state === 'working') {
+                  fill(150,150,150);
+                  if (w.role === 'cutter') rect(4, -8, 2, 6);
+                  else if (w.role === 'quarrier') rect(4, -8, 2, 6);
+                  else if (w.role === 'priestess') { fill(100,200,255); ellipse(5, -6, 4, 4); }
+                  else { fill(80,140,50); rect(4, -4, 2, 5); }
+                }
+                fill(255,255,255,150); textAlign(CENTER,BOTTOM); textSize(6);
+                text(w.role === 'cutter' ? 'Cutter' : w.role === 'quarrier' ? 'Quarrier' : w.role === 'priestess' ? 'Priestess' : 'Farmer', 0, -14);
+                textAlign(LEFT,TOP); pop();
+              }
+            }
+            // Temple HP bar
+            let templeB = _own.islandState.buildings ? _own.islandState.buildings.find(b => b.isTemple || b.type === 'temple') : null;
+            if (templeB) {
+              let thx = w2sX(templeB.x), thy = w2sY(templeB.y) - 35;
+              let tHP = _own.islandState.templeHP || 100;
+              fill(0,0,0,150); noStroke(); rect(thx - 25, thy, 50, 6, 2);
+              let hpRatio = tHP / 100;
+              let hpR = hpRatio > 0.5 ? Math.floor((1 - hpRatio) * 2 * 200) : 200;
+              let hpG = hpRatio > 0.5 ? 200 : Math.floor(hpRatio * 2 * 200);
+              fill(hpR, hpG, 50); rect(thx - 23, thy + 1, 46 * hpRatio, 4, 1);
+              fill(255,255,255,200); textAlign(CENTER,BOTTOM); textSize(7);
+              text('Temple ' + tHP + '%', thx, thy - 1); textAlign(LEFT,TOP);
+              if (tHP < 50) { fill(80,80,80, 40 + Math.sin(frameCount * 0.05) * 20); ellipse(thx + Math.sin(frameCount * 0.03) * 5, thy - 10, 15, 8); }
+              if (tHP < 25) { fill(255, 100, 30, 60 + Math.sin(frameCount * 0.1) * 30); ellipse(thx - 5, thy - 5, 8, 12); ellipse(thx + 8, thy - 3, 6, 10); }
+            }
             swapBack();
+          }
+          // Critter pet following bot leader
+          let _critter = _own.islandState ? _own.islandState.critter : null;
+          if (_critter && typeof BotAI !== 'undefined' && BotAI.bots[_owKey]) {
+            let bot = BotAI.bots[_owKey];
+            let cdx = bot.x - _critter.x, cdy = bot.y - _critter.y;
+            let cd = Math.sqrt(cdx*cdx + cdy*cdy);
+            if (cd > 20) { _critter.x += cdx/cd * 1.5; _critter.y += cdy/cd * 1.5; }
+            let cx2 = w2sX(_critter.x), cy2 = w2sY(_critter.y);
+            push(); noStroke(); translate(Math.floor(cx2), Math.floor(cy2));
+            if (_critter.type === 'cat') { fill(200,160,100); ellipse(0,0,6,4); fill(180,140,80); ellipse(-3,-1,3,3); }
+            else if (_critter.type === 'wolf') { fill(130,130,130); ellipse(0,0,8,5); fill(110,110,110); ellipse(-4,-1,4,3); }
+            else if (_critter.type === 'owl') { fill(160,140,100); ellipse(0,-2,5,5); fill(200,180,120); rect(-2,-4,4,3); }
+            else { fill(140,100,60); ellipse(0,0,9,6); fill(120,80,40); ellipse(-5,-1,4,4); }
+            pop();
           }
           // Bot AI: create, update, and draw
           if (typeof BotAI !== 'undefined') {
@@ -18035,6 +18102,10 @@ function createPrebuiltIsland(factionKey, cx, cy, targetLevel) {
       });
     }
   });
+  // Every island MUST have a temple (even at low levels)
+  if (!is.buildings.some(b => b.type === 'temple')) {
+    is.buildings.push({ type: 'temple', x: cx, y: cy - (is.islandRY * 0.15), w: 70, h: 50, hp: 100, built: true, isTemple: true });
+  }
 
   // Trees
   is.trees = [];
@@ -18069,6 +18140,13 @@ function createPrebuiltIsland(factionKey, cx, cy, targetLevel) {
     });
   }
 
+  is.workers = [
+    { role: 'cutter', x: cx - 60, y: cy + 20, targetX: cx - 60, targetY: cy + 20, state: 'walking', timer: 0, speed: 0.5 },
+    { role: 'quarrier', x: cx + 80, y: cy - 10, targetX: cx + 80, targetY: cy - 10, state: 'walking', timer: 0, speed: 0.4 },
+    { role: 'priestess', x: cx - is.islandRX * 0.6, y: cy, targetX: cx - is.islandRX * 0.6, targetY: cy, state: 'walking', timer: 0, speed: 0.35 },
+    { role: 'farmer', x: cx - is.islandRX * 0.3, y: cy, targetX: cx - is.islandRX * 0.3, targetY: cy, state: 'walking', timer: 0, speed: 0.4 },
+  ];
+
   // Military
   is.legia = { army: [], castrumLevel: targetLevel >= 8 ? 1 : 0, morale: 100, recruits: 0, maxRecruits: 10 };
   if (targetLevel >= 8) {
@@ -18084,6 +18162,11 @@ function createPrebuiltIsland(factionKey, cx, cy, targetLevel) {
     { name: 'npc3', x: cx - 30, y: cy - 50, role: 'vesta', hearts: 1, facing: 'down', moving: false, targetX: cx - 20, targetY: cy - 40, moveTimer: 120 },
     { name: 'npc4', x: cx + 50, y: cy + 30, role: 'felix', hearts: 0, facing: 'right', moving: false, targetX: cx + 60, targetY: cy + 20, moveTimer: 70 },
   ];
+
+  is.critter = {
+    type: factionKey === 'egypt' ? 'cat' : factionKey === 'gaul' ? 'boar' : factionKey === 'greece' ? 'owl' : 'wolf',
+    x: cx, y: cy, targetX: cx, targetY: cy
+  };
 
   is.templeHP = 100;
   is.gold = 50 + targetLevel * 20;
