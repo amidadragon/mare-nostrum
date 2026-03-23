@@ -8891,9 +8891,23 @@ function selectFaction(faction) {
   if (snd && snd.playNarration) snd.playNarration(faction + '_intro');
   // Initialize all rival nations (everyone except player's faction)
   initNations();
-  // Create per-island state for each bot nation
+  // Create per-island state for each bot nation with starter buildings
   for (let k of Object.keys(state.nations)) {
-    state.nations[k].islandState = createIslandState(k);
+    let is = createIslandState(k);
+    let n = state.nations[k];
+    let cx = n.isleX, cy = n.isleY;
+    // Place 8-12 starter buildings on each bot island
+    let bpKeys = Object.keys(BLUEPRINTS).filter(bk => (BLUEPRINTS[bk].minLevel || 1) <= 5);
+    for (let i = 0; i < 10; i++) {
+      let bk = bpKeys[floor(random(bpKeys.length))];
+      let bp = BLUEPRINTS[bk];
+      let ang = random(TWO_PI), rd = random(0.2, 0.6);
+      let bx = cx + cos(ang) * (is.islandRX || 500) * rd * 0.8;
+      let by = cy + sin(ang) * (is.islandRY || 320) * rd * 0.35;
+      is.buildings.push({ type: bk, x: bx, y: by, w: bp.w || 40, h: bp.h || 40, hp: 100, built: true });
+    }
+    is.islandLevel = 3;
+    n.islandState = is;
   }
   // Initialize personal rival
   initPersonalRival(faction);
