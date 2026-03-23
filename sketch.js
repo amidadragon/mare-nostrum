@@ -3179,6 +3179,10 @@ function drawInner() {
     pop();
     pop();
     drawHUD();
+    // Strategy power rankings (top-right corner)
+    if (typeof StrategyEngine !== 'undefined' && StrategyEngine.session && !photoMode && !screenshotMode && !dialogState.active) {
+      StrategyEngine.drawPowerRankings();
+    }
     drawTempleRoomHUD();
     if (!screenshotMode) drawCursor();
     drawGameVignette();
@@ -4575,6 +4579,8 @@ function updateTime(dt) {
     if (typeof collectVassalTribute === 'function') collectVassalTribute();
     // Check all victory conditions daily
     checkAllVictoryConditions();
+    // Strategy engine daily tick
+    if (typeof StrategyEngine !== 'undefined' && StrategyEngine.session) StrategyEngine.updateStrategy();
     // Nations AI daily tick
     if (state.nations && Object.keys(state.nations).length > 0) updateNationsDaily();
     // Sea People raid check (daily)
@@ -6842,6 +6848,10 @@ function selectFaction(faction) {
     if (typeof BotAI !== 'undefined') {
       BotAI.create(k, cx, cy);
     }
+  }
+  // Initialize strategy engine
+  if (typeof StrategyEngine !== 'undefined') {
+    StrategyEngine.initSession(faction, 'normal', Object.keys(state.nations).length);
   }
   // Initialize bot Web Worker
   initBotWorker();
