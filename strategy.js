@@ -47,6 +47,20 @@ const StrategyEngine = {
       this._eraCheck(prevEra);
     }
 
+    // World status ticker — every 15 days, brief summary of strongest bot
+    if (this.session.turn % 15 === 0 && typeof addNotification === 'function') {
+      let rankings = this.getPowerRankings().filter(r => !r.isPlayer);
+      if (rankings.length > 0) {
+        let top = rankings[0];
+        let topN = nk.length > 0 ? state.nations[rankings[0].key] : null;
+        if (topN) {
+          let lvl = topN.islandState ? (topN.islandState.islandLevel || 1) : (topN.level || 1);
+          let mil = topN.military || 0;
+          addNotification('World Report: ' + top.name + ' leads (Lv' + lvl + ', ' + mil + ' troops, ' + top.power + ' power)', '#ccbb88');
+        }
+      }
+    }
+
     // Bot strategic goals (long-term AI)
     for (let k of nk) {
       this._updateBotStrategy(k);
