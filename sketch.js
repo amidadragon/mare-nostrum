@@ -3733,6 +3733,27 @@ function drawInner() {
                 _botItems.push({ y: c.y, draw: () => { if (typeof drawOneCitizen === 'function') drawOneCitizen(c); } });
               }
             }
+            // Bot chickens (generated once, cached)
+            if (!_own.islandState._chickens && typeof drawOneChicken === 'function') {
+              let _bch = [];
+              for (let _ci = 0; _ci < 4; _ci++) {
+                _bch.push({ x: botCX - 80 + Math.random() * 40, y: botCY + 10 + Math.random() * 20, facing: Math.random() > 0.5 ? 1 : -1, color: [200 + Math.floor(Math.random()*40), 170 + Math.floor(Math.random()*30), 120 + Math.floor(Math.random()*30)], pecking: false, peckTimer: 0, timer: Math.floor(Math.random() * 60), vx: 0, vy: 0 });
+              }
+              _own.islandState._chickens = _bch;
+            }
+            if (_own.islandState._chickens) {
+              for (let ch of _own.islandState._chickens) {
+                ch.timer--;
+                if (ch.pecking) { ch.peckTimer--; if (ch.peckTimer <= 0) ch.pecking = false; }
+                else if (ch.timer <= 0) {
+                  if (Math.random() < 0.3) { ch.pecking = true; ch.peckTimer = 30 + Math.floor(Math.random() * 30); ch.vx = 0; ch.vy = 0; }
+                  else { ch.vx = (Math.random() - 0.5) * 0.4; ch.vy = (Math.random() - 0.5) * 0.2; ch.facing = ch.vx > 0 ? 1 : -1; }
+                  ch.timer = 30 + Math.floor(Math.random() * 60);
+                }
+                ch.x += ch.vx; ch.y += ch.vy;
+                _botItems.push({ y: ch.y, draw: () => drawOneChicken(ch) });
+              }
+            }
             // Bot garrison soldiers patrolling near castrum
             if (_own.islandState.legia && _own.islandState.legia.army && typeof drawLegionAmbientSoldier === 'function') {
               let _castB = _own.islandState.buildings ? _own.islandState.buildings.find(b => b.type === 'castrum') : null;
