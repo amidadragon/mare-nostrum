@@ -3636,6 +3636,16 @@ function drawInner() {
             if (_savedSM) { window._botRender = true; }
             // Y-sort all bot entities for proper depth
             let _botItems = [];
+            // PYRAMID (main temple visual) — the most important building
+            if (_own.islandState.pyramid && typeof drawPyramid === 'function') {
+              let _savedPyr = state.pyramid;
+              state.pyramid = _own.islandState.pyramid;
+              _botItems.push({ y: _own.islandState.pyramid.y - 40, draw: () => { state.pyramid = _own.islandState.pyramid; drawPyramid(); state.pyramid = _savedPyr; } });
+            }
+            // Ruins
+            if (_own.islandState.ruins && typeof drawRuins === 'function') {
+              _botItems.push({ y: botCY - 30, draw: () => { let _sr = state.ruins; state.ruins = _own.islandState.ruins; drawRuins(); state.ruins = _sr; } });
+            }
             for (let b of _own.islandState.buildings) {
               _botItems.push({ y: b.y, draw: () => { if (typeof drawOneBuilding === 'function') drawOneBuilding(b); } });
             }

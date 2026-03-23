@@ -440,7 +440,9 @@ const _islandFields = [
   'buildings','plots','citizens','trees','crystalNodes',
   'islandLevel','islandRX','islandRY',
   'wood','stone','gold','crystals','ironOre','harvest','fish','seeds',
-  'meals','wine','oil'
+  'meals','wine','oil',
+  'pyramid','ruins','resources','factionFlora','factionWildlife',
+  'chickens','crystalShrine','faction'
 ];
 
 function createIslandState(faction) {
@@ -466,6 +468,10 @@ function createIslandState(faction) {
     foodShortage: 0, day: 1,
     // Port
     portLeft: null, portRight: null,
+    // Visual elements (needed for full rendering parity)
+    pyramid: null, ruins: [], resources: [],
+    factionFlora: [], factionWildlife: [],
+    chickens: [], crystalShrine: null,
   };
 }
 
@@ -513,6 +519,40 @@ function createPrebuiltIsland(factionKey, cx, cy, targetLevel) {
   for (let i = 0; i < 5; i++) {
     is.crystalNodes.push({ x: cx - is.islandRX * 0.7 + (Math.random() - 0.5) * 40, y: cy + (Math.random() - 0.5) * 30, charge: 50, size: 14 });
   }
+
+  // Pyramid (main temple visual) — positioned at crystal shrine location
+  is.pyramid = { x: cx, y: cy - is.islandRY * 0.12, level: targetLevel };
+  // Crystal shrine
+  is.crystalShrine = { x: cx - is.islandRX * 0.65, y: cy - 10 };
+  // Ruins (decorative)
+  is.ruins = [];
+  for (let i = 0; i < 3; i++) {
+    let a = Math.random() * Math.PI * 2, r = Math.random() * 0.3 + 0.35;
+    is.ruins.push({ x: cx + Math.cos(a) * is.islandRX * r * 0.6, y: cy + Math.sin(a) * is.islandRY * r * 0.3, w: 20 + Math.random() * 15, h: 12 + Math.random() * 8, rot: (Math.random() - 0.5) * 0.1 });
+  }
+  // Resources (stone/vine/leaf nodes)
+  is.resources = [];
+  for (let i = 0; i < 8; i++) {
+    let a = Math.random() * Math.PI * 2, r = Math.random() * 0.35 + 0.25;
+    is.resources.push({ x: cx + Math.cos(a) * is.islandRX * r * 0.7, y: cy + Math.sin(a) * is.islandRY * r * 0.3, type: ['stone','vine','leaf'][i % 3], collected: false });
+  }
+  // Chickens
+  is.chickens = [];
+  for (let i = 0; i < 4; i++) {
+    is.chickens.push({ x: cx - 80 + Math.random() * 40, y: cy + 10 + Math.random() * 20, facing: Math.random() > 0.5 ? 1 : -1, color: [200 + Math.floor(Math.random()*40), 170 + Math.floor(Math.random()*30), 120 + Math.floor(Math.random()*30)], pecking: false, peckTimer: 0, timer: Math.floor(Math.random() * 60), vx: 0, vy: 0 });
+  }
+  // Faction flora
+  is.factionFlora = [];
+  if (typeof FACTION_FLORA !== 'undefined') {
+    let _ffl = FACTION_FLORA[factionKey] || FACTION_FLORA.rome;
+    for (let fi = 0; fi < 12; fi++) {
+      let fa = Math.PI * 2 * fi / 12 + 0.7, fd = 0.15 + Math.random() * 0.45;
+      let tmpl = _ffl[fi % _ffl.length];
+      is.factionFlora.push({ x: cx + Math.cos(fa) * is.islandRX * fd, y: cy + Math.sin(fa) * is.islandRY * fd * 0.4, col: tmpl.col, w: tmpl.w, h: tmpl.h, phase: Math.random() * Math.PI * 2 });
+    }
+  }
+  // Faction wildlife
+  is.factionWildlife = [];
 
   // Scale starting resources with level
   is.crystals = 20 + targetLevel * 8;
