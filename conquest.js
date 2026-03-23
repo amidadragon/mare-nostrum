@@ -8,64 +8,11 @@
 const _ARENA_REMOVED = true; // arena system removed — rebuild later
 
 function drawConquestDistantLabel() {
-  if (state.conquest.active) return;
-  let c = state.conquest;
-  let sx = w2sX(c.isleX);
-  let sy = w2sY(c.isleY);
-  let minY = max(height * 0.06, height * 0.25 - horizonOffset) + 10;
-  sy = max(sy, minY);
-  if (sx < -400 || sx > width + 400 || sy > height + 400) return;
-  let baseY = sy + c.isleRY + 12;
-  push();
-  noStroke(); textAlign(CENTER);
-  // Sword icon
-  fill(170, 160, 130, 180); textSize(14);
-  text('\u2694', sx, baseY - 2);
-  // Name
-  fill(170, 160, 130, 180); textSize(11); textStyle(ITALIC);
-  let label = c.colonized ? 'Terra Nova (Colony LV.' + c.colonyLevel + ')' :
-              c.phase === 'settled' ? 'Terra Nova (Settled)' :
-              c.phase === 'unexplored' ? 'Terra Nova' : 'Terra Nova';
-  text(label, sx, baseY + 12); textStyle(NORMAL);
-  // Status
-  let status = c.colonized ? 'Colonized' : c.phase === 'settled' ? 'Settled' : c.phase === 'unexplored' ? 'Unexplored' : 'Discovered';
-  let _di = c.colonized ? '\u262E ' : '\u2694 ';
-  fill(c.colonized ? color(100, 200, 100, 160) : color(200, 180, 130, 160)); textSize(9);
-  text(_di + status, sx, baseY + 24);
-  if (c.colonized) {
-    fill(160, 200, 130, 140); textSize(9);
-    text(c.colonyWorkers + ' colonists  +' + c.colonyIncome + 'g/day', sx, baseY + 34);
-    if (state.imperialBridge.built) {
-      fill(200, 180, 100, 120); textSize(8);
-      text('BRIDGE CONNECTED', sx, baseY + 44);
-    }
-  } else if (c.buildings.length > 0) {
-    fill(160, 150, 115, 110); textSize(9);
-    text(c.buildings.length + ' buildings, ' + c.workers.length + ' workers', sx, baseY + 34);
-  }
-  // Distance
-  if (typeof _getIslandDist === 'function') {
-    let _yOff = c.colonized ? (state.imperialBridge.built ? 54 : 44) : c.buildings.length > 0 ? 44 : 34;
-    let _d = _getIslandDist(c.isleX, c.isleY);
-    fill(180, 170, 140, 110); textSize(8);
-    text(_d, sx, baseY + _yOff);
-  }
-  pop();
+  return;
 }
 
 function drawConquestDistantEntities() {
-  // Draw persistent soldiers + workers on Terra Nova when viewing from afar
-  if (state.conquest.active) return;
-  let c = state.conquest;
-  let items = [];
-  for (let s of c.soldiers) {
-    if (s.hp > 0) items.push({ y: s.y, draw: () => drawConquestSoldier(s) });
-  }
-  for (let w of c.workers) {
-    items.push({ y: w.y, draw: () => drawConquestWorker(w) });
-  }
-  items.sort((a, b) => a.y - b.y);
-  for (let it of items) it.draw();
+  return;
 }
 
 function drawOneEnemy(e) {
@@ -2496,110 +2443,7 @@ function _getCqVerts(rx, ry) {
 }
 
 function drawConquestIsleDistant() {
-  if (state.conquest.active) return;
-  let c = state.conquest;
-  let sx = w2sX(c.isleX);
-  let sy = w2sY(c.isleY);
-  // Clamp to horizon — never float above water
-  let _horizY = max(height * 0.06, height * 0.25 - horizonOffset) + 10;
-  sy = max(sy, _horizY);
-  // Distance-based scaling
-  let _dScale = null;
-  if (typeof _getDistantScale === 'function') {
-    _dScale = _getDistantScale(c.isleX, c.isleY, c.isleRX);
-    if (_dScale.dist > (typeof _getMaxViewDist === 'function' ? _getMaxViewDist() : 4000)) return;
-  }
-  if (sx < -350 || sx > width + 350 || sy < -350 || sy > height + 350) return;
-  push();
-  noStroke();
-  if (_dScale && _dScale.scale < 0.98) {
-    translate(sx, sy); scale(_dScale.scale); translate(-sx, -sy);
-  }
-  let _cBright = getSkyBrightness();
-
-  let _cqSeed = 42;
-  if (c.colonized) {
-    // Colonized: organic coastline terrain
-    let rx = c.isleRX, ry = c.isleRY;
-    let cqV = _getCqVerts(rx, ry);
-    drawIslandBase(sx, sy, rx, ry, cqV, ISLAND_PALETTES.default, 'medium');
-    // Golden colony glow
-    fill(255, 220, 100, 8);
-    drawIslandCoastShape(sx, sy, cqV, 0.75, rx, ry, -5);
-    // Dock indicator at south shore
-    fill(120, 90, 50);
-    rect(floor(sx - 4), floor(sy + ry * 0.88), 8, 14);
-    fill(100, 75, 40);
-    rect(floor(sx - 6), floor(sy + ry * 0.86), 12, 3);
-  } else {
-    // Unexplored / in-progress: organic coastline terrain (wild)
-    let rx = c.isleRX, ry = c.isleRY;
-    let ct = frameCount * 0.01;
-    let cqV = _getCqVerts(rx, ry);
-    drawIslandBase(sx, sy, rx, ry, cqV, ISLAND_PALETTES.default, 'medium');
-    // Dense forest interior on top
-    fill(28, 62, 25);
-    drawIslandCoastShape(sx, sy, cqV, 0.7, rx, ry, -4);
-    // Hills / ridgeline
-    fill(22, 55, 20); drawIslandShape(sx - 15, sy - 8, 50, 32, -6, _cqSeed + 2);
-    fill(28, 68, 25); drawIslandShape(sx + 10, sy - 14, 37, 24, -6, _cqSeed + 3);
-    fill(35, 78, 32); drawIslandShape(sx - 5, sy - 18, 26, 16, -6, _cqSeed + 4);
-    // Tree canopy clusters
-    for (let i = 0; i < 14; i++) {
-      let ta = (i * 2.39996) % TWO_PI;
-      let tr = ((i * 17 + 5) % 70) / 100 * 0.65;
-      let tpx = sx + cos(ta) * rx * tr;
-      let tpy = sy + sin(ta) * ry * tr * 0.69;
-      fill(20, 50 + (i % 4) * 5, 18, 120);
-      ellipse(tpx, tpy, 16 + (i % 3) * 4, 10 + (i % 3) * 3);
-      fill(30, 65 + (i % 3) * 6, 28, 80);
-      ellipse(tpx - 2, tpy - 2, 10 + (i % 2) * 3, 6 + (i % 2) * 2);
-    }
-    // Mist over wild island
-    fill(160, 180, 160, 18 + sin(frameCount * 0.015) * 10);
-    drawIslandCoastShape(sx, sy, cqV, 0.65, rx, ry, -2);
-    // Enemy camp fires visible from distance (if explored)
-    if (c.phase !== 'unexplored' && c.phase !== 'locked') {
-      for (let i = 0; i < 3; i++) {
-        let fa = (i / 3) * TWO_PI + 0.8;
-        let fr = rx * 0.35;
-        let fx = sx + cos(fa) * fr;
-        let fy = sy + sin(fa) * fr * 0.6;
-        let fl = sin(frameCount * 0.12 + i * 2) * 2;
-        fill(255, 140, 30, 120); rect(floor(fx - 2), floor(fy - 6 + fl), 4, 5);
-        fill(255, 80, 15, 60); rect(floor(fx - 1), floor(fy - 8 + fl), 2, 3);
-        fill(120, 110, 100, 20); ellipse(fx, fy - 12 + fl, 8, 4);
-      }
-    }
-    // Resource deposits (wood piles, ore veins)
-    fill(100, 70, 35, 80);
-    rect(floor(sx + rx * 0.3), floor(sy + ry * 0.2), 8, 5);
-    rect(floor(sx + rx * 0.32), floor(sy + ry * 0.18), 6, 4);
-    fill(120, 110, 95, 60);
-    rect(floor(sx - rx * 0.35), floor(sy - ry * 0.15), 6, 4);
-    rect(floor(sx - rx * 0.33), floor(sy - ry * 0.17), 4, 3);
-    // Beacon fire on settled islands
-    if (c.phase === 'settled' || c.buildings.length > 0) {
-      let fl = floor(sin(frameCount * 0.12) * 2);
-      fill(255, 160, 40, 140);
-      rect(floor(sx - 2), floor(sy - 22 + fl), 5, 7);
-      fill(255, 100, 20, 80);
-      rect(floor(sx - 1), floor(sy - 24 + fl), 3, 4);
-    }
-    // Dock indicator
-    fill(100, 75, 40);
-    rect(floor(sx - 3), floor(sy + ry * 0.88), 6, 12);
-    fill(120, 90, 50);
-    rect(floor(sx - 5), floor(sy + ry * 0.86), 10, 3);
-  }
-  // Final atmospheric wash over entire island — stronger with distance
-  let _cRX = c.isleRX, _cRY = c.isleRY;
-  let _horizHaze = max(0, 1 - (sy - _horizY) / 200) * 25;
-  let _cHazeA = _dScale ? max(10, floor(_dScale.haze * 0.5 + _horizHaze)) : floor(10 * _cBright + _horizHaze);
-  fill(160, 185, 210, _cHazeA);
-  let _cqHV = _getCqVerts(_cRX, _cRY);
-  drawIslandCoastShape(sx, sy, _cqHV, 1.1, _cRX, _cRY, -2);
-  pop();
+  return;
 }
 
 function drawConquestIsland() {

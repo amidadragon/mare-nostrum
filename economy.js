@@ -759,11 +759,7 @@ function updateEconomySystem(dt) {
 // ─── MAIN DRAW (called from sketch.js hooks) ────────────────────────────────
 
 function drawEconomyWorldOverlay() {
-  // Trade route paths and ships (world space — called inside translate block)
-  if (state.tradeRoutes.length > 0) {
-    drawTradeRoutePaths();
-    drawTradeShips();
-  }
+  return;
 }
 
 function drawEconomyUIOverlay() {
