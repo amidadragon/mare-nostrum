@@ -1180,6 +1180,21 @@ function keyPressed() {
     return false;
   }
 
+  // F key — island invasion while rowing
+  if ((key === 'f' || key === 'F') && state.rowing && state.rowing.active && state.rowing.nearIsle) {
+    let _fIsle = state.rowing.nearIsle;
+    if (_fIsle === 'conquest' || _fIsle === 'wreck') return; // no invading these
+    let _fRel = typeof getIslandRelationship === 'function' ? getIslandRelationship(_fIsle) : 'neutral';
+    if (_fRel === 'home' || _fRel === 'owned' || _fRel === 'ally') {
+      if (typeof addFloatingText === 'function') addFloatingText(width/2, height*0.3, 'Cannot invade friendly territory!', '#ffaa44');
+      return;
+    }
+    if (typeof startIslandInvasion === 'function') {
+      startIslandInvasion(_fIsle);
+    }
+    return;
+  }
+
   // Interact
   if (key === 'e' || key === 'E') {
     // Temple interior interactions (advisor, jester, pet, altar)
@@ -1380,6 +1395,14 @@ function keyPressed() {
       // Dock at nearby island
       // Board enemy ship if boarding target available
       if (state.naval && state.naval.boardingTarget && typeof startBoardingCombat === 'function') { startBoardingCombat(); return; }
+      // Block peaceful visit to enemy islands — must use F to invade
+      if (r.nearIsle && typeof getIslandRelationship === 'function') {
+        let _eRel = getIslandRelationship(r.nearIsle);
+        if (_eRel === 'enemy') {
+          if (typeof addFloatingText === 'function') addFloatingText(width/2, height*0.3, 'Cannot visit enemy — press F to invade!', '#ff6644');
+          return;
+        }
+      }
       if (r.nearIsle === 'conquest') {
         if (state.conquest.colonized) {
           // Colonized — free, peaceful entry

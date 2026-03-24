@@ -5555,3 +5555,65 @@ function drawInvasionHUD() {
   textAlign(LEFT, TOP);
   pop();
 }
+
+// ═══ ISLAND INVASION — Quick combat when pressing F ═══
+function startIslandInvasion(islandKey) {
+  let defStr = 300; // default
+  // Check world island defense
+  if (typeof getWorldIsland === 'function') {
+    let wisle = getWorldIsland(islandKey);
+    if (wisle) defStr = wisle.defense || 500;
+  }
+  // Check nation defense
+  let rv = state.nations[islandKey];
+  if (rv) {
+    defStr = 800 + (rv.level || 1) * 200 + (rv.military || 0) * 50;
+  }
+
+  // Player army strength
+  let lg = state.legia || {};
+  let soldiers = lg.soldiers || 0;
+  let playerStr = soldiers * 30 + (lg.castrumLevel || 0) * 100;
+
+  if (playerStr < 50) {
+    if (typeof addFloatingText === 'function') addFloatingText(width/2, height*0.3, 'No army! Recruit soldiers first.', '#ff6644');
+    return;
+  }
+
+  // Simple combat resolution
+  let ratio = playerStr / Math.max(1, defStr);
+  let playerWins = ratio > 0.8 + Math.random() * 0.4; // need ~1:1 ratio with some luck
+
+  // Casualties
+  let playerCasualtyRate = playerWins ? (0.2 + Math.random() * 0.2) : (0.5 + Math.random() * 0.3);
+  let casualties = Math.floor(soldiers * playerCasualtyRate);
+  if (lg.soldiers) lg.soldiers = Math.max(0, lg.soldiers - casualties);
+
+  if (playerWins) {
+    // Claim island
+    if (typeof captureIsland === 'function') captureIsland(islandKey);
+    // Handle faction elimination
+    if (rv) {
+      rv.defeated = true;
+      rv.vassal = true;
+      rv.military = 0;
+      if (typeof addNotification === 'function') addNotification(islandKey.toUpperCase() + ' conquered!', '#ffd700');
+    }
+    if (typeof addFloatingText === 'function') {
+      addFloatingText(width/2, height*0.25, 'VICTORY! Island captured!', '#44ff44');
+      addFloatingText(width/2, height*0.35, 'Lost ' + casualties + ' soldiers', '#ffaa44');
+    }
+    // Check victory conditions
+    if (typeof checkVictoryConditions === 'function') {
+      let v = checkVictoryConditions();
+      if (v && typeof triggerVictory === 'function') triggerVictory(v);
+    }
+  } else {
+    if (typeof addFloatingText === 'function') {
+      addFloatingText(width/2, height*0.25, 'DEFEATED! Retreating...', '#ff4444');
+      addFloatingText(width/2, height*0.35, 'Lost ' + casualties + ' soldiers', '#ffaa44');
+    }
+  }
+
+  return playerWins;
+}

@@ -2906,19 +2906,14 @@ function drawInner() {
 
     // Dock prompt when rowing near an island
     if (state.rowing.active && state.rowing.nearIsle) {
-      let isColonized = state.rowing.nearIsle === 'conquest' && state.conquest.colonized;
-      let label = state.rowing.nearIsle === 'wreck' ? '[E] Dock at Wreck Beach' :
-                  state.rowing.nearIsle === 'vulcan' ? '[E] Dock at Isle of Vulcan' :
-                  state.rowing.nearIsle === 'hyperborea' ? '[E] Dock at Hyperborea' :
-                  state.rowing.nearIsle === 'plenty' ? '[E] Dock at Isle of Plenty' :
-                  state.rowing.nearIsle === 'necropolis' ? '[E] Dock at Necropolis' :
-                  (state.nations && state.nations[state.rowing.nearIsle]) ? '[E] Dock at ' + (state.colonies[state.rowing.nearIsle] ? '[Colony] ' : '') + getNationName(state.rowing.nearIsle) :
-                  isColonized ? '[E] Visit Colony' : '[E] Dock at Terra Nova';
-      fill(255, 255, 220, 200 + sin(frameCount * 0.08) * 40);
-      noStroke(); textAlign(CENTER); textSize(13);
-      text(label, width / 2, height * 0.35);
-      // Show supply cost for Terra Nova (free for colonized)
-      if (state.rowing.nearIsle === 'conquest') {
+      let _nearKey = state.rowing.nearIsle;
+      // Special islands keep original prompts
+      if (_nearKey === 'conquest') {
+        let isColonized = state.conquest.colonized;
+        let label = isColonized ? '[E] Visit Colony' : '[E] Dock at Terra Nova';
+        fill(255, 255, 220, 200 + sin(frameCount * 0.08) * 40);
+        noStroke(); textAlign(CENTER); textSize(13);
+        text(label, width / 2, height * 0.35);
         if (isColonized) {
           fill(100, 200, 100, 180); textSize(9);
           text('Colony LV.' + state.conquest.colonyLevel + ' — Free passage', width / 2, height * 0.39);
@@ -2931,6 +2926,43 @@ function drawInner() {
           fill(canGo ? color(180, 170, 130, 180) : color(200, 80, 60, 200));
           textSize(9);
           text('Cost: ' + costG + 'g  ' + costW + ' wood  ' + costM + ' meals', width / 2, height * 0.39);
+        }
+      } else if (_nearKey === 'wreck') {
+        fill(255, 255, 220, 200 + sin(frameCount * 0.08) * 40);
+        noStroke(); textAlign(CENTER); textSize(13);
+        text('[E] Dock at Wreck Beach', width / 2, height * 0.35);
+      } else {
+        // Relationship-aware prompt
+        let _dockName = _nearKey;
+        if (typeof getWorldIsland === 'function') {
+          let _wi = getWorldIsland(_nearKey);
+          if (_wi) _dockName = _wi.name;
+        }
+        if (state.nations && state.nations[_nearKey]) {
+          _dockName = typeof getNationName === 'function' ? getNationName(_nearKey) : _nearKey.charAt(0).toUpperCase() + _nearKey.slice(1);
+        }
+
+        let _rel = typeof getIslandRelationship === 'function' ? getIslandRelationship(_nearKey) : 'neutral';
+        let _promptY = height * 0.35;
+        textAlign(CENTER); textSize(14); noStroke();
+        let _promptAlpha = 200 + sin(frameCount * 0.08) * 40;
+
+        if (_rel === 'home') {
+          fill(80, 200, 80, _promptAlpha);
+          text('Visit Home [E]', width/2, _promptY);
+        } else if (_rel === 'owned') {
+          fill(220, 180, 50, _promptAlpha);
+          text('Your Territory: ' + _dockName + ' [E]', width/2, _promptY);
+        } else if (_rel === 'ally') {
+          fill(80, 140, 220, _promptAlpha);
+          text('Visit Ally: ' + _dockName + ' [E]', width/2, _promptY);
+        } else if (_rel === 'enemy') {
+          fill(220, 60, 60, _promptAlpha);
+          text('Invade ' + _dockName + ' [F]', width/2, _promptY);
+        } else {
+          // Neutral
+          fill(220, 220, 200, _promptAlpha);
+          text('Visit ' + _dockName + ' [E]  /  Invade [F]', width/2, _promptY);
         }
       }
     }

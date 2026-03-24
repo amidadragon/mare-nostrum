@@ -1047,3 +1047,28 @@ function drawVolcanoHeartOverlay() {
   textAlign(LEFT);
   pop();
 }
+
+function getIslandRelationship(islandKey) {
+  if (!islandKey) return 'none';
+  // Home island
+  if (islandKey === 'home' || (!state.nations[islandKey] && !getWorldIsland(islandKey) && islandKey !== 'wreck' && islandKey !== 'conquest')) return 'home';
+  // Player-owned/controlled
+  if (isIslandControlled(islandKey)) return 'owned';
+  // Faction island
+  let rv = state.nations[islandKey];
+  if (rv) {
+    if (rv.defeated) return 'owned';
+    if (rv.allied || (state._alliances && state._alliances.includes(islandKey))) return 'ally';
+    if (rv.reputation <= -30) return 'enemy';
+    return 'neutral';
+  }
+  // World island (neutral/resource/trade/etc)
+  let wisle = getWorldIsland(islandKey);
+  if (wisle) {
+    if (isIslandControlled(islandKey)) return 'owned';
+    return 'neutral';
+  }
+  // Exploration islands
+  if (['vulcan','hyperborea','plenty','necropolis'].includes(islandKey)) return 'neutral';
+  return 'neutral';
+}
