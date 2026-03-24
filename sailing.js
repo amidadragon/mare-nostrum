@@ -211,7 +211,7 @@ function updateRowing(dt) {
     if (cqNear < 1.5 * 1.5) { r.nearIsle = 'conquest'; unlockJournal('terra_nova'); }
   }
 
-  // Nation islands — elliptical proximity + collision for each
+  // Nation islands — proximity detection (dock prompt), NO hard collision
   let _nationKeys = Object.keys(state.nations || {});
   for (let _nk of _nationKeys) {
     let _nv = state.nations[_nk];
@@ -219,13 +219,10 @@ function updateRowing(dt) {
     let _nvx = ((r.x - _nv.isleX) / _nv.isleRX);
     let _nvy = ((r.y - _nv.isleY) / _nv.isleRY);
     let _nvDist = _nvx * _nvx + _nvy * _nvy;
-    if (_nvDist < 1.5 * 1.5) r.nearIsle = _nk;
-    if (_nvDist < 0.8 * 0.8) {
-      // Soft bounce — push outward but keep some speed so boat doesn't trap
-      let ang = atan2(r.y - _nv.isleY, r.x - _nv.isleX);
-      r.x = _nv.isleX + cos(ang) * _nv.isleRX * 0.85;
-      r.y = _nv.isleY + sin(ang) * _nv.isleRY * 0.85;
-      r.speed = max(r.speed * 0.5, 0.5); // never fully stop
+    if (_nvDist < 2.0 * 2.0) r.nearIsle = _nk; // dock prompt at 2x radius
+    // Gentle slow-down near island shore (no hard bounce)
+    if (_nvDist < 0.7 * 0.7) {
+      r.speed *= 0.92; // gradual deceleration, player can still steer
     }
   }
 
