@@ -1102,9 +1102,11 @@ function drawLegiaUI() {
   let _legiaFt = (typeof getFactionTerms === 'function') ? getFactionTerms() : { barracks: 'Castrum', army: 'Legion' };
   let castrumName = (typeof getCastrumLevelName === 'function') ? getCastrumLevelName(lg.castrumLevel) : _legiaFt.barracks;
 
-  // Dynamic height based on unlocked units
+  // Dynamic height based on unlocked units + army type count
   let trainRows = unlockedTypes.length;
-  let pw = min(320, width - 20), ph = min(200 + trainRows * 26 + (armyCount > 0 ? 50 : 0), height - 20);
+  let armyTypeCount = armyCount > 0 ? unlockedTypes.filter(t => typeof getArmyCountByType === 'function' && getArmyCountByType(t) > 0).length : 0;
+  let ph = min(220 + trainRows * 28 + armyTypeCount * 14 + (armyCount > 0 ? 60 : 0) + (lg.castrumLevel < 5 ? 30 : 0), height - 20);
+  let pw = min(320, width - 20);
   let px = max(10, width / 2 - pw / 2), py = max(10, height / 2 - ph / 2);
 
   // Dark panel background
