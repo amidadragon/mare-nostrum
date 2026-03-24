@@ -141,14 +141,14 @@ function placeEraBuildings(lvl) {
     // Update legia state with absolute castrum coords
     if (state.legia) {
       state.legia.castrumLevel = 1;
-      state.legia.castrumX = 920;
-      state.legia.castrumY = 480;
+      state.legia.castrumX = 780 + offsetX;
+      state.legia.castrumY = 340 + offsetY;
     }
     unlockJournal('legia_founded');
     _addProceduralPerimeter(lvl, cx, cy, rx, ry);
     addFarmPlots(farmCX, farmCY, lvl);
     addFloatingText(width / 2, height * 0.3, 'Baths & ' + getFactionTerms().barracks + ' — your settlement grows strong!', '#cc4444');
-    spawnParticles(920, 480, 'build', 12);
+    spawnParticles(780, 340, 'build', 12);
   }
 
   if (lvl === 9) {

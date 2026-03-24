@@ -1038,14 +1038,14 @@ const CITY_SLOTS = [
   // --- BATH (residential south, x:440-520) ---
   { id: 'bath_1',          x: 480, y: 430, w: 70, h: 52, type: 'bath',        level: 8,  district: 'residential' },
 
-  // --- MILITARY (far right, x:855-985) ---
-  { id: 'castrum',         x: 920, y: 480, w: 130, h: 100, type: 'castrum',    level: 8,  district: 'military' },
-  { id: 'wall_cast_l',     x: 855, y: 480, w:  8, h: 50, type: 'wall',        level: 8,  district: 'military' },
-  { id: 'wall_cast_r',     x: 985, y: 480, w:  8, h: 50, type: 'wall',        level: 8,  district: 'military' },
-  { id: 'wall_cast_top',   x: 920, y: 430, w: 80, h:  8, type: 'wall',        level: 8,  district: 'military' },
-  { id: 'watchtower_cast', x: 985, y: 430, w: 24, h: 56, type: 'watchtower',  level: 8,  district: 'military' },
-  { id: 'torch_cast_l',    x: 900, y: 500, w:  8, h: 16, type: 'torch',       level: 8,  district: 'military' },
-  { id: 'torch_cast_r',    x: 940, y: 500, w:  8, h: 16, type: 'torch',       level: 8,  district: 'military' },
+  // --- MILITARY (NE of center, x:715-845) ---
+  { id: 'castrum',         x: 780, y: 340, w: 130, h: 100, type: 'castrum',    level: 8,  district: 'military' },
+  { id: 'wall_cast_l',     x: 715, y: 340, w:  8, h: 50, type: 'wall',        level: 8,  district: 'military' },
+  { id: 'wall_cast_r',     x: 845, y: 340, w:  8, h: 50, type: 'wall',        level: 8,  district: 'military' },
+  { id: 'wall_cast_top',   x: 780, y: 290, w: 80, h:  8, type: 'wall',        level: 8,  district: 'military' },
+  { id: 'watchtower_cast', x: 845, y: 290, w: 24, h: 56, type: 'watchtower',  level: 8,  district: 'military' },
+  { id: 'torch_cast_l',    x: 760, y: 360, w:  8, h: 16, type: 'torch',       level: 8,  district: 'military' },
+  { id: 'torch_cast_r',    x: 800, y: 360, w:  8, h: 16, type: 'torch',       level: 8,  district: 'military' },
 
   // ===============================================================
   // ERA 2: CITY (Lv 9-17)
@@ -4453,6 +4453,7 @@ function drawPyramid() {
   let sy = w2sY(pyr.y);
   let lvl = pyr.level;
   let tier = lvl <= 4 ? 1 : lvl <= 8 ? 2 : lvl <= 14 ? 3 : lvl <= 19 ? 4 : 5;
+  let _ps = FACTION_CASTRUM_STYLE[state.faction] || FACTION_CASTRUM_STYLE.rome;
 
   // Tier-based scaling — no caps
   let baseW, colH, colCount, colW, steps;
@@ -4490,11 +4491,11 @@ function drawPyramid() {
       fill(84, 66, 50);
       rect(-stepW / 2, stepY, stepW, 2);
     } else {
-      fill(192 - st * 5, 185 - st * 5, 175 - st * 5);
+      fill(_ps.wallColor[0] + 12 - st * 5, _ps.wallColor[1] + 15 - st * 5, _ps.wallColor[2] + 20 - st * 5);
       rect(-stepW / 2, stepY, stepW, 5, 1);
-      fill(205 - st * 4, 198 - st * 4, 188 - st * 4);
+      fill(_ps.wallColor[0] + 25 - st * 4, _ps.wallColor[1] + 28 - st * 4, _ps.wallColor[2] + 33 - st * 4);
       rect(-stepW / 2, stepY, stepW, 2);
-      fill(155 - st * 5, 148 - st * 5, 138 - st * 5, 60);
+      fill(_ps.wallColor[0] - 25 - st * 5, _ps.wallColor[1] - 22 - st * 5, _ps.wallColor[2] - 17 - st * 5, 60);
       rect(-stepW / 2 + 1, stepY + 3, stepW, 2);
     }
   }
@@ -4519,9 +4520,9 @@ function drawPyramid() {
   let cellaW = baseW * 0.7;
   let cellaH = colH - 4;
   if (tier >= 2) {
-    fill(175, 168, 158);
+    fill(_ps.wallColor[0] - 5, _ps.wallColor[1] - 2, _ps.wallColor[2] + 3);
     rect(-cellaW / 2, cellaTop - cellaH, cellaW, cellaH);
-    stroke(165, 158, 148, 40);
+    stroke(_ps.wallColor[0] - 15, _ps.wallColor[1] - 12, _ps.wallColor[2] - 7, 40);
     strokeWeight(0.5);
     for (let ly = cellaTop - cellaH + 6; ly < cellaTop; ly += 8) {
       line(-cellaW / 2 + 2, ly, cellaW / 2 - 2, ly);
@@ -4532,7 +4533,7 @@ function drawPyramid() {
     fill(40, 35, 30);
     rect(-doorW / 2, cellaTop - cellaH * 0.7, doorW, cellaH * 0.7, 2, 2, 0, 0);
     // Door arch
-    fill(160, 152, 142);
+    fill(_ps.wallColor[0] - 20, _ps.wallColor[1] - 18, _ps.wallColor[2] - 13);
     arc(0, cellaTop - cellaH * 0.7, doorW + 4, 10, -PI, 0, PIE);
     // Amber doorway glow — enhanced when player is near
     let _nearDoor = dist(state.player.x, state.player.y, pyr.x, pyr.y + 5) < 40;
@@ -4572,12 +4573,12 @@ function drawPyramid() {
       rect(cx2 - colW + 0.5, colBase - 5, colW, -(colH - 8));
     } else {
       // Column base
-      fill(180, 174, 164);
+      fill(_ps.wallColor[0], _ps.wallColor[1] + 4, _ps.wallColor[2] + 9);
       rect(cx2 - colW - 2, colBase - 5, colW * 2 + 4, 5, 1);
-      fill(190, 184, 174);
+      fill(_ps.wallColor[0] + 10, _ps.wallColor[1] + 14, _ps.wallColor[2] + 19);
       rect(cx2 - colW - 1, colBase - 6, colW * 2 + 2, 2, 1);
       // Shaft with entasis
-      fill(195, 188, 178);
+      fill(_ps.wallColor[0] + 15, _ps.wallColor[1] + 18, _ps.wallColor[2] + 23);
       beginShape();
       vertex(cx2 - colW, colBase - 5);
       vertex(cx2 - colW + 0.5, colTop + 6);
@@ -4585,7 +4586,7 @@ function drawPyramid() {
       vertex(cx2 + colW, colBase - 5);
       endShape(CLOSE);
       // Fluting
-      stroke(175, 168, 158, 50);
+      stroke(_ps.wallColor[0] - 5, _ps.wallColor[1] - 2, _ps.wallColor[2] + 3, 50);
       strokeWeight(0.5);
       for (let f = -colW + 1.5; f <= colW - 1.5; f += 2) {
         line(cx2 + f, colBase - 5, cx2 + f * 0.9, colTop + 6);
@@ -4702,7 +4703,7 @@ function drawPyramid() {
     pedW = (tier >= 3 ? entW : entW * 0.9) / 2 + 5;
     pedH = tier === 2 ? 8 : (tier === 3 ? 18 : (tier === 4 ? 26 : 28));
 
-    fill(190, 184, 174);
+    fill(_ps.wallColor[0] + 10, _ps.wallColor[1] + 14, _ps.wallColor[2] + 19);
     triangle(-pedW, pedY, pedW, pedY, 0, pedY - pedH);
     // Raking cornice
     stroke(tier >= 4 ? color(212, 170, 64, 180) : color(200, 194, 184));
@@ -4712,7 +4713,7 @@ function drawPyramid() {
     line(-pedW, pedY, pedW, pedY);
     noStroke();
     // Tympanum
-    fill(170, 164, 154);
+    fill(_ps.wallColor[0] - 10, _ps.wallColor[1] - 6, _ps.wallColor[2] - 1);
     triangle(-pedW + 5, pedY, pedW - 5, pedY, 0, pedY - pedH + 4);
 
     // Tympanum sculpture (Tier 3+: Sol Invictus)

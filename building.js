@@ -206,6 +206,17 @@ function drawBuildings() {
     }
   }
 }
+const FACTION_CASTRUM_STYLE = {
+  rome:      { wallColor: [180,170,155], roofColor: [180,80,40],  accentColor: [185,38,28],  gateStyle: 'arch',    towerStyle: 'square',   bannerIcon: 'eagle' },
+  carthage:  { wallColor: [200,190,170], roofColor: [100,40,130], accentColor: [120,50,160], gateStyle: 'columns', towerStyle: 'round',    bannerIcon: 'elephant' },
+  egypt:     { wallColor: [210,190,140], roofColor: [40,150,160], accentColor: [200,170,40], gateStyle: 'pylon',   towerStyle: 'obelisk',  bannerIcon: 'sun' },
+  greece:    { wallColor: [235,230,220], roofColor: [50,90,150],  accentColor: [50,100,170], gateStyle: 'columns', towerStyle: 'column',   bannerIcon: 'owl' },
+  persia:    { wallColor: [60,100,170],  roofColor: [170,130,50], accentColor: [106,42,138], gateStyle: 'arch',    towerStyle: 'dome',     bannerIcon: 'lion' },
+  gaul:      { wallColor: [100,80,50],   roofColor: [80,90,50],   accentColor: [42,106,48],  gateStyle: 'wood',    towerStyle: 'log',      bannerIcon: 'boar' },
+  phoenicia: { wallColor: [200,190,170], roofColor: [120,20,70],  accentColor: [138,16,80],  gateStyle: 'cedar',   towerStyle: 'square',   bannerIcon: 'ship' },
+  seapeople: { wallColor: [60,55,50],    roofColor: [50,45,40],   accentColor: [180,40,40],  gateStyle: 'dragon',  towerStyle: 'spike',    bannerIcon: 'serpent' }
+};
+
 function drawOneBuilding(b) {
     let sx = w2sX(b.x);
     let sy = w2sY(b.y);
@@ -1952,14 +1963,15 @@ function drawOneBuilding(b) {
         break;
       }
 
-      case 'castrum':
+      case 'castrum': {
         // Military fortress — faction
+        let _cs = FACTION_CASTRUM_STYLE[state.faction] || FACTION_CASTRUM_STYLE.rome;
         noStroke();
         // Ground shadow
         fill(0, 0, 0, 35);
         rect(-bw / 2 + 4, bh / 2 - 4, bw, 10);
         // Outer stone wall — faction
-        fill(fc.wall[0] - 60, fc.wall[1] - 60, fc.wall[2] - 60);
+        fill(_cs.wallColor[0], _cs.wallColor[1], _cs.wallColor[2]);
         rect(-bw / 2, -bh / 2, bw, bh, 3);
         // Stone block variation — ashlar courses
         stroke(108, 96, 78, 55);
@@ -1981,14 +1993,14 @@ function drawOneBuilding(b) {
           rect(-bw / 2 + 18 + pi2 * 12, -bh / 2 + 20, 9, 3);
         }
         // Interior barracks building (left)
-        fill(138, 124, 102);
+        fill(_cs.roofColor[0] - 42, _cs.roofColor[1] - 42, _cs.roofColor[2] - 42);
         rect(-bw / 2 + 24, -bh / 2 + 22, 30, 20, 1);
-        fill(128, 114, 92);
+        fill(_cs.roofColor[0] - 52, _cs.roofColor[1] - 52, _cs.roofColor[2] - 52);
         rect(-bw / 2 + 24, -bh / 2 + 22, 30, 4);
         // Interior armory building (right)
-        fill(138, 124, 102);
+        fill(_cs.roofColor[0] - 42, _cs.roofColor[1] - 42, _cs.roofColor[2] - 42);
         rect(bw / 2 - 54, -bh / 2 + 22, 30, 20, 1);
-        fill(128, 114, 92);
+        fill(_cs.roofColor[0] - 52, _cs.roofColor[1] - 52, _cs.roofColor[2] - 52);
         rect(bw / 2 - 54, -bh / 2 + 22, 30, 4);
         // Training dummy (cross shape) in courtyard
         fill(110, 82, 42);
@@ -2009,19 +2021,19 @@ function drawOneBuilding(b) {
         rect(bw / 4 - 2, -bh / 2 + 41, 2, 2);
         rect(bw / 4 + 1, -bh / 2 + 42, 2, 2);
         // Corner towers — bigger and thicker
-        fill(112, 100, 82);
+        fill(_cs.wallColor[0] - 68, _cs.wallColor[1] - 70, _cs.wallColor[2] - 73);
         rect(-bw / 2, -bh / 2, 20, 22);
         rect(bw / 2 - 20, -bh / 2, 20, 22);
         rect(-bw / 2, bh / 2 - 22, 20, 22);
         rect(bw / 2 - 20, bh / 2 - 22, 20, 22);
         // Tower cap highlights
-        fill(128, 116, 96);
+        fill(_cs.wallColor[0] - 52, _cs.wallColor[1] - 54, _cs.wallColor[2] - 59);
         rect(-bw / 2, -bh / 2, 20, 4);
         rect(bw / 2 - 20, -bh / 2, 20, 4);
         rect(-bw / 2, bh / 2 - 22, 20, 4);
         rect(bw / 2 - 20, bh / 2 - 22, 20, 4);
         // Wall crenellations (merlons) — top wall
-        fill(132, 120, 100);
+        fill(_cs.wallColor[0] - 48, _cs.wallColor[1] - 50, _cs.wallColor[2] - 55);
         for (let mi = 0; mi < 11; mi++) {
           let mx2 = -bw / 2 + 22 + mi * (bw - 44) / 10;
           rect(mx2, -bh / 2 - 6, 7, 8, 1);
@@ -2053,7 +2065,7 @@ function drawOneBuilding(b) {
         line(-14, bh / 2 - 6, 14, bh / 2 - 6);
         noStroke();
         // Gate arch top
-        fill(112, 100, 82);
+        fill(_cs.wallColor[0] - 68, _cs.wallColor[1] - 70, _cs.wallColor[2] - 73);
         arc(0, bh / 2 - 20, 28, 14, PI, TWO_PI);
         // Gate guard silhouettes
         fill(65, 50, 35, 170);
@@ -2069,7 +2081,7 @@ function drawOneBuilding(b) {
         let castFlap = sin(frameCount * 0.04 + b.x * 0.01) * 2.5;
         fill(100, 75, 42);
         rect(-2, -bh / 2 - 22, 4, 26);   // pole
-        fill(fc.accent[0], fc.accent[1], fc.accent[2]);
+        fill(_cs.accentColor[0], _cs.accentColor[1], _cs.accentColor[2]);
         beginShape();
         vertex(0, -bh / 2 - 21);
         vertex(16 + castFlap, -bh / 2 - 17);
@@ -2079,7 +2091,7 @@ function drawOneBuilding(b) {
         // Faction sigil on banner
         fill(220, 195, 60, 200);
         circle(8 + castFlap * 0.4, -bh / 2 - 14, 5);
-        fill(fc.accent[0], fc.accent[1], fc.accent[2], 0);
+        fill(_cs.accentColor[0], _cs.accentColor[1], _cs.accentColor[2], 0);
         // Military cooking smoke (darker, greyer than residential) — spread wider
         {
           let castSmokeAlpha = map(getSkyBrightness(), 0.0, 0.6, 65, 18);
@@ -2113,6 +2125,7 @@ function drawOneBuilding(b) {
           ellipse(16, bh / 2 - 16, 10, 10);
         }
         break;
+      }
 
       // ─── NEW BUILDING TYPES ─────────────────────────────────────────────
 
