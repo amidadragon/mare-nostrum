@@ -2610,10 +2610,10 @@ function drawInner() {
     let _onOtherIsland = !!state._activeNation || !!state._activeExploration;
     if ((!_isSailing && !_onOtherIsland) || (_isSailing && _homeDist < 800)) {
       drawIsland(); // Full home island render (on island or close while sailing)
-    } else if (_homeDist < 2000) {
-      // Medium LOD for home island while sailing away
-      drawIsland(); // Still draw terrain (it's the player's base, keep visible longer)
-    } else if (_homeDist < 4000) {
+    } else if (_isSailing && _homeDist < 2000) {
+      // Medium LOD for home island while sailing away (not when visiting other islands)
+      drawIsland();
+    } else if (_isSailing && _homeDist < 4000) {
       // Far LOD — simplified silhouette of home island
       let _hsx = w2sX(WORLD.islandCX), _hsy = w2sY(WORLD.islandCY);
       let _hrx = Math.max(10, Math.floor(state.islandRX * 0.12));
