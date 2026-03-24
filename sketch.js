@@ -2779,18 +2779,9 @@ function drawInner() {
           // Full terrain render when close
           if (dist < 600 && typeof drawIslandAt === 'function') {
             drawIslandAt({ cx: pos.x, cy: pos.y, rx: isle.isleRX || 300, ry: isle.isleRY || 200, level: 3, seed: isle.key.length * 7 });
-            // Name label on top
-            push();
-            translate(sx, sy);
-            fill(255, 255, 220, 200);
-            textSize(10);
-            textAlign(CENTER);
-            text(isle.name, 0, -(isle.isleRY || 200)*0.9);
-            if (isIslandControlled(isle.key)) {
-              fill(100, 255, 100);
-              ellipse(0, -(isle.isleRY || 200)*0.5, 6, 6);
+            if (typeof drawWorldIslandContent === 'function') {
+              drawWorldIslandContent(isle, sx, sy, sc);
             }
-            pop();
           } else {
           push();
           translate(sx, sy);

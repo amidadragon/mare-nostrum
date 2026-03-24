@@ -1109,3 +1109,243 @@ function getIslandRelationship(islandKey) {
   if (['vulcan','hyperborea','plenty','necropolis'].includes(islandKey)) return 'neutral';
   return 'neutral';
 }
+
+// ═══ UNIQUE WORLD ISLAND VISUALS ═══
+function drawWorldIslandContent(isle, sx, sy, sc) {
+  if (!isle || !isle.key) return;
+  push();
+  translate(sx, sy);
+  noStroke();
+  let s = sc || 1; // distance scale
+
+  switch(isle.key) {
+    // ═══ TRADE HUBS ═══
+    case 'golden_bazaar':
+      // Golden market tents
+      for (let i = -2; i <= 2; i++) {
+        fill(200, 170, 50); triangle(i*18*s, -10*s, i*18*s-8*s, 2*s, i*18*s+8*s, 2*s);
+        fill(180, 140, 30); rect(i*18*s-6*s, 2*s, 12*s, 6*s);
+      }
+      // Gold coins scattered
+      fill(220, 190, 40, 180);
+      for (let i = 0; i < 5; i++) ellipse((i-2)*12*s, 12*s + (i%2)*4*s, 3*s, 3*s);
+      break;
+
+    case 'emporium':
+      // Large warehouse
+      fill(140, 120, 90); rect(-20*s, -15*s, 40*s, 25*s);
+      fill(160, 140, 100); rect(-20*s, -15*s, 40*s, 5*s); // roof
+      // Crane
+      fill(100, 80, 50); rect(22*s, -20*s, 3*s, 25*s);
+      stroke(100, 80, 50); strokeWeight(1); line(22*s, -20*s, 35*s, -15*s); noStroke();
+      // Crates
+      fill(120, 90, 50); rect(-8*s, 12*s, 6*s, 6*s); rect(2*s, 10*s, 8*s, 8*s);
+      break;
+
+    case 'silk_road':
+      // Caravanserai arch
+      fill(180, 150, 110); rect(-15*s, -12*s, 30*s, 20*s, 2*s);
+      fill(200, 170, 120); arc(0, -12*s, 20*s, 14*s, PI, 0);
+      // Silk fabrics hanging
+      fill(200, 50, 80, 180); rect(-10*s, -5*s, 5*s, 10*s);
+      fill(50, 100, 200, 180); rect(0, -5*s, 5*s, 10*s);
+      fill(200, 180, 50, 180); rect(8*s, -5*s, 5*s, 10*s);
+      break;
+
+    case 'spice_islands':
+      // Colorful spice mounds
+      fill(200, 80, 30); ellipse(-15*s, 5*s, 12*s, 6*s); // paprika
+      fill(220, 200, 50); ellipse(0, 3*s, 10*s, 5*s); // turmeric
+      fill(60, 120, 40); ellipse(12*s, 5*s, 11*s, 5*s); // herbs
+      fill(160, 40, 40); ellipse(-5*s, 10*s, 9*s, 4*s); // saffron
+      // Drying racks
+      fill(100, 80, 50); rect(-20*s, -8*s, 2*s, 16*s); rect(18*s, -8*s, 2*s, 16*s);
+      stroke(100, 80, 50); strokeWeight(1); line(-19*s, -6*s, 19*s, -6*s); line(-19*s, -2*s, 19*s, -2*s); noStroke();
+      break;
+
+    case 'amber_coast':
+      // Golden amber stones
+      fill(220, 180, 60, 200);
+      for (let i = 0; i < 6; i++) {
+        let ax = (i-3)*10*s + sin(i)*5*s, ay = 8*s + cos(i*2)*3*s;
+        ellipse(ax, ay, 5*s + i%3*2*s, 4*s + i%2*2*s);
+      }
+      // Golden beach shimmer
+      fill(240, 220, 140, 60); ellipse(0, 10*s, 50*s, 12*s);
+      break;
+
+    case 'ivory_port':
+      // Ivory arch
+      fill(230, 220, 200); rect(-12*s, -15*s, 4*s, 20*s); rect(8*s, -15*s, 4*s, 20*s);
+      fill(240, 230, 210); arc(0, -15*s, 24*s, 12*s, PI, 0);
+      // Elephant tusks
+      fill(235, 225, 200);
+      beginShape(); vertex(-20*s, 5*s); vertex(-18*s, -8*s); vertex(-15*s, -10*s); vertex(-16*s, 5*s); endShape(CLOSE);
+      beginShape(); vertex(20*s, 5*s); vertex(18*s, -8*s); vertex(15*s, -10*s); vertex(16*s, 5*s); endShape(CLOSE);
+      break;
+
+    // ═══ RESOURCE ISLANDS ═══
+    case 'ironwood_forest':
+      // Dark trees
+      for (let i = -3; i <= 3; i++) {
+        fill(40, 50, 35); rect(i*10*s-1*s, -2*s, 3*s, 12*s); // trunk
+        fill(30, 60, 30); ellipse(i*10*s, -6*s, 10*s, 12*s); // canopy
+      }
+      // Iron ore veins
+      fill(100, 90, 80); rect(-15*s, 12*s, 8*s, 4*s); fill(120, 100, 85); rect(-13*s, 13*s, 4*s, 2*s);
+      break;
+
+    case 'stoneheart':
+      // Marble cliffs
+      fill(210, 205, 195); rect(-20*s, -10*s, 40*s, 15*s, 2*s);
+      fill(230, 225, 215); rect(-18*s, -8*s, 36*s, 5*s);
+      // Quarry pit
+      fill(160, 155, 145); ellipse(0, 8*s, 24*s, 10*s);
+      fill(140, 135, 125); ellipse(0, 8*s, 18*s, 7*s);
+      // Stone blocks
+      fill(200, 195, 185); rect(15*s, 2*s, 6*s, 4*s); rect(18*s, -2*s, 5*s, 4*s);
+      break;
+
+    case 'golden_hills':
+      // Gold mine entrance
+      fill(120, 100, 60); rect(-8*s, -5*s, 16*s, 12*s, 2*s);
+      fill(40, 35, 25); ellipse(0, 2*s, 10*s, 8*s); // mine opening
+      // Gold flecks
+      fill(240, 210, 50, 200);
+      for (let i = 0; i < 8; i++) ellipse((i-4)*6*s, 12*s + sin(i)*3*s, 2*s, 2*s);
+      // Cart tracks
+      stroke(100, 80, 40, 100); strokeWeight(1);
+      line(-5*s, 10*s, -20*s, 15*s); line(5*s, 10*s, 20*s, 15*s); noStroke();
+      break;
+
+    case 'grain_sea':
+      // Wheat fields
+      fill(210, 190, 80);
+      for (let i = -4; i <= 4; i++) {
+        for (let j = 0; j < 3; j++) {
+          rect(i*8*s, j*5*s - 2*s, 5*s, 4*s);
+        }
+      }
+      // Windmill
+      fill(180, 160, 130); rect(18*s, -15*s, 6*s, 20*s);
+      fill(200, 180, 140); // blades
+      push(); translate(21*s, -15*s); rotate(frameCount * 0.02);
+      for (let b = 0; b < 4; b++) { rotate(HALF_PI); rect(-1*s, 0, 2*s, 12*s); }
+      pop();
+      break;
+
+    // ═══ MILITARY FORTS ═══
+    case 'iron_keep':
+      // Black fortress
+      fill(50, 50, 55); rect(-18*s, -12*s, 36*s, 22*s);
+      fill(60, 60, 65); rect(-18*s, -12*s, 36*s, 4*s);
+      // Towers
+      fill(45, 45, 50); rect(-22*s, -16*s, 8*s, 28*s); rect(14*s, -16*s, 8*s, 28*s);
+      // Iron gate
+      fill(30, 30, 35); rect(-5*s, 2*s, 10*s, 8*s);
+      fill(80, 80, 90); for (let i = -3; i <= 3; i++) rect(i*2*s, 2*s, 1*s, 8*s);
+      // Red flag
+      fill(180, 40, 40); rect(16*s, -20*s, 8*s, 5*s);
+      break;
+
+    case 'castrum_maris':
+      // Roman coastal fort
+      fill(170, 160, 140); rect(-15*s, -10*s, 30*s, 18*s);
+      fill(180, 170, 150); rect(-15*s, -10*s, 30*s, 4*s);
+      // Crenellations
+      for (let i = -6; i <= 6; i++) { fill(175, 165, 145); rect(i*4*s, -13*s, 3*s, 3*s); }
+      // Gate
+      fill(120, 100, 70); arc(0, 4*s, 10*s, 12*s, PI, 0);
+      break;
+
+    case 'warhorse':
+      // Stables
+      fill(120, 90, 50); rect(-18*s, -5*s, 36*s, 14*s);
+      fill(100, 70, 35); rect(-18*s, -5*s, 36*s, 3*s);
+      // Horse silhouettes
+      fill(140, 100, 60);
+      for (let i = -1; i <= 1; i++) {
+        ellipse(i*12*s, 3*s, 8*s, 5*s); // body
+        ellipse(i*12*s+4*s, 0, 4*s, 4*s); // head
+      }
+      // Training fence
+      stroke(100, 80, 40); strokeWeight(1);
+      rect(-25*s, 10*s, 50*s, 1*s); noStroke();
+      break;
+
+    case 'siege_works':
+      // Forge building
+      fill(100, 80, 60); rect(-12*s, -8*s, 24*s, 16*s);
+      // Catapult
+      fill(90, 70, 40); rect(15*s, -2*s, 3*s, 10*s); // arm
+      fill(80, 60, 35); rect(10*s, 6*s, 12*s, 4*s); // base
+      // Fire glow
+      fill(255, 150, 30, 100 + sin(frameCount * 0.1) * 40);
+      ellipse(-5*s, 0, 10*s, 8*s);
+      fill(255, 200, 50, 80); ellipse(-5*s, -2*s, 6*s, 5*s);
+      break;
+
+    case 'heros_grave':
+      // Mausoleum
+      fill(190, 185, 175); rect(-10*s, -12*s, 20*s, 18*s);
+      fill(200, 195, 185); triangle(-12*s, -12*s, 12*s, -12*s, 0, -20*s);
+      // Columns
+      fill(210, 205, 195); rect(-10*s, -10*s, 3*s, 14*s); rect(7*s, -10*s, 3*s, 14*s);
+      // Eternal flame
+      fill(255, 180, 40, 180 + sin(frameCount * 0.08) * 40);
+      ellipse(0, -22*s, 4*s, 6*s);
+      fill(255, 220, 80, 140); ellipse(0, -23*s, 3*s, 4*s);
+      break;
+
+    // ═══ DIPLOMATIC ISLANDS ═══
+    case 'senate_house':
+      // Grand senate building
+      fill(220, 215, 200); rect(-18*s, -10*s, 36*s, 18*s);
+      fill(230, 225, 210); triangle(-20*s, -10*s, 20*s, -10*s, 0, -22*s);
+      // Columns
+      for (let i = -3; i <= 3; i++) { fill(235, 230, 220); rect(i*6*s-1*s, -8*s, 3*s, 14*s); }
+      break;
+
+    case 'oracle':
+      // Mystical observatory
+      fill(180, 170, 200); rect(-10*s, -8*s, 20*s, 16*s);
+      fill(160, 150, 190); ellipse(0, -10*s, 16*s, 8*s); // dome
+      // Glowing eye
+      fill(100, 200, 255, 120 + sin(frameCount * 0.06) * 60);
+      ellipse(0, -2*s, 8*s, 6*s);
+      fill(40, 100, 200, 180); ellipse(0, -2*s, 4*s, 4*s);
+      break;
+
+    case 'neutral_port':
+      // Peaceful harbor
+      fill(150, 140, 120); rect(-15*s, 0, 30*s, 8*s); // pier
+      fill(140, 130, 100); rect(-15*s, 0, 30*s, 2*s);
+      // White flag
+      fill(240, 240, 230); rect(0, -12*s, 8*s, 5*s);
+      fill(100, 80, 50); rect(-1*s, -14*s, 2*s, 20*s);
+      break;
+
+    case 'temple_concord':
+      // Harmony temple
+      fill(210, 200, 180); rect(-12*s, -8*s, 24*s, 16*s);
+      fill(220, 210, 190); triangle(-14*s, -8*s, 14*s, -8*s, 0, -18*s);
+      // Olive branches
+      fill(120, 150, 80); ellipse(-16*s, -4*s, 8*s, 12*s); ellipse(16*s, -4*s, 8*s, 12*s);
+      break;
+  }
+
+  // Island name label (always shown when close)
+  fill(255, 255, 220, 200);
+  textSize(Math.max(8, 10 * s));
+  textAlign(CENTER);
+  text(isle.name, 0, -30 * s);
+
+  // Controlled marker
+  if (typeof isIslandControlled === 'function' && isIslandControlled(isle.key)) {
+    fill(100, 255, 100, 180);
+    textSize(Math.max(7, 8 * s));
+    text('Controlled', 0, -22 * s);
+  }
+
+  pop();
+}
