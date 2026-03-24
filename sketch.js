@@ -2728,6 +2728,40 @@ function drawInner() {
           ellipse(0, 0, rx*1.8, ry*1.8);
           fill(tc[0], tc[1], tc[2]);
           ellipse(0, 0, rx*1.4, ry*1.4);
+          // Type-specific visual indicators
+          if (dist < 1200) {
+            // Military islands — small tower
+            if (isle.type === 'military') {
+              fill(140, 120, 100);
+              rect(-4, -ry*0.4, 8, ry*0.3);
+              fill(160, 140, 120);
+              rect(-6, -ry*0.4 - 4, 12, 4);
+              // Flag
+              fill(200, 60, 60);
+              rect(-1, -ry*0.4 - 12, 8, 6);
+            }
+            // Economic islands — market tent
+            if (isle.type === 'economic') {
+              fill(200, 180, 100);
+              triangle(-8, -ry*0.3, 0, -ry*0.3 - 10, 8, -ry*0.3);
+              fill(180, 160, 80);
+              rect(-6, -ry*0.3, 12, 6);
+            }
+            // Diplomatic islands — column
+            if (isle.type === 'diplomatic') {
+              fill(220, 215, 200);
+              rect(-3, -ry*0.4, 6, ry*0.3);
+              rect(-5, -ry*0.4 - 2, 10, 3);
+              rect(-5, -ry*0.4 + ry*0.3 - 1, 10, 3);
+            }
+            // Resource islands — tree
+            if (isle.type === 'resource') {
+              fill(100, 70, 40);
+              rect(-2, -ry*0.3, 4, ry*0.2);
+              fill(60, 130, 50);
+              ellipse(0, -ry*0.35, 14, 12);
+            }
+          }
           // Icon indicator
           if (dist < 1500) {
             fill(255, 255, 220, 200);
@@ -2959,10 +2993,26 @@ function drawInner() {
         } else if (_rel === 'enemy') {
           fill(220, 60, 60, _promptAlpha);
           text('Invade ' + _dockName + ' [F]', width/2, _promptY);
+          if (typeof getWorldIsland === 'function') {
+            let _defIsle = getWorldIsland(_nearKey);
+            if (_defIsle && _defIsle.defense) {
+              fill(200, 160, 100, 180);
+              textSize(11);
+              text('Defense: ' + _defIsle.defense, width/2, _promptY + 16);
+            }
+          }
         } else {
           // Neutral
           fill(220, 220, 200, _promptAlpha);
           text('Visit ' + _dockName + ' [E]  /  Invade [F]', width/2, _promptY);
+          if (typeof getWorldIsland === 'function') {
+            let _defIsle = getWorldIsland(_nearKey);
+            if (_defIsle && _defIsle.defense) {
+              fill(200, 160, 100, 180);
+              textSize(11);
+              text('Defense: ' + _defIsle.defense, width/2, _promptY + 16);
+            }
+          }
         }
       }
     }
@@ -4204,15 +4254,18 @@ function _drawTemplePet(hall, px, py) {
 function drawCastrumRoom() {
   var R = CASTRUM_ROOM, fk = state.faction || 'rome';
   var mil = FACTION_MILITARY[fk] || FACTION_MILITARY.rome;
+  var _cs = FACTION_CASTRUM_STYLE[fk] || FACTION_CASTRUM_STYLE.rome;
   var ft = frameCount, hw = R.hw, hh = R.hh;
   var clv = state.legia ? state.legia.castrumLevel : 1;
   noStroke();
-  var wc = clv >= 5 ? [55,50,45] : clv >= 3 ? [50,45,38] : [42,36,28];
-  fill(wc[0]*0.3, wc[1]*0.3, wc[2]*0.3);
+  var _wbase = _cs.wallColor;
+  var wc = clv >= 5 ? [_wbase[0]*0.34,_wbase[1]*0.32,_wbase[2]*0.30] : clv >= 3 ? [_wbase[0]*0.30,_wbase[1]*0.28,_wbase[2]*0.26] : [_wbase[0]*0.25,_wbase[1]*0.23,_wbase[2]*0.20];
+  fill(_wbase[0]*0.13, _wbase[1]*0.12, _wbase[2]*0.11);
   rect(w2sX(R.cx - hw - 20), w2sY(R.cy - hh - 40), (hw + 20) * 2, (hh + 60) * 2);
   var tileS = 24;
-  var f1 = clv >= 5 ? [200,195,185] : clv >= 3 ? [175,168,155] : [155,138,112];
-  var f2 = clv >= 5 ? [180,175,165] : clv >= 3 ? [155,148,135] : [140,125,100];
+  var _fw = _cs.wallColor;
+  var f1 = clv >= 5 ? [_fw[0]*1.1,_fw[1]*1.14,_fw[2]*1.2] : clv >= 3 ? [_fw[0]*0.97,_fw[1]*0.99,_fw[2]*1.02] : [_fw[0]*0.86,_fw[1]*0.81,_fw[2]*0.72];
+  var f2 = clv >= 5 ? [_fw[0],_fw[1]*1.03,_fw[2]*1.07] : clv >= 3 ? [_fw[0]*0.86,_fw[1]*0.87,_fw[2]*0.87] : [_fw[0]*0.78,_fw[1]*0.74,_fw[2]*0.65];
   for (var tx = -hw; tx < hw; tx += tileS) {
     for (var ty = -hh; ty < hh; ty += tileS) {
       var light = (floor((tx + hw) / tileS) + floor((ty + hh) / tileS)) % 2 === 0;
@@ -4220,14 +4273,14 @@ function drawCastrumRoom() {
       rect(w2sX(R.cx + tx), w2sY(R.cy + ty), tileS, tileS);
     }
   }
-  fill(wc[0], wc[1], wc[2]);
+  fill(_cs.roofColor[0], _cs.roofColor[1], _cs.roofColor[2]);
   rect(w2sX(R.cx - hw), w2sY(R.cy - hh - 30), hw * 2, 30);
-  fill(wc[0]+20, wc[1]+20, wc[2]+20);
+  fill(min(255,_cs.roofColor[0]+30), min(255,_cs.roofColor[1]+30), min(255,_cs.roofColor[2]+30));
   rect(w2sX(R.cx - hw), w2sY(R.cy - hh - 2), hw * 2, 4);
   fill(wc[0]*0.8, wc[1]*0.8, wc[2]*0.8);
   rect(w2sX(R.cx - hw - 10), w2sY(R.cy - hh), 10, hh * 2);
   rect(w2sX(R.cx + hw), w2sY(R.cy - hh), 10, hh * 2);
-  if (clv >= 7) { fill(200,170,50,80); rect(w2sX(R.cx - hw), w2sY(R.cy - hh - 4), hw * 2, 2); }
+  if (clv >= 7) { fill(_cs.accentColor[0],_cs.accentColor[1],_cs.accentColor[2],80); rect(w2sX(R.cx - hw), w2sY(R.cy - hh - 4), hw * 2, 2); }
   var items = [];
   // Training Yard (center)
   var sparX = R.cx, sparY = R.cy + 10, sparPhase = state.castrumSparAnim;
@@ -4245,11 +4298,12 @@ function drawCastrumRoom() {
     fill(mil.helm[0], mil.helm[1], mil.helm[2]); arc(sx2, sy2 - 9, 8, 5, PI, TWO_PI);
     fill(mil.shield[0], mil.shield[1], mil.shield[2]); rect(sx2 - 6, sy2 - 6, 5, 8, 1);
     var dx2 = w2sX(sparX), dy2 = w2sY(sparY - 25);
-    fill(180,160,100); rect(dx2 - 2, dy2, 4, 14);
-    fill(200,180,120); rect(dx2 - 6, dy2 + 2, 12, 3);
-    fill(160,140,90); ellipse(dx2, dy2 - 2, 8, 8);
+    var _ac = _cs.accentColor;
+    fill(_ac[0]*0.87,_ac[1]*0.80,_ac[2]*0.45); rect(dx2 - 2, dy2, 4, 14);
+    fill(_ac[0]*0.96,_ac[1]*0.90,_ac[2]*0.55); rect(dx2 - 6, dy2 + 2, 12, 3);
+    fill(_ac[0]*0.78,_ac[1]*0.72,_ac[2]*0.40); ellipse(dx2, dy2 - 2, 8, 8);
     var wrx = w2sX(sparX + 30), wry = w2sY(sparY - 10);
-    fill(100,80,50); rect(wrx, wry, 3, 16);
+    fill(_ac[0]*0.54,_ac[1]*0.47,_ac[2]*0.25); rect(wrx, wry, 3, 16);
     fill(180,180,190); rect(wrx - 3, wry - 6, 2, 10); rect(wrx + 4, wry - 4, 2, 8);
   }});
   // Recruitment Station (right)

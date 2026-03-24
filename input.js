@@ -1889,7 +1889,7 @@ function keyPressed() {
   // Legia UI number keys
   if (state.legia && state.legia.legiaUIOpen) {
     if (key === 'l' || key === 'L' || key === 'e' || key === 'E') { state.legia.legiaUIOpen = false; return; }
-    if ((key === 'r' || key === 'R') && state.legia.soldiers && state.legia.soldiers.length > 0) {
+    if ((key === 'r' || key === 'R') && state.legia.army && state.legia.army.length > 0) {
       state.legia.marching = true;
       state.legia.legiaUIOpen = false;
       addFloatingText(width / 2, height * 0.3, 'The legion marches! Board your ship.', '#cc4444');

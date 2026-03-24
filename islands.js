@@ -212,6 +212,9 @@ function captureIsland(key) {
   let isle = getWorldIsland(key);
   if (isle && typeof addNotification === 'function') {
     addNotification('Captured ' + isle.name + '!', '#ffd700');
+    if (isle.benefit && isle.benefit.desc) {
+      addNotification('Bonus: ' + isle.benefit.desc, '#88ff88');
+    }
   }
 }
 
