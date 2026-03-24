@@ -2462,7 +2462,7 @@ function drawInner() {
     updateScreenTransition(dt);
     updateImperatorCeremony(dt);
     updateCamera();
-    updateWreckRowing(dt);
+    if (state._gameMode !== 'conquest') updateWreckRowing(dt);
 
     // Sky + ocean background — horizon always above island top
     if (state.rowing.active) {
@@ -2525,16 +2525,15 @@ function drawInner() {
     }
     drawColonyOverlay(); // Colony buildings/farms on settled Terra Nova
     if (typeof drawEconomyWorldOverlay === 'function') drawEconomyWorldOverlay();
-    // Wreck beach visible when sailing
-    if (state.rowing.active) {
+    // Campaign islands visible when sailing (skip in Conquest — only nation islands exist)
+    if (state.rowing.active && state._gameMode !== 'conquest') {
       drawWreckIsland();
-      // Distant label
       let wsx = w2sX(WRECK.cx), wsy = w2sY(WRECK.cy);
       let _wreckHorizY = max(height * 0.06, height * 0.25 - horizonOffset) + 10;
       wsy = max(wsy, _wreckHorizY);
       let _wreckDS = typeof _getDistantScale === 'function' ? _getDistantScale(WRECK.cx, WRECK.cy, WRECK.rx) : null;
       let _maxVD = typeof _getMaxViewDist === 'function' ? _getMaxViewDist() : 4000;
-      if (_wreckDS && _wreckDS.dist > _maxVD) {} // skip label if too far
+      if (_wreckDS && _wreckDS.dist > _maxVD) {}
       else if (wsx > -100 && wsx < width + 100 && wsy > -100 && wsy < height + 100) {
         let _wLabelAlpha = _wreckDS ? lerp(120, 40, constrain((_wreckDS.dist - 500) / 3000, 0, 1)) : 120;
         fill(200, 180, 120, _wLabelAlpha);
@@ -2542,7 +2541,6 @@ function drawInner() {
         text('Wreck Beach', floor(wsx), floor(wsy - WRECK.ry * 0.5 * (_wreckDS ? _wreckDS.scale : 1)));
         textAlign(LEFT, TOP);
       }
-      // New islands visible when sailing
       drawVulcanIsland();
       drawVulcanDistantLabel();
       drawHyperboreIsland();
@@ -2551,6 +2549,8 @@ function drawInner() {
       drawPlentyDistantLabel();
       drawNecropolisIsland();
       drawNecropolisDistantLabel();
+    }
+    if (state.rowing.active) {
       drawHomeIslandDistant();
     }
     pop();
