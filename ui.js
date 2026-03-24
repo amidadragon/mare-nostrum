@@ -4455,6 +4455,24 @@ function drawWorldMap() {
     }
     if (isle.isHuman) { fill(80, 200, 255, 180); textSize(6); textAlign(CENTER, TOP); text('PLAYER', ix, iy + sz * 0.4 + 10); }
   }
+  // World islands (neutral/captured)
+  if (typeof WORLD_ISLANDS !== 'undefined') {
+    for (let isle of WORLD_ISLANDS) {
+      if (isle.faction) continue; // capitals already shown as nation dots
+      let pos = getIslandWorldPos(isle);
+      let ix = mapPX(pos.x), iy = mapPY(pos.y);
+      let controlled = typeof isIslandControlled === 'function' && isIslandControlled(isle.key);
+      let tc = isle.type === 'military' ? [200,80,80] : isle.type === 'economic' ? [200,180,60] : isle.type === 'diplomatic' ? [80,160,200] : [120,180,100];
+      noStroke();
+      fill(tc[0], tc[1], tc[2], controlled ? 220 : 100);
+      ellipse(ix, iy, controlled ? 8 : 5, controlled ? 8 : 5);
+      if (controlled) {
+        fill(255, 255, 220, 180);
+        textSize(7); textAlign(CENTER);
+        text(isle.name, ix, iy - 6);
+      }
+    }
+  }
   if (state.rowing && state.rowing.active) {
     let plX = mapPX(state.rowing.x), plY = mapPY(state.rowing.y);
     let pulse = 3 + sin(frameCount * 0.08) * 1.5;
