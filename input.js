@@ -1215,6 +1215,28 @@ function keyPressed() {
     return;
   }
 
+  // G key — Dive / Surface
+  if (key === 'g' || key === 'G') {
+    // Surface if already diving
+    if (state.diving && state.diving.active && typeof endDive === 'function') {
+      endDive(); return;
+    }
+    // Dive from boat — G while rowing in open water
+    if (typeof startDive === 'function' && state.rowing && state.rowing.active &&
+        !state.conquest.active && !state.rowing.nearIsle) {
+      startDive(); return;
+    }
+    // Dive from shore — G near water
+    if (typeof startDive === 'function' && !state.rowing.active && !state.buildMode &&
+        !state.conquest.active && !state._activeExploration) {
+      let _port = typeof getPortPosition === 'function' ? getPortPosition() : { x: 0, y: 0 };
+      let _nearBoat = dist(state.player.x, state.player.y, _port.x + 80, _port.y + 20) < 70;
+      if (!_nearBoat && isInShallows(state.player.x, state.player.y)) {
+        startDive(); return;
+      }
+    }
+  }
+
   // Interact
   if (key === 'e' || key === 'E') {
     if (state._diplomacyOpen) { state._diplomacyOpen = false; return; }
@@ -1228,21 +1250,7 @@ function keyPressed() {
       _castrumRoomInteractE();
       return;
     }
-    // Dive from boat — E while rowing in open water
-    if (typeof startDive === 'function' && state.rowing && state.rowing.active &&
-        !state.conquest.active && !state.rowing.nearIsle) {
-      startDive(); return;
-    }
-    // Dive — E near water, but NOT if near the rowboat
-    if (typeof startDive === 'function' && !state.rowing.active && !state.buildMode &&
-        !state.conquest.active &&
-        !state._activeExploration) {
-      let _port = typeof getPortPosition === 'function' ? getPortPosition() : { x: 0, y: 0 };
-      let _nearBoat = dist(state.player.x, state.player.y, _port.x + 80, _port.y + 20) < 70;
-      if (!_nearBoat && isInShallows(state.player.x, state.player.y)) {
-        startDive(); return;
-      }
-    }
+    // Diving moved to G key (below) — E is interact only
 
     // Random event E-key interactions
     if (interactWanderingMerchant()) return;
