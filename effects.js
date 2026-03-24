@@ -749,24 +749,7 @@ function drawColorGrading() {
     rect(0, 0, width, height);
   }
 
-  // Vignette — darker edges for cinematic feel (always subtle)
-  let vigA = 14 + (h >= 20 || h < 6 ? 3 : 0);
-  let vigW = width * 0.35, vigH = height * 0.35;
-  // Top-left corner
-  fill(0, 0, 0, vigA * 0.5);
-  rect(0, 0, vigW, vigH);
-  // Top-right
-  rect(width - vigW, 0, vigW, vigH);
-  // Bottom corners
-  fill(0, 0, 0, vigA * 0.4);
-  rect(0, height - vigH, vigW, vigH);
-  rect(width - vigW, height - vigH, vigW, vigH);
-  // Edge strips
-  fill(0, 0, 0, vigA * 0.3);
-  rect(0, 0, 20, height);
-  rect(width - 20, 0, 20, height);
-  rect(0, 0, width, 12);
-  rect(0, height - 12, width, 12);
+  // Vignette handled by drawGameVignette() in systems.js — no duplicate here
 }
 
 // ─── STORM ────────────────────────────────────────────────────────────────
