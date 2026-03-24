@@ -840,6 +840,7 @@ function keyPressed() {
     if (state.ship && state.ship.shopOpen) { state.ship.shopOpen = false; return; }
     if (state.tradeRouteUI) { state.tradeRouteUI = false; return; }
     if (state.colonyManageOpen) { state.colonyManageOpen = false; state.colonyManageSelected = null; return; }
+    if (state._diplomacyOpen) { state._diplomacyOpen = false; return; }
     if (state.legia && state.legia.legiaUIOpen) { state.legia.legiaUIOpen = false; return; }
     if (state.activeEvent && state.activeEvent.data && state.activeEvent.data.shopOpen) { state.activeEvent.data.shopOpen = false; return; }
     if (state.naturalistOpen) { state.naturalistOpen = false; return; }
@@ -1216,6 +1217,7 @@ function keyPressed() {
 
   // Interact
   if (key === 'e' || key === 'E') {
+    if (state._diplomacyOpen) { state._diplomacyOpen = false; return; }
     // Temple interior interactions (advisor, jester, pet, altar)
     if (state.insideTemple) {
       _templeRoomInteractE();

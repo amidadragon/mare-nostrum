@@ -3215,6 +3215,7 @@ function drawInner() {
       if (typeof drawSkillTree === 'function') drawSkillTree();
       if (typeof drawRecipeBookUI === 'function') drawRecipeBookUI();
       drawLegiaUI();
+      if (typeof drawDiplomacyPanel === 'function') drawDiplomacyPanel();
       if (typeof drawArmyBattle === 'function') drawArmyBattle();
       // drawVisualInvasion is called in the world render pass (lines 2383/3172), not here
       if (typeof drawInvasionHUD === 'function') drawInvasionHUD();
@@ -4261,18 +4262,10 @@ function _templeRoomInteractE() {
     return true;
   }
 
-  // Advisor
+  // Advisor — opens diplomacy panel
   var advX = R.cx + R.hw * 0.55, advY = R.cy - R.hh * 0.3;
   if (dist(state.player.x, state.player.y, advX, advY) < 35) {
-    var advice = 'You are prospering, leader!';
-    if (state.harvest < 20) advice = 'Your food stores are low. Build more farms.';
-    else if (state.legia && state.legia.army && state.legia.army.length < 5) advice = 'Our military is weak. Train more soldiers.';
-    else if (state.nations) {
-      var nk = Object.keys(state.nations);
-      var badRep = nk.find(function(k) { return state.nations[k] && state.nations[k].reputation < -20; });
-      if (badRep) advice = 'The nations grow restless. Consider diplomacy.';
-    }
-    addFloatingText(w2sX(advX), w2sY(advY) - 20, advice, '#ffd080');
+    state._diplomacyOpen = !state._diplomacyOpen;
     if (snd) snd.playSFX('click');
     return true;
   }

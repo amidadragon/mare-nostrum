@@ -4548,3 +4548,128 @@ function _getDiscoveredIslandKeys() {
   }
   return keys;
 }
+
+function drawDiplomacyPanel() {
+  if (!state._diplomacyOpen) return;
+
+  let pw = min(400, width - 20), ph = min(350, height - 40);
+  let px = width/2 - pw/2, py = height/2 - ph/2;
+
+  // Panel background
+  if (typeof drawParchmentPanel === 'function') drawParchmentPanel(px, py, pw, ph);
+  else { fill(30, 25, 20, 230); rect(px, py, pw, ph, 5); }
+
+  // Title
+  textFont('Cinzel, Georgia, serif');
+  fill(210, 180, 80); textAlign(CENTER, TOP); textSize(14);
+  text('DIPLOMACY', px + pw/2, py + 10);
+  textFont('monospace');
+
+  let sy = py + 34;
+  let nations = state.nations ? Object.keys(state.nations) : [];
+
+  // Your faction + reputation
+  fill(180, 160, 120); textSize(9); textAlign(LEFT, TOP);
+  let allies = typeof getAlliances === 'function' ? getAlliances() : [];
+  text('Your faction: ' + (state.faction || 'rome').toUpperCase() + '  |  Alliances: ' + allies.length + '/5', px + 14, sy);
+  sy += 16;
+
+  // Separator
+  stroke(100, 80, 50, 120); strokeWeight(1);
+  line(px + 14, sy, px + pw - 14, sy); noStroke();
+  sy += 8;
+
+  for (let nk of nations) {
+    let rv = state.nations[nk];
+    if (!rv) continue;
+
+    let rep = rv.reputation || 0;
+    let status = rv.defeated ? 'Defeated' : rv.allied ? 'Allied' : rep >= 30 ? 'Friendly' : rep <= -30 ? 'Hostile' : 'Neutral';
+    let statusCol = rv.defeated ? [100,100,100] : rv.allied ? [80,180,80] : rep >= 30 ? [120,180,120] : rep <= -30 ? [200,80,80] : [180,170,140];
+
+    // Faction name + status
+    let fm = (typeof FACTION_MILITARY !== 'undefined' && FACTION_MILITARY[nk]) ? FACTION_MILITARY[nk] : null;
+    let fc = fm ? fm.conquestFlag : [150,150,150];
+
+    fill(fc[0], fc[1], fc[2]); textSize(10); textAlign(LEFT, TOP);
+    text(nk.charAt(0).toUpperCase() + nk.slice(1), px + 14, sy);
+
+    fill(statusCol[0], statusCol[1], statusCol[2]); textSize(9);
+    text(status + ' (rep: ' + rep + ')', px + 100, sy + 1);
+
+    if (!rv.defeated) {
+      // Action buttons
+      let btnX = px + pw - 180;
+      let btnY = sy - 1;
+      let btnW = 52, btnH = 14;
+
+      if (!rv.allied && rep >= 0) {
+        // Alliance button
+        let hover1 = mouseX >= btnX && mouseX <= btnX + btnW && mouseY >= btnY && mouseY <= btnY + btnH;
+        fill(hover1 ? color(60, 120, 60) : color(40, 80, 40, 180));
+        rect(btnX, btnY, btnW, btnH, 2);
+        fill(hover1 ? 255 : 200); textSize(8); textAlign(CENTER, TOP);
+        text('Ally 500g', btnX + btnW/2, btnY + 2);
+        if (hover1 && mouseIsPressed && typeof formAlliance === 'function') {
+          if (!state._diplomacyCooldown || frameCount > state._diplomacyCooldown) {
+            formAlliance(nk);
+            state._diplomacyCooldown = frameCount + 30;
+          }
+        }
+      }
+
+      if (rv.allied) {
+        // Break alliance button
+        let hover2 = mouseX >= btnX && mouseX <= btnX + btnW && mouseY >= btnY && mouseY <= btnY + btnH;
+        fill(hover2 ? color(160, 80, 40) : color(120, 60, 30, 180));
+        rect(btnX, btnY, btnW, btnH, 2);
+        fill(hover2 ? 255 : 200); textSize(8); textAlign(CENTER, TOP);
+        text('Break', btnX + btnW/2, btnY + 2);
+        if (hover2 && mouseIsPressed && typeof breakAlliance === 'function') {
+          if (!state._diplomacyCooldown || frameCount > state._diplomacyCooldown) {
+            breakAlliance(nk);
+            state._diplomacyCooldown = frameCount + 30;
+          }
+        }
+      }
+
+      // Trade button
+      let btnX2 = btnX + btnW + 4;
+      let hover3 = mouseX >= btnX2 && mouseX <= btnX2 + btnW && mouseY >= btnY && mouseY <= btnY + btnH;
+      fill(hover3 ? color(80, 100, 140) : color(50, 70, 100, 180));
+      rect(btnX2, btnY, btnW, btnH, 2);
+      fill(hover3 ? 255 : 200); textSize(8); textAlign(CENTER, TOP);
+      text('Trade', btnX2 + btnW/2, btnY + 2);
+
+      // Improve relations button
+      let btnX3 = btnX2 + btnW + 4;
+      let hover4 = mouseX >= btnX3 && mouseX <= btnX3 + btnW && mouseY >= btnY && mouseY <= btnY + btnH;
+      fill(hover4 ? color(120, 120, 60) : color(80, 80, 40, 180));
+      rect(btnX3, btnY, btnW, btnH, 2);
+      fill(hover4 ? 255 : 200); textSize(8); textAlign(CENTER, TOP);
+      text('+Rep 100g', btnX3 + btnW/2, btnY + 2);
+      if (hover4 && mouseIsPressed && state.gold >= 100) {
+        if (!state._diplomacyCooldown || frameCount > state._diplomacyCooldown) {
+          state.gold -= 100;
+          rv.reputation = Math.min(100, (rv.reputation || 0) + 15);
+          if (typeof addFloatingText === 'function') addFloatingText(width/2, height*0.3, '+15 reputation with ' + nk, '#88ff88');
+          state._diplomacyCooldown = frameCount + 30;
+        }
+      }
+    }
+
+    sy += 20;
+    if (sy > py + ph - 30) break;
+  }
+
+  // Victory progress at bottom
+  sy = py + ph - 28;
+  fill(160, 140, 100); textSize(8); textAlign(LEFT, TOP);
+  let caps = typeof getCapturedCapitals === 'function' ? getCapturedCapitals() : { count: 0 };
+  let hasSenate = state._controlledIslands && state._controlledIslands.includes('senate_house');
+  text('Victory: ' + caps.count + '/6 capitals | ' + allies.length + '/4 allies | Senate: ' + (hasSenate ? 'Yes' : 'No'), px + 14, sy);
+
+  // Close hint
+  fill(140, 120, 90); textSize(8); textAlign(RIGHT, TOP);
+  text('[E] or [ESC] Close', px + pw - 14, sy);
+}
