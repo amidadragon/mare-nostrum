@@ -3031,6 +3031,7 @@ function drawInner() {
       if (typeof drawClockHUD === 'function') drawClockHUD();
       if (typeof drawCompassHUD === 'function') drawCompassHUD();
       if (typeof drawQuestTracker === 'function') drawQuestTracker();
+      if (typeof drawContextActionBar === 'function') drawContextActionBar();
       drawHotbar();
       drawFestivalBanner();
       drawFestivalAnnouncement();

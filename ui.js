@@ -1741,6 +1741,89 @@ function _drawEquipIcon(cx, cy, item, size) {
   pop();
 }
 
+function drawHUDTooltip(x, y, lines) {
+  let maxW = 0;
+  textSize(10);
+  for (let line of lines) {
+    let w = textWidth(line.text || line);
+    if (w > maxW) maxW = w;
+  }
+  let tipW = maxW + 16;
+  let tipH = lines.length * 14 + 8;
+  let tx = min(x + 12, width - tipW - 4);
+  let ty = min(y, height - tipH - 4);
+
+  fill(25, 22, 18, 230);
+  stroke(160, 130, 60, 120);
+  strokeWeight(1);
+  rect(tx, ty, tipW, tipH, 3);
+  noStroke();
+
+  textAlign(LEFT);
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+    if (typeof line === 'string') {
+      fill(200, 190, 170);
+      text(line, tx + 8, ty + 14 + i * 14);
+    } else {
+      fill(line.color || [200, 190, 170]);
+      text(line.text, tx + 8, ty + 14 + i * 14);
+    }
+  }
+}
+
+function drawContextActionBar() {
+  if (state.cutscene || gameScreen !== 'game') return;
+  if (state._paused || state.menuOverlay) return;
+
+  let actions = [];
+
+  if (state.rowing && state.rowing.active) {
+    if (state.rowing.nearIsle) {
+      let rel = typeof getIslandRelationship === 'function' ? getIslandRelationship(state.rowing.nearIsle) : 'neutral';
+      if (rel === 'home' || rel === 'owned') actions.push({ label: 'Visit [E]', color: [80,200,80] });
+      else if (rel === 'ally') actions.push({ label: 'Visit Ally [E]', color: [80,140,220] });
+      else if (rel === 'enemy') actions.push({ label: 'Invade [F]', color: [220,60,60] });
+      else {
+        actions.push({ label: 'Visit [E]', color: [200,200,180] });
+        actions.push({ label: 'Invade [F]', color: [220,100,60] });
+      }
+    }
+  } else if (!state.rowing || !state.rowing.active) {
+    // On island
+    if (state._activeNation) {
+      actions.push({ label: 'Leave [E]', color: [180,180,160] });
+    }
+    if (state.legia && state.legia.castrumLevel > 0) {
+      actions.push({ label: 'Army [L]', color: [160,140,100] });
+    }
+    actions.push({ label: 'Build [B]', color: [140,160,120] });
+    actions.push({ label: 'Map [M]', color: [120,140,160] });
+  }
+
+  if (actions.length === 0) return;
+
+  let btnW = 80, btnH = 22, gap = 6;
+  let totalW = actions.length * (btnW + gap) - gap;
+  let startX = width / 2 - totalW / 2;
+  let barY = height - 80; // above hotbar
+
+  textAlign(CENTER); textSize(10); noStroke();
+  for (let i = 0; i < actions.length; i++) {
+    let a = actions[i];
+    let bx = startX + i * (btnW + gap);
+    // Button background
+    fill(30, 25, 20, 180);
+    stroke(a.color[0], a.color[1], a.color[2], 120);
+    strokeWeight(1);
+    rect(bx, barY, btnW, btnH, 3);
+    noStroke();
+    // Button text
+    fill(a.color[0], a.color[1], a.color[2]);
+    text(a.label, bx + btnW / 2, barY + btnH / 2 + 3);
+  }
+}
+
 function drawHotbar() {
   if (screenshotMode) return;
   let p = state.player;
@@ -2166,6 +2249,24 @@ function drawHUD() {
     if (state.meals > 0) { text('MEALS    ' + state.meals, hudX, cookedY); cookedY += hudLineH; }
     if (state.wine > 0) { fill(160, 50, 80); text('WINE     ' + state.wine, hudX, cookedY); cookedY += hudLineH; }
     if (state.oil > 0) { fill(140, 160, 60); text('OIL      ' + state.oil, hudX, cookedY); cookedY += hudLineH; }
+  }
+
+  // ─── ARMY SUMMARY ───
+  if (state.legia && (state.legia.soldiers > 0 || (state.legia.army && state.legia.army.length > 0) || (state.legia.units && state.legia.units.length > 0))) {
+    cookedY += 4;
+    fill(180, 160, 120);
+    textSize(9 * uiScale);
+    textAlign(LEFT);
+    let armyCount = (state.legia.soldiers || 0) + (state.legia.army ? state.legia.army.length : 0);
+    if (state.legia.units) armyCount += state.legia.units.reduce((s, u) => s + (u.count || 1), 0);
+    let armyCap = typeof getArmyCap === 'function' ? getArmyCap() : 30;
+    text('Army: ' + armyCount + '/' + armyCap, hudX, cookedY + 10);
+    cookedY += 14;
+    if (state.legia.castrumLevel > 0) {
+      fill(140, 130, 110);
+      text('Castrum Lv.' + state.legia.castrumLevel, hudX, cookedY + 10);
+      cookedY += 12;
+    }
   }
 
   let barH = max(7, floor(8 * uiScale));
