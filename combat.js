@@ -5603,8 +5603,9 @@ function startIslandInvasion(islandKey) {
     if (isIslandControlled('siege_works') && rv) playerStr = Math.floor(playerStr * 1.2); // +20% siege
   }
 
-  if (playerStr < 50) {
-    if (typeof addFloatingText === 'function') addFloatingText(width/2, height*0.3, 'No army! Recruit soldiers first.', '#ff6644');
+  if (playerStr < 1) {
+    if (typeof addFloatingText === 'function') addFloatingText(width/2, height*0.3, 'No army! Build a Castrum and recruit soldiers.', '#ff6644');
+    if (typeof addNotification === 'function') addNotification('Press X to expand city, build Castrum at level 3, enter it with E, recruit with number keys.', '#ffaa44');
     return false;
   }
 

@@ -1280,10 +1280,16 @@ function startConquestGame(playerFaction) {
   state.solar = 100; state.fish = 3;
   // Tools unlocked
   state.tools = { sickle: 1, axe: 1, net: 1 };
-  // Conquest starts with a castrum so players can recruit immediately
+  // Conquest starts with a castrum + starting army
   state.legia.castrumLevel = 1;
   state.legia.castrumX = 780;
   state.legia.castrumY = 340;
+  // Starting army — 3 legionaries ready to fight
+  state.legia.army = [
+    { type: 'legionary', hp: 20, maxHp: 20, damage: 5, speed: 1.2, garrison: false },
+    { type: 'legionary', hp: 20, maxHp: 20, damage: 5, speed: 1.2, garrison: false },
+    { type: 'legionary', hp: 20, maxHp: 20, damage: 5, speed: 1.2, garrison: false }
+  ];
   // Show faction select screen — player picks their faction
   if (!playerFaction) {
     // Open faction select overlay — selectFaction callback will finish setup
