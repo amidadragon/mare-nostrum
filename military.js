@@ -107,7 +107,7 @@ const COMMON_UNITS = {
   heavy_inf:    { name: 'Heavy Infantry',role: 'frontline', cost: 120, str: 120, food: 2, speed: 0.7 }
 };
 
-const FACTION_UNITS = {
+const FACTION_ARMY_UNITS = {
   rome: {
     legionary:  { name: 'Legionary',  role: 'heavy',   cost: 150, str: 150, food: 2, speed: 0.8, special: 'testudo' },
     praetorian: { name: 'Praetorian', role: 'elite',   cost: 250, str: 200, food: 3, speed: 0.8, special: 'inspire' },
@@ -189,7 +189,7 @@ function getGarrisonCap() {
 function getAvailableUnits() {
   let faction = state.faction || 'rome';
   let units = { ...COMMON_UNITS };
-  let factionUnits = FACTION_UNITS[faction];
+  let factionUnits = FACTION_ARMY_UNITS[faction];
   if (factionUnits) {
     for (let k in factionUnits) units[k] = factionUnits[k];
   }
@@ -199,7 +199,7 @@ function getAvailableUnits() {
 function getUnitInfo(unitKey) {
   let faction = state.faction || 'rome';
   if (COMMON_UNITS[unitKey]) return COMMON_UNITS[unitKey];
-  if (FACTION_UNITS[faction] && FACTION_UNITS[faction][unitKey]) return FACTION_UNITS[faction][unitKey];
+  if (FACTION_ARMY_UNITS[faction] && FACTION_ARMY_UNITS[faction][unitKey]) return FACTION_ARMY_UNITS[faction][unitKey];
   return null;
 }
 
