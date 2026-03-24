@@ -151,9 +151,9 @@ function drawAmbientShips() {
 function updateRowing(dt) {
   let r = state.rowing;
   if (!r.active) return;
-  // Freeze boat while modifier select is open
   if (state.expeditionModifierSelect) return;
 
+  // ═══ INPUT ═══
   let dx = 0, dy = 0;
   if (isKeybindDown('moveLeft') || keyIsDown(LEFT_ARROW))  dx -= 1;
   if (isKeybindDown('moveRight') || keyIsDown(RIGHT_ARROW)) dx += 1;
@@ -163,6 +163,7 @@ function updateRowing(dt) {
     dx = _touchJoystick.dx; dy = _touchJoystick.dy;
   }
 
+  // ═══ SPEED ═══
   let rowSpeed = 3.5 * getFactionData().sailSpeedMult;
   if (typeof hasTech === 'function' && hasTech('celestial_navigation')) rowSpeed *= 1.15;
   rowSpeed *= getWeatherEffects().sailMult;
@@ -181,101 +182,78 @@ function updateRowing(dt) {
     if (r.speed < 0.05) r.speed = 0;
   }
 
+  // ═══ MOVE ═══
   r.x += cos(r.angle) * r.speed * dt;
   r.y += sin(r.angle) * r.speed * dt;
-
-  // Bobbing
-  let bob = sin(frameCount * 0.03) * 2;
-  // Camera follows boat
   state.player.x = r.x;
   state.player.y = r.y;
 
-  // Boundary: don't let boat go too far from island (islands surround home)
-  let maxDist = Math.max(state.islandRX * 8.5, 7000); // world radius covers all nation islands (4000-6000px)
-  let bDist = dist(r.x, r.y, WORLD.islandCX, WORLD.islandCY);
+  // ═══ WORLD BOUNDARY (circular, hardcoded center) ═══
+  let _homeX = 600, _homeY = 400;
+  let maxDist = 8000;
+  let bDist = dist(r.x, r.y, _homeX, _homeY);
   if (bDist > maxDist) {
-    let ang = atan2(r.y - WORLD.islandCY, r.x - WORLD.islandCX);
-    r.x = WORLD.islandCX + cos(ang) * maxDist;
-    r.y = WORLD.islandCY + sin(ang) * maxDist;
+    let ang = atan2(r.y - _homeY, r.x - _homeX);
+    r.x = _homeX + cos(ang) * maxDist;
+    r.y = _homeY + sin(ang) * maxDist;
     r.speed *= 0.5;
   }
 
-  // Detect proximity to islands — set dock prompt (E to dock)
+  // ═══ ISLAND PROXIMITY — dock detection only, NO collisions ═══
   r.nearIsle = null;
-  let _isConquestMode = state._gameMode === 'conquest';
+  let _isConquest = state._gameMode === 'conquest';
 
-  // Terra Nova — campaign only (disabled in Conquest mode)
-  if (!_isConquestMode && state.conquest) {
-    let cq = state.conquest;
-    let cqNear = ((r.x - cq.isleX) / cq.isleRX) ** 2 + ((r.y - cq.isleY) / cq.isleRY) ** 2;
-    if (cqNear < 1.5 * 1.5) { r.nearIsle = 'conquest'; unlockJournal('terra_nova'); }
-  }
-
-  // Nation islands — proximity detection (dock prompt), NO hard collision
+  // Nation islands — detect nearest for dock prompt
   let _nationKeys = Object.keys(state.nations || {});
   for (let _nk of _nationKeys) {
     let _nv = state.nations[_nk];
     if (!_nv || _nv.defeated) continue;
-    let _nvx = ((r.x - _nv.isleX) / _nv.isleRX);
-    let _nvy = ((r.y - _nv.isleY) / _nv.isleRY);
+    let _nvx = (r.x - _nv.isleX) / (_nv.isleRX || 400);
+    let _nvy = (r.y - _nv.isleY) / (_nv.isleRY || 280);
     let _nvDist = _nvx * _nvx + _nvy * _nvy;
-    if (_nvDist < 2.0 * 2.0) r.nearIsle = _nk; // dock prompt at 2x radius
-    // Gentle slow-down near island shore (no hard bounce)
-    if (_nvDist < 0.7 * 0.7) {
-      r.speed *= 0.92; // gradual deceleration, player can still steer
-    }
+    if (_nvDist < 2.5 * 2.5) r.nearIsle = _nk;
   }
 
-  // Exploration islands + Terra Nova — campaign only (disabled in Conquest)
-  if (!_isConquestMode) {
-    let _newIsles = [
-      { key: 'vulcan',    s: state.vulcan },
-      { key: 'hyperborea',s: state.hyperborea },
-      { key: 'plenty',    s: state.plenty },
-      { key: 'necropolis',s: state.necropolis },
-    ];
-    for (let ni of _newIsles) {
-      if (!ni.s) continue;
-      let nex = ((r.x - ni.s.isleX) / ni.s.isleRX);
-      let ney = ((r.y - ni.s.isleY) / ni.s.isleRY);
-      let neDist = nex * nex + ney * ney;
-      if (neDist < 1.5 * 1.5) r.nearIsle = ni.key;
-      if (neDist < 0.8 * 0.8) {
-        let ang = atan2(r.y - ni.s.isleY, r.x - ni.s.isleX);
-        r.x = ni.s.isleX + cos(ang) * ni.s.isleRX * 0.85;
-        r.y = ni.s.isleY + sin(ang) * ni.s.isleRY * 0.85;
-        r.speed = max(r.speed * 0.5, 0.5);
-      }
-    }
-    // Terra Nova collision
+  // Campaign-only islands (skip entirely in Conquest)
+  if (!_isConquest) {
+    // Terra Nova
     if (state.conquest) {
       let cq = state.conquest;
-      let cqNx = (r.x - cq.isleX) / cq.isleRX;
-      let cqNy = (r.y - cq.isleY) / cq.isleRY;
-      let cqEllDist = cqNx * cqNx + cqNy * cqNy;
-      if (cqEllDist < 0.8 * 0.8) {
+      let cqN = ((r.x - cq.isleX) / cq.isleRX) ** 2 + ((r.y - cq.isleY) / cq.isleRY) ** 2;
+      if (cqN < 1.5 * 1.5) r.nearIsle = 'conquest';
+      if (cqN < 0.7 * 0.7) {
         let ang = atan2(r.y - cq.isleY, r.x - cq.isleX);
         r.x = cq.isleX + cos(ang) * cq.isleRX * 0.85;
         r.y = cq.isleY + sin(ang) * cq.isleRY * 0.85;
-        r.speed = max(r.speed * 0.5, 0.5);
       }
+    }
+    // Exploration islands
+    let _newIsles = [
+      { key: 'vulcan', s: state.vulcan }, { key: 'hyperborea', s: state.hyperborea },
+      { key: 'plenty', s: state.plenty }, { key: 'necropolis', s: state.necropolis },
+    ];
+    for (let ni of _newIsles) {
+      if (!ni.s) continue;
+      let nex = (r.x - ni.s.isleX) / ni.s.isleRX, ney = (r.y - ni.s.isleY) / ni.s.isleRY;
+      let neDist = nex * nex + ney * ney;
+      if (neDist < 1.5 * 1.5) r.nearIsle = ni.key;
+      if (neDist < 0.7 * 0.7) {
+        let ang = atan2(r.y - ni.s.isleY, r.x - ni.s.isleX);
+        r.x = ni.s.isleX + cos(ang) * ni.s.isleRX * 0.85;
+        r.y = ni.s.isleY + sin(ang) * ni.s.isleRY * 0.85;
+      }
+    }
+    // Home island collision (campaign only — uses hardcoded sizes, NOT getSurfaceRX which gets swapped)
+    let _hRX = 450, _hRY = 115; // safe fallback sizes
+    let _hDx = (r.x - _homeX) / _hRX, _hDy = (r.y - _homeY) / _hRY;
+    if (_hDx * _hDx + _hDy * _hDy < 1.0) {
+      let ang = atan2(r.y - _homeY, r.x - _homeX);
+      r.x = _homeX + cos(ang) * _hRX * 1.1;
+      r.y = _homeY + sin(ang) * _hRY * 1.1;
     }
   }
 
-  // Don't let boat go onto HOME island (use saved home coords, not WORLD which may be swapped)
-  let _homeX = 600, _homeY = 400; // home island is always at these coords
-  let _hDx = (r.x - _homeX) / (getSurfaceRX() || 450);
-  let _hDy = (r.y - _homeY) / (getSurfaceRY() || 115);
-  if (_hDx * _hDx + _hDy * _hDy < 1.0) {
-    let ang = atan2(r.y - _homeY, r.x - _homeX);
-    let rx = (getSurfaceRX() || 450) * 1.1;
-    let ry = (getSurfaceRY() || 115) * 1.1;
-    r.x = _homeX + cos(ang) * rx;
-    r.y = _homeY + sin(ang) * ry;
-    r.speed = max(r.speed * 0.5, 0.3);
-  }
-
-  // Wake trail — behind the ship (stern/ram trails at -x)
+  // ═══ WAKE TRAIL ═══
   if (r.speed > 0.3 && frameCount % 4 === 0) {
     r.wakeTrail.push({ x: r.x - cos(r.angle) * 55, y: r.y - sin(r.angle) * 55, life: 40 });
   }
