@@ -234,12 +234,9 @@ function drawShip() {
 
   push();
   translate(sx, sy + bob);
-  // Try sprite first
-  let _shipSprKey = 'ship_' + (state.faction || 'rome');
-  if (typeof drawSprite === 'function' && drawSprite(_shipSprKey, 0, 0, 80, 40)) {
-    pop();
-    return;
-  }
+  // Sprite ships disabled — CyberRealistic generates photorealistic, not pixel art
+  // Need a pixel-art SD model to generate matching sprites
+  // Procedural pixel-art rendering below works great
   let _fs = FACTION_SHIPS[state.faction] || FACTION_SHIPS.rome;
   // Flip ship to face island (right) when leaving, normal when docked/arriving from left
   if (ship.state === 'leaving') scale(-1, 1);
