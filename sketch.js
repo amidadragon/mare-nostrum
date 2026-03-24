@@ -1966,7 +1966,8 @@ function draw() {
   // ─── REAL-TIME AUTOSAVE (every 5 min, skip combat) ───
   state.autoSaveTimer++;
   if (state.autoSaveTimer >= state.autoSaveInterval &&
-      !state.conquest.active) {
+      !state.conquest.active &&
+      !(typeof isInvasionBattleActive === 'function' && isInvasionBattleActive())) {
     state.autoSaveTimer = 0;
     saveGame();
   }

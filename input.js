@@ -853,6 +853,7 @@ function keyPressed() {
     if (state.codexOpen) { state.codexOpen = false; return; }
     if (state.journalOpen) { state.journalOpen = false; return; }
     if (!state.insideTemple && !state.insideCastrum && !state.buildMode && !(state.legia && state.legia.legiaUIOpen)) {
+      if (typeof isInvasionBattleActive === 'function' && isInvasionBattleActive()) return;
       state._paused = !state._paused;
       return;
     }

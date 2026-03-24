@@ -5728,6 +5728,14 @@ function recruitUnit(unitKey, count) {
 let _invasionBattle = null;
 
 function startVisualInvasion(islandKey) {
+  if (_invasionBattle) return false; // already in battle
+
+  // Stop rowing when invasion starts
+  if (state.rowing) {
+    state.rowing.active = false;
+    if (typeof camZoomTarget !== 'undefined') camZoomTarget = 1.0;
+  }
+
   // Get defender strength
   let defStr = 300;
   let rv = state.nations[islandKey];
@@ -5979,6 +5987,14 @@ function updateVisualInvasion(dt) {
         state.rowing.active = true;
         state.rowing.speed = 0;
         if (typeof camZoomTarget !== 'undefined') camZoomTarget = 0.55;
+        // Position ship near the island they just attacked
+        let rv = state.nations[b.islandKey];
+        if (rv && rv.isleX) {
+          state.rowing.x = rv.isleX + (rv.isleRX || 400) * 1.2;
+          state.rowing.y = rv.isleY;
+          state.player.x = state.rowing.x;
+          state.player.y = state.rowing.y;
+        }
       }
     }
   }
