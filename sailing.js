@@ -203,15 +203,25 @@ function updateRowing(dt) {
   r.nearIsle = null;
   let _isConquest = state._gameMode === 'conquest';
 
-  // Nation islands — detect nearest for dock prompt
+  // Nation islands — detect nearest for dock prompt + collision
   let _nationKeys = Object.keys(state.nations || {});
   for (let _nk of _nationKeys) {
     let _nv = state.nations[_nk];
     if (!_nv || _nv.defeated) continue;
-    let _nvx = (r.x - _nv.isleX) / (_nv.isleRX || 400);
-    let _nvy = (r.y - _nv.isleY) / (_nv.isleRY || 280);
+    let _nrx = _nv.isleRX || 400, _nry = _nv.isleRY || 280;
+    let _nvx = (r.x - _nv.isleX) / _nrx;
+    let _nvy = (r.y - _nv.isleY) / _nry;
     let _nvDist = _nvx * _nvx + _nvy * _nvy;
     if (_nvDist < 2.5 * 2.5) r.nearIsle = _nk;
+    // Collision — push ship out of island body
+    if (_nvDist < 0.8 * 0.8) {
+      let _nd = Math.sqrt(_nvDist);
+      if (_nd > 0.01) {
+        r.x = _nv.isleX + (_nvx / _nd) * 0.85 * _nrx;
+        r.y = _nv.isleY + (_nvy / _nd) * 0.85 * _nry;
+        r.speed *= 0.3;
+      }
+    }
   }
 
   // Campaign-only islands (skip entirely in Conquest)
@@ -243,33 +253,37 @@ function updateRowing(dt) {
         r.y = ni.s.isleY + sin(ang) * ni.s.isleRY * 0.85;
       }
     }
-    // World islands proximity
-    if (typeof WORLD_ISLANDS !== 'undefined') {
-      for (let isle of WORLD_ISLANDS) {
-        if (isle.faction) continue; // capitals handled as nations
-        let pos = getIslandWorldPos(isle);
-        let _wdx = (r.x - pos.x) / (isle.isleRX || 300);
-        let _wdy = (r.y - pos.y) / (isle.isleRY || 200);
-        let _wdist = _wdx * _wdx + _wdy * _wdy;
-        if (_wdist < 2.5 * 2.5) r.nearIsle = isle.key;
-        // Collision push-back
-        if (_wdist < 0.7 * 0.7) {
-          let _wd = Math.sqrt(_wdist);
-          if (_wd > 0.01) {
-            r.x = pos.x + (_wdx / _wd) * 0.85 * (isle.isleRX || 300);
-            r.y = pos.y + (_wdy / _wd) * 0.85 * (isle.isleRY || 200);
-          }
+  }
+
+  // World islands proximity + collision (all modes)
+  if (typeof WORLD_ISLANDS !== 'undefined') {
+    for (let isle of WORLD_ISLANDS) {
+      if (isle.faction) continue; // capitals handled as nations
+      let pos = getIslandWorldPos(isle);
+      let _wdx = (r.x - pos.x) / (isle.isleRX || 300);
+      let _wdy = (r.y - pos.y) / (isle.isleRY || 200);
+      let _wdist = _wdx * _wdx + _wdy * _wdy;
+      if (_wdist < 2.5 * 2.5) r.nearIsle = isle.key;
+      // Collision push-back
+      if (_wdist < 0.7 * 0.7) {
+        let _wd = Math.sqrt(_wdist);
+        if (_wd > 0.01) {
+          r.x = pos.x + (_wdx / _wd) * 0.85 * (isle.isleRX || 300);
+          r.y = pos.y + (_wdy / _wd) * 0.85 * (isle.isleRY || 200);
+          r.speed *= 0.3;
         }
       }
     }
-    // Home island collision (campaign only — uses hardcoded sizes, NOT getSurfaceRX which gets swapped)
-    let _hRX = 450, _hRY = 115; // safe fallback sizes
-    let _hDx = (r.x - _homeX) / _hRX, _hDy = (r.y - _homeY) / _hRY;
-    if (_hDx * _hDx + _hDy * _hDy < 1.0) {
-      let ang = atan2(r.y - _homeY, r.x - _homeX);
-      r.x = _homeX + cos(ang) * _hRX * 1.1;
-      r.y = _homeY + sin(ang) * _hRY * 1.1;
-    }
+  }
+
+  // Home island collision (all modes)
+  let _hRX = 450, _hRY = 115;
+  let _hDx = (r.x - _homeX) / _hRX, _hDy = (r.y - _homeY) / _hRY;
+  if (_hDx * _hDx + _hDy * _hDy < 1.0) {
+    let ang = atan2(r.y - _homeY, r.x - _homeX);
+    r.x = _homeX + cos(ang) * _hRX * 1.1;
+    r.y = _homeY + sin(ang) * _hRY * 1.1;
+    r.speed *= 0.3;
   }
 
   // ═══ WAKE TRAIL ═══
