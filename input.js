@@ -1447,7 +1447,8 @@ function keyPressed() {
         state.player.y = _nv.isleY + sin(_dockAng) * _nv.isleRY * 0.6;
         state.player.vx = 0; state.player.vy = 0;
         cam.x = state.player.x; cam.y = state.player.y;
-        _startCamTransition(); camZoomTarget = 1.0; // zoom back in
+        camSmooth.x = cam.x; camSmooth.y = cam.y; // instant camera snap
+        camZoomTarget = 1.0;
         addNotification('Arrived at ' + (typeof getNationName === 'function' ? getNationName(r.nearIsle) : r.nearIsle), '#aaddff');
         // Set invasion target if player has army
         if (state.legia && state.legia.army && state.legia.army.length > 0 && !_nv.defeated && !_nv.vassal) {
@@ -1455,22 +1456,19 @@ function keyPressed() {
         }
         return;
       }
-      // World island docking
+      // World island docking — visit (not capture, use F to invade/capture)
       if (typeof getWorldIsland === 'function') {
         let _wisle = getWorldIsland(r.nearIsle);
         if (_wisle && !_wisle.faction) {
           state.rowing.active = false;
           camZoomTarget = 1.0;
-          // Capture the island
-          captureIsland(_wisle.key);
-          // Apply benefit notification
-          if (typeof addFloatingText === 'function') {
-            addFloatingText(width/2, height*0.3, 'Captured ' + _wisle.name + '!', '#ffd700');
-          }
-          // Place player on island
           let pos = getIslandWorldPos(_wisle);
           state.player.x = pos.x;
           state.player.y = pos.y;
+          state.player.vx = 0; state.player.vy = 0;
+          cam.x = state.player.x; cam.y = state.player.y;
+          _startCamTransition();
+          if (typeof addNotification === 'function') addNotification('Arrived at ' + _wisle.name, '#aaddff');
           return;
         }
       }
