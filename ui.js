@@ -2244,9 +2244,19 @@ function drawHUD() {
   let _bldUpkeep = (typeof calculateBuildingMaintenance === 'function') ? calculateBuildingMaintenance() : 0;
   let _armUpkeep = (typeof getArmyUpkeep === 'function') ? getArmyUpkeep() : 0;
   let _totalUpkeep = _bldUpkeep + _armUpkeep;
+  let _dailyIncome = 0;
+  if (typeof calculateDailyTradeIncome === 'function') _dailyIncome += calculateDailyTradeIncome();
+  if (state.conquest && state.conquest.colonyIncome) _dailyIncome += state.conquest.colonyIncome;
+  let _goldSuffix = hudX + barW;
   if (_totalUpkeep > 0) {
     fill(200, 80, 60); textSize(hudSmallText);
-    text(' -' + _totalUpkeep + '/d', hudX + barW, resY);
+    let upkeepStr = ' -' + _totalUpkeep + '/d';
+    text(upkeepStr, _goldSuffix, resY);
+    _goldSuffix += textWidth(upkeepStr);
+  }
+  if (_dailyIncome > 0) {
+    fill(80, 200, 100); textSize(hudSmallText);
+    text(' +' + _dailyIncome + '/d', _goldSuffix, resY);
   }
   resY += hudLineH;
   if (state.fish > 0) { drawHudResource(hudX, resY, 'FISH     ', state.fish, color(100, 180, 255), 'fish'); resY += hudLineH; }

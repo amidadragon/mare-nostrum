@@ -1682,6 +1682,7 @@ function keyPressed() {
         state._castrumReturnY = state.player.y;
         startDoorTransition(function() {
           state.insideCastrum = true;
+          state._castrumVisited = true;
           state.player.x = CASTRUM_ROOM.cx;
           state.player.y = CASTRUM_ROOM.cy + CASTRUM_ROOM.hh * 0.5;
           state.player.vx = 0; state.player.vy = 0; state.player.moving = false;

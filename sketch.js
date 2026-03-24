@@ -1305,6 +1305,7 @@ function startConquestGame(playerFaction) {
   state.buildings.push({ x: 780, y: 340, type: 'castrum', w: 130, h: 100, rot: 0, buildProgress: 1 });
   gameScreen = 'game';
   if (typeof addNotification === 'function') {
+    addNotification('Starting: 100 gold, 3 legionaries, castrum ready', '#88ff88');
     addNotification('CONQUEST MODE — Rise above all nations!', '#ffdd44');
     addNotification('Expand, build armies, forge alliances, and dominate.', '#aaddff');
     addNotification('Capture 6 capitals, control 4 trade hubs + 100k gold, or hold the Senate with 4 allies to win!', '#88ff88');
@@ -2953,10 +2954,17 @@ function drawInner() {
       let cdx = state.player.x - state.legia.castrumX;
       let cdy = state.player.y - (state.legia.castrumY + 50);
       if (cdx*cdx + cdy*cdy < 40*40) {
-        fill(255, 220, 120, 200 + sin(frameCount * 0.08) * 40);
-        textAlign(CENTER); textSize(11); noStroke();
         let sx = w2sX(state.legia.castrumX);
         let sy = w2sY(state.legia.castrumY + 70) + floatOffset;
+        // Glow if player has never entered castrum
+        if (!state._castrumVisited) {
+          let glowAlpha = 80 + sin(frameCount * 0.06) * 40;
+          fill(255, 200, 50, glowAlpha);
+          noStroke();
+          ellipse(w2sX(state.legia.castrumX), w2sY(state.legia.castrumY) + floatOffset, 40, 20);
+        }
+        fill(255, 220, 120, 200 + sin(frameCount * 0.08) * 40);
+        textAlign(CENTER); textSize(11); noStroke();
         text('[E] Enter Castrum', sx, sy);
       }
     }
