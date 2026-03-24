@@ -2640,7 +2640,8 @@ function drawInner() {
             // ═══ TIER 3: FULL RENDER (close or visiting) ═══
             let _owt = (typeof FACTION_TERRAIN !== 'undefined') ? (FACTION_TERRAIN[_owKey] || FACTION_TERRAIN.rome) : { seed: 42 };
             drawIslandAt({ cx: botCX, cy: botCY, rx: _isRX, ry: _isRY, level: _isLevel, seed: _owt.seed, factionKey: _owKey });
-            if (_own.islandState && _own.islandState.buildings && typeof swapToIsland === 'function') {
+            if (_own.islandState && _own.islandState.buildings && typeof swapToIsland === 'function' && !_isVisiting) {
+              // Only render bot island via state swap when NOT visiting — drawActiveNationContent handles visited islands
               swapToIsland(_own.islandState, botCX, botCY);
               state.faction = _owKey;
               if (!state.pyramid) state.pyramid = { x: botCX, y: botCY - 40, level: state.islandLevel || 1 };
@@ -2800,7 +2801,7 @@ function drawInner() {
       }
       if (!_frameBudget.throttled || frameCount % 2 === 0) drawShoreWaves();
       drawAmbientHouses();
-      drawWorldObjectsSorted();
+      if (!state._activeNation) drawWorldObjectsSorted(); // Skip home island objects when visiting nation
       if (!_frameBudget.throttled) drawCitySmoke();
       drawLaundryLines();
       drawStreetWear();
