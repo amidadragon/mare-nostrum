@@ -2498,10 +2498,13 @@ function drawInner() {
     // Full island rendering (visible from boat/home) — no floatOffset for distant islands
     push();
     translate(shakeX, shakeY);
-    drawImperialBridge(); // Draw bridge BEHIND islands
-    drawConquestIsleDistant();
-    drawConquestDistantEntities();
-    drawConquestDistantLabel();
+    // Campaign-only distant islands (skip in Conquest mode)
+    if (state._gameMode !== 'conquest') {
+      drawImperialBridge();
+      drawConquestIsleDistant();
+      drawConquestDistantEntities();
+      drawConquestDistantLabel();
+    }
     drawRivalIsleDistant();
     // Seamless nation island content (when player is standing on a nation island)
     if (state._activeNation) drawActiveNationContent();

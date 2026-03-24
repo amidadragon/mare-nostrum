@@ -201,11 +201,15 @@ function updateRowing(dt) {
   }
 
   // Detect proximity to islands — set dock prompt (E to dock)
-  let cq = state.conquest;
-  let cqDist = dist(r.x, r.y, cq.isleX, cq.isleY);
   r.nearIsle = null;
-  let cqNear = ((r.x - cq.isleX) / cq.isleRX) ** 2 + ((r.y - cq.isleY) / cq.isleRY) ** 2;
-  if (cqNear < 1.5 * 1.5) { r.nearIsle = 'conquest'; unlockJournal('terra_nova'); }
+  let _isConquestMode = state._gameMode === 'conquest';
+
+  // Terra Nova — campaign only (disabled in Conquest mode)
+  if (!_isConquestMode && state.conquest) {
+    let cq = state.conquest;
+    let cqNear = ((r.x - cq.isleX) / cq.isleRX) ** 2 + ((r.y - cq.isleY) / cq.isleRY) ** 2;
+    if (cqNear < 1.5 * 1.5) { r.nearIsle = 'conquest'; unlockJournal('terra_nova'); }
+  }
 
   // Nation islands — elliptical proximity + collision for each
   let _nationKeys = Object.keys(state.nations || {});
@@ -225,36 +229,40 @@ function updateRowing(dt) {
     }
   }
 
-  // New islands — elliptical proximity detection + collision
-  let _newIsles = [
-    { key: 'vulcan',    s: state.vulcan },
-    { key: 'hyperborea',s: state.hyperborea },
-    { key: 'plenty',    s: state.plenty },
-    { key: 'necropolis',s: state.necropolis },
-  ];
-  for (let ni of _newIsles) {
-    let nex = ((r.x - ni.s.isleX) / ni.s.isleRX);
-    let ney = ((r.y - ni.s.isleY) / ni.s.isleRY);
-    let neDist = nex * nex + ney * ney;
-    if (neDist < 1.5 * 1.5) r.nearIsle = ni.key;
-    // Collision
-    if (neDist < 0.8 * 0.8) {
-      let ang = atan2(r.y - ni.s.isleY, r.x - ni.s.isleX);
-      r.x = ni.s.isleX + cos(ang) * ni.s.isleRX * 0.82;
-      r.y = ni.s.isleY + sin(ang) * ni.s.isleRY * 0.82;
-      r.speed *= 0.3;
+  // Exploration islands + Terra Nova — campaign only (disabled in Conquest)
+  if (!_isConquestMode) {
+    let _newIsles = [
+      { key: 'vulcan',    s: state.vulcan },
+      { key: 'hyperborea',s: state.hyperborea },
+      { key: 'plenty',    s: state.plenty },
+      { key: 'necropolis',s: state.necropolis },
+    ];
+    for (let ni of _newIsles) {
+      if (!ni.s) continue;
+      let nex = ((r.x - ni.s.isleX) / ni.s.isleRX);
+      let ney = ((r.y - ni.s.isleY) / ni.s.isleRY);
+      let neDist = nex * nex + ney * ney;
+      if (neDist < 1.5 * 1.5) r.nearIsle = ni.key;
+      if (neDist < 0.8 * 0.8) {
+        let ang = atan2(r.y - ni.s.isleY, r.x - ni.s.isleX);
+        r.x = ni.s.isleX + cos(ang) * ni.s.isleRX * 0.85;
+        r.y = ni.s.isleY + sin(ang) * ni.s.isleRY * 0.85;
+        r.speed = max(r.speed * 0.5, 0.5);
+      }
     }
-  }
-
-  // Elliptical collision for Terra Nova (RX != RY)
-  let cqNx = (r.x - cq.isleX) / cq.isleRX;
-  let cqNy = (r.y - cq.isleY) / cq.isleRY;
-  let cqEllDist = cqNx * cqNx + cqNy * cqNy;
-  if (cqEllDist < 0.8 * 0.8) {
-    let ang = atan2(r.y - cq.isleY, r.x - cq.isleX);
-    r.x = cq.isleX + cos(ang) * cq.isleRX * 0.82;
-    r.y = cq.isleY + sin(ang) * cq.isleRY * 0.82;
-    r.speed *= 0.3;
+    // Terra Nova collision
+    if (state.conquest) {
+      let cq = state.conquest;
+      let cqNx = (r.x - cq.isleX) / cq.isleRX;
+      let cqNy = (r.y - cq.isleY) / cq.isleRY;
+      let cqEllDist = cqNx * cqNx + cqNy * cqNy;
+      if (cqEllDist < 0.8 * 0.8) {
+        let ang = atan2(r.y - cq.isleY, r.x - cq.isleX);
+        r.x = cq.isleX + cos(ang) * cq.isleRX * 0.85;
+        r.y = cq.isleY + sin(ang) * cq.isleRY * 0.85;
+        r.speed = max(r.speed * 0.5, 0.5);
+      }
+    }
   }
 
   // Don't let boat go onto HOME island (use saved home coords, not WORLD which may be swapped)
