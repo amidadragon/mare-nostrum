@@ -5731,7 +5731,7 @@ function startVisualInvasion(islandKey) {
   // Get defender strength
   let defStr = 300;
   let rv = state.nations[islandKey];
-  if (rv) defStr = 800 + (rv.level || 1) * 200 + (rv.military || 0) * 50;
+  if (rv) defStr = 500 + (rv.level || 1) * 100 + (rv.military || 0) * 30;
   if (typeof getWorldIsland === 'function') {
     let wisle = getWorldIsland(islandKey);
     if (wisle) defStr = wisle.defense || 500;
@@ -5788,7 +5788,7 @@ function startVisualInvasion(islandKey) {
   }
 
   // Generate defenders based on defense strength
-  let defCount = Math.max(3, Math.floor(defStr / 100));
+  let defCount = Math.max(3, Math.min(15, Math.floor(defStr / 150)));
   let defUnits = [];
   let defColor = rv ? (typeof FACTION_MILITARY !== 'undefined' && FACTION_MILITARY[islandKey] ? FACTION_MILITARY[islandKey].conquestFlag : [150, 80, 80]) : [150, 80, 80];
   if (!rv) {
@@ -5823,7 +5823,8 @@ function startVisualInvasion(islandKey) {
     attackers: playerUnits,
     defenders: defUnits,
     resultTimer: 0,
-    winner: null
+    winner: null,
+    defStr: defStr
   };
 
   return true;
@@ -5924,6 +5925,9 @@ function updateVisualInvasion(dt) {
         if (rv) { rv.defeated = true; rv.vassal = true; rv.military = 0; }
         if (!state._battlesWon) state._battlesWon = 0;
         state._battlesWon++;
+        let goldReward = 50 + Math.floor(b.defStr * 0.3);
+        state.gold += goldReward;
+        if (typeof addNotification === 'function') addNotification('+' + goldReward + ' gold plundered!', '#ffd700');
         if (typeof addNotification === 'function') addNotification('VICTORY! ' + b.islandKey.toUpperCase() + ' conquered!', '#ffd700');
         if (typeof addFloatingText === 'function') {
           addFloatingText(width/2, height*0.2, b.islandKey.toUpperCase() + ' HAS FALLEN!', '#ffd700');

@@ -272,6 +272,10 @@ function expandIsland() {
   if (cost.ancientRelic) state.ancientRelic -= cost.ancientRelic;
   if (cost.titanBone) state.titanBone -= cost.titanBone;
   state.islandLevel++;
+  // Expansion resource bonus
+  state.wood += 10;
+  state.stone += 5;
+  state.gold += 25;
   triggerIslandMilestone(state.islandLevel);
   addNotification('Island expanded to Level ' + state.islandLevel, '#ffdd66');
   // Earn Sesterces for expansion milestones

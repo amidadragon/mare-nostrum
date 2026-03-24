@@ -2296,6 +2296,13 @@ function drawHUD() {
       text('Castrum Lv.' + state.legia.castrumLevel, hudX, cookedY + 10);
       cookedY += 12;
     }
+  } else if (state.legia && state.legia.castrumLevel > 0) {
+    let _hx = hudX, _hy = cookedY;
+    fill(180, 140, 80);
+    textSize(8 * uiScale);
+    textAlign(LEFT);
+    text('Enter Castrum to recruit', _hx + 8, _hy + 10);
+    cookedY += 12;
   }
   // Controlled islands
   let _hx = hudX, _hy = cookedY;
