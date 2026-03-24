@@ -1859,11 +1859,434 @@ function handleNationIslandInteract() {
 
 // ─── SEAMLESS NATION ISLAND RENDERING (V4.0) ─────────────────────────────
 function drawActiveNationContent() {
-  return;
+  let nk = state._activeNation;
+  if (!nk) return;
+  let rv = state.nations[nk];
+  if (!rv || !rv._nationContent) return;
+  let nc = rv._nationContent;
+  let fm = FACTION_MILITARY[nk] || FACTION_MILITARY.rome;
+  let flagCol = fm.conquestFlag;
+  let pal = getNationIslandPalette(nk);
+
+  // --- Dock (pier at south of island) ---
+  let dsx = w2sX(nc.dock.x), dsy = w2sY(nc.dock.y);
+  if (dsx > -60 && dsx < width + 60 && dsy > -60 && dsy < height + 60) {
+    push();
+    translate(floor(dsx), floor(dsy));
+    noStroke();
+    // Pier planks
+    fill(110, 80, 45);
+    rect(-18, -3, 36, 6);
+    rect(-14, -9, 28, 6);
+    // Pier posts
+    fill(90, 65, 35);
+    rect(-16, 3, 4, 10);
+    rect(12, 3, 4, 10);
+    rect(-2, 3, 4, 10);
+    // Rope coil
+    fill(160, 140, 100);
+    ellipse(14, -5, 5, 4);
+    // Mooring post
+    fill(80, 60, 30);
+    rect(-19, -6, 3, 8);
+    pop();
+  }
+
+  // --- Walls (if level >= 3) ---
+  if (nc.hasWalls) {
+    let cx = rv.isleX, cy = rv.isleY;
+    let wrx = rv.isleRX * 0.52, wry = rv.isleRY * 0.52;
+    let wallSegs = 16;
+    for (let i = 0; i < wallSegs; i++) {
+      let a1 = (i / wallSegs) * TWO_PI;
+      let a2 = ((i + 1) / wallSegs) * TWO_PI;
+      let x1 = w2sX(cx + cos(a1) * wrx), y1 = w2sY(cy + sin(a1) * wry);
+      let x2 = w2sX(cx + cos(a2) * wrx), y2 = w2sY(cy + sin(a2) * wry);
+      if (x1 < -100 && x2 < -100) continue;
+      if (x1 > width + 100 && x2 > width + 100) continue;
+      stroke(pal.special1[0], pal.special1[1], pal.special1[2], 180);
+      strokeWeight(3);
+      line(x1, y1, x2, y2);
+      // Towers at corners
+      if (nc.hasTowers && i % 4 === 0) {
+        noStroke();
+        fill(pal.special1[0], pal.special1[1], pal.special1[2]);
+        rect(floor(x1) - 5, floor(y1) - 10, 10, 12);
+        fill(flagCol[0], flagCol[1], flagCol[2]);
+        rect(floor(x1) - 1, floor(y1) - 16, 2, 8);
+      }
+    }
+    noStroke();
+  }
+
+  // --- Palace (large central building) ---
+  let psx = w2sX(nc.palace.x), psy = w2sY(nc.palace.y);
+  if (psx > -80 && psx < width + 80 && psy > -80 && psy < height + 80) {
+    let pw = nc.palace.w, ph = nc.palace.h;
+    push();
+    translate(floor(psx), floor(psy));
+    noStroke();
+    // Shadow
+    fill(0, 0, 0, 25);
+    ellipse(3, 4, pw + 8, 8);
+    // Base/foundation
+    fill(pal.terrainDark[0], pal.terrainDark[1], pal.terrainDark[2]);
+    rect(-pw / 2 - 2, -2, pw + 4, 6, 1);
+    // Main structure
+    fill(pal.special1[0], pal.special1[1], pal.special1[2]);
+    rect(-pw / 2, -ph, pw, ph, 1);
+    // Lighter face
+    fill(pal.special1[0] + 20, pal.special1[1] + 15, pal.special1[2] + 15, 120);
+    rect(-pw / 2 + 2, -ph + 2, pw - 4, ph - 4);
+    // Roof
+    fill(flagCol[0], flagCol[1], flagCol[2]);
+    rect(-pw / 2 - 3, -ph - 4, pw + 6, 5, 1);
+    // Columns
+    fill(pal.special1[0] + 30, pal.special1[1] + 25, pal.special1[2] + 25);
+    for (let ci = 0; ci < 4; ci++) {
+      let cx2 = -pw / 2 + 4 + ci * (pw - 8) / 3;
+      rect(cx2, -ph + 3, 3, ph - 5);
+    }
+    // Door
+    fill(90, 60, 30);
+    rect(-4, -12, 8, 12);
+    // Banner
+    fill(flagCol[0], flagCol[1], flagCol[2]);
+    rect(-pw / 2 - 1, -ph - 14, 2, 12);
+    rect(-pw / 2 - 1, -ph - 14, 6, 4);
+    pop();
+  }
+
+  // --- Buildings ---
+  for (let b of nc.buildings) {
+    let bsx = w2sX(b.x), bsy = w2sY(b.y);
+    if (bsx < -60 || bsx > width + 60 || bsy < -60 || bsy > height + 60) continue;
+    push();
+    translate(floor(bsx), floor(bsy));
+    noStroke();
+    // Shadow
+    fill(0, 0, 0, 22);
+    ellipse(2, 3, b.w + 4, 5);
+    switch (b.type) {
+      case 'hut':
+        fill(pal.terrain[0], pal.terrain[1], pal.terrain[2]);
+        rect(-b.w / 2, -b.h * 0.7, b.w, b.h * 0.7, 1);
+        fill(pal.terrainDark[0], pal.terrainDark[1], pal.terrainDark[2]);
+        rect(-b.w / 2 - 1, -b.h * 0.7 - 3, b.w + 2, 4, 1);
+        fill(70, 50, 25);
+        rect(-2, -5, 4, 5);
+        break;
+      case 'market':
+        fill(pal.terrain[0] + 10, pal.terrain[1] + 5, pal.terrain[2]);
+        rect(-b.w / 2, -b.h * 0.6, b.w, b.h * 0.6);
+        fill(flagCol[0], flagCol[1], flagCol[2], 180);
+        rect(-b.w / 2 - 2, -b.h * 0.6 - 3, b.w + 4, 4, 1);
+        fill(200, 170, 60);
+        rect(-b.w / 4, -3, b.w / 2, 3);
+        break;
+      case 'barracks':
+        fill(pal.terrainDark[0] - 10, pal.terrainDark[1] - 10, pal.terrainDark[2] - 10);
+        rect(-b.w / 2, -b.h * 0.8, b.w, b.h * 0.8, 1);
+        fill(fm.armor[0], fm.armor[1], fm.armor[2]);
+        rect(-b.w / 2 - 1, -b.h * 0.8 - 2, b.w + 2, 3);
+        fill(flagCol[0], flagCol[1], flagCol[2]);
+        rect(b.w / 2 - 2, -b.h * 0.8 - 10, 2, 10);
+        rect(b.w / 2 - 2, -b.h * 0.8 - 10, 5, 3);
+        break;
+      case 'temple':
+        fill(pal.special1[0] + 20, pal.special1[1] + 15, pal.special1[2] + 15);
+        rect(-b.w / 2, -b.h * 0.8, b.w, b.h * 0.8);
+        fill(pal.special1[0] + 30, pal.special1[1] + 25, pal.special1[2] + 25);
+        for (let ti = 0; ti < 3; ti++) {
+          rect(-b.w / 2 + 2 + ti * (b.w - 4) / 2, -b.h * 0.8 + 2, 2, b.h * 0.8 - 4);
+        }
+        fill(flagCol[0], flagCol[1], flagCol[2]);
+        beginShape();
+        vertex(-b.w / 2 - 2, -b.h * 0.8);
+        vertex(0, -b.h * 0.8 - 8);
+        vertex(b.w / 2 + 2, -b.h * 0.8);
+        endShape(CLOSE);
+        break;
+      case 'tower':
+        fill(pal.terrainDark[0], pal.terrainDark[1], pal.terrainDark[2]);
+        rect(-5, -b.h, 10, b.h);
+        fill(pal.terrainDark[0] + 15, pal.terrainDark[1] + 10, pal.terrainDark[2] + 10);
+        rect(-7, -b.h - 3, 14, 4, 1);
+        fill(flagCol[0], flagCol[1], flagCol[2]);
+        rect(-1, -b.h - 12, 2, 10);
+        rect(-1, -b.h - 12, 5, 3);
+        break;
+      case 'harbor':
+        fill(110, 85, 50);
+        rect(-b.w / 2, -3, b.w, 5);
+        fill(90, 70, 40);
+        rect(-b.w / 2 + 2, -b.h * 0.5, b.w - 4, b.h * 0.5);
+        fill(pal.water[0], pal.water[1], pal.water[2], 100);
+        ellipse(0, 5, b.w + 6, 6);
+        break;
+      case 'forge':
+        fill(80, 65, 50);
+        rect(-b.w / 2, -b.h * 0.7, b.w, b.h * 0.7, 1);
+        fill(60, 50, 35);
+        rect(-b.w / 2 - 1, -b.h * 0.7 - 2, b.w + 2, 3);
+        fill(200, 80, 20, 160 + sin(frameCount * 0.1) * 60);
+        ellipse(0, -b.h * 0.35, 6, 5);
+        break;
+      case 'granary':
+        fill(pal.terrain[0] + 5, pal.terrain[1] + 10, pal.terrain[2]);
+        rect(-b.w / 2, -b.h * 0.6, b.w, b.h * 0.6, 2);
+        fill(180, 160, 80);
+        rect(-b.w / 2 + 2, -b.h * 0.5, b.w - 4, b.h * 0.3);
+        fill(pal.terrainDark[0], pal.terrainDark[1], pal.terrainDark[2]);
+        rect(-b.w / 2 - 1, -b.h * 0.6 - 2, b.w + 2, 3, 1);
+        break;
+      case 'wall':
+        fill(pal.terrainDark[0], pal.terrainDark[1], pal.terrainDark[2]);
+        rect(-b.w / 2, -10, b.w, 12, 1);
+        fill(pal.terrainDark[0] + 10, pal.terrainDark[1] + 8, pal.terrainDark[2] + 8);
+        rect(-b.w / 2, -12, b.w, 3, 1);
+        break;
+      default:
+        fill(pal.terrain[0], pal.terrain[1], pal.terrain[2]);
+        rect(-b.w / 2, -b.h * 0.6, b.w, b.h * 0.6, 1);
+        fill(pal.terrainDark[0], pal.terrainDark[1], pal.terrainDark[2]);
+        rect(-b.w / 2 - 1, -b.h * 0.6 - 2, b.w + 2, 3, 1);
+        break;
+    }
+    pop();
+  }
+
+  // --- Trees ---
+  for (let t of nc.trees) {
+    let tsx = w2sX(t.x), tsy = w2sY(t.y);
+    if (tsx < -40 || tsx > width + 40 || tsy < -40 || tsy > height + 40) continue;
+    let s = t.size / 12;
+    let sway = floor(sin(frameCount * 0.01 + t.x * 0.1) * 1.5);
+    push();
+    translate(floor(tsx), floor(tsy));
+    noStroke();
+    // Shadow
+    fill(0, 0, 0, 25);
+    ellipse(1, 2, 12 * s, 4 * s);
+    // Trunk
+    fill(pal.treeTrunk[0], pal.treeTrunk[1], pal.treeTrunk[2]);
+    rect(-2 * s, -16 * s, 4 * s, 18 * s);
+    // Canopy
+    fill(pal.treeLeaf[0], pal.treeLeaf[1], pal.treeLeaf[2]);
+    if (t.type === 'palm' || t.type === 'datepalm') {
+      // Palm fronds
+      for (let fi = 0; fi < 5; fi++) {
+        let fa = fi * 1.25 - 2.5;
+        let fx = sway + cos(fa) * 10 * s;
+        let fy = -18 * s + sin(fa) * 4 * s;
+        rect(floor(fx - 3 * s), floor(fy - 2 * s), floor(7 * s), floor(3 * s), 1);
+      }
+    } else if (t.type === 'cypress' || t.type === 'cedar') {
+      // Tall narrow canopy
+      for (let li = 0; li < 4; li++) {
+        let lw = (4 - li) * 2.5 * s;
+        fill(pal.treeLeaf[0] - li * 5, pal.treeLeaf[1] + li * 3, pal.treeLeaf[2] - li * 3);
+        rect(floor(sway * (li / 3) - lw), floor(-20 * s - li * 6 * s), floor(lw * 2), floor(7 * s), 1);
+      }
+    } else if (t.type === 'papyrus') {
+      // Thin reedy top
+      fill(pal.treeLeaf[0], pal.treeLeaf[1] + 10, pal.treeLeaf[2]);
+      rect(floor(sway - 4 * s), floor(-20 * s), floor(8 * s), floor(5 * s), 2);
+      fill(pal.treeLeaf[0] + 20, pal.treeLeaf[1] + 20, pal.treeLeaf[2] + 10, 140);
+      rect(floor(sway - 3 * s), floor(-22 * s), floor(6 * s), floor(3 * s), 1);
+    } else {
+      // Round canopy (oak, olive, etc.)
+      ellipse(sway, -20 * s, 14 * s, 12 * s);
+      fill(pal.treeLeaf[0] + 15, pal.treeLeaf[1] + 10, pal.treeLeaf[2] + 5, 160);
+      ellipse(sway + 1, -21 * s, 10 * s, 8 * s);
+    }
+    pop();
+  }
+
+  // --- Flora ---
+  for (let f of nc.flora) {
+    let fsx = w2sX(f.x), fsy = w2sY(f.y);
+    if (fsx < -20 || fsx > width + 20 || fsy < -20 || fsy > height + 20) continue;
+    noStroke();
+    let sway = sin(frameCount * 0.015 + f.phase) * 0.8;
+    fill(f.col[0], f.col[1], f.col[2], 200);
+    ellipse(floor(fsx + sway), floor(fsy), f.w * 2, f.h * 2);
+    fill(f.col[0] + 20, f.col[1] + 15, f.col[2] + 10, 120);
+    ellipse(floor(fsx + sway + 1), floor(fsy - 1), f.w, f.h);
+  }
+
+  // --- Wildlife ---
+  if (nc.wildlife) {
+    for (let w of nc.wildlife) {
+      let wsx = w2sX(w.x), wsy = w2sY(w.y);
+      if (wsx < -30 || wsx > width + 30 || wsy < -30 || wsy > height + 30) continue;
+      push();
+      translate(floor(wsx), floor(wsy));
+      noStroke();
+      // Shadow
+      fill(0, 0, 0, 20);
+      ellipse(0, 2, w.size * 2 + 4, 3);
+      let dir = w.facing || 1;
+      scale(dir, 1);
+      // Body
+      if (w.type === 'bird' || w.type === 'ibis' || w.type === 'raven' || w.type === 'parrot' || w.type === 'falcon') {
+        fill(80, 70, 60);
+        ellipse(0, -2, w.size * 1.5, w.size);
+        // Wing flap
+        let wingY = sin(frameCount * 0.08 + w.phase) * 2;
+        fill(70, 60, 50);
+        rect(-w.size * 0.8, -4 + wingY, w.size * 0.6, 2);
+        rect(w.size * 0.3, -4 - wingY, w.size * 0.6, 2);
+        fill(200, 180, 50);
+        rect(w.size * 0.6, -2, 3, 2);
+      } else if (w.type === 'fish' || w.type === 'crab') {
+        fill(140, 100, 60);
+        ellipse(0, 0, w.size * 1.5, w.size * 0.8);
+        fill(120, 80, 40);
+        rect(w.size * 0.5, -1, 3, 2);
+      } else {
+        // Generic quadruped (wolf, deer, lion, etc.)
+        fill(140, 110, 70);
+        ellipse(0, -w.size * 0.4, w.size * 2, w.size);
+        // Head
+        fill(150, 120, 80);
+        ellipse(w.size * 0.8, -w.size * 0.5, w.size * 0.7, w.size * 0.6);
+        // Legs
+        fill(120, 90, 55);
+        rect(-w.size * 0.5, 0, 2, w.size * 0.4);
+        rect(w.size * 0.3, 0, 2, w.size * 0.4);
+      }
+      pop();
+    }
+  }
+
+  // --- NPCs ---
+  for (let n of nc.npcs) {
+    let nsx = w2sX(n.x), nsy = w2sY(n.y);
+    if (nsx < -30 || nsx > width + 30 || nsy < -30 || nsy > height + 30) continue;
+    push();
+    translate(floor(nsx), floor(nsy));
+    noStroke();
+    let dir = n.facing || 1;
+    let bob = (n.vx !== 0 || n.vy !== 0) ? sin(frameCount * 0.12 + n.x) * 1.5 : 0;
+    // Shadow
+    fill(0, 0, 0, 30);
+    ellipse(0, 10, 10, 4);
+    scale(dir * 0.6, 0.6);
+    translate(0, bob);
+    // Feet
+    fill(100, 75, 45);
+    rect(-5, 12, 4, 3);
+    rect(2, 12, 4, 3);
+    // Legs
+    fill(pal.terrain[0] - 20, pal.terrain[1] - 15, pal.terrain[2] - 10);
+    rect(-4, 5, 3, 8);
+    rect(1, 5, 3, 8);
+    // Tunic (faction-colored)
+    fill(n.col[0], n.col[1], n.col[2]);
+    rect(-6, -6, 12, 12);
+    // Belt
+    fill(n.col[0] - 30, n.col[1] - 25, n.col[2] - 20);
+    rect(-6, 1, 12, 2);
+    // Arms
+    fill(185, 145, 105);
+    rect(-8, -4, 2, 7);
+    rect(6, -4, 2, 7);
+    // Head
+    fill(190, 150, 110);
+    rect(-5, -15, 10, 10, 1);
+    // Hair
+    fill(60, 40, 25);
+    rect(-5, -16, 10, 4, 1);
+    // Role-specific accent
+    if (n.role === 'soldier') {
+      fill(fm.helm[0], fm.helm[1], fm.helm[2]);
+      rect(-5, -17, 10, 3);
+      fill(fm.helmCrest[0], fm.helmCrest[1], fm.helmCrest[2]);
+      rect(-1, -20, 2, 4);
+    } else if (n.role === 'merchant') {
+      fill(200, 170, 50);
+      rect(-3, 0, 6, 3);
+    } else if (n.role === 'priest') {
+      fill(240, 235, 220);
+      rect(-6, -6, 12, 12);
+      fill(flagCol[0], flagCol[1], flagCol[2]);
+      rect(-1, -5, 2, 6);
+      rect(-3, -3, 6, 2);
+    }
+    pop();
+  }
+
+  // --- Interaction prompt near palace ---
+  let p = state.player;
+  let dPal = dist(p.x, p.y, nc.palace.x, nc.palace.y);
+  if (dPal < 60 && !state.nationDiplomacyOpen) {
+    let psx2 = w2sX(nc.palace.x), psy2 = w2sY(nc.palace.y);
+    fill(255, 255, 255, 200);
+    noStroke();
+    textAlign(CENTER, BOTTOM);
+    textSize(11);
+    text("[E] Enter Palace", psx2, psy2 - nc.palace.h - 10);
+  }
 }
 
 function updateActiveNationEntities(dt) {
-  return;
+  let nk = state._activeNation;
+  if (!nk) return;
+  let rv = state.nations[nk];
+  if (!rv || !rv._nationContent) return;
+  let nc = rv._nationContent;
+
+  // Update NPC wandering
+  for (let n of nc.npcs) {
+    n.moveTimer -= dt;
+    if (n.moveTimer <= 0) {
+      n.vx = (random() - 0.5) * 0.5;
+      n.vy = (random() - 0.5) * 0.5;
+      n.facing = n.vx > 0 ? 1 : -1;
+      n.moveTimer = random(80, 250);
+      n.idleTimer = random(60, 120);
+    }
+    if (n.idleTimer > 0) {
+      n.idleTimer -= dt;
+      n.vx = 0;
+      n.vy = 0;
+    } else {
+      let nx = n.x + n.vx * dt, ny = n.y + n.vy * dt;
+      let ex = (nx - rv.isleX) / (rv.isleRX * 0.6);
+      let ey = (ny - rv.isleY) / (rv.isleRY * 0.6);
+      if (ex * ex + ey * ey < 1) {
+        n.x = nx;
+        n.y = ny;
+      } else {
+        n.vx = -n.vx;
+        n.vy = -n.vy;
+      }
+    }
+  }
+
+  // Update wildlife wandering
+  if (nc.wildlife) {
+    for (let w of nc.wildlife) {
+      w.timer -= dt;
+      if (w.timer <= 0) {
+        w.vx = (random() - 0.5) * w.speed * 2;
+        w.vy = (random() - 0.5) * w.speed * 2;
+        w.facing = w.vx > 0 ? 1 : -1;
+        w.timer = random(80, 250);
+      }
+      let nx = w.x + w.vx * dt, ny = w.y + w.vy * dt;
+      let ex = (nx - rv.isleX) / (rv.isleRX * 0.6);
+      let ey = (ny - rv.isleY) / (rv.isleRY * 0.6);
+      if (ex * ex + ey * ey < 1) {
+        w.x = nx;
+        w.y = ny;
+      } else {
+        w.vx = -w.vx;
+        w.vy = -w.vy;
+      }
+    }
+  }
 }
 
 function handleActiveNationInteract() {

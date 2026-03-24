@@ -492,6 +492,11 @@ let _cachedSkyTop = null, _cachedSkyBot = null, _cachedSkyFrame = -1;
 function drawSky() {
   let bright = getSkyBrightness();
   let h = state.time / 60;
+  // Viewport expansion for zoom-out
+  let _zpad = (typeof camZoom !== 'undefined' && camZoom < 1) ? 1/camZoom : 1;
+  let _vx = width/2 - width*_zpad/2;
+  let _vw = width * _zpad;
+  let _vy = height/2 - height*_zpad/2;
 
   let skyTop, skyBot;
   if (frameCount % 30 === 0 || !_cachedSkyTop) {
@@ -538,6 +543,7 @@ function drawSky() {
   skyH = max(skyH, height * 0.06);
 
   let hasHorizonBand = (h >= 5 && h < 8) || (h >= 16 && h < 20.5);
+  if (_vy < 0) { fill(_cachedSkyTop); rect(_vx, _vy, _vw, -_vy + 1); }
   for (let y = 0; y < skyH; y += 2) {
     let t = y / skyH;
     let c = lerpColor(skyTop, skyBot, t);
@@ -550,7 +556,7 @@ function drawSky() {
     } else {
       fill(c);
     }
-    rect(0, y, width, 2);
+    rect(_vx, y, _vw, 2);
   }
 
   if ((bright > 0.1 || (h >= 5 && h < 7)) && !stormActive && !(typeof _frameBudget !== 'undefined' && _frameBudget.throttled)) {
@@ -3442,6 +3448,9 @@ function applyAtmosphericPerspective(screenY) {
 function drawAtmosphericHaze() {
   let bright = getSkyBrightness();
   if (bright < 0.1) return;
+  let _zpad = (typeof camZoom !== 'undefined' && camZoom < 1) ? 1/camZoom : 1;
+  let _vx = width/2 - width*_zpad/2;
+  let _vw = width * _zpad;
   let oceanTop = max(height * 0.06, height * 0.25 - (typeof horizonOffset !== 'undefined' ? horizonOffset : 0));
   let hazeH = 40;
   noStroke();
@@ -3449,7 +3458,7 @@ function drawAtmosphericHaze() {
     let t = 1 - y / hazeH;
     let hazeAlpha = t * t * 18 * bright;
     fill(160, 190, 220, hazeAlpha);
-    rect(0, oceanTop + y, width, 2);
+    rect(_vx, oceanTop + y, _vw, 2);
   }
   // Warm haze during golden hour
   let h = state.time / 60;
@@ -3458,7 +3467,7 @@ function drawAtmosphericHaze() {
     for (let y = 0; y < hazeH * 0.6; y += 2) {
       let t2 = 1 - y / (hazeH * 0.6);
       fill(255, 180, 100, t2 * t2 * 8 * warmT * bright);
-      rect(0, oceanTop + y, width, 2);
+      rect(_vx, oceanTop + y, _vw, 2);
     }
   }
 }

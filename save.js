@@ -175,6 +175,7 @@ function saveGame() {
     eventHistory: state.eventHistory || [],
     // Faction
     faction: state.faction || 'rome',
+    _gameMode: state._gameMode || null,
     // God system
     god: state.god || { faction: null, prayerCooldown: 0, ultimateCharge: 0, blessingActive: null, blessingTimer: 0 },
     // Wardrobe cosmetics
@@ -773,6 +774,7 @@ function loadGame() {
     if (Array.isArray(d.eventHistory)) state.eventHistory = d.eventHistory;
     // Faction — default to 'rome' for existing saves
     state.faction = d.faction || 'rome';
+    state._gameMode = d._gameMode || null;
     // God system
     if (d.god) {
       state.god = { faction: d.god.faction || state.faction, prayerCooldown: d.god.prayerCooldown || 0,

@@ -100,9 +100,15 @@ function drawOcean() {
   let t = frameCount * 0.012;
   let h = state.time / 60;
   noStroke();
+  // Viewport expansion for zoom-out
+  let _zpad = (typeof camZoom !== 'undefined' && camZoom < 1) ? 1/camZoom : 1;
+  let _vx = width/2 - width*_zpad/2;
+  let _vw = width * _zpad;
+  let _vr = _vx + _vw;
+  let _vb = height/2 + height*_zpad/2;
 
   let oceanTop = max(height * 0.06, height * 0.25 - horizonOffset);
-  let oceanH = height - oceanTop;
+  let oceanH = max(height, _vb) - oceanTop;
 
   // Deep ocean gradient — time-of-day tinted
   let tintR = 0, tintG = 0, tintB = 0;
@@ -118,7 +124,7 @@ function drawOcean() {
     let g = lerp(lerp(40, 140, dayMix), lerp(20, 65, dayMix), d) + tintG * (1 - d);
     let b = lerp(lerp(60, 175, dayMix), lerp(40, 100, dayMix), d) + tintB * (1 - d);
     fill(max(0, min(255, r)), max(0, min(255, g)), max(0, min(255, b)));
-    rect(0, y0, width, oceanH / 10 + 2);
+    rect(_vx, y0, _vw, oceanH / 10 + 2);
   }
 
   // Subtle horizon line where sea meets sky
@@ -126,16 +132,16 @@ function drawOcean() {
     let hLineY = floor(oceanTop);
     let hBright = dayMix;
     fill(lerp(80, 180, hBright), lerp(110, 210, hBright), lerp(140, 235, hBright), 35 + 25 * hBright);
-    rect(0, hLineY - 1, width, 3);
+    rect(_vx, hLineY - 1, _vw, 3);
     fill(lerp(120, 220, hBright), lerp(150, 230, hBright), lerp(170, 245, hBright), 20 + 15 * hBright);
-    rect(0, hLineY, width, 1);
+    rect(_vx, hLineY, _vw, 1);
     fill(lerp(100, 200, hBright), lerp(130, 215, hBright), lerp(160, 235, hBright), 10 + 8 * hBright);
-    rect(0, hLineY - 4, width, 4);
+    rect(_vx, hLineY - 4, _vw, 4);
   }
 
   // ── DEEP OCEAN WAVES — rolling rows with sin-based horizontal movement ──
   let _waveRowStep = _fpsSmooth < 40 ? 44 : 26;
-  for (let wy = oceanTop + 4; wy < height; wy += _waveRowStep) {
+  for (let wy = oceanTop + 4; wy < _vb; wy += _waveRowStep) {
     let depthNorm = (wy - oceanTop) / oceanH;
     let depthFade = 1 - depthNorm * 0.6;
     let waveAlpha = (28 + 24 * dayMix) * depthFade;
@@ -147,7 +153,7 @@ function drawOcean() {
     // Primary wave crest — lighter highlight
     fill(120 + 70 * dayMix, 175 + 50 * dayMix, 210 + 30 * dayMix, waveAlpha);
     let spacing = 60 + floor(depthNorm * 20);
-    for (let wx = ((offsetX % spacing) + spacing) % spacing; wx < width; wx += spacing) {
+    for (let wx = ((offsetX % spacing) + spacing) % spacing; wx < _vr; wx += spacing) {
       let segW = 24 + floor(sin(wy * 0.07 + wx * 0.04 + t * 0.8) * 10);
       rect(wx, wy, segW, 3);
     }
@@ -156,7 +162,7 @@ function drawOcean() {
     if (depthNorm < 0.5 && dayMix > 0.2) {
       let foamCapAlpha = waveAlpha * 0.6 * (1 - depthNorm * 2);
       fill(230, 242, 250, foamCapAlpha);
-      for (let wx = ((offsetX + 30) % spacing + spacing) % spacing; wx < width; wx += spacing) {
+      for (let wx = ((offsetX + 30) % spacing + spacing) % spacing; wx < _vr; wx += spacing) {
         let capPhase = sin(t * 1.5 + wx * 0.06 + wy * 0.04);
         if (capPhase > 0.3) {
           let cw = 4 + floor(capPhase * 6);
@@ -169,12 +175,12 @@ function drawOcean() {
     if (frameCount % 2 === 0) {
       let off2 = floor(sin(t * 0.35 + wy * 0.05 + 2) * 8);
       fill(90 + 50 * dayMix, 150 + 40 * dayMix, 195 + 25 * dayMix, waveAlpha * 0.5);
-      for (let wx = ((off2 % 90) + 90) % 90; wx < width; wx += 90) {
+      for (let wx = ((off2 % 90) + 90) % 90; wx < _vr; wx += 90) {
         rect(wx, wy + 5, 18 + floor(sin(wy * 0.05 + wx * 0.03) * 6), 2);
       }
       // Dark trough between waves
       fill(10 + 20 * dayMix, 25 + 50 * dayMix, 50 + 70 * dayMix, waveAlpha * 0.5);
-      for (let wx = ((offsetX + 14) % 90 + 90) % 90; wx < width; wx += 90) {
+      for (let wx = ((offsetX + 14) % 90 + 90) % 90; wx < _vr; wx += 90) {
         rect(wx, wy + 8, 14, 2);
       }
     }
@@ -191,7 +197,7 @@ function drawOcean() {
       let midOff = floor(sin(t * 0.7 + wy * 0.04) * 10);
       // Reflection highlight — lighter blue-white bands
       fill(150 + 80 * dayMix, 200 + 40 * dayMix, 230 + 20 * dayMix, midAlpha);
-      for (let wx = ((midOff % 80) + 80) % 80; wx < width; wx += 80) {
+      for (let wx = ((midOff % 80) + 80) % 80; wx < _vr; wx += 80) {
         let sw = 16 + floor(sin(wy * 0.06 + wx * 0.05 + t) * 6);
         rect(wx, wy, sw, 2);
       }

@@ -899,6 +899,7 @@ let camZoomTarget = 1.0;
 const CAM_ZOOM_MIN = 1.0;
 const CAM_ZOOM_MIN_SAILING = 0.4;
 const CAM_ZOOM_MAX = 2.0;
+let _viewW = 0, _viewH = 0, _viewX = 0, _viewY = 0;
 let particles = [];
 let lightningBolts = [];
 let stormTimer = 0;
@@ -2320,6 +2321,7 @@ function drawInner() {
     // Sky + ocean — push horizon above island's visible water effects
     horizonOffset = height * 0.19;
     push(); translate(width/2,height/2); scale(camZoom); translate(-width/2,-height/2);
+    _viewW = width / camZoom; _viewH = height / camZoom; _viewX = (width - _viewW) / 2; _viewY = (height - _viewH) / 2;
     push();
     translate(shakeX, shakeY);
     drawSky();
@@ -2483,6 +2485,7 @@ function drawInner() {
     translate(width / 2, height / 2);
     scale(camZoom);
     translate(-width / 2, -height / 2);
+    _viewW = width / camZoom; _viewH = height / camZoom; _viewX = (width - _viewW) / 2; _viewY = (height - _viewH) / 2;
 
     push();
     translate(shakeX, shakeY);

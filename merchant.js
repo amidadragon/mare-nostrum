@@ -213,6 +213,17 @@ function doTrade(offerIdx) {
   }
 }
 
+const FACTION_SHIPS = {
+  rome: { hullColor: [75,45,20], hullW: 60, hullH: 16, ramColor: [160,120,40], sailH: 38, mastH: 50, hasRam: true, hasEagle: true, hasDragon: false, deckColor: [110,75,40], oarCount: 8 },
+  carthage: { hullColor: [55,30,55], hullW: 65, hullH: 18, ramColor: [140,100,50], sailH: 42, mastH: 55, hasRam: true, hasEagle: false, hasDragon: false, deckColor: [90,55,80], oarCount: 10 },
+  egypt: { hullColor: [90,65,30], hullW: 55, hullH: 14, ramColor: [200,170,40], sailH: 44, mastH: 52, hasRam: false, hasEagle: false, hasDragon: false, deckColor: [130,100,50], oarCount: 6 },
+  greece: { hullColor: [60,40,25], hullW: 58, hullH: 15, ramColor: [140,130,50], sailH: 36, mastH: 48, hasRam: true, hasEagle: false, hasDragon: false, deckColor: [100,70,45], oarCount: 8 },
+  seapeople: { hullColor: [35,35,40], hullW: 70, hullH: 20, ramColor: [100,100,110], sailH: 40, mastH: 54, hasRam: false, hasEagle: false, hasDragon: true, deckColor: [60,60,65], oarCount: 12 },
+  persia: { hullColor: [70,35,50], hullW: 62, hullH: 17, ramColor: [170,130,60], sailH: 40, mastH: 52, hasRam: false, hasEagle: false, hasDragon: false, deckColor: [120,70,80], oarCount: 8 },
+  phoenicia: { hullColor: [80,30,30], hullW: 64, hullH: 16, ramColor: [150,110,40], sailH: 38, mastH: 50, hasRam: true, hasEagle: false, hasDragon: false, deckColor: [115,60,50], oarCount: 10 },
+  gaul: { hullColor: [50,55,30], hullW: 56, hullH: 18, ramColor: [100,90,40], sailH: 34, mastH: 46, hasRam: false, hasEagle: false, hasDragon: false, deckColor: [85,90,50], oarCount: 6 }
+};
+
 function drawShip() {
   let ship = state.ship;
   if (ship.state === 'gone') return;
@@ -223,6 +234,7 @@ function drawShip() {
 
   push();
   translate(sx, sy + bob);
+  let _fs = FACTION_SHIPS[state.faction] || FACTION_SHIPS.rome;
   // Flip ship to face island (right) when leaving, normal when docked/arriving from left
   if (ship.state === 'leaving') scale(-1, 1);
   noStroke();
@@ -244,7 +256,7 @@ function drawShip() {
 
   // ─── TRIREME HULL — pixel rects ───
   // Hull body — tapered layers of rects (wide center, narrow ends)
-  fill(75, 45, 20);
+  fill(_fs.hullColor[0], _fs.hullColor[1], _fs.hullColor[2]);
   rect(-50, -4, 100, 4);   // upper hull
   rect(-48, 0, 96, 4);     // mid hull
   rect(-44, 4, 84, 4);     // lower hull
@@ -263,7 +275,7 @@ function drawShip() {
   noStroke();
 
   // Bronze ram at bow — stepped pixel wedge
-  fill(160, 120, 40);
+  fill(_fs.ramColor[0], _fs.ramColor[1], _fs.ramColor[2]);
   rect(56, -2, 4, 4);
   rect(60, -1, 4, 2);
   rect(64, -1, 2, 2);
@@ -273,14 +285,14 @@ function drawShip() {
   // Oar bank — pixel vertical rects (animated)
   let rowPhase = frameCount * 0.06;
   fill(100, 70, 35);
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < _fs.oarCount; i++) {
     let ox = floor(-38 + i * 10);
     let oarDip = floor(sin(rowPhase + i * 0.4) * 4);
     rect(ox, 10, 1, 10 + oarDip);
   }
 
   // Deck — pixel rect
-  fill(100, 68, 32);
+  fill(_fs.deckColor[0], _fs.deckColor[1], _fs.deckColor[2]);
   rect(-48, -6, 96, 5);
 
   // Deck rail — pixel rect
@@ -330,7 +342,7 @@ function drawShip() {
     // Larger hull extension
     fill(50, 35, 20);
     rect(-56, -2, 6, 4);  // wider stern
-  } else {
+  } else if (_fs.hasEagle) {
     // Standard: eagle/standard at top — pixel rect + crown
     fill(180, 140, 50);
     rect(-51, -32, 6, 4);
