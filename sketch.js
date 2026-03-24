@@ -2449,6 +2449,8 @@ function drawInner() {
     // Update bot islands — full island simulation with staggered updates
     updateConquestIslands(dt);
     if (typeof updateDiplomacy === 'function') updateDiplomacy(dt);
+    if (typeof updatePet === 'function') updatePet(dt);
+    if (typeof updateTavern === 'function') updateTavern(dt);
     updateSeaPeopleRaid(dt);
     if (typeof updateNavalCombat === 'function') updateNavalCombat(dt);
     updateNotifications(dt);
@@ -2477,8 +2479,9 @@ function drawInner() {
       let islandScreenY = w2sY(WORLD.islandCY) + floatOffset;
       let visualTopRadius = state.islandRY * 0.50 * 1.12; // outermost shallow water ring
       let islandTopScreen = islandScreenY - visualTopRadius - 10;
-      let horizonY = min(islandTopScreen, height * 0.35);
-      horizonY = max(horizonY, height * 0.05);
+      // Keep sky visible — horizon should be at least 25% from top
+      let horizonY = min(islandTopScreen, height * 0.25);
+      horizonY = max(horizonY, height * 0.15);
       horizonOffset = (height * 0.25) - horizonY;
     }
     // When visiting a nation island, recalculate horizon based on that island's position
@@ -5893,6 +5896,7 @@ function drawWorldObjectsSorted() {
   // Sort by Y (back to front)
   _sortItems.sort((a, b) => a.y - b.y);
   for (let i = 0; i < _sortItems.length; i++) _sortItems[i].draw();
+  if (typeof drawPet === 'function') drawPet();
 }
 
 // [MOVED TO building.js] drawBuildings+drawOneBuilding

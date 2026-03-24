@@ -259,6 +259,11 @@ function saveGame() {
       wreckDayStart: state.wreck.wreckDayStart,
       caveDiscovered: state.wreck.caveDiscovered,
     },
+    _pets: state._pets || [],
+    _activePet: state._activePet || null,
+    _lighthouses: state._lighthouses || {},
+    _tavern: state._tavern || null,
+    _revealedIslands: state._revealedIslands || [],
   };
   try {
     // Backup current save before overwriting
@@ -793,6 +798,11 @@ function loadGame() {
     state._victoriesEarned = d._victoriesEarned || [];
     state._victoryAchieved = d._victoryAchieved || null;
     state._lastStandActive = d._lastStandActive || false;
+    state._pets = d._pets || [];
+    state._activePet = d._activePet || null;
+    state._lighthouses = d._lighthouses || {};
+    state._tavern = d._tavern || null;
+    state._revealedIslands = d._revealedIslands || [];
     // God system
     if (d.god) {
       state.god = { faction: d.god.faction || state.faction, prayerCooldown: d.god.prayerCooldown || 0,
