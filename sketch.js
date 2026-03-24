@@ -4793,35 +4793,68 @@ function drawPyramid() {
     fill(_ps.wallColor[0] - 10, _ps.wallColor[1] - 6, _ps.wallColor[2] - 1);
     triangle(-pedW + 5, pedY, pedW - 5, pedY, 0, pedY - pedH + 4);
 
-    // Tympanum sculpture (Tier 3+: Sol Invictus)
+    // Tympanum sculpture (Tier 3+: faction-specific)
     if (tier >= 3) {
       let tympCY = pedY - pedH * 0.35;
-      stroke(200, 180, 60, 60 + sin(pyr.chargePhase) * 25);
-      strokeWeight(1.2);
-      noFill();
-      circle(0, tympCY, 14);
-      for (let r = 0; r < 8; r++) {
-        let ra = r * PI / 4 + pyr.chargePhase * 0.1;
-        line(cos(ra) * 8, tympCY + sin(ra) * 8, cos(ra) * 12, tympCY + sin(ra) * 12);
-      }
+      let _fk = state.faction || 'rome';
       noStroke();
-      fill(210, 190, 70, 80 + sin(pyr.chargePhase) * 30);
-      circle(0, tympCY, 6);
+      if (_fk === 'rome') {
+        // Eagle silhouette
+        fill(_ps.accentColor[0], _ps.accentColor[1], _ps.accentColor[2], 180);
+        triangle(-6, tympCY + 3, 0, tympCY - 5, 6, tympCY + 3); // body
+        triangle(-10, tympCY, -3, tympCY + 1, -6, tympCY + 4); // left wing
+        triangle(10, tympCY, 3, tympCY + 1, 6, tympCY + 4); // right wing
+      } else if (_fk === 'carthage') {
+        // Elephant silhouette
+        fill(_ps.accentColor[0], _ps.accentColor[1], _ps.accentColor[2], 180);
+        ellipse(0, tympCY + 1, 10, 8); rect(-2, tympCY + 4, 2, 3); rect(2, tympCY + 4, 2, 3);
+        rect(4, tympCY - 1, 3, 4); // trunk
+      } else if (_fk === 'egypt') {
+        // Gold capstone / ankh
+        fill(200, 170, 40, 200);
+        triangle(-5, tympCY + 3, 0, tympCY - 6, 5, tympCY + 3);
+        fill(220, 190, 50, 160 + sin(pyr.chargePhase) * 40);
+        triangle(-3, tympCY + 2, 0, tympCY - 4, 3, tympCY + 2);
+      } else if (_fk === 'greece') {
+        // Owl face
+        fill(220, 215, 200, 180);
+        ellipse(0, tympCY, 10, 9);
+        fill(200, 180, 50); ellipse(-2, tympCY - 1, 3, 3); ellipse(2, tympCY - 1, 3, 3);
+        fill(40); ellipse(-2, tympCY - 1, 1.5, 1.5); ellipse(2, tympCY - 1, 1.5, 1.5);
+      } else if (_fk === 'persia') {
+        // Winged lion
+        fill(_ps.accentColor[0], _ps.accentColor[1], _ps.accentColor[2], 180);
+        ellipse(0, tympCY + 1, 8, 6);
+        triangle(-8, tympCY - 1, -3, tympCY, -5, tympCY + 3);
+        triangle(8, tympCY - 1, 3, tympCY, 5, tympCY + 3);
+      } else if (_fk === 'gaul') {
+        // Boar head
+        fill(_ps.accentColor[0], _ps.accentColor[1], _ps.accentColor[2], 180);
+        ellipse(0, tympCY, 10, 7);
+        fill(200, 180, 140); rect(3, tympCY - 3, 4, 2); // tusks
+      } else if (_fk === 'phoenicia') {
+        // Cedar tree
+        fill(60, 100, 50, 180);
+        triangle(-6, tympCY + 3, 0, tympCY - 5, 6, tympCY + 3);
+        fill(80, 50, 30); rect(-1, tympCY + 3, 2, 3);
+      } else if (_fk === 'seapeople') {
+        // Dragon head
+        fill(_ps.accentColor[0], _ps.accentColor[1], _ps.accentColor[2], 200);
+        beginShape(); vertex(-4, tympCY + 3); vertex(-3, tympCY - 4); vertex(0, tympCY - 6);
+        vertex(3, tympCY - 3); vertex(5, tympCY + 3); endShape(CLOSE);
+        fill(200, 50, 30); ellipse(1, tympCY - 2, 2, 2); // eye
+      }
     }
 
-    // Acroteria
-    let acroH = tier >= 4 ? 14 : (tier >= 3 ? 10 : 6);
-    let acroW = tier >= 4 ? 10 : (tier >= 3 ? 7 : 5);
-    let acroCol = tier >= 4 ? color(220, 195, 60) : color(195, 188, 178);
+    // Apex finial (small, faction-colored — replaces old circle acroteria)
+    let acroCol = color(_ps.accentColor[0], _ps.accentColor[1], _ps.accentColor[2]);
     fill(acroCol);
-    ellipse(0, pedY - pedH - 2, acroW, acroH);
-    if (tier >= 3) {
-      fill(210, 190, 70, 120);
-      ellipse(0, pedY - pedH - 3, acroW * 0.5, acroH * 0.6);
-    }
-    fill(acroCol);
-    ellipse(-pedW + 2, pedY - 3, acroW - 1, acroH - 2);
-    ellipse(pedW - 2, pedY - 3, acroW - 1, acroH - 2);
+    // Small pointed finial at apex
+    triangle(-3, pedY - pedH, 0, pedY - pedH - 8, 3, pedY - pedH);
+    // Corner finials
+    fill(_ps.wallColor[0] + 10, _ps.wallColor[1] + 14, _ps.wallColor[2] + 19);
+    triangle(-pedW + 1, pedY - 1, -pedW + 3, pedY - 6, -pedW + 5, pedY - 1);
+    triangle(pedW - 1, pedY - 1, pedW - 3, pedY - 6, pedW - 5, pedY - 1);
   } else {
     // Tier 1 has no pediment — set variables for flame positioning
     entW = 64; entY = colTop + 8; pedY = colTop; pedW = 32; pedH = 0;
