@@ -1039,13 +1039,13 @@ const CITY_SLOTS = [
   { id: 'bath_1',          x: 480, y: 430, w: 70, h: 52, type: 'bath',        level: 8,  district: 'residential' },
 
   // --- MILITARY (NE of center, x:715-845) ---
-  { id: 'castrum',         x: 780, y: 340, w: 130, h: 100, type: 'castrum',    level: 8,  district: 'military' },
-  { id: 'wall_cast_l',     x: 715, y: 340, w:  8, h: 50, type: 'wall',        level: 8,  district: 'military' },
-  { id: 'wall_cast_r',     x: 845, y: 340, w:  8, h: 50, type: 'wall',        level: 8,  district: 'military' },
-  { id: 'wall_cast_top',   x: 780, y: 290, w: 80, h:  8, type: 'wall',        level: 8,  district: 'military' },
-  { id: 'watchtower_cast', x: 845, y: 290, w: 24, h: 56, type: 'watchtower',  level: 8,  district: 'military' },
-  { id: 'torch_cast_l',    x: 760, y: 360, w:  8, h: 16, type: 'torch',       level: 8,  district: 'military' },
-  { id: 'torch_cast_r',    x: 800, y: 360, w:  8, h: 16, type: 'torch',       level: 8,  district: 'military' },
+  { id: 'castrum',         x: 780, y: 340, w: 130, h: 100, type: 'castrum',    level: 3,  district: 'military' },
+  { id: 'wall_cast_l',     x: 715, y: 340, w:  8, h: 50, type: 'wall',        level: 3,  district: 'military' },
+  { id: 'wall_cast_r',     x: 845, y: 340, w:  8, h: 50, type: 'wall',        level: 3,  district: 'military' },
+  { id: 'wall_cast_top',   x: 780, y: 290, w: 80, h:  8, type: 'wall',        level: 3,  district: 'military' },
+  { id: 'watchtower_cast', x: 845, y: 290, w: 24, h: 56, type: 'watchtower',  level: 3,  district: 'military' },
+  { id: 'torch_cast_l',    x: 760, y: 360, w:  8, h: 16, type: 'torch',       level: 3,  district: 'military' },
+  { id: 'torch_cast_r',    x: 800, y: 360, w:  8, h: 16, type: 'torch',       level: 3,  district: 'military' },
 
   // ===============================================================
   // ERA 2: CITY (Lv 9-17)
@@ -1276,10 +1276,14 @@ function startConquestGame(playerFaction) {
   camSmooth.x = cam.x; camSmooth.y = cam.y;
   // Equal starting resources
   state.wood = 15; state.stone = 10; state.crystals = 8;
-  state.gold = 20; state.seeds = 5; state.harvest = 8;
+  state.gold = 100; state.seeds = 5; state.harvest = 8;
   state.solar = 100; state.fish = 3;
   // Tools unlocked
   state.tools = { sickle: 1, axe: 1, net: 1 };
+  // Conquest starts with a castrum so players can recruit immediately
+  state.legia.castrumLevel = 1;
+  state.legia.castrumX = 780;
+  state.legia.castrumY = 340;
   // Show faction select screen — player picks their faction
   if (!playerFaction) {
     // Open faction select overlay — selectFaction callback will finish setup
@@ -1291,6 +1295,8 @@ function startConquestGame(playerFaction) {
   // Faction specified — finish setup
   if (typeof selectFaction === 'function') selectFaction(playerFaction);
   if (typeof buildIsland === 'function') buildIsland();
+  // Place castrum building on island
+  state.buildings.push({ x: 780, y: 340, type: 'castrum', w: 130, h: 100, rot: 0, buildProgress: 1 });
   gameScreen = 'game';
   if (typeof addNotification === 'function') {
     addNotification('CONQUEST MODE — Rise above all nations!', '#ffdd44');

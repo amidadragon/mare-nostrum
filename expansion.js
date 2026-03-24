@@ -131,7 +131,7 @@ function placeEraBuildings(lvl) {
     spawnParticles(810, 375, 'build', 10);
   }
 
-  if (lvl === 8) {
+  if (lvl === 3) {
     // South road from port toward center (5 tiles)
     let _port = getPortPosition();
     for (let i = 0; i < 5; i++) {

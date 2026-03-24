@@ -778,8 +778,8 @@ function loadGame() {
     // Safety: ensure castrum is active if island level >= 8
     if (state.islandLevel >= 8 && state.legia && state.legia.castrumLevel < 1) {
       state.legia.castrumLevel = 1;
-      state.legia.castrumX = 920;
-      state.legia.castrumY = 480;
+      state.legia.castrumX = 780;
+      state.legia.castrumY = 340;
       // Ensure castrum building exists
       if (!state.buildings.some(b => b.type === 'castrum')) {
         state.buildings.push({ x: 920, y: 480, w: 130, h: 100, type: 'castrum', rot: 0 });
