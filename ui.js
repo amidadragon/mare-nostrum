@@ -4673,3 +4673,48 @@ function drawDiplomacyPanel() {
   fill(140, 120, 90); textSize(8); textAlign(RIGHT, TOP);
   text('[E] or [ESC] Close', px + pw - 14, sy);
 }
+
+function drawControlsOverlay() {
+  if (!state._controlsOpen) return;
+
+  let pw = min(300, width - 20), ph = min(320, height - 40);
+  let px = width/2 - pw/2, py = height/2 - ph/2;
+
+  fill(20, 18, 14, 230);
+  rect(px, py, pw, ph, 5);
+  stroke(160, 130, 60, 120); strokeWeight(1);
+  rect(px, py, pw, ph, 5); noStroke();
+
+  fill(210, 180, 80); textAlign(CENTER, TOP); textSize(14);
+  text('CONTROLS', px + pw/2, py + 10);
+
+  let sy = py + 32;
+  let controls = [
+    ['WASD', 'Move'],
+    ['E', 'Interact / Enter'],
+    ['F', 'Invade island'],
+    ['G', 'Dive / Surface'],
+    ['L', 'Army panel'],
+    ['X', 'Expand city'],
+    ['B', 'Build mode'],
+    ['M', 'World map'],
+    ['TAB', 'Empire dashboard'],
+    ['Space', 'Attack'],
+    ['R', 'Retreat (in combat)'],
+    ['1-6', 'Recruit units (in castrum)'],
+    ['H', 'This help screen'],
+    ['ESC', 'Pause']
+  ];
+
+  fill(180, 160, 120); textSize(10); textAlign(LEFT, TOP);
+  for (let [key, desc] of controls) {
+    fill(200, 180, 100);
+    text('[' + key + ']', px + 14, sy);
+    fill(160, 150, 130);
+    text(desc, px + 80, sy);
+    sy += 16;
+  }
+
+  fill(120, 100, 70); textSize(8); textAlign(CENTER);
+  text('Press H to close', px + pw/2, py + ph - 16);
+}

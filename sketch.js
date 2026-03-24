@@ -3216,6 +3216,7 @@ function drawInner() {
       if (typeof drawRecipeBookUI === 'function') drawRecipeBookUI();
       drawLegiaUI();
       if (typeof drawDiplomacyPanel === 'function') drawDiplomacyPanel();
+      if (typeof drawControlsOverlay === 'function') drawControlsOverlay();
       if (typeof drawArmyBattle === 'function') drawArmyBattle();
       // drawVisualInvasion is called in the world render pass (lines 2383/3172), not here
       if (typeof drawInvasionHUD === 'function') drawInvasionHUD();

@@ -840,6 +840,7 @@ function keyPressed() {
     if (state.ship && state.ship.shopOpen) { state.ship.shopOpen = false; return; }
     if (state.tradeRouteUI) { state.tradeRouteUI = false; return; }
     if (state.colonyManageOpen) { state.colonyManageOpen = false; state.colonyManageSelected = null; return; }
+    if (state._controlsOpen) { state._controlsOpen = false; return; }
     if (state._diplomacyOpen) { state._diplomacyOpen = false; return; }
     if (state.legia && state.legia.legiaUIOpen) { state.legia.legiaUIOpen = false; return; }
     if (state.activeEvent && state.activeEvent.data && state.activeEvent.data.shopOpen) { state.activeEvent.data.shopOpen = false; return; }
@@ -2018,6 +2019,12 @@ function keyPressed() {
   if (key === 'm' || key === 'M') {
     _seaMapOpen = !_seaMapOpen;
     if (snd) snd.playSFX('page_turn');
+    return;
+  }
+
+  // Controls help overlay (H or ?)
+  if (key === 'h' || key === 'H' || key === '?') {
+    state._controlsOpen = !state._controlsOpen;
     return;
   }
 
