@@ -1348,6 +1348,16 @@ function trackHudResource(key, val) {
 }
 function drawHudResource(x, y, label, val, col, key) {
   trackHudResource(key, val);
+  // Try sprite icon
+  let _iconKey = null;
+  let _lTrim = label.trim();
+  if (_lTrim === 'GOLD') _iconKey = 'icon_gold';
+  else if (_lTrim === 'WOOD') _iconKey = 'icon_wood';
+  else if (_lTrim === 'STONE') _iconKey = 'icon_stone';
+  else if (_lTrim === 'HARVEST' || _lTrim === 'SEEDS') _iconKey = 'icon_food';
+  if (_iconKey && typeof drawSprite === 'function') {
+    drawSprite(_iconKey, x + 6, y + 6, 12, 12);
+  }
   let flash = hudFlash[key];
   let sc = 1, flashAlpha = 0, _fDelta = 0;
   if (flash && flash.timer > 0) {

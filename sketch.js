@@ -1179,6 +1179,7 @@ const CITY_SLOTS = [
 // ─── PRELOAD ─────────────────────────────────────────────────────────────
 function preload() {
   menuBgImg = loadImage('menu_bg.webp');
+  preloadAllSprites();
 }
 
 // ─── SETUP ────────────────────────────────────────────────────────────────
