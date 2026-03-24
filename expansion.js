@@ -518,7 +518,7 @@ function createIslandState(faction, cx, cy) {
     npcFavor: { livia: 0, marcus: 0, vesta: 0, felix: 0 },
     npcNames: FACTIONS[faction] ? FACTIONS[faction].npcNames : null,
     // Military
-    legia: { army: [], castrumLevel: 0, morale: 100, recruits: 0, maxRecruits: 10, trainingQueue: 0, trainingTimer: 0, soldiers: [], castrumX: icx + 100, castrumY: icy + 50 },
+    legia: { army: [], castrumLevel: 0, morale: 100, recruits: 0, maxRecruits: 10, trainingQueue: 0, trainingTimer: 0, soldiers: [], castrumX: icx + 180, castrumY: icy - 60 },
     // Progression (fully unlocked for bot/conquest islands)
     progression: { gameStarted: true, wreckExplored: true, triremeRepaired: true, homeIslandReached: true, villaCleared: true, farmCleared: true, aqueductRepaired: true, npcsFound: { marcus: true, vesta: true, felix: true }, companionsAwakened: { lares: true, woodcutter: true, harvester: true, centurion: true }, tutorialsSeen: {} },
     // Systems
