@@ -217,10 +217,11 @@ function updateRowing(dt) {
     let _nvDist = _nvx * _nvx + _nvy * _nvy;
     if (_nvDist < 1.5 * 1.5) r.nearIsle = _nk;
     if (_nvDist < 0.8 * 0.8) {
+      // Soft bounce — push outward but keep some speed so boat doesn't trap
       let ang = atan2(r.y - _nv.isleY, r.x - _nv.isleX);
-      r.x = _nv.isleX + cos(ang) * _nv.isleRX * 0.82;
-      r.y = _nv.isleY + sin(ang) * _nv.isleRY * 0.82;
-      r.speed *= 0.3;
+      r.x = _nv.isleX + cos(ang) * _nv.isleRX * 0.85;
+      r.y = _nv.isleY + sin(ang) * _nv.isleRY * 0.85;
+      r.speed = max(r.speed * 0.5, 0.5); // never fully stop
     }
   }
 
@@ -256,14 +257,17 @@ function updateRowing(dt) {
     r.speed *= 0.3;
   }
 
-  // Don't let boat go onto island
-  if (isOnIsland(r.x, r.y)) {
-    let ang = atan2(r.y - WORLD.islandCY, r.x - WORLD.islandCX);
-    let rx = getSurfaceRX() * 1.05;
-    let ry = getSurfaceRY() * 1.05;
-    r.x = WORLD.islandCX + cos(ang) * rx;
-    r.y = WORLD.islandCY + sin(ang) * ry;
-    r.speed = 0;
+  // Don't let boat go onto HOME island (use saved home coords, not WORLD which may be swapped)
+  let _homeX = 600, _homeY = 400; // home island is always at these coords
+  let _hDx = (r.x - _homeX) / (getSurfaceRX() || 450);
+  let _hDy = (r.y - _homeY) / (getSurfaceRY() || 115);
+  if (_hDx * _hDx + _hDy * _hDy < 1.0) {
+    let ang = atan2(r.y - _homeY, r.x - _homeX);
+    let rx = (getSurfaceRX() || 450) * 1.1;
+    let ry = (getSurfaceRY() || 115) * 1.1;
+    r.x = _homeX + cos(ang) * rx;
+    r.y = _homeY + sin(ang) * ry;
+    r.speed = max(r.speed * 0.5, 0.3);
   }
 
   // Wake trail — behind the ship (stern/ram trails at -x)

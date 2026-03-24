@@ -1279,11 +1279,16 @@ function startConquestGame(playerFaction) {
   state.solar = 100; state.fish = 3;
   // Tools unlocked
   state.tools = { sickle: 1, axe: 1, net: 1 };
-  // Random faction if not specified
-  let factions = ['rome', 'carthage', 'egypt', 'greece', 'seapeople', 'persia', 'phoenicia', 'gaul'];
-  if (!playerFaction) playerFaction = factions[Math.floor(Math.random() * factions.length)];
+  // Show faction select screen — player picks their faction
+  if (!playerFaction) {
+    // Open faction select overlay — selectFaction callback will finish setup
+    factionSelectActive = true;
+    factionSelectFade = 0;
+    gameScreen = 'game';
+    return;
+  }
+  // Faction specified — finish setup
   if (typeof selectFaction === 'function') selectFaction(playerFaction);
-  // Build starting island
   if (typeof buildIsland === 'function') buildIsland();
   gameScreen = 'game';
   if (typeof addNotification === 'function') {
