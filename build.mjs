@@ -10,11 +10,16 @@ const DIST = join(__dirname, 'dist');
 
 // JS load order from index.html (excluding libs — those stay separate)
 const JS_FILES = [
-  'engine.js', 'sound.js', 'narrative.js', 'progression.js', 'cinematics.js',
+  'sprites.js', 'engine.js', 'sound.js', 'narrative.js', 'cinematics.js',
   'fishing.js', 'farming.js', 'npc.js', 'events.js',
-  'world.js', 'player.js', 'ui.js', 'sketch.js',
-  'wreck.js', 'menu.js', 'islands.js', 'diving.js',
-  'combat.js', 'economy.js', 'debug.js', 'multiplayer.js', 'mobile.js',
+  'world.js', 'player.js', 'ui.js', 'multiplayer.js', 'lobby.js',
+  'save.js', 'sailing.js', 'building.js', 'nations.js', 'bot.js',
+  'conquest.js', 'input.js', 'companions.js', 'effects.js', 'military.js',
+  'systems.js', 'lifecycle.js', 'social.js', 'expansion.js', 'environment.js',
+  'strategy.js', 'progression.js', 'faction_select.js', 'merchant.js', 'sketch.js',
+  'wreck.js', 'menu.js', 'islands.js', 'diving.js', 'combat.js', 'naval.js',
+  'economy.js', 'pets.js', 'lighthouse.js', 'tavern.js', 'diplomacy.js',
+  'debug.js', 'mobile.js',
 ];
 
 // 1. Concatenate all JS files
@@ -50,7 +55,7 @@ unlinkSync(tmpFile);
 let html = readFileSync(join(__dirname, 'index.html'), 'utf8');
 
 // Remove all individual game script tags (keep p5 libs)
-html = html.replace(/\s*<script src="(engine|sound|narrative|progression|cinematics|fishing|farming|npc|events|world|player|ui|sketch|wreck|menu|islands|diving|combat|economy|debug|multiplayer|mobile)\.js[^"]*"><\/script>/g, '');
+html = html.replace(/\s*<script src="(sprites|engine|sound|narrative|cinematics|fishing|farming|npc|events|world|player|ui|multiplayer|lobby|save|sailing|building|nations|bot|conquest|input|companions|effects|military|systems|lifecycle|social|expansion|environment|strategy|progression|faction_select|merchant|sketch|wreck|menu|islands|diving|combat|naval|economy|pets|lighthouse|tavern|diplomacy|debug|mobile)\.js[^"]*"><\/script>/g, '');
 
 // Insert single bundle before the inline scripts
 html = html.replace(
@@ -65,6 +70,14 @@ const { readdirSync } = await import('fs');
 const soundFiles = readdirSync(join(__dirname, 'sounds'))
   .filter(f => /\.(ogg|mp3|wav|flac)$/.test(f))
   .map(f => 'sounds/' + f);
+const spriteSheets = readdirSync(join(__dirname, 'sprites/sheets'))
+  .filter(f => /\.png$/.test(f))
+  .map(f => 'sprites/sheets/' + f);
+const spriteChars = existsSync(join(__dirname, 'sprites/characters'))
+  ? readdirSync(join(__dirname, 'sprites/characters'))
+      .filter(f => /\.png$/.test(f))
+      .map(f => 'sprites/characters/' + f)
+  : [];
 const ASSETS = [
   'libs/p5.min.js', 'libs/p5.sound.min.js',
   'libs/cinzel-latin.woff2', 'libs/cinzel-latin-ext.woff2',
@@ -73,6 +86,8 @@ const ASSETS = [
   'icon-152.png', 'icon-192.png', 'icon-384.png', 'icon-512.png',
   'logo.png',
   ...soundFiles,
+  ...spriteSheets,
+  ...spriteChars,
 ];
 
 for (const a of ASSETS) {

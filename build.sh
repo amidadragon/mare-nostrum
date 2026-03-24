@@ -10,8 +10,8 @@ PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 echo "=== Bundling with esbuild ==="
 node "$PROJECT_DIR/build.mjs"
 
-# Step 2: Zip from dist/ (minified single-bundle version)
-DIST_FILES=(
+# Step 2: Verify core dist files exist
+REQUIRED_FILES=(
   index.html
   game.min.js
   libs/p5.min.js
@@ -33,8 +33,7 @@ DIST_FILES=(
   logo.png
 )
 
-# Verify all dist files exist
-for f in "${DIST_FILES[@]}"; do
+for f in "${REQUIRED_FILES[@]}"; do
   if [ ! -f "$DIST_DIR/$f" ]; then
     echo "ERROR: Missing dist file: $f" >&2
     exit 1
@@ -43,11 +42,11 @@ done
 
 rm -f "$DIST_DIR/$ZIP_NAME"
 
-# Create zip from dist directory
+# Step 3: Zip all dist contents (includes sounds/, sprites/sheets/, sprites/characters/)
 cd "$DIST_DIR"
-zip "$ZIP_NAME" "${DIST_FILES[@]}"
+zip -r "$ZIP_NAME" . --exclude "*.zip" --exclude "_combined.js"
 
 echo ""
 echo "Built: dist/$ZIP_NAME"
-echo "Files: ${#DIST_FILES[@]}"
-zip -sf "$ZIP_NAME"
+zip -sf "$ZIP_NAME" | tail -5
+echo "Total files: $(zip -sf "$ZIP_NAME" | wc -l)"
