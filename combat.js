@@ -5890,10 +5890,15 @@ function updateVisualInvasion(dt) {
           if (typeof snd !== 'undefined' && snd && typeof snd.playSFX === 'function') {
             if (Math.random() < 0.3) snd.playSFX('hit'); // don't play every hit
           }
-          if (typeof spawnParticles === 'function') spawnParticles(width/2 + nearest.x, height/2 + nearest.y, 'hit', 1);
+          let _aCX = width * 0.1 + width * 0.8 * 0.35;
+          let _aCY = height * 0.15 + height * 0.55 * 0.5;
+          if (typeof spawnParticles === 'function') spawnParticles(_aCX + nearest.x, _aCY + nearest.y, 'hit', 1);
           if (nearest.hp <= 0) {
             nearest.dead = true;
             nearest.deathTimer = 0;
+            if (typeof spawnParticles === 'function') {
+              spawnParticles(_aCX + nearest.x, _aCY + nearest.y, 'combat', 3);
+            }
           }
         }
       }

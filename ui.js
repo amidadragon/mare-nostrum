@@ -2638,6 +2638,18 @@ function drawHUD() {
   let ndy = (state.npc.y - WORLD.islandCY) * scaleY;
   fill(200, 80, 200, 180);
   circle(mcx + ndx, mcy + ndy, 3);
+  // Castrum ping — guide new conquest players to castrum when army is empty
+  if (state.legia && state.legia.castrumLevel > 0 && state.legia.army && state.legia.army.length === 0) {
+    let cx = state.legia.castrumX, cy = state.legia.castrumY;
+    let cdx = (cx - WORLD.islandCX) * scaleX;
+    let cdy = (cy - WORLD.islandCY) * scaleY;
+    let mmcx = mcx + cdx;
+    let mmcy = mcy + cdy;
+    let pulse = sin(frameCount * 0.1) * 3;
+    fill(255, 200, 50, 180 + sin(frameCount * 0.08) * 60);
+    noStroke();
+    ellipse(mmcx, mmcy, 6 + pulse, 6 + pulse);
+  }
   // Bridge indicator (west arrow)
   if (state.imperialBridge.built) {
     stroke(200, 170, 90, 120); strokeWeight(0.5);

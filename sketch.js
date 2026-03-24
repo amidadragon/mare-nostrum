@@ -1309,6 +1309,14 @@ function startConquestGame(playerFaction) {
     addNotification('Expand, build armies, forge alliances, and dominate.', '#aaddff');
     addNotification('Capture 6 capitals, control 4 trade hubs + 100k gold, or hold the Senate with 4 allies to win!', '#88ff88');
   }
+  // Tutorial hints — delayed
+  state._tutorialStart = frameCount;
+  state._tutorialTimers = [
+    { frame: 300, msg: 'Walk to the Castrum (NE building) and press E to enter', color: '#aaddff' },
+    { frame: 600, msg: 'Inside Castrum: press 1 to recruit Legionaries (10 gold each)', color: '#aaddff' },
+    { frame: 900, msg: 'Walk to the left pier and press E to board your ship', color: '#aaddff' },
+    { frame: 1200, msg: 'Sail to another island and press F to invade!', color: '#aaddff' },
+  ];
 }
 
 function startNewGame() {
@@ -2482,6 +2490,14 @@ function drawInner() {
     if (typeof updateNavalCombat === 'function') updateNavalCombat(dt);
     if (typeof updateVisualInvasion === 'function') updateVisualInvasion(dt);
     updateNotifications(dt);
+    // Conquest tutorial hints
+    if (state._tutorialTimers && state._tutorialTimers.length > 0) {
+      let t = state._tutorialTimers[0];
+      if (frameCount >= t.frame + (state._tutorialStart || 0)) {
+        addNotification(t.msg, t.color);
+        state._tutorialTimers.shift();
+      }
+    }
     // Narrative engine updates
     if (typeof updateMainQuest === 'function') { updateMainQuest(); updateNPCQuests(); updateNarrativeDialogue(); checkLoreTabletPickup(); }
     if (typeof tickPendingNudges === 'function') tickPendingNudges(dt);
