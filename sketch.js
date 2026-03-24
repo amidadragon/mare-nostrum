@@ -2448,6 +2448,7 @@ function drawInner() {
     updateRivalRaid(dt);
     // Update bot islands — full island simulation with staggered updates
     updateConquestIslands(dt);
+    if (typeof updateDiplomacy === 'function') updateDiplomacy(dt);
     updateSeaPeopleRaid(dt);
     if (typeof updateNavalCombat === 'function') updateNavalCombat(dt);
     updateNotifications(dt);
@@ -2695,6 +2696,51 @@ function drawInner() {
             text('Lv' + _isLevel, _sx, _sy - _sry + 4);
             textAlign(LEFT, TOP);
           }
+        }
+      }
+      // Render neutral world islands during sailing
+      if (typeof WORLD_ISLANDS !== 'undefined' && state.rowing && state.rowing.active) {
+        for (let isle of WORLD_ISLANDS) {
+          if (isle.faction) continue; // capitals rendered as nation islands
+          let pos = getIslandWorldPos(isle);
+          let dx = pos.x - state.player.x;
+          let dy = pos.y - state.player.y;
+          let dist = Math.sqrt(dx*dx + dy*dy);
+          if (dist > 3000) continue; // too far to render
+          let sx = w2sX(pos.x);
+          let sy = w2sY(pos.y);
+          if (sx < -200 || sx > width+200 || sy < -200 || sy > height+200) continue;
+          let sc = Math.max(0.3, 1 - dist/3000);
+          let rx = (isle.isleRX || 300) * sc;
+          let ry = (isle.isleRY || 200) * sc;
+          push();
+          translate(sx, sy);
+          // Water ring
+          noStroke();
+          fill(40, 120, 160, 80);
+          ellipse(0, 0, rx*2.2, ry*2.2);
+          // Island body
+          let tc = isle.type === 'military' ? [140,110,80] : isle.type === 'economic' ? [160,140,90] : isle.type === 'diplomatic' ? [130,140,120] : [100,150,80];
+          fill(tc[0], tc[1], tc[2]);
+          ellipse(0, 0, rx*1.6, ry*1.6);
+          // Beach ring
+          fill(200, 180, 130);
+          ellipse(0, 0, rx*1.8, ry*1.8);
+          fill(tc[0], tc[1], tc[2]);
+          ellipse(0, 0, rx*1.4, ry*1.4);
+          // Icon indicator
+          if (dist < 1500) {
+            fill(255, 255, 220, 200);
+            textSize(10);
+            textAlign(CENTER);
+            text(isle.name, 0, -ry*0.9);
+            // Controlled marker
+            if (isIslandControlled(isle.key)) {
+              fill(100, 255, 100);
+              ellipse(0, -ry*0.5, 6, 6);
+            }
+          }
+          pop();
         }
       }
       if (!_frameBudget.throttled || frameCount % 2 === 0) drawShoreWaves();
@@ -7236,6 +7282,29 @@ function drawSeaMap() {
     rect(eix - 3, eiy - 3, 6, 6, 1);
     fill(ei.color[0], ei.color[1], ei.color[2]); textSize(5); textAlign(CENTER, TOP);
     text(ei.name, eix, eiy + 5);
+  }
+
+  // Draw world islands (neutral)
+  if (typeof WORLD_ISLANDS !== 'undefined') {
+    for (let isle of WORLD_ISLANDS) {
+      if (isle.faction) continue; // capitals already drawn as nation dots
+      let pos = getIslandWorldPos(isle);
+      let ix = centerX + (pos.x - WORLD.islandCX) * scale;
+      let iy = centerY + (pos.y - WORLD.islandCY) * scale;
+      // Color by type
+      let tc = isle.type === 'military' ? [200,80,80] : isle.type === 'economic' ? [200,180,60] : isle.type === 'diplomatic' ? [80,160,200] : [120,180,100];
+      let controlled = isIslandControlled(isle.key);
+      fill(tc[0], tc[1], tc[2], controlled ? 255 : 150);
+      noStroke();
+      ellipse(ix, iy, controlled ? 8 : 6, controlled ? 8 : 6);
+      // Label on hover
+      if (abs(mouseX - ix) < 10 && abs(mouseY - iy) < 10) {
+        fill(255, 255, 220);
+        textSize(9);
+        textAlign(CENTER);
+        text(isle.name, ix, iy - 8);
+      }
+    }
   }
 
   // Legend

@@ -1432,6 +1432,25 @@ function keyPressed() {
         }
         return;
       }
+      // World island docking
+      if (typeof getWorldIsland === 'function') {
+        let _wisle = getWorldIsland(r.nearIsle);
+        if (_wisle && !_wisle.faction) {
+          state.rowing.active = false;
+          camZoomTarget = 1.0;
+          // Capture the island
+          captureIsland(_wisle.key);
+          // Apply benefit notification
+          if (typeof addFloatingText === 'function') {
+            addFloatingText(width/2, height*0.3, 'Captured ' + _wisle.name + '!', '#ffd700');
+          }
+          // Place player on island
+          let pos = getIslandWorldPos(_wisle);
+          state.player.x = pos.x;
+          state.player.y = pos.y;
+          return;
+        }
+      }
       // Otherwise disembark — snap player back to pier
       let port = getPortPosition();
       state.rowing.active = false;

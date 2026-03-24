@@ -125,6 +125,12 @@ function saveGame() {
     colonies: (function() { var saved = {}; for (var ck of Object.keys(state.colonies || {})) { var cc = state.colonies[ck]; saved[ck] = { level: cc.level, buildings: cc.buildings, population: cc.population, gold: cc.gold, income: cc.income, military: cc.military, resources: cc.resources, governor: cc.governor, autoHarvest: cc.autoHarvest, autoTrade: cc.autoTrade, name: cc.name, isleX: cc.isleX, isleY: cc.isleY, isleRX: cc.isleRX, isleRY: cc.isleRY, uniqueResource: cc.uniqueResource, daysOwned: cc.daysOwned || 0, troopsStationed: cc.troopsStationed || 0 }; } return saved; })(),
     worldEvents: state.worldEvents || [],
     victoryAchieved: state.victoryAchieved || null,
+    // Diplomacy system
+    _alliances: state._alliances || [],
+    _controlledIslands: state._controlledIslands || [],
+    _victoriesEarned: state._victoriesEarned || [],
+    _victoryAchieved: state._victoryAchieved || null,
+    _lastStandActive: state._lastStandActive || false,
     // Personal rival & reputation
     personalRival: state.personalRival || null,
     globalReputation: state.globalReputation || 50,
@@ -775,6 +781,12 @@ function loadGame() {
     // Faction — default to 'rome' for existing saves
     state.faction = d.faction || 'rome';
     state._gameMode = d._gameMode || null;
+    // Diplomacy system
+    state._alliances = d._alliances || [];
+    state._controlledIslands = d._controlledIslands || [];
+    state._victoriesEarned = d._victoriesEarned || [];
+    state._victoryAchieved = d._victoryAchieved || null;
+    state._lastStandActive = d._lastStandActive || false;
     // God system
     if (d.god) {
       state.god = { faction: d.god.faction || state.faction, prayerCooldown: d.god.prayerCooldown || 0,

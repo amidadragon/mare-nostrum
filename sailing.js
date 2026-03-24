@@ -243,6 +243,25 @@ function updateRowing(dt) {
         r.y = ni.s.isleY + sin(ang) * ni.s.isleRY * 0.85;
       }
     }
+    // World islands proximity
+    if (typeof WORLD_ISLANDS !== 'undefined') {
+      for (let isle of WORLD_ISLANDS) {
+        if (isle.faction) continue; // capitals handled as nations
+        let pos = getIslandWorldPos(isle);
+        let _wdx = (r.x - pos.x) / (isle.isleRX || 300);
+        let _wdy = (r.y - pos.y) / (isle.isleRY || 200);
+        let _wdist = _wdx * _wdx + _wdy * _wdy;
+        if (_wdist < 2.5 * 2.5) r.nearIsle = isle.key;
+        // Collision push-back
+        if (_wdist < 0.7 * 0.7) {
+          let _wd = Math.sqrt(_wdist);
+          if (_wd > 0.01) {
+            r.x = pos.x + (_wdx / _wd) * 0.85 * (isle.isleRX || 300);
+            r.y = pos.y + (_wdy / _wd) * 0.85 * (isle.isleRY || 200);
+          }
+        }
+      }
+    }
     // Home island collision (campaign only — uses hardcoded sizes, NOT getSurfaceRX which gets swapped)
     let _hRX = 450, _hRY = 115; // safe fallback sizes
     let _hDx = (r.x - _homeX) / _hRX, _hDy = (r.y - _homeY) / _hRY;

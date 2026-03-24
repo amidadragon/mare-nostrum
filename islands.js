@@ -1,3 +1,229 @@
+// ======================================================================
+// === WORLD ISLANDS — 27-island conquest system =======================
+// ======================================================================
+// Center of world: 600, 400  (matches NATION_DEFAULTS / WORLD constants)
+// Capital angles/dist match NATION_DEFAULTS exactly so they overlay faction islands.
+// Neutral island angles are spread across 0-2PI avoiding capital angles (±0.15 rad buffer).
+
+const WORLD_ISLANDS = [
+  // ── FACTION CAPITALS (8) ── angles/dist mirror NATION_DEFAULTS ──────
+  {
+    key: 'rome_capital', name: 'Capitoline Hill', type: 'capital',
+    angle: 3.8, dist: 4500, isleRX: 400, isleRY: 280,
+    defense: 2500, faction: 'rome', controlPoints: 3,
+    benefit: { desc: 'Rome capital — controls Mediterranean heartland', goldMod: 1.2 }
+  },
+  {
+    key: 'carthage_capital', name: 'Byrsa', type: 'capital',
+    angle: -0.6, dist: 4500, isleRX: 400, isleRY: 280,
+    defense: 2500, faction: 'carthage', controlPoints: 3,
+    benefit: { desc: 'Carthage capital — dominates western trade', tradeMod: 1.3 }
+  },
+  {
+    key: 'egypt_capital', name: 'Alexandria', type: 'capital',
+    angle: 1.4, dist: 5000, isleRX: 420, isleRY: 290,
+    defense: 2000, faction: 'egypt', controlPoints: 3,
+    benefit: { desc: 'Egypt capital — granary of the ancient world', foodMod: 1.4 }
+  },
+  {
+    key: 'greece_capital', name: 'Athens', type: 'capital',
+    angle: 0.2, dist: 4200, isleRX: 390, isleRY: 270,
+    defense: 2000, faction: 'greece', controlPoints: 3,
+    benefit: { desc: 'Greece capital — birthplace of democracy and war', militaryMod: 1.2 }
+  },
+  {
+    key: 'persia_capital', name: 'Persepolis', type: 'capital',
+    angle: 0.9, dist: 5800, isleRX: 430, isleRY: 300,
+    defense: 2000, faction: 'persia', controlPoints: 3,
+    benefit: { desc: 'Persia capital — richest empire in the world', goldMod: 1.5 }
+  },
+  {
+    key: 'gaul_capital', name: 'Alesia', type: 'capital',
+    angle: 3.0, dist: 5200, isleRX: 410, isleRY: 290,
+    defense: 1500, faction: 'gaul', controlPoints: 2,
+    benefit: { desc: 'Gaul capital — wild north, iron and wolves', militaryMod: 1.15 }
+  },
+  {
+    key: 'phoenicia_capital', name: 'Tyre', type: 'capital',
+    angle: -1.3, dist: 4800, isleRX: 380, isleRY: 260,
+    defense: 1500, faction: 'phoenicia', controlPoints: 2,
+    benefit: { desc: 'Phoenicia capital — masters of the sea lanes', tradeMod: 1.4 }
+  },
+  {
+    key: 'seapeople_capital', name: 'The Leviathan', type: 'capital',
+    angle: 2.5, dist: 5500, isleRX: 350, isleRY: 250,
+    defense: 2000, faction: 'seapeople', controlPoints: 3,
+    benefit: { desc: 'Sea People capital — raiders of the bronze age', militaryMod: 1.3 }
+  },
+
+  // ── RESOURCE ISLANDS (4) ─────────────────────────────────────────────
+  // Angles: 0.45, 0.65, 1.10, 4.00  (all >0.15 away from any capital)
+  {
+    key: 'ironwood_forest', name: 'Ironwood Forest', type: 'resource',
+    angle: 0.45, dist: 3500, isleRX: 370, isleRY: 260,
+    defense: 650, faction: null, controlPoints: 1,
+    benefit: { desc: '+50% wood production, ships built 25% faster', woodMod: 1.5, shipSpeedMod: 0.75 }
+  },
+  {
+    key: 'stoneheart', name: 'Stoneheart Quarry', type: 'resource',
+    angle: 0.65, dist: 3800, isleRX: 350, isleRY: 250,
+    defense: 700, faction: null, controlPoints: 1,
+    benefit: { desc: '+50% stone production, buildings cost 20% less', stoneMod: 1.5, buildCostMod: 0.8 }
+  },
+  {
+    key: 'grain_sea', name: 'Grain Sea', type: 'resource',
+    angle: 1.10, dist: 3200, isleRX: 380, isleRY: 270,
+    defense: 600, faction: null, controlPoints: 1,
+    benefit: { desc: '+50% food output, army upkeep -15%', foodMod: 1.5, upkeepMod: 0.85 }
+  },
+  {
+    key: 'golden_hills', name: 'Golden Hills', type: 'resource',
+    angle: 4.00, dist: 4000, isleRX: 360, isleRY: 255,
+    defense: 750, faction: null, controlPoints: 1,
+    benefit: { desc: '+50% gold income from all sources', goldMod: 1.5 }
+  },
+
+  // ── MILITARY ISLANDS (5) ─────────────────────────────────────────────
+  // Angles: 1.65, 1.85, 2.05, 2.25, 3.20
+  {
+    key: 'iron_keep', name: 'Iron Keep', type: 'military',
+    angle: 1.65, dist: 4500, isleRX: 340, isleRY: 240,
+    defense: 900, faction: null, controlPoints: 2,
+    benefit: { desc: '+20% army production speed, +10% garrison defense', armyProdMod: 1.2, defMod: 1.1 }
+  },
+  {
+    key: 'warhorse', name: 'Warhorse Downs', type: 'military',
+    angle: 1.85, dist: 5000, isleRX: 330, isleRY: 235,
+    defense: 850, faction: null, controlPoints: 2,
+    benefit: { desc: 'Unlocks cavalry units, +15% cavalry combat strength', unlockCavalry: true, cavCombatMod: 1.15 }
+  },
+  {
+    key: 'castrum_maris', name: 'Castrum Maris', type: 'military',
+    angle: 2.05, dist: 4800, isleRX: 345, isleRY: 245,
+    defense: 950, faction: null, controlPoints: 2,
+    benefit: { desc: 'Unlocks legionary units, +5 army capacity', unlockLegionaries: true, armyCapBonus: 5 }
+  },
+  {
+    key: 'siege_works', name: 'Siege Works', type: 'military',
+    angle: 2.25, dist: 5200, isleRX: 320, isleRY: 230,
+    defense: 800, faction: null, controlPoints: 2,
+    benefit: { desc: 'Unlocks siege weapons, +20% siege damage', unlockSiege: true, siegeDmgMod: 1.2 }
+  },
+  {
+    key: 'heros_grave', name: "Hero's Grave", type: 'military',
+    angle: 3.20, dist: 4000, isleRX: 300, isleRY: 215,
+    defense: 700, faction: null, controlPoints: 1,
+    benefit: { desc: 'Recruit one free elite hero upon capture', freeHero: true }
+  },
+
+  // ── ECONOMIC / TRADE HUB ISLANDS (6) ─────────────────────────────────
+  // Angles: 3.43, 4.20, 4.45, 4.70, 5.18, 5.40
+  {
+    key: 'golden_bazaar', name: 'Golden Bazaar', type: 'economic',
+    angle: 3.43, dist: 4200, isleRX: 360, isleRY: 255,
+    defense: 600, faction: null, controlPoints: 2,
+    benefit: { desc: '+25% trade income, access to luxury goods market', tradeMod: 1.25, luxuryAccess: true }
+  },
+  {
+    key: 'emporium', name: 'Emporium', type: 'economic',
+    angle: 4.20, dist: 3800, isleRX: 340, isleRY: 240,
+    defense: 550, faction: null, controlPoints: 1,
+    benefit: { desc: 'Open trade routes with any faction regardless of relations', tradeAny: true }
+  },
+  {
+    key: 'silk_road', name: 'Silk Road Outpost', type: 'economic',
+    angle: 4.45, dist: 5500, isleRX: 310, isleRY: 220,
+    defense: 650, faction: null, controlPoints: 2,
+    benefit: { desc: 'Rare goods sell for double their base value', rareGoodsMod: 2.0 }
+  },
+  {
+    key: 'amber_coast', name: 'Amber Coast', type: 'economic',
+    angle: 4.70, dist: 4600, isleRX: 350, isleRY: 248,
+    defense: 600, faction: null, controlPoints: 2,
+    benefit: { desc: 'All active trade routes yield +50% income', allTradeRouteMod: 1.5 }
+  },
+  {
+    key: 'spice_islands', name: 'Spice Islands', type: 'economic',
+    angle: 5.18, dist: 6000, isleRX: 290, isleRY: 205,
+    defense: 700, faction: null, controlPoints: 2,
+    benefit: { desc: 'Luxury goods income +100%', luxuryMod: 2.0 }
+  },
+  {
+    key: 'ivory_port', name: 'Ivory Port', type: 'economic',
+    angle: 5.40, dist: 5000, isleRX: 330, isleRY: 235,
+    defense: 650, faction: null, controlPoints: 1,
+    benefit: { desc: 'Sell surplus military units for gold', sellUnits: true }
+  },
+
+  // ── DIPLOMATIC ISLANDS (4) ────────────────────────────────────────────
+  // Angles: 5.88, 6.10, 6.25, 2.72
+  {
+    key: 'senate_house', name: 'Senate House', type: 'diplomatic',
+    angle: 2.72, dist: 3000, isleRX: 320, isleRY: 228,
+    defense: 500, faction: null, controlPoints: 3,
+    benefit: { desc: 'Required for diplomatic victory; +1 alliance slot', diplomVictory: true, allianceBonus: 1 }
+  },
+  {
+    key: 'oracle', name: "Oracle's Isle", type: 'diplomatic',
+    angle: 5.88, dist: 4400, isleRX: 300, isleRY: 215,
+    defense: 500, faction: null, controlPoints: 1,
+    benefit: { desc: 'Reveals enemy faction army strengths on world map', revealEnemies: true }
+  },
+  {
+    key: 'neutral_port', name: 'Neutral Port', type: 'diplomatic',
+    angle: 6.10, dist: 3600, isleRX: 315, isleRY: 225,
+    defense: 520, faction: null, controlPoints: 1,
+    benefit: { desc: 'Host peace conferences; +1 alliance slot', peaceTreaties: true, allianceBonus: 1 }
+  },
+  {
+    key: 'temple_concord', name: 'Temple of Concord', type: 'diplomatic',
+    angle: 6.25, dist: 4000, isleRX: 310, isleRY: 220,
+    defense: 510, faction: null, controlPoints: 2,
+    benefit: { desc: 'All alliance benefits are 50% stronger', allianceMod: 1.5 }
+  },
+];
+
+// ── WORLD ISLAND LOOKUP HELPERS ──────────────────────────────────────────
+
+function getWorldIsland(key) {
+  return WORLD_ISLANDS.find(i => i.key === key);
+}
+
+function getIslandWorldPos(island) {
+  let cx = 600, cy = 400;
+  return {
+    x: cx + Math.cos(island.angle) * island.dist,
+    y: cy + Math.sin(island.angle) * island.dist
+  };
+}
+
+function getAllWorldIslands() {
+  return WORLD_ISLANDS.map(isle => {
+    let pos = getIslandWorldPos(isle);
+    return { ...isle, isleX: pos.x, isleY: pos.y };
+  });
+}
+
+function captureIsland(key) {
+  if (!state._controlledIslands) state._controlledIslands = [];
+  if (!state._controlledIslands.includes(key)) {
+    state._controlledIslands.push(key);
+  }
+  let isle = getWorldIsland(key);
+  if (isle && typeof addNotification === 'function') {
+    addNotification('Captured ' + isle.name + '!', '#ffd700');
+  }
+}
+
+function isIslandControlled(key) {
+  return state._controlledIslands && state._controlledIslands.includes(key);
+}
+
+function getIslandBenefit(key) {
+  let isle = getWorldIsland(key);
+  return isle ? isle.benefit : null;
+}
+
 // ─── SEAMLESS EXPLORATION ISLAND HELPER ────────────────────────────────
 function _isExplorationActive(key) { return state._activeExploration === key; }
 
