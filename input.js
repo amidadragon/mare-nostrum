@@ -1418,13 +1418,13 @@ function keyPressed() {
         // Dock at nation island — enter foreign island visit mode
         let _nv = state.nations[r.nearIsle];
         state.rowing.active = false;
-        state._activeNation = r.nearIsle; // Mark as visiting foreign island
+        state._activeNation = r.nearIsle;
         let _dockAng = atan2(r.y - _nv.isleY, r.x - _nv.isleX);
         state.player.x = _nv.isleX + cos(_dockAng) * _nv.isleRX * 0.6;
         state.player.y = _nv.isleY + sin(_dockAng) * _nv.isleRY * 0.6;
         state.player.vx = 0; state.player.vy = 0;
         cam.x = state.player.x; cam.y = state.player.y;
-        _startCamTransition(); camZoomTarget = 1.0;
+        _startCamTransition(); camZoomTarget = 1.0; // zoom back in
         addNotification('Arrived at ' + (typeof getNationName === 'function' ? getNationName(r.nearIsle) : r.nearIsle), '#aaddff');
         // Set invasion target if player has army
         if (state.legia && state.legia.army && state.legia.army.length > 0 && !_nv.defeated && !_nv.vassal) {
@@ -1439,6 +1439,7 @@ function keyPressed() {
       state.player.y = port.y;
       state.player.vx = 0;
       state.player.vy = 0;
+      camZoomTarget = 1.0; // zoom back in
       addFloatingText(width / 2, height * 0.35, 'Back on solid ground', C.textBright);
       return;
     }
@@ -1463,6 +1464,7 @@ function keyPressed() {
         state.rowing.wakeTrail = [];
         state._activeNation = null;
         state._invasionTarget = null;
+        camZoomTarget = 0.55; // zoom out for sailing
         addFloatingText(width / 2, height * 0.35, 'Setting sail!', C.solarBright);
         return;
       }
@@ -1474,13 +1476,13 @@ function keyPressed() {
     let boatWorldY = port.y + 20;
     if (_canBoard && dist(state.player.x, state.player.y, boatWorldX, boatWorldY) < 60) {
       state.rowing.active = true;
-      // Start boat OUTSIDE the island surface to avoid collision trap
-      let _surfRX = typeof getSurfaceRX === 'function' ? getSurfaceRX() : state.islandRX * 0.9;
-      let _surfRY = typeof getSurfaceRY === 'function' ? getSurfaceRY() : state.islandRY * 0.36;
-      state.rowing.x = WORLD.islandCX + _surfRX * 1.15;
-      state.rowing.y = WORLD.islandCY + _surfRY * 0.3;
-      state.rowing.angle = 0; // facing right (east, away from island)
-      state.rowing.speed = 1.5; // initial push away from island
+      // Start boat outside the island
+      state.rowing.x = boatWorldX;
+      state.rowing.y = boatWorldY;
+      state.rowing.angle = 0;
+      state.rowing.speed = 2.0;
+      // Zoom out for sailing view
+      camZoomTarget = 0.55;
       state.rowing.oarPhase = 0;
       state.rowing.wakeTrail = [];
       addFloatingText(width / 2, height * 0.35, 'Rowing the Navis Parva! WASD to sail, E to dock', C.solarBright);
