@@ -2776,6 +2776,22 @@ function drawInner() {
           let sc = Math.max(0.3, 1 - dist/3000);
           let rx = (isle.isleRX || 300) * sc;
           let ry = (isle.isleRY || 200) * sc;
+          // Full terrain render when close
+          if (dist < 600 && typeof drawIslandAt === 'function') {
+            drawIslandAt({ cx: pos.x, cy: pos.y, rx: isle.isleRX || 300, ry: isle.isleRY || 200, level: 3, seed: isle.key.length * 7 });
+            // Name label on top
+            push();
+            translate(sx, sy);
+            fill(255, 255, 220, 200);
+            textSize(10);
+            textAlign(CENTER);
+            text(isle.name, 0, -(isle.isleRY || 200)*0.9);
+            if (isIslandControlled(isle.key)) {
+              fill(100, 255, 100);
+              ellipse(0, -(isle.isleRY || 200)*0.5, 6, 6);
+            }
+            pop();
+          } else {
           push();
           translate(sx, sy);
           // Water ring
@@ -2838,6 +2854,7 @@ function drawInner() {
             }
           }
           pop();
+          }
         }
       }
       if (!_frameBudget.throttled || frameCount % 2 === 0) drawShoreWaves();
@@ -6016,9 +6033,9 @@ function drawWorldObjectsSorted() {
         let sx = px + cos(angle) * dist;
         let sy = py + sin(angle) * dist * 0.5 + 5;
         fill(col[0], col[1], col[2], 200);
-        ellipse(sx, sy, 4, 4);
+        ellipse(sx, sy, 3, 3);
         fill(200, 170, 130, 180);
-        ellipse(sx, sy - 3, 3, 3);
+        ellipse(sx, sy - 2, 2, 2);
       }
     }
   }

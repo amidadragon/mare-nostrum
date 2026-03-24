@@ -6004,13 +6004,13 @@ function drawVisualInvasion() {
   if (!_invasionBattle) return;
   let b = _invasionBattle;
 
-  fill(0, 0, 0, 160);
+  fill(0, 0, 0, 40);
   rect(0, 0, width, height);
 
   let arenaX = width * 0.1, arenaY = height * 0.15;
   let arenaW = width * 0.8, arenaH = height * 0.55;
 
-  fill(80, 100, 60);
+  fill(80, 100, 60, 120);
   rect(arenaX, arenaY, arenaW, arenaH, 5);
   fill(70, 90, 50);
   for (let i = 0; i < 20; i++) {
