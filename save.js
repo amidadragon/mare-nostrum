@@ -175,6 +175,9 @@ function saveGame() {
     },
     // Legia military system
     legia: state.legia || null,
+    legiaUnits: (state.legia ? state.legia.units : []) || [],
+    _battlesWon: state._battlesWon || 0,
+    _activeFormation: state._activeFormation || 'line',
     // Random events
     activeEvent: state.activeEvent || null,
     eventCooldown: state.eventCooldown || {},
@@ -763,7 +766,10 @@ function loadGame() {
       state.legia.morale = d.legia.morale != null ? d.legia.morale : 100;
       state.legia.expeditionTarget = null; // reset expedition state on load
       state.legia.marching = false;
+      state.legia.units = d.legiaUnits || [];
     }
+    if (d._battlesWon) state._battlesWon = d._battlesWon;
+    if (d._activeFormation) state._activeFormation = d._activeFormation;
     // Safety: ensure castrum is active if island level >= 8
     if (state.islandLevel >= 8 && state.legia && state.legia.castrumLevel < 1) {
       state.legia.castrumLevel = 1;

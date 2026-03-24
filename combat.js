@@ -5558,62 +5558,163 @@ function drawInvasionHUD() {
 
 // ═══ ISLAND INVASION — Quick combat when pressing F ═══
 function startIslandInvasion(islandKey) {
-  let defStr = 300; // default
-  // Check world island defense
+  let defStr = 300;
+  // World island defense
   if (typeof getWorldIsland === 'function') {
     let wisle = getWorldIsland(islandKey);
     if (wisle) defStr = wisle.defense || 500;
   }
-  // Check nation defense
+  // Nation defense — scales with level and military
   let rv = state.nations[islandKey];
   if (rv) {
     defStr = 800 + (rv.level || 1) * 200 + (rv.military || 0) * 50;
+    // Last Stand buff
+    if (rv._lastStandBuff) defStr = Math.floor(defStr * 1.2);
   }
 
-  // Player army strength
+  // Player army strength — unit-based
   let lg = state.legia || {};
   let soldiers = lg.soldiers || 0;
-  let playerStr = soldiers * 30 + (lg.castrumLevel || 0) * 100;
+  let playerStr = 0;
+
+  if (lg.units && lg.units.length > 0) {
+    // New unit system
+    for (let u of lg.units) {
+      let info = typeof getUnitInfo === 'function' ? getUnitInfo(u.type) : null;
+      let baseStr = info ? info.str : 50;
+      let lvlMult = 1 + (u.level || 0) * 0.1;
+      playerStr += baseStr * lvlMult * (u.count || 1);
+    }
+  } else {
+    // Legacy: simple soldier count
+    playerStr = soldiers * 30 + (lg.castrumLevel || 0) * 100;
+  }
+
+  // Formation modifier
+  let formation = state._activeFormation || 'line';
+  if (typeof FORMATIONS !== 'undefined' && FORMATIONS[formation]) {
+    playerStr = Math.floor(playerStr * FORMATIONS[formation].atkMod);
+  }
+
+  // Island bonuses
+  if (typeof isIslandControlled === 'function') {
+    if (isIslandControlled('iron_keep')) playerStr = Math.floor(playerStr * 1.1); // +10% def from Iron Keep
+    if (isIslandControlled('castrum_maris')) playerStr += 150; // +5 army cap equivalent
+    if (isIslandControlled('siege_works') && rv) playerStr = Math.floor(playerStr * 1.2); // +20% siege
+  }
 
   if (playerStr < 50) {
     if (typeof addFloatingText === 'function') addFloatingText(width/2, height*0.3, 'No army! Recruit soldiers first.', '#ff6644');
-    return;
+    return false;
   }
 
-  // Simple combat resolution
+  // Combat resolution with variance
   let ratio = playerStr / Math.max(1, defStr);
-  let playerWins = ratio > 0.8 + Math.random() * 0.4; // need ~1:1 ratio with some luck
+  let roll = 0.7 + Math.random() * 0.6; // 0.7 to 1.3
+  let effectiveRatio = ratio * roll;
+  let playerWins = effectiveRatio > 0.9;
 
-  // Casualties
-  let playerCasualtyRate = playerWins ? (0.2 + Math.random() * 0.2) : (0.5 + Math.random() * 0.3);
-  let casualties = Math.floor(soldiers * playerCasualtyRate);
-  if (lg.soldiers) lg.soldiers = Math.max(0, lg.soldiers - casualties);
+  // Casualties scale with how close the fight was
+  let closeness = Math.min(1, defStr / Math.max(1, playerStr));
+  let baseCasualty = playerWins ? (0.15 + closeness * 0.25) : (0.4 + closeness * 0.3);
 
-  if (playerWins) {
-    // Claim island
-    if (typeof captureIsland === 'function') captureIsland(islandKey);
-    // Handle faction elimination
-    if (rv) {
-      rv.defeated = true;
-      rv.vassal = true;
-      rv.military = 0;
-      if (typeof addNotification === 'function') addNotification(islandKey.toUpperCase() + ' conquered!', '#ffd700');
+  if (lg.units && lg.units.length > 0) {
+    // Remove casualties from units
+    let totalUnits = lg.units.reduce((sum, u) => sum + (u.count || 1), 0);
+    let casualties = Math.max(1, Math.floor(totalUnits * baseCasualty));
+    let remaining = totalUnits - casualties;
+    // Distribute losses proportionally
+    for (let u of lg.units) {
+      let unitLoss = Math.floor((u.count || 1) * baseCasualty);
+      u.count = Math.max(0, (u.count || 1) - unitLoss);
     }
-    if (typeof addFloatingText === 'function') {
-      addFloatingText(width/2, height*0.25, 'VICTORY! Island captured!', '#44ff44');
-      addFloatingText(width/2, height*0.35, 'Lost ' + casualties + ' soldiers', '#ffaa44');
-    }
-    // Check victory conditions
-    if (typeof checkVictoryConditions === 'function') {
-      let v = checkVictoryConditions();
-      if (v && typeof triggerVictory === 'function') triggerVictory(v);
+    // Remove empty units
+    lg.units = lg.units.filter(u => u.count > 0);
+
+    if (playerWins) {
+      if (typeof captureIsland === 'function') captureIsland(islandKey);
+      if (rv) { rv.defeated = true; rv.vassal = true; rv.military = 0; }
+      if (!state._battlesWon) state._battlesWon = 0;
+      state._battlesWon++;
+      if (typeof addFloatingText === 'function') {
+        addFloatingText(width/2, height*0.25, 'VICTORY! Island captured!', '#44ff44');
+        addFloatingText(width/2, height*0.35, 'Lost ' + casualties + ' units (' + remaining + ' remain)', '#ffaa44');
+      }
+      if (typeof addNotification === 'function' && rv) addNotification(islandKey.toUpperCase() + ' conquered!', '#ffd700');
+      if (typeof checkVictoryConditions === 'function') {
+        let v = checkVictoryConditions();
+        if (v && typeof triggerVictory === 'function') triggerVictory(v);
+      }
+    } else {
+      if (typeof addFloatingText === 'function') {
+        addFloatingText(width/2, height*0.25, 'DEFEATED! Retreating...', '#ff4444');
+        addFloatingText(width/2, height*0.35, 'Lost ' + casualties + ' units (' + remaining + ' remain)', '#ffaa44');
+      }
     }
   } else {
-    if (typeof addFloatingText === 'function') {
-      addFloatingText(width/2, height*0.25, 'DEFEATED! Retreating...', '#ff4444');
-      addFloatingText(width/2, height*0.35, 'Lost ' + casualties + ' soldiers', '#ffaa44');
+    // Legacy soldier system
+    let casualties = Math.max(1, Math.floor(soldiers * baseCasualty));
+    if (lg.soldiers) lg.soldiers = Math.max(0, lg.soldiers - casualties);
+
+    if (playerWins) {
+      if (typeof captureIsland === 'function') captureIsland(islandKey);
+      if (rv) { rv.defeated = true; rv.vassal = true; rv.military = 0; }
+      if (!state._battlesWon) state._battlesWon = 0;
+      state._battlesWon++;
+      if (typeof addFloatingText === 'function') {
+        addFloatingText(width/2, height*0.25, 'VICTORY! Island captured!', '#44ff44');
+        addFloatingText(width/2, height*0.35, 'Lost ' + casualties + ' soldiers', '#ffaa44');
+      }
+      if (typeof addNotification === 'function' && rv) addNotification(islandKey.toUpperCase() + ' conquered!', '#ffd700');
+      if (typeof checkVictoryConditions === 'function') {
+        let v = checkVictoryConditions();
+        if (v && typeof triggerVictory === 'function') triggerVictory(v);
+      }
+    } else {
+      if (typeof addFloatingText === 'function') {
+        addFloatingText(width/2, height*0.25, 'DEFEATED! Retreating...', '#ff4444');
+        addFloatingText(width/2, height*0.35, 'Lost ' + casualties + ' soldiers', '#ffaa44');
+      }
     }
   }
 
   return playerWins;
+}
+
+// ═══ UNIT RECRUITMENT ═══
+function recruitUnit(unitKey, count) {
+  count = count || 1;
+  let info = typeof getUnitInfo === 'function' ? getUnitInfo(unitKey) : null;
+  if (!info) return false;
+
+  let totalCost = info.cost * count;
+  if (state.gold < totalCost) {
+    if (typeof addFloatingText === 'function') addFloatingText(width/2, height*0.3, 'Not enough gold!', '#ff6644');
+    return false;
+  }
+
+  // Check army cap
+  let lg = state.legia || {};
+  if (!lg.units) lg.units = [];
+  let currentCount = lg.units.reduce((sum, u) => sum + (u.count || 1), 0) + (lg.soldiers || 0);
+  let cap = typeof getArmyCap === 'function' ? getArmyCap() : 30;
+  if (currentCount + count > cap) {
+    if (typeof addFloatingText === 'function') addFloatingText(width/2, height*0.3, 'Army at capacity! (' + cap + ')', '#ff6644');
+    return false;
+  }
+
+  state.gold -= totalCost;
+
+  // Add to existing unit group or create new
+  let existing = lg.units.find(u => u.type === unitKey);
+  if (existing) {
+    existing.count = (existing.count || 1) + count;
+  } else {
+    lg.units.push({ type: unitKey, count: count, level: 0 });
+  }
+
+  if (typeof addFloatingText === 'function') {
+    addFloatingText(width/2, height*0.3, 'Recruited ' + count + ' ' + info.name + '!', '#44ff88');
+  }
+  return true;
 }

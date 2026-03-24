@@ -98,6 +98,148 @@ const FACTION_STARTER_GEAR = {
   gaul:      { head: 'gallic_helm', chest: 'chainmail', mainHand: 'long_sword', trinket: 'torque' },
 };
 
+// ═══ FACTION UNIT ROSTER ═══
+const COMMON_UNITS = {
+  militia:      { name: 'Militia',       role: 'light',    cost: 50,  str: 50,  food: 2, speed: 1.0 },
+  spearman:     { name: 'Spearman',      role: 'anti-cav', cost: 80,  str: 80,  food: 2, speed: 0.9 },
+  archer:       { name: 'Archer',        role: 'ranged',   cost: 100, str: 60,  food: 2, speed: 1.0 },
+  light_cav:    { name: 'Light Cavalry', role: 'scout',    cost: 150, str: 90,  food: 3, speed: 1.5 },
+  heavy_inf:    { name: 'Heavy Infantry',role: 'frontline', cost: 120, str: 120, food: 2, speed: 0.7 }
+};
+
+const FACTION_UNITS = {
+  rome: {
+    legionary:  { name: 'Legionary',  role: 'heavy',   cost: 150, str: 150, food: 2, speed: 0.8, special: 'testudo' },
+    praetorian: { name: 'Praetorian', role: 'elite',   cost: 250, str: 200, food: 3, speed: 0.8, special: 'inspire' },
+    ballista:   { name: 'Ballista',   role: 'siege',   cost: 200, str: 100, food: 4, speed: 0.4, special: 'anti_building' },
+    scorpion:   { name: 'Scorpion',   role: 'anti-inf',cost: 180, str: 80,  food: 4, speed: 0.5, special: 'rapid_fire' },
+    onager:     { name: 'Onager',     role: 'siege',   cost: 300, str: 150, food: 4, speed: 0.3, special: 'aoe' }
+  },
+  carthage: {
+    sacred_band:    { name: 'Sacred Band',     role: 'elite',   cost: 200, str: 180, food: 3, speed: 0.8, special: 'unbreakable' },
+    numidian_cav:   { name: 'Numidian Cavalry',role: 'light-cav',cost: 140, str: 100, food: 3, speed: 1.6, special: 'hit_and_run' },
+    elephant:       { name: 'War Elephant',    role: 'shock',   cost: 400, str: 300, food: 6, speed: 0.5, special: 'trample' },
+    balearic:       { name: 'Balearic Slinger',role: 'skirmish', cost: 80,  str: 70,  food: 2, speed: 1.1, special: 'anti_light' },
+    libyan_spear:   { name: 'Libyan Spearman', role: 'medium',  cost: 100, str: 100, food: 2, speed: 0.9 }
+  },
+  egypt: {
+    medjay:       { name: 'Medjay',        role: 'ranged', cost: 150, str: 90,  food: 2, speed: 1.0, special: 'poison' },
+    chariot:      { name: 'War Chariot',   role: 'mobile', cost: 200, str: 120, food: 4, speed: 1.4, special: 'mobile_fire' },
+    nile_guard:   { name: 'Nile Guard',    role: 'anti-cav',cost: 120, str: 110, food: 2, speed: 0.8, special: 'anti_cavalry' },
+    khopesh:      { name: 'Khopesh Warrior',role: 'shock', cost: 130, str: 130, food: 2, speed: 1.1, special: 'fast_attack' },
+    priest:       { name: 'Priest',        role: 'support',cost: 100, str: 50,  food: 2, speed: 0.8, special: 'heal' }
+  },
+  greece: {
+    hoplite:      { name: 'Hoplite',       role: 'heavy',  cost: 140, str: 140, food: 2, speed: 0.7, special: 'phalanx' },
+    peltast:      { name: 'Peltast',       role: 'skirmish',cost: 90,  str: 70,  food: 2, speed: 1.2, special: 'javelin' },
+    sacred_band_t:{ name: 'Sacred Band',   role: 'elite',  cost: 220, str: 190, food: 3, speed: 0.7, special: 'unbreakable_phalanx' },
+    philosopher:  { name: 'Philosopher',   role: 'support',cost: 80,  str: 30,  food: 2, speed: 0.8, special: 'morale_boost' }
+  },
+  persia: {
+    immortal:     { name: 'Immortal',      role: 'heavy',  cost: 180, str: 160, food: 2, speed: 0.9, special: 'respawn' },
+    cataphract:   { name: 'Cataphract',    role: 'heavy-cav',cost: 220, str: 200, food: 3, speed: 1.0, special: 'charge' },
+    horse_archer: { name: 'Horse Archer',  role: 'mobile', cost: 160, str: 100, food: 3, speed: 1.4, special: 'mobile_fire' },
+    scythed_chariot:{ name: 'Scythed Chariot',role:'shock', cost: 250, str: 180, food: 4, speed: 1.2, special: 'fear' },
+    satrap_guard: { name: 'Satrap Guard',  role: 'elite',  cost: 200, str: 170, food: 3, speed: 0.8 }
+  },
+  gaul: {
+    berserker:    { name: 'Berserker',     role: 'shock',  cost: 140, str: 140, food: 2, speed: 1.2, special: 'rage' },
+    swordmaster:  { name: 'Swordmaster',   role: 'elite',  cost: 180, str: 160, food: 2, speed: 1.0, special: 'crit' },
+    druid:        { name: 'Druid',         role: 'support',cost: 100, str: 40,  food: 2, speed: 0.8, special: 'curse' },
+    gaul_cav:     { name: 'Gaul Cavalry',  role: 'scout',  cost: 120, str: 80,  food: 3, speed: 1.6, special: 'fastest' },
+    naked_spear:  { name: 'Naked Fanatic', role: 'shock',  cost: 130, str: 120, food: 2, speed: 1.3, special: 'fearless' }
+  },
+  phoenicia: {
+    marine:       { name: 'Marine',        role: 'naval',  cost: 120, str: 100, food: 2, speed: 1.0, special: 'board' },
+    cedar_warship:{ name: 'Cedar Warship', role: 'ship',   cost: 200, str: 150, food: 4, speed: 0.8, special: 'gold_gen' },
+    merchant:     { name: 'Dye Merchant',  role: 'economic',cost: 100, str: 40,  food: 2, speed: 0.8, special: 'trade_boost' },
+    explorer:     { name: 'Explorer',      role: 'scout',  cost: 80,  str: 50,  food: 2, speed: 1.4, special: 'reveal' },
+    phoen_hoplite:{ name: 'Phoenician Hoplite',role:'heavy',cost: 130, str: 120, food: 2, speed: 0.7, special: 'phalanx' }
+  },
+  seapeople: {
+    raider:       { name: 'Raider',        role: 'light',  cost: 90,  str: 80,  food: 2, speed: 1.2, special: 'coastal_bonus' },
+    longship:     { name: 'Longship',      role: 'ship',   cost: 150, str: 110, food: 4, speed: 1.0, special: 'raid' },
+    shark_warrior:{ name: 'Shark Warrior',  role: 'elite',  cost: 160, str: 130, food: 2, speed: 1.1, special: 'amphibious' },
+    wave_caller:  { name: 'Wave Caller',   role: 'support',cost: 120, str: 50,  food: 2, speed: 0.8, special: 'slow_ships' },
+    sea_serpent:  { name: 'Sea Serpent',    role: 'mythical',cost: 300, str: 250, food: 6, speed: 0.6, special: 'terror' }
+  }
+};
+
+// ═══ ARMY SCALING ═══
+function getArmyCap() {
+  let controlled = (state._controlledIslands ? state._controlledIslands.length : 0);
+  let isMP = state._gameMode === 'multiplayer';
+
+  if (isMP) {
+    // Multiplayer: 20-60 units based on islands
+    return Math.min(60, 20 + controlled * 5);
+  }
+
+  // Conquest: 30-250 based on islands
+  if (controlled <= 3) return 30 + controlled * 5;
+  if (controlled <= 10) return 45 + (controlled - 3) * 5;
+  if (controlled <= 20) return 80 + (controlled - 10) * 7;
+  return Math.min(250, 150 + (controlled - 20) * 15);
+}
+
+function getGarrisonCap() {
+  return state._gameMode === 'multiplayer' ? 10 : 20;
+}
+
+function getAvailableUnits() {
+  let faction = state.faction || 'rome';
+  let units = { ...COMMON_UNITS };
+  let factionUnits = FACTION_UNITS[faction];
+  if (factionUnits) {
+    for (let k in factionUnits) units[k] = factionUnits[k];
+  }
+  return units;
+}
+
+function getUnitInfo(unitKey) {
+  let faction = state.faction || 'rome';
+  if (COMMON_UNITS[unitKey]) return COMMON_UNITS[unitKey];
+  if (FACTION_UNITS[faction] && FACTION_UNITS[faction][unitKey]) return FACTION_UNITS[faction][unitKey];
+  return null;
+}
+
+// Food upkeep calculation
+function calculateArmyUpkeep() {
+  let lg = state.legia || {};
+  let units = lg.units || [];
+  let totalFood = 0;
+  for (let u of units) {
+    let info = getUnitInfo(u.type);
+    totalFood += info ? info.food : 2;
+  }
+  // Grain Sea island reduces upkeep by 15%
+  if (state._controlledIslands && state._controlledIslands.includes('grain_sea')) {
+    totalFood = Math.floor(totalFood * 0.85);
+  }
+  return totalFood;
+}
+
+// ═══ FORMATIONS ═══
+const FORMATIONS = {
+  line:       { name: 'Line',       defMod: 1.0, atkMod: 1.0, spdMod: 1.0, unlock: 0 },
+  shield_wall:{ name: 'Shield Wall', defMod: 1.5, atkMod: 0.7, spdMod: 0.5, unlock: 0 },
+  wedge:      { name: 'Wedge',       defMod: 0.75,atkMod: 1.5, spdMod: 1.2, unlock: 5 },
+  phalanx:    { name: 'Phalanx',     defMod: 2.0, atkMod: 0.8, spdMod: 0.5, unlock: 0, factions: ['rome','greece','phoenicia'] }
+};
+
+function getAvailableFormations() {
+  let battles = state._battlesWon || 0;
+  let faction = state.faction || 'rome';
+  let available = [];
+  for (let k in FORMATIONS) {
+    let f = FORMATIONS[k];
+    if (battles < f.unlock) continue;
+    if (f.factions && !f.factions.includes(faction)) continue;
+    available.push({ key: k, ...f });
+  }
+  return available;
+}
+
 function getEquipBonus(stat) {
   if (!state || !state.equipment) return 0;
   var total = 0;
