@@ -1474,20 +1474,15 @@ function keyPressed() {
         }
         return;
       }
-      // World island docking — visit (not capture, use F to invade/capture)
+      // World island — visit from ship (don't disembark)
       if (typeof getWorldIsland === 'function') {
         let _wisle = getWorldIsland(r.nearIsle);
         if (_wisle && !_wisle.faction) {
-          state.rowing.active = false;
-          camZoomTarget = 1.0;
-          let pos = getIslandWorldPos(_wisle);
-          state.player.x = pos.x;
-          state.player.y = pos.y;
-          state.player.vx = 0; state.player.vy = 0;
-          cam.x = state.player.x; cam.y = state.player.y;
-          _startCamTransition();
-          if (typeof addNotification === 'function') addNotification('Arrived at ' + _wisle.name, '#aaddff');
-          return;
+          if (typeof addNotification === 'function') addNotification('Visited ' + _wisle.name, '#aaddff');
+          if (_wisle.benefit && _wisle.benefit.desc) {
+            addNotification('Bonus available: ' + _wisle.benefit.desc, '#88ff88');
+          }
+          return; // stay on ship
         }
       }
       // Otherwise disembark — snap player back to pier

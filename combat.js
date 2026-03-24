@@ -5791,6 +5791,13 @@ function startVisualInvasion(islandKey) {
   let defCount = Math.max(3, Math.floor(defStr / 100));
   let defUnits = [];
   let defColor = rv ? (typeof FACTION_MILITARY !== 'undefined' && FACTION_MILITARY[islandKey] ? FACTION_MILITARY[islandKey].conquestFlag : [150, 80, 80]) : [150, 80, 80];
+  if (!rv) {
+    // World island defenders — color by type
+    let wisle = typeof getWorldIsland === 'function' ? getWorldIsland(islandKey) : null;
+    if (wisle) {
+      defColor = wisle.type === 'military' ? [180, 60, 60] : wisle.type === 'economic' ? [180, 160, 60] : wisle.type === 'diplomatic' ? [60, 120, 180] : [120, 150, 80];
+    }
+  }
   for (let i = 0; i < defCount; i++) {
     defUnits.push({
       x: 250 + Math.random() * 30,

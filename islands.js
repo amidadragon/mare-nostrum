@@ -197,6 +197,18 @@ function getIslandWorldPos(island) {
   };
 }
 
+function isOnWorldIsland(wx, wy) {
+  if (typeof WORLD_ISLANDS === 'undefined') return null;
+  for (let isle of WORLD_ISLANDS) {
+    if (isle.faction) continue;
+    let pos = getIslandWorldPos(isle);
+    let dx = (wx - pos.x) / (isle.isleRX || 300);
+    let dy = (wy - pos.y) / (isle.isleRY || 200);
+    if (dx*dx + dy*dy < 1.0) return isle;
+  }
+  return null;
+}
+
 function getAllWorldIslands() {
   return WORLD_ISLANDS.map(isle => {
     let pos = getIslandWorldPos(isle);
