@@ -1536,9 +1536,9 @@ function drawIsland() {
   // City wall / pomerium (Era 2+, drawn after roads but before buildings)
   drawCityWall(ix, iy, iw, ih);
 
-  // Harbor port (player ship — right side)
+  // Harbor port (player ship — left side)
   drawPort();
-  // Merchant port (Mercator — left side)
+  // Merchant port (Mercator — right side)
   drawMerchantPort();
 
   // District props — scarecrow, training dummies, lamp posts, awnings, etc.
