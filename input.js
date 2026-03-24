@@ -782,6 +782,16 @@ function keyPressed() {
   // Block all input during army battle
   if (typeof _armyBattle !== 'undefined' && _armyBattle) return;
 
+  // Pause menu: Q quits to menu, ESC resumes
+  if (state._paused && (key === 'q' || key === 'Q')) {
+    state._paused = false;
+    saveGame();
+    gameScreen = 'menu';
+    menuFadeIn = 0;
+    return;
+  }
+  if (state._paused && keyCode !== 27) return;
+
   // ESC — close overlays first, then menu as last resort
   if (keyCode === 27) {
     if (!state.tutorialGoalComplete && state.tutorialGoalStep < TUTORIAL_STEPS.length && state.progression.homeIslandReached) { skipTutorial(); addNotification('Tutorial skipped', '#aaaaaa'); return; }
@@ -838,6 +848,10 @@ function keyPressed() {
     if (state.techTreeOpen) { state.techTreeOpen = false; return; }
     if (state.codexOpen) { state.codexOpen = false; return; }
     if (state.journalOpen) { state.journalOpen = false; return; }
+    if (!state.insideTemple && !state.insideCastrum && !state.buildMode && !(state.legia && state.legia.legiaUIOpen)) {
+      state._paused = !state._paused;
+      return;
+    }
     saveGame();
     state._paused = true;
     gameScreen = 'menu';

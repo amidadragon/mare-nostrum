@@ -508,10 +508,9 @@ function drawMenuScreen() {
   textSize(itemSize);
 
   let _rs = null;
-  try { _rs = localStorage.getItem('sunlitIsles_save'); } catch(e) {}
+  try { _rs = localStorage.getItem('mare_nostrum_save') || localStorage.getItem('sunlitIsles_save'); } catch(e) {}
   let hasSave = false;
-  if (_rs) { try { let _d = JSON.parse(_rs); hasSave = _d && _d.version >= 8; } catch(e) {} }
-  if (!hasSave && _rs) { try { localStorage.removeItem('sunlitIsles_save'); } catch(e) {} }
+  if (_rs) { try { let _d = JSON.parse(_rs); hasSave = _d && _d.version >= 1; } catch(e) {} }
   let items = [];
   if (hasSave) items.push('CONTINUE');
   items.push('CONQUEST', 'MULTIPLAYER', 'SETTINGS', 'CREDITS');
@@ -1380,10 +1379,9 @@ function handleMenuClick() {
   }
   if (menuHover < 0 || menuFadeOut > 0) return;
   let _rs = null;
-  try { _rs = localStorage.getItem('sunlitIsles_save'); } catch(e) {}
+  try { _rs = localStorage.getItem('mare_nostrum_save') || localStorage.getItem('sunlitIsles_save'); } catch(e) {}
   let hasSave = false;
-  if (_rs) { try { let _d = JSON.parse(_rs); hasSave = _d && _d.version >= 8; } catch(e) {} }
-  if (!hasSave && _rs) { try { localStorage.removeItem('sunlitIsles_save'); } catch(e) {} }
+  if (_rs) { try { let _d = JSON.parse(_rs); hasSave = _d && _d.version >= 1; } catch(e) {} }
   let btns = [];
   if (hasSave) btns.push('load');
   btns.push('conquest', 'multiplayer', 'settings', 'credits');

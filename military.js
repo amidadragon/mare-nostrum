@@ -385,16 +385,7 @@ function handleLegiaKey(k) {
   if (!lg || lg.castrumLevel < 1) return false;
   // [1] Train legionary
   if (k === '1') {
-    if (typeof trainUnit === 'function') {
-      trainUnit('legionary');
-    } else {
-      if (state.gold < 20) { addFloatingText(width / 2, height * 0.3, 'Need 20 gold', '#ff6644'); return true; }
-      if (state.meals < 1) { addFloatingText(width / 2, height * 0.3, 'Need 1 meal', '#ff6644'); return true; }
-      if (lg.recruits + lg.trainingQueue >= lg.maxRecruits + getFactionData().recruitBonus) { addFloatingText(width / 2, height * 0.3, getFactionTerms().army + ' at capacity!', '#ff6644'); return true; }
-      state.gold = max(0, state.gold - 20); state.meals = max(0, state.meals - 1);
-      lg.trainingQueue++; if (lg.trainingTimer <= 0) lg.trainingTimer = 300;
-      addFloatingText(width / 2, height * 0.3, 'Training ' + getFactionTerms().soldier.toLowerCase() + '...', '#cc8844');
-    }
+    trainUnit('legionary');
     return true;
   }
   // [2] Upgrade castrum

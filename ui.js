@@ -2622,6 +2622,22 @@ function drawHUD() {
 
   // ─── SPAWN LEGION BUTTON (bottom-right, above hotbar) ───
   drawLegionButton();
+
+  // ─── PAUSE OVERLAY ───
+  if (state._paused && gameScreen === 'game') {
+    noStroke();
+    fill(0, 0, 0, 150);
+    rect(0, 0, width, height);
+    fill(220, 200, 140);
+    textAlign(CENTER, CENTER);
+    textSize(20);
+    text('PAUSED', width / 2, height / 2 - 20);
+    textSize(12);
+    fill(180, 160, 120);
+    text('Press ESC to resume', width / 2, height / 2 + 10);
+    text('Press Q to quit to menu', width / 2, height / 2 + 30);
+    textAlign(LEFT, TOP);
+  }
 }
 
 // Legion button state
