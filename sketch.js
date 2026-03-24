@@ -2605,9 +2605,10 @@ function drawInner() {
     }
     push();
     translate(shakeX, shakeY + floatOffset);
-    // Home island: always render when on it, LOD when sailing away
+    // Home island: render when on it (not visiting another island), LOD when sailing away
     let _isSailing = state.rowing && state.rowing.active;
-    if (!_isSailing || _homeDist < 800) {
+    let _onOtherIsland = !!state._activeNation || !!state._activeExploration;
+    if ((!_isSailing && !_onOtherIsland) || (_isSailing && _homeDist < 800)) {
       drawIsland(); // Full home island render (on island or close while sailing)
     } else if (_homeDist < 2000) {
       // Medium LOD for home island while sailing away
