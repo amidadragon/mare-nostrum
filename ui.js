@@ -1423,6 +1423,18 @@ function drawEmpireDashboard() {
   let fX=px+pw*0.52;fill(120,110,80);textSize(10);text('FLEET',fX,cdY);text('Navis Parva - Active',fX,cdY+13);
   fill(state.ship.state==='docked'?color(140,200,140):color(90,80,60));text('Merchant - '+(state.ship.state==='docked'?'DOCKED':state.ship.state==='gone'?'At sea':state.ship.state.toUpperCase()),fX,cdY+26);
   if(state.imperialBridge.built){fill(200,170,90);text('Imperial Bridge - ACTIVE',fX,cdY+39);}
+  // Victory progress
+  let sy = cdY + 56;
+  fill(200, 170, 100); textSize(10); textAlign(LEFT, TOP);
+  text('VICTORY PROGRESS', px + 14, sy); sy += 14;
+  let caps = typeof getCapturedCapitals === 'function' ? getCapturedCapitals() : { count: 0 };
+  let hubs = typeof getControlledTradeHubs === 'function' ? getControlledTradeHubs() : [];
+  let allies = typeof getAlliances === 'function' ? getAlliances() : [];
+  let hasSenate = state._controlledIslands && state._controlledIslands.includes('senate_house');
+  fill(160, 140, 100); textSize(9);
+  text('Military: ' + caps.count + '/6 capitals', px + 20, sy); sy += 12;
+  text('Economic: ' + hubs.length + '/4 hubs, ' + floor(state.gold) + '/100,000 gold', px + 20, sy); sy += 12;
+  text('Diplomatic: ' + allies.length + '/4 allies, Senate: ' + (hasSenate ? 'Yes' : 'No'), px + 20, sy); sy += 12;
   fill(120,100,70);textSize(10);textAlign(CENTER,BOTTOM);text('[TAB] Close',width/2,py+ph-6);textAlign(LEFT,TOP);
 }
 function _empDL(x1,y1,x2,y2,dl){let d=dist(x1,y1,x2,y2);if(d<1)return;let dx=(x2-x1)/d,dy=(y2-y1)/d;for(let i=0;i<d;i+=dl*2){let e=min(i+dl,d);line(x1+dx*i,y1+dy*i,x1+dx*e,y1+dy*e);}}
@@ -2285,6 +2297,15 @@ function drawHUD() {
       cookedY += 12;
     }
   }
+  // Controlled islands
+  let _hx = hudX, _hy = cookedY;
+  if (state._controlledIslands && state._controlledIslands.length > 0) {
+    fill(140, 160, 120);
+    textSize(9 * uiScale); textAlign(LEFT);
+    text('Islands: ' + state._controlledIslands.length, _hx + 8, _hy + 10);
+    _hy += 12;
+  }
+  cookedY = _hy;
 
   let barH = max(7, floor(8 * uiScale));
   drawBarHUD(hudX, cookedY + 2, barW, barH, state.companion.energy / 100, C.companionG, C.companionD, 'CRITTER');

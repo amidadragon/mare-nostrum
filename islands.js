@@ -227,6 +227,28 @@ function getIslandBenefit(key) {
   return isle ? isle.benefit : null;
 }
 
+function getIslandBonuses() {
+  let bonuses = { wood: 1, stone: 1, gold: 1, food: 1, trade: 1, army: 1, defense: 1, speed: 1 };
+  if (!state._controlledIslands) return bonuses;
+  for (let key of state._controlledIslands) {
+    let isle = typeof getWorldIsland === 'function' ? getWorldIsland(key) : null;
+    if (!isle || !isle.benefit) continue;
+    let b = isle.benefit;
+    if (b.type === 'resource') {
+      if (b.resource === 'wood') bonuses.wood += b.mult || 0.5;
+      if (b.resource === 'stone') bonuses.stone += b.mult || 0.5;
+      if (b.resource === 'gold') bonuses.gold += b.mult || 0.5;
+      if (b.resource === 'food') bonuses.food += b.mult || 0.5;
+    }
+    if (b.type === 'trade') bonuses.trade += b.mult || 0.25;
+    if (b.type === 'military') {
+      if (b.stat === 'army_production') bonuses.army += b.mult || 0.2;
+      if (b.stat === 'defense') bonuses.defense += b.mult || 0.1;
+    }
+  }
+  return bonuses;
+}
+
 // ─── SEAMLESS EXPLORATION ISLAND HELPER ────────────────────────────────
 function _isExplorationActive(key) { return state._activeExploration === key; }
 
