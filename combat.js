@@ -5925,6 +5925,16 @@ function updateVisualInvasion(dt) {
         if (!state._battlesWon) state._battlesWon = 0;
         state._battlesWon++;
         if (typeof addNotification === 'function') addNotification('VICTORY! ' + b.islandKey.toUpperCase() + ' conquered!', '#ffd700');
+        if (typeof addFloatingText === 'function') {
+          addFloatingText(width/2, height*0.2, b.islandKey.toUpperCase() + ' HAS FALLEN!', '#ffd700');
+        }
+        // Other nations react to conquest
+        for (let k in state.nations) {
+          if (k === b.islandKey) continue;
+          let other = state.nations[k];
+          if (!other || other.defeated) continue;
+          other.reputation = Math.max(-100, (other.reputation || 0) - 10);
+        }
         if (typeof checkVictoryConditions === 'function') {
           let v = checkVictoryConditions();
           if (v && typeof triggerVictory === 'function') triggerVictory(v);
