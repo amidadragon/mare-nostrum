@@ -1173,6 +1173,7 @@ function drawLegiaUI() {
   fill(200, 170, 100); textSize(10); textAlign(LEFT, TOP);
   text('TRAIN UNITS:', px + 14, sy); sy += 14;
 
+  let _ftTrain = (typeof getFactionTerms === 'function') ? getFactionTerms() : { soldier: 'Legionary', elite: 'Centurion' };
   let unitKeys = { legionary: '1', archer: '3', cavalry: '4', siege_ram: '5', centurion: '6' };
   let unitCosts = (typeof UNIT_TYPES !== 'undefined') ? UNIT_TYPES : {};
   for (let t of unlockedTypes) {
@@ -1180,8 +1181,8 @@ function drawLegiaUI() {
     let def = unitCosts[t];
     let costStr = def ? def.cost + 'g' : '?g';
     let nameStr = def ? def.name : t;
-    if (t === 'legionary') nameStr = _ft.soldier;
-    else if (t === 'centurion') nameStr = 'Elite ' + _ft.elite;
+    if (t === 'legionary' && _ftTrain) nameStr = _ftTrain.soldier || 'Legionary';
+    else if (t === 'centurion' && _ftTrain) nameStr = 'Elite ' + (_ftTrain.elite || 'Centurion');
     let canAfford = def && state.gold >= def.cost && armyCount < maxSoldiers;
     // Clickable button
     let btnX = px + 14, btnY = sy - 2, btnW = pw - 28, btnH = 16;
