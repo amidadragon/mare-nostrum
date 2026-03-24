@@ -1209,7 +1209,7 @@ function keyPressed() {
     }
     // Dive from boat — E while rowing in open water
     if (typeof startDive === 'function' && state.rowing && state.rowing.active &&
-        !state.conquest.active) {
+        !state.conquest.active && !state.rowing.nearIsle) {
       startDive(); return;
     }
     // Dive — E near water, but NOT if near the rowboat

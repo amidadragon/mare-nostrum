@@ -2071,7 +2071,7 @@ function updateConquestIslands(dt) {
   swapToIsland(is, nation.isleX, nation.isleY);
 
   // Bot AI generates synthetic input for this island's leader
-  if (typeof BotAI !== 'undefined') BotAI.update(k, dt * botKeys.length);
+  if (typeof BotAI !== 'undefined') BotAI.update(k, dt);
 
   // Run the same island systems as the player
   updateIslandSystems(dt * botKeys.length, false);

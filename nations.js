@@ -354,7 +354,7 @@ function updateNationDaily(key) {
 
   // Bot difficulty multipliers
   let botDiff = (rv.isBot && typeof BOT_DIFFICULTY !== 'undefined' && BOT_DIFFICULTY[rv.botDifficulty])
-    ? BOT_DIFFICULTY[rv.botDifficulty] : { goldMult: 1, buildMult: 1, militaryMult: 1, raidMult: 1 };
+    ? BOT_DIFFICULTY[rv.botDifficulty] : { goldMult: 1, buildMult: 1, militaryMult: 1, raidMult: 1, crystalMult: 1, woodMult: 1, stoneMult: 1, harvestMult: 1, recruitRate: 1, expandDelayDays: 3 };
 
   // --- ECONOMIC AI ---
   let baseIncome = 5 + rv.population * 2;
@@ -1850,7 +1850,8 @@ function generateNationIslandContent(key) {
   let trees = [];
   for (let i = 0; i < numTrees; i++) {
     let a = random(TWO_PI), d = random(0.4, 0.65) * rx;
-    let tTypes = getFactionTreeTypes(key); trees.push({ x: cx + cos(a) * d, y: cy + sin(a) * d * (ry / rx), size: random(8, 16), type: tTypes[i % tTypes.length] });
+    let tType = (FACTION_BIOMES[key] || FACTION_BIOMES.rome).treeType;
+    trees.push({ x: cx + cos(a) * d, y: cy + sin(a) * d * (ry / rx), size: random(8, 16), type: tType });
   }
 
   // Walls if level >= 3
