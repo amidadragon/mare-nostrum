@@ -1621,12 +1621,23 @@ function isOnBridge(wx, wy) {
 
 // Check if point is on the harbor pier (left side of island)
 function isOnPier(wx, wy) {
+  // Player dock (left side)
   let port = getPortPosition();
   let pierLeft = port.x - 30;
   let pierRight = port.x + 150;
   let pierTop = port.y - 15;
-  let pierBot = port.y + 30; // extend south to reach the boat position
-  return wx >= pierLeft && wx <= pierRight && wy >= pierTop && wy <= pierBot;
+  let pierBot = port.y + 30;
+  if (wx >= pierLeft && wx <= pierRight && wy >= pierTop && wy <= pierBot) return true;
+  // Merchant dock (right side)
+  if (typeof getMerchantPortPosition === 'function') {
+    let mp = getMerchantPortPosition();
+    let mpLeft = mp.x - 150;
+    let mpRight = mp.x + 30;
+    let mpTop = mp.y - 15;
+    let mpBot = mp.y + 30;
+    if (wx >= mpLeft && wx <= mpRight && wy >= mpTop && wy <= mpBot) return true;
+  }
+  return false;
 }
 
 // Check if point is in shallow water (just beyond island edge)
