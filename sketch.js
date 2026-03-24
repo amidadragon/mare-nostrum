@@ -1607,7 +1607,7 @@ function isOnBridge(wx, wy) {
   return false;
 }
 
-// Check if point is on the harbor pier (extends right from port into water)
+// Check if point is on the harbor pier (left side of island)
 function isOnPier(wx, wy) {
   let port = getPortPosition();
   let pierLeft = port.x - 30;

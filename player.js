@@ -652,7 +652,8 @@ function drawPlayer() {
   }
 
   let inWater = isInShallows(p.x, p.y);
-  let _swimming = typeof isNearAnyIsland === 'function' && !isOnAnyIslandSurface(p.x, p.y) && isNearAnyIsland(p.x, p.y, 300);
+  let _onPier = typeof isOnPier === 'function' && isOnPier(p.x, p.y);
+  let _swimming = typeof isNearAnyIsland === 'function' && !isOnAnyIslandSurface(p.x, p.y) && !_onPier && isNearAnyIsland(p.x, p.y, 300);
   let isDiving = state.diving && state.diving.active;
 
   if (_swimming && !isDiving) {
