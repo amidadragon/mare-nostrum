@@ -4,14 +4,14 @@ function updatePortPositions() {
   // Ports always at the shoreline — just past the grass surface edge
   let srx = getSurfaceRX();
   let sry = getSurfaceRY();
-  // Player port: RIGHT side of island (pier extends right into water)
+  // Player port: LEFT side of island (pier extends left into water)
   state.portLeft = {
-    x: WORLD.islandCX + srx + 10,
+    x: WORLD.islandCX - srx - 20,
     y: WORLD.islandCY + sry * 0.15
   };
-  // Merchant port: LEFT side of island
+  // Merchant port: RIGHT side of island
   state.portRight = {
-    x: WORLD.islandCX - srx - 20,
+    x: WORLD.islandCX + srx + 10,
     y: WORLD.islandCY - sry * 0.05
   };
 }
@@ -25,8 +25,8 @@ function updateShip(dt) {
   let ship = state.ship;
   ship.timer += dt;
 
-  // Merchant docks on LEFT shore — far end of pier
-  ship.dockX = WORLD.islandCX - getSurfaceRX() * 1.12;
+  // Merchant docks on RIGHT shore — far end of pier
+  ship.dockX = WORLD.islandCX + getSurfaceRX() * 1.12;
   ship.dockY = WORLD.islandCY + 20;
 
   switch (ship.state) {
@@ -34,7 +34,7 @@ function updateShip(dt) {
       if (ship.timer > ship.nextArrival) {
         ship.state = 'arriving';
         ship.timer = 0;
-        ship.x = WORLD.islandCX - state.islandRX - 400;
+        ship.x = WORLD.islandCX + state.islandRX + 400;
         ship.y = ship.dockY;
         ship.offers = generateShopOffers();
         addFloatingText(width / 2, height * 0.3, 'A merchant ship approaches!', C.solarBright);
@@ -64,7 +64,7 @@ function updateShip(dt) {
         ship.shopOpen = false;
         addFloatingText(width / 2, height * 0.35, 'Mercator sailing away...', C.textDim);
       }
-      // Player must be near the left-side merchant dock (in shallows)
+      // Player must be near the right-side merchant dock (in shallows)
       let pd = dist2(state.player.x, state.player.y, ship.dockX, ship.dockY);
       ship.shopOpen = (pd < 120);
 
@@ -100,9 +100,9 @@ function updateShip(dt) {
       break;
 
     case 'leaving':
-      ship.x -= 2;
-      ship.y += 0.1; // sail away left
-      if (ship.x < WORLD.islandCX - state.islandRX - 500) {
+      ship.x += 2;
+      ship.y += 0.1; // sail away right
+      if (ship.x > WORLD.islandCX + state.islandRX + 500) {
         ship.state = 'gone';
         ship.timer = 0;
         ship.nextArrival = 3600 + random(-600, 600);

@@ -2631,7 +2631,7 @@ function drawInner() {
               if (!state.ruins) state.ruins = [];
               if (!state.crystalRainDrops) state.crystalRainDrops = [];
               if (!state.plots) state.plots = [];
-              if (!state.crystalShrine) state.crystalShrine = { x: botCX - 200, y: botCY };
+              if (!state.crystalShrine) state.crystalShrine = { x: botCX + 50, y: botCY - 30 };
               if (!state.progression) state.progression = { gameStarted: true, villaCleared: true, companionsAwakened: { lares: true, woodcutter: true, harvester: true, centurion: true }, tutorialsSeen: {} };
               if (!state.legia) state.legia = { army: [], soldiers: [], castrumX: botCX + 100, castrumY: botCY + 50, castrumLevel: 0 };
               if (!state.companion) state.companion = { x: botCX + 40, y: botCY + 20, vx: 0, vy: 0, speed: 2, task: 'idle', taskTarget: null, carryItem: null, energy: 100, pulsePhase: 0, trailPoints: [] };

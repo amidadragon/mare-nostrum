@@ -1041,7 +1041,7 @@ function loadGame() {
       });
     }
     // Always use current shrine position (layout may have changed)
-    state.crystalShrine = { x: WORLD.islandCX - 480, y: WORLD.islandCY - 15 };
+    state.crystalShrine = { x: WORLD.islandCX + 50, y: WORLD.islandCY - 30 };
     // Rebuild crystal nodes around shrine
     let shX = state.crystalShrine.x, shY = state.crystalShrine.y;
     let cSlots = [

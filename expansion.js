@@ -580,13 +580,13 @@ function createPrebuiltIsland(factionKey, cx, cy, targetLevel) {
   // Crystal nodes
   is.crystalNodes = [];
   for (let i = 0; i < 5; i++) {
-    is.crystalNodes.push({ x: cx - is.islandRX * 0.7 + (Math.random() - 0.5) * 40, y: cy + (Math.random() - 0.5) * 30, charge: 50, size: 14 });
+    is.crystalNodes.push({ x: cx + 50 + (Math.random() - 0.5) * 40, y: cy - 30 + (Math.random() - 0.5) * 30, charge: 50, size: 14 });
   }
 
   // Pyramid (main temple visual) — positioned at crystal shrine location
   is.pyramid = { x: cx, y: cy - is.islandRY * 0.12, level: targetLevel };
   // Crystal shrine
-  is.crystalShrine = { x: cx - is.islandRX * 0.65, y: cy - 10 };
+  is.crystalShrine = { x: cx + 50, y: cy - 30 };
   // Ruins (decorative)
   is.ruins = [];
   for (let i = 0; i < 3; i++) {
