@@ -230,8 +230,8 @@ function selectFaction(faction) {
   // All nations at their NATION_DEFAULTS positions (4000-6000px from home)
   let _nationKeys = Object.keys(state.nations);
   // Create bot islands — level depends on game mode
-  // 1v1 mode: bot starts at level 5 (visible civilization from the start)
-  // Default mode: bot starts at level 12 (established civilization)
+  // 1v1 mode: bot starts at level 3 (early village)
+  // Default mode: bot starts at level 5 (mid-village)
   let _botStartLevel = (state._gameMode === '1v1') ? 3 : 5;
   for (let k of Object.keys(state.nations)) {
     let n = state.nations[k];

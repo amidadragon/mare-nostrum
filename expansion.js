@@ -672,7 +672,7 @@ function createPrebuiltIsland(factionKey, cx, cy, targetLevel) {
   ];
 
   // Military
-  is.legia = { army: [], castrumLevel: targetLevel >= 8 ? 1 : 0, morale: 100, recruits: 0, maxRecruits: 10 };
+  is.legia = { army: [], castrumLevel: targetLevel >= 8 ? 1 : 0, morale: 100, recruits: 0, maxRecruits: 10, castrumX: cx + 180, castrumY: cy - 60 };
   if (targetLevel >= 8) {
     for (let i = 0; i < 4; i++) {
       is.legia.army.push({ type: 'legionary', hp: 20, maxHp: 20, damage: 5, speed: 1.2, garrison: false });
@@ -693,9 +693,13 @@ function createPrebuiltIsland(factionKey, cx, cy, targetLevel) {
   };
 
   is.templeHP = 100;
+  // Resources scale with level (don't overwrite with flat values)
   is.gold = 50 + targetLevel * 20;
-  is.wood = 30; is.stone = 20; is.crystals = 15;
-  is.harvest = 20; is.fish = 10;
+  is.wood = 20 + targetLevel * 5;
+  is.stone = 15 + targetLevel * 3;
+  is.crystals = 10 + targetLevel * 2;
+  is.harvest = 15 + targetLevel * 3;
+  is.fish = 5 + targetLevel * 2;
 
   return is;
 }
