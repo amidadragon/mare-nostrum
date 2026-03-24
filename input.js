@@ -2277,8 +2277,15 @@ function keyPressed() {
     }
     addFloatingText(width / 2, height * 0.3, photoMode ? 'PHOTO MODE' : 'HUD RESTORED', '#ffdc50');
   }
-  // Save / Load
-  if (key === 'l' || key === 'L') { loadGame(); }
+  // L key — toggle army/legia UI (anywhere, not just in castrum)
+  if (key === 'l' || key === 'L') {
+    if (state.legia && state.legia.castrumLevel > 0) {
+      state.legia.legiaUIOpen = !state.legia.legiaUIOpen;
+      return;
+    } else {
+      if (typeof addFloatingText === 'function') addFloatingText(width/2, height*0.3, 'Build a Castrum first (expand to level 3)', '#ffaa44');
+    }
+  }
 
   // Debug seeds
   if (key === 'r' || key === 'R') {
