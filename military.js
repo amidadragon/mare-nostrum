@@ -219,23 +219,13 @@ function calculateArmyUpkeep() {
   return totalFood;
 }
 
-// ═══ FORMATIONS ═══
-const FORMATIONS = {
-  line:       { name: 'Line',       defMod: 1.0, atkMod: 1.0, spdMod: 1.0, unlock: 0 },
-  shield_wall:{ name: 'Shield Wall', defMod: 1.5, atkMod: 0.7, spdMod: 0.5, unlock: 0 },
-  wedge:      { name: 'Wedge',       defMod: 0.75,atkMod: 1.5, spdMod: 1.2, unlock: 5 },
-  phalanx:    { name: 'Phalanx',     defMod: 2.0, atkMod: 0.8, spdMod: 0.5, unlock: 0, factions: ['rome','greece','phoenicia'] }
-};
+// ═══ FORMATIONS — defined in combat.js (FORMATIONS constant) ═══
 
 function getAvailableFormations() {
-  let battles = state._battlesWon || 0;
-  let faction = state.faction || 'rome';
+  if (typeof FORMATIONS === 'undefined') return [];
   let available = [];
   for (let k in FORMATIONS) {
-    let f = FORMATIONS[k];
-    if (battles < f.unlock) continue;
-    if (f.factions && !f.factions.includes(faction)) continue;
-    available.push({ key: k, ...f });
+    available.push({ key: k, ...FORMATIONS[k] });
   }
   return available;
 }

@@ -5593,7 +5593,7 @@ function startIslandInvasion(islandKey) {
   // Formation modifier
   let formation = state._activeFormation || 'line';
   if (typeof FORMATIONS !== 'undefined' && FORMATIONS[formation]) {
-    playerStr = Math.floor(playerStr * FORMATIONS[formation].atkMod);
+    playerStr = Math.floor(playerStr * (FORMATIONS[formation].atkBonus || FORMATIONS[formation].atkMod || 1));
   }
 
   // Island bonuses
