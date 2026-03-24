@@ -5940,7 +5940,20 @@ function updateVisualInvasion(dt) {
         lg.units = lg.units.filter(u => u.count > 0);
       }
 
+      let totalAtk = b.attackers.length;
+      let losses2 = totalAtk - survivingAttackers;
+      if (typeof addNotification === 'function') {
+        addNotification('Battle: ' + survivingAttackers + '/' + totalAtk + ' survived (' + losses2 + ' lost)', '#ffaa44');
+      }
+
       _invasionBattle = null;
+
+      // Put player back on ship after battle
+      if (typeof state !== 'undefined' && state.rowing) {
+        state.rowing.active = true;
+        state.rowing.speed = 0;
+        if (typeof camZoomTarget !== 'undefined') camZoomTarget = 0.55;
+      }
     }
   }
 }

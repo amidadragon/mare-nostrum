@@ -2480,6 +2480,7 @@ function drawInner() {
     if (typeof updateTavern === 'function') updateTavern(dt);
     updateSeaPeopleRaid(dt);
     if (typeof updateNavalCombat === 'function') updateNavalCombat(dt);
+    if (typeof updateVisualInvasion === 'function') updateVisualInvasion(dt);
     updateNotifications(dt);
     // Narrative engine updates
     if (typeof updateMainQuest === 'function') { updateMainQuest(); updateNPCQuests(); updateNarrativeDialogue(); checkLoreTabletPickup(); }
@@ -3168,6 +3169,7 @@ function drawInner() {
       if (typeof drawRecipeBookUI === 'function') drawRecipeBookUI();
       drawLegiaUI();
       if (typeof drawArmyBattle === 'function') drawArmyBattle();
+      if (typeof drawVisualInvasion === 'function' && typeof isInvasionBattleActive === 'function' && isInvasionBattleActive()) drawVisualInvasion();
       if (typeof drawInvasionHUD === 'function') drawInvasionHUD();
       drawRivalDiplomacyUI();
       if (state._activeNation && state.nationDiplomacyOpen) drawNationDiplomacyUI();
