@@ -2333,6 +2333,7 @@ function drawInner() {
     try { updateConquest(dt); } catch(e) { console.error('updateConquest crash:', e.message, e.stack); }
     if (typeof updateCombatSystem === 'function') updateCombatSystem(dt);
     if (typeof updateArmyBattle === 'function') updateArmyBattle(dt);
+    if (typeof updateVisualInvasion === 'function') updateVisualInvasion(dt);
     if (typeof updatePlayerEscort === 'function') updatePlayerEscort(dt);
     if (typeof updateEconomySystem === 'function') updateEconomySystem(dt);
     try { updateCenturion(dt); } catch(e) { console.error('updateCenturion crash:', e); }
@@ -2370,6 +2371,9 @@ function drawInner() {
     pop(); // end zoom
 
     drawConquestHUD();
+    if (typeof drawVisualInvasion === 'function' && typeof isInvasionBattleActive === 'function' && isInvasionBattleActive()) {
+      drawVisualInvasion();
+    }
     if (typeof drawFactionAbilityHUD === 'function') drawFactionAbilityHUD();
     if (typeof drawEconomyUIOverlay === 'function') drawEconomyUIOverlay();
     drawModifierSelectUI();
@@ -2548,8 +2552,6 @@ function drawInner() {
       drawConquestDistantLabel();
     }
     drawRivalIsleDistant();
-    // Seamless nation island content (when player is standing on a nation island)
-    if (state._activeNation) drawActiveNationContent();
     if (typeof drawInvasion === 'function') drawInvasion();
     // Seamless exploration island content
     if (state._activeExploration) {
@@ -2658,7 +2660,10 @@ function drawInner() {
             // ═══ TIER 3: FULL RENDER (close or visiting) ═══
             let _owt = (typeof FACTION_TERRAIN !== 'undefined') ? (FACTION_TERRAIN[_owKey] || FACTION_TERRAIN.rome) : { seed: 42 };
             drawIslandAt({ cx: botCX, cy: botCY, rx: _isRX, ry: _isRY, level: _isLevel, seed: _owt.seed, factionKey: _owKey });
-            if (_own.islandState && _own.islandState.buildings && typeof swapToIsland === 'function' && !_isVisiting) {
+            if (_isVisiting) {
+              // Draw biome content AFTER terrain so it renders on top
+              drawActiveNationContent();
+            } else if (_own.islandState && _own.islandState.buildings && typeof swapToIsland === 'function') {
               // Only render bot island via state swap when NOT visiting — drawActiveNationContent handles visited islands
               swapToIsland(_own.islandState, botCX, botCY);
               state.faction = _owKey;

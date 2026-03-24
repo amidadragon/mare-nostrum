@@ -5558,6 +5558,10 @@ function drawInvasionHUD() {
 
 // ═══ ISLAND INVASION — Quick combat when pressing F ═══
 function startIslandInvasion(islandKey) {
+  return startVisualInvasion(islandKey);
+}
+
+function startIslandInvasionAutoResolve(islandKey) {
   let defStr = 300;
   // World island defense
   if (typeof getWorldIsland === 'function') {
@@ -5718,4 +5722,338 @@ function recruitUnit(unitKey, count) {
     addFloatingText(width/2, height*0.3, 'Recruited ' + count + ' ' + info.name + '!', '#44ff88');
   }
   return true;
+}
+
+// ═══ VISUAL INVASION BATTLE ═══
+let _invasionBattle = null;
+
+function startVisualInvasion(islandKey) {
+  // Get defender strength
+  let defStr = 300;
+  let rv = state.nations[islandKey];
+  if (rv) defStr = 800 + (rv.level || 1) * 200 + (rv.military || 0) * 50;
+  if (typeof getWorldIsland === 'function') {
+    let wisle = getWorldIsland(islandKey);
+    if (wisle) defStr = wisle.defense || 500;
+  }
+  if (rv && rv._lastStandBuff) defStr = Math.floor(defStr * 1.2);
+
+  // Get player army
+  let lg = state.legia || {};
+  let playerUnits = [];
+  if (lg.army && lg.army.length > 0) {
+    for (let u of lg.army) {
+      playerUnits.push({
+        x: -50 + Math.random() * 30,
+        y: Math.random() * 200 - 100,
+        hp: u.hp || u.maxHp || 20,
+        maxHp: u.maxHp || 20,
+        damage: u.damage || 5,
+        speed: 0.8 + Math.random() * 0.4,
+        type: u.type || 'legionary',
+        side: 'attacker',
+        target: null,
+        attackTimer: 0,
+        dead: false,
+        deathTimer: 0
+      });
+    }
+  }
+  if (lg.units && lg.units.length > 0) {
+    for (let u of lg.units) {
+      let info = typeof getUnitInfo === 'function' ? getUnitInfo(u.type) : null;
+      let count = u.count || 1;
+      for (let i = 0; i < count; i++) {
+        playerUnits.push({
+          x: -50 + Math.random() * 30,
+          y: Math.random() * 200 - 100,
+          hp: 20 + (info ? info.str / 10 : 0),
+          maxHp: 20 + (info ? info.str / 10 : 0),
+          damage: 3 + (info ? info.str / 30 : 0),
+          speed: 0.8 + Math.random() * 0.4,
+          type: u.type || 'legionary',
+          side: 'attacker',
+          target: null,
+          attackTimer: 0,
+          dead: false,
+          deathTimer: 0
+        });
+      }
+    }
+  }
+
+  if (playerUnits.length === 0) {
+    if (typeof addFloatingText === 'function') addFloatingText(width/2, height*0.3, 'No army! Build a Castrum and recruit soldiers.', '#ff6644');
+    return false;
+  }
+
+  // Generate defenders based on defense strength
+  let defCount = Math.max(3, Math.floor(defStr / 100));
+  let defUnits = [];
+  let defColor = rv ? (typeof FACTION_MILITARY !== 'undefined' && FACTION_MILITARY[islandKey] ? FACTION_MILITARY[islandKey].conquestFlag : [150, 80, 80]) : [150, 80, 80];
+  for (let i = 0; i < defCount; i++) {
+    defUnits.push({
+      x: 250 + Math.random() * 30,
+      y: Math.random() * 200 - 100,
+      hp: 15 + Math.random() * 10,
+      maxHp: 25,
+      damage: 3 + Math.random() * 3,
+      speed: 0.6 + Math.random() * 0.4,
+      type: 'defender',
+      side: 'defender',
+      target: null,
+      attackTimer: 0,
+      dead: false,
+      deathTimer: 0,
+      color: defColor
+    });
+  }
+
+  _invasionBattle = {
+    islandKey: islandKey,
+    phase: 'deploy',
+    timer: 0,
+    attackers: playerUnits,
+    defenders: defUnits,
+    resultTimer: 0,
+    winner: null
+  };
+
+  return true;
+}
+
+function updateVisualInvasion(dt) {
+  if (!_invasionBattle) return;
+  let b = _invasionBattle;
+  b.timer += dt;
+
+  if (b.phase === 'deploy') {
+    for (let u of b.attackers) {
+      if (u.dead) continue;
+      u.x += u.speed * 0.5;
+    }
+    for (let u of b.defenders) {
+      if (u.dead) continue;
+      u.x -= u.speed * 0.3;
+    }
+    if (b.timer > 60) b.phase = 'fighting';
+  }
+
+  if (b.phase === 'fighting') {
+    let allUnits = [...b.attackers, ...b.defenders];
+
+    for (let u of allUnits) {
+      if (u.dead) { u.deathTimer += dt; continue; }
+
+      let enemies = u.side === 'attacker' ? b.defenders : b.attackers;
+      let nearest = null, nearDist = 9999;
+      for (let e of enemies) {
+        if (e.dead) continue;
+        let dx = u.x - e.x, dy = u.y - e.y;
+        let d = Math.sqrt(dx*dx + dy*dy);
+        if (d < nearDist) { nearDist = d; nearest = e; }
+      }
+
+      if (!nearest) continue;
+
+      if (nearDist > 20) {
+        let dx = nearest.x - u.x, dy = nearest.y - u.y;
+        let d = Math.sqrt(dx*dx + dy*dy);
+        u.x += (dx / d) * u.speed;
+        u.y += (dy / d) * u.speed * 0.5;
+      } else {
+        u.attackTimer += dt;
+        if (u.attackTimer > 20) {
+          u.attackTimer = 0;
+          nearest.hp -= u.damage * (0.8 + Math.random() * 0.4);
+          if (typeof spawnParticles === 'function') spawnParticles(width/2 + nearest.x, height/2 + nearest.y, 'hit', 1);
+          if (nearest.hp <= 0) {
+            nearest.dead = true;
+            nearest.deathTimer = 0;
+          }
+        }
+      }
+    }
+
+    let atkAlive = b.attackers.filter(u => !u.dead).length;
+    let defAlive = b.defenders.filter(u => !u.dead).length;
+
+    if (defAlive === 0) {
+      b.phase = 'result';
+      b.winner = 'attacker';
+      b.resultTimer = 0;
+    } else if (atkAlive === 0) {
+      b.phase = 'result';
+      b.winner = 'defender';
+      b.resultTimer = 0;
+    }
+  }
+
+  if (b.phase === 'result') {
+    b.resultTimer += dt;
+    if (b.resultTimer > 180) {
+      let lg = state.legia || {};
+      let survivingAttackers = b.attackers.filter(u => !u.dead).length;
+
+      if (b.winner === 'attacker') {
+        if (typeof captureIsland === 'function') captureIsland(b.islandKey);
+        let rv = state.nations[b.islandKey];
+        if (rv) { rv.defeated = true; rv.vassal = true; rv.military = 0; }
+        if (!state._battlesWon) state._battlesWon = 0;
+        state._battlesWon++;
+        if (typeof addNotification === 'function') addNotification('VICTORY! ' + b.islandKey.toUpperCase() + ' conquered!', '#ffd700');
+        if (typeof checkVictoryConditions === 'function') {
+          let v = checkVictoryConditions();
+          if (v && typeof triggerVictory === 'function') triggerVictory(v);
+        }
+      } else {
+        if (typeof addNotification === 'function') addNotification('DEFEATED! Retreating...', '#ff4444');
+      }
+
+      if (lg.army) {
+        let remaining = Math.min(lg.army.length, survivingAttackers);
+        lg.army = lg.army.slice(0, remaining);
+      }
+      if (lg.units && lg.units.length > 0) {
+        let totalBefore = lg.units.reduce((sum, u) => sum + (u.count || 1), 0);
+        let losses = totalBefore - survivingAttackers;
+        for (let u of lg.units) {
+          let unitLoss = Math.floor((u.count || 1) * (losses / Math.max(1, totalBefore)));
+          u.count = Math.max(0, (u.count || 1) - unitLoss);
+        }
+        lg.units = lg.units.filter(u => u.count > 0);
+      }
+
+      _invasionBattle = null;
+    }
+  }
+}
+
+function drawVisualInvasion() {
+  if (!_invasionBattle) return;
+  let b = _invasionBattle;
+
+  fill(0, 0, 0, 160);
+  rect(0, 0, width, height);
+
+  let arenaX = width * 0.1, arenaY = height * 0.15;
+  let arenaW = width * 0.8, arenaH = height * 0.55;
+
+  fill(80, 100, 60);
+  rect(arenaX, arenaY, arenaW, arenaH, 5);
+  fill(70, 90, 50);
+  for (let i = 0; i < 20; i++) {
+    let gx = arenaX + Math.random() * arenaW;
+    let gy = arenaY + Math.random() * arenaH;
+    rect(gx, gy, 3 + Math.random() * 8, 2);
+  }
+
+  fill(160, 150, 120);
+  rect(arenaX + arenaW * 0.75, arenaY, arenaW * 0.25, arenaH, 0, 5, 5, 0);
+
+  let cx = arenaX + arenaW * 0.35;
+  let cy = arenaY + arenaH * 0.5;
+
+  noStroke();
+  let allUnits = [..._invasionBattle.attackers, ..._invasionBattle.defenders];
+  allUnits.sort((a, b2) => a.y - b2.y);
+
+  for (let u of allUnits) {
+    if (u.dead && u.deathTimer > 60) continue;
+
+    let sx = cx + u.x;
+    let sy = cy + u.y;
+    let alpha = u.dead ? Math.max(0, 255 - u.deathTimer * 4) : 255;
+
+    push();
+    translate(sx, sy);
+
+    if (u.dead) {
+      fill(80, 60, 40, alpha);
+      rect(-4, -1, 8, 3);
+    } else {
+      let bodyColor;
+      if (u.side === 'attacker') {
+        let fm = typeof getFactionMilitary === 'function' ? getFactionMilitary() : null;
+        bodyColor = fm ? fm.conquestFlag : [185, 38, 28];
+      } else {
+        bodyColor = u.color || [150, 80, 80];
+      }
+
+      let walkPhase = sin(frameCount * 0.15 + u.x * 0.1);
+      fill(60, 50, 40, alpha);
+      rect(-2, 4, 2, 4 + walkPhase);
+      rect(1, 4, 2, 4 - walkPhase);
+
+      fill(bodyColor[0], bodyColor[1], bodyColor[2], alpha);
+      rect(-4, -3, 8, 8);
+
+      fill(200, 170, 130, alpha);
+      ellipse(0, -5, 6, 6);
+
+      let atkAnim = u.attackTimer > 15 ? sin((u.attackTimer - 15) * 0.5) * 6 : 0;
+      fill(180, 180, 190, alpha);
+      if (u.side === 'attacker') {
+        rect(4, -2 - atkAnim, 2, 6);
+      } else {
+        rect(-6, -2 - atkAnim, 2, 6);
+      }
+
+      fill(Math.max(0, bodyColor[0] - 30), Math.max(0, bodyColor[1] - 20), Math.max(0, bodyColor[2] - 10), alpha);
+      if (u.side === 'attacker') {
+        rect(-5, -2, 3, 6, 1);
+      } else {
+        rect(3, -2, 3, 6, 1);
+      }
+
+      if (u.hp < u.maxHp) {
+        fill(40, 30, 20, alpha * 0.8);
+        rect(-5, -10, 10, 2);
+        let hpPct = Math.max(0, u.hp / u.maxHp);
+        if (hpPct > 0.5) fill(80, 200, 80, alpha);
+        else fill(220, 60, 40, alpha);
+        rect(-5, -10, 10 * hpPct, 2);
+      }
+    }
+
+    pop();
+  }
+
+  let atkAlive = b.attackers.filter(u => !u.dead).length;
+  let defAlive = b.defenders.filter(u => !u.dead).length;
+
+  fill(0, 0, 0, 180);
+  rect(arenaX, arenaY - 30, arenaW, 25, 3);
+
+  textAlign(LEFT); textSize(12); noStroke();
+  let fm = typeof getFactionMilitary === 'function' ? getFactionMilitary() : null;
+  let atkCol = fm ? fm.conquestFlag : [185, 38, 28];
+  fill(atkCol[0], atkCol[1], atkCol[2]);
+  text('Your Army: ' + atkAlive + '/' + b.attackers.length, arenaX + 10, arenaY - 12);
+
+  fill(200, 100, 100);
+  textAlign(RIGHT);
+  text('Defenders: ' + defAlive + '/' + b.defenders.length, arenaX + arenaW - 10, arenaY - 12);
+
+  textAlign(CENTER); fill(220, 200, 140); textSize(14);
+  if (b.phase === 'deploy') text('DEPLOYING...', width/2, arenaY - 12);
+  if (b.phase === 'fighting') text('BATTLE!', width/2, arenaY - 12);
+  if (b.phase === 'result') {
+    textSize(20);
+    if (b.winner === 'attacker') {
+      fill(80, 220, 80);
+      text('VICTORY!', width/2, height * 0.78);
+      textSize(12); fill(200, 200, 180);
+      text(atkAlive + ' soldiers survived', width/2, height * 0.83);
+    } else {
+      fill(220, 60, 60);
+      text('DEFEATED', width/2, height * 0.78);
+      textSize(12); fill(200, 200, 180);
+      text('Your army has fallen', width/2, height * 0.83);
+    }
+  }
+}
+
+function isInvasionBattleActive() {
+  return _invasionBattle !== null;
 }

@@ -609,6 +609,8 @@ function touchStarted() {
 
 function keyPressed() {
   if (snd) snd.resume();
+  // Block input during visual invasion battle
+  if (typeof isInvasionBattleActive === 'function' && isInvasionBattleActive()) return;
   // Victory screen — any key returns to menu
   if (state._victoryShown && state._victory) {
     state._victoryShown = false;
