@@ -5999,6 +5999,10 @@ function updateVisualInvasion(dt) {
 
       _invasionBattle = null;
 
+      // Clear nation visit state so home island can render again
+      state._activeNation = null;
+      state._invasionTarget = null;
+
       // Put player back on ship after battle
       if (typeof state !== 'undefined' && state.rowing) {
         state.rowing.active = true;

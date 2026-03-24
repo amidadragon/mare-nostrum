@@ -2680,8 +2680,8 @@ function drawInner() {
             // ═══ TIER 3: FULL RENDER (close or visiting) ═══
             let _owt = (typeof FACTION_TERRAIN !== 'undefined') ? (FACTION_TERRAIN[_owKey] || FACTION_TERRAIN.rome) : { seed: 42 };
             drawIslandAt({ cx: botCX, cy: botCY, rx: _isRX, ry: _isRY, level: _isLevel, seed: _owt.seed, factionKey: _owKey });
-            if (_isVisiting) {
-              // Draw biome content AFTER terrain so it renders on top
+            if (_isVisiting && !(typeof isInvasionBattleActive === 'function' && isInvasionBattleActive())) {
+              // Draw biome content AFTER terrain — skip during invasion battle (battle units replace NPCs)
               drawActiveNationContent();
             } else if (_own.islandState && _own.islandState.buildings && typeof swapToIsland === 'function') {
               // Only render bot island via state swap when NOT visiting — drawActiveNationContent handles visited islands
