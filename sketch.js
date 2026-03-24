@@ -2481,6 +2481,18 @@ function drawInner() {
       horizonY = max(horizonY, height * 0.05);
       horizonOffset = (height * 0.25) - horizonY;
     }
+    // When visiting a nation island, recalculate horizon based on that island's position
+    if (state._activeNation) {
+      let nv = state.nations[state._activeNation];
+      if (nv) {
+        let islandScreenY = w2sY(nv.isleY) + floatOffset;
+        let visualTopRadius = (nv.isleRY || 280) * 0.50 * 1.12;
+        let islandTopScreen = islandScreenY - visualTopRadius - 10;
+        let horizonY = min(islandTopScreen, height * 0.35);
+        horizonY = max(horizonY, height * 0.05);
+        horizonOffset = (height * 0.25) - horizonY;
+      }
+    }
     // ─── ZOOM TRANSFORM — scale world rendering around screen center ───
     push();
     translate(width / 2, height / 2);
@@ -5759,7 +5771,6 @@ function drawWorldObjectsSorted() {
   if (frameCount - _groundSortFrame > 30) {
     _groundItems.length = 0;
     let templeX = state.pyramid.x, templeY = state.pyramid.y;
-    state.plots.forEach(p => _groundItems.push({ y: p.y, draw: () => drawOnePlot(p) }));
     state.resources.forEach(r => { if (!(abs(r.x - templeX) < 70 && r.y > templeY - 80 && r.y < templeY + 15)) _groundItems.push({ y: r.y, draw: () => drawOneResource(r) }); });
     state.crystalNodes.forEach(c => _groundItems.push({ y: c.y, draw: () => drawOneCrystal(c) }));
     if (state.crystalRainDrops) state.crystalRainDrops.forEach(d => { if (!d.collected) _groundItems.push({ y: d.y, draw: () => drawCrystalRainDrop(d) }); });
@@ -5771,6 +5782,8 @@ function drawWorldObjectsSorted() {
 
   // Layer 1: tall objects + all characters (Y-sorted together)
   _sortItems.length = 0;
+  // Farm plots sorted with characters so crops never incorrectly overlap NPCs/player
+  state.plots.forEach(p => _sortItems.push({ y: p.y - 20, draw: () => drawOnePlot(p) }));
   _sortItems.push({ y: state.pyramid.y - 40, draw: drawPyramid });
   _sortItems.push({ y: WORLD.islandCY - 30, draw: drawRuins });
   // Buildings — pre-cull offscreen, then sort
