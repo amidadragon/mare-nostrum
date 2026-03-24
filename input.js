@@ -1183,7 +1183,7 @@ function keyPressed() {
   // F key — island invasion while rowing
   if ((key === 'f' || key === 'F') && state.rowing && state.rowing.active && state.rowing.nearIsle) {
     let _fIsle = state.rowing.nearIsle;
-    if (_fIsle === 'conquest' || _fIsle === 'wreck') return; // no invading these
+    if (_fIsle === 'conquest' || _fIsle === 'wreck' || ['vulcan','hyperborea','plenty','necropolis'].includes(_fIsle)) return; // no invading these
     let _fRel = typeof getIslandRelationship === 'function' ? getIslandRelationship(_fIsle) : 'neutral';
     if (_fRel === 'home' || _fRel === 'owned' || _fRel === 'ally') {
       if (typeof addFloatingText === 'function') addFloatingText(width/2, height*0.3, 'Cannot invade friendly territory!', '#ffaa44');

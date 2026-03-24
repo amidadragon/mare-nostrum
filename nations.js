@@ -3039,23 +3039,13 @@ function generateWorldEvent(keys) {
 
 // ─── VICTORY CONDITIONS ───────────────────────────────────────────────────
 
-function checkVictoryConditions() {
-  if (state.victoryAchieved) return;
-  if (!state.nations) return;
-  let nk = Object.keys(state.nations);
-  if (nk.length === 0) return;
-  let allDefeated = nk.every(k => state.nations[k].defeated || state.nations[k].reputation <= -100);
-  if (allDefeated) { state.victoryAchieved = 'domination'; showVictoryScreen('domination'); return; }
-  let allAllied = nk.every(k => state.nations[k].allied || state.nations[k].reputation >= 50);
-  if (allAllied) { state.victoryAchieved = 'diplomatic'; showVictoryScreen('diplomatic'); return; }
-  let allTrading = nk.every(k => state.nations[k].tradeActive);
-  if (state.gold >= 10000 && allTrading) { state.victoryAchieved = 'economic'; showVictoryScreen('economic'); return; }
-}
+// checkVictoryConditions is defined in diplomacy.js (v2 multi-path victory system)
+// Legacy version removed to prevent overwrite
 
 function showVictoryScreen(type) {
-  let titles = { domination: 'DOMINATION VICTORY', diplomatic: 'DIPLOMATIC VICTORY', economic: 'ECONOMIC VICTORY' };
-  let descs = { domination: 'You have conquered all nations! The Mediterranean is yours.', diplomatic: 'All nations are your allies! A new era of peace dawns.', economic: 'Your trade empire spans the sea! Wealth beyond measure.' };
-  addFloatingText(width / 2, height * 0.15, titles[type] || 'VICTORY!', '#ffdd44');
+  let titles = { military: 'CONQUEROR', economic: 'TYRANT OF TRADE', diplomatic: 'FIRST AMONG EQUALS', domination: 'TRUE ROMAN' };
+  let descs = { military: 'You have conquered 6 capitals! The Mediterranean is yours.', economic: 'Your trade empire spans the sea! Wealth beyond measure.', diplomatic: 'The Senate is yours, with allies at your side!', domination: 'Master of war and diplomacy — none can challenge you!' };
+  addFloatingText(width / 2, height * 0.15, (titles[type] || 'VICTORY!'), '#ffdd44');
   addNotification(descs[type] || 'You have won!', '#ffdd44');
   spawnParticles(state.player.x, state.player.y, 'divine', 20);
   trackMilestone('victory_' + type);

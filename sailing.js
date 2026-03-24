@@ -276,8 +276,9 @@ function updateRowing(dt) {
     }
   }
 
-  // Home island collision (all modes)
-  let _hRX = 450, _hRY = 115;
+  // Home island collision (all modes) — use actual island size
+  let _hRX = (state.islandRX || 500) * 0.85;
+  let _hRY = (state.islandRY || 320) * 0.35;
   let _hDx = (r.x - _homeX) / _hRX, _hDy = (r.y - _homeY) / _hRY;
   if (_hDx * _hDx + _hDy * _hDy < 1.0) {
     let ang = atan2(r.y - _homeY, r.x - _homeX);

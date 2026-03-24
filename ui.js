@@ -1195,10 +1195,12 @@ function drawLegiaUI() {
     fill(canAfford ? (isHover ? color(220, 200, 140) : color(180, 160, 120)) : color(100, 80, 60));
     textSize(10); textAlign(LEFT, TOP);
     text('[' + k + '] ' + nameStr + ' (' + costStr + ')', px + 20, sy);
-    // Click to recruit
+    // Click to recruit (with cooldown to prevent rapid-fire)
     if (isHover && canAfford && mouseIsPressed && typeof trainUnit === 'function') {
-      trainUnit(t);
-      mouseIsPressed = false; // prevent double-click
+      if (!state._recruitCooldown || frameCount > state._recruitCooldown) {
+        trainUnit(t);
+        state._recruitCooldown = frameCount + 15; // 15 frame cooldown (~0.25s)
+      }
     }
     sy += 13;
     // Counter info line
