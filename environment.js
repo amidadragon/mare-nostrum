@@ -116,6 +116,25 @@ function drawOcean() {
   else if (h >= 16 && h < 19) { tintR = 25; tintG = 8; tintB = -15; }
   else if (h >= 21 || h < 5) { tintR = -5; tintG = -5; tintB = 8; }
 
+  // Biome water tinting — shift ocean color near faction islands
+  let _waterTint = null;
+  if (typeof FACTION_BIOMES !== 'undefined' && state._activeNation && FACTION_BIOMES[state._activeNation]) {
+    _waterTint = FACTION_BIOMES[state._activeNation].waterTint;
+  } else if (state.rowing && state.rowing.active && typeof state.nations !== 'undefined') {
+    // Find nearest nation for water tint while sailing
+    let _nearDist = 999999;
+    for (let k in state.nations) {
+      let rv = state.nations[k];
+      if (!rv || !rv.isleX) continue;
+      let dx = state.player.x - rv.isleX, dy = state.player.y - rv.isleY;
+      let d = dx*dx + dy*dy;
+      if (d < _nearDist && d < 4000*4000) {
+        _nearDist = d;
+        if (typeof FACTION_BIOMES !== 'undefined' && FACTION_BIOMES[k]) _waterTint = FACTION_BIOMES[k].waterTint;
+      }
+    }
+  }
+
   // 10-band gradient for smoother deep ocean
   for (let band = 0; band < 10; band++) {
     let y0 = oceanTop + band * oceanH / 10;
@@ -123,6 +142,12 @@ function drawOcean() {
     let r = lerp(lerp(18, 50, dayMix), lerp(8, 22, dayMix), d) + tintR * (1 - d);
     let g = lerp(lerp(40, 140, dayMix), lerp(20, 65, dayMix), d) + tintG * (1 - d);
     let b = lerp(lerp(60, 175, dayMix), lerp(40, 100, dayMix), d) + tintB * (1 - d);
+    if (_waterTint) {
+      let tintStrength = 0.3;
+      r = r * (1-tintStrength) + _waterTint[0] * tintStrength;
+      g = g * (1-tintStrength) + _waterTint[1] * tintStrength;
+      b = b * (1-tintStrength) + _waterTint[2] * tintStrength;
+    }
     fill(max(0, min(255, r)), max(0, min(255, g)), max(0, min(255, b)));
     rect(_vx, y0, _vw, oceanH / 10 + 2);
   }
@@ -237,6 +262,29 @@ function drawOcean() {
             rect(foamX + fw + 2, fy + 1, floor(fw * 0.4), 1);
             rect(foamX - 3, fy + 1, 2, 1);
           }
+        }
+      }
+    }
+  }
+
+  // Shore foam ring near islands
+  if (state.rowing && state.rowing.active && typeof state.nations !== 'undefined') {
+    for (let k in state.nations) {
+      let rv = state.nations[k];
+      if (!rv || !rv.isleX) continue;
+      let sx = typeof w2sX === 'function' ? w2sX(rv.isleX) : rv.isleX;
+      let sy = typeof w2sY === 'function' ? w2sY(rv.isleY) : rv.isleY;
+      let srx = (rv.isleRX || 400) * (typeof camZoom !== 'undefined' ? camZoom : 1);
+      let sry = (rv.isleRY || 280) * (typeof camZoom !== 'undefined' ? camZoom : 1);
+      if (sx < -srx*2 || sx > width+srx*2 || sy < -sry*2 || sy > height+sry*2) continue;
+      // Draw foam dots along ellipse edge
+      fill(240, 245, 250, 40 + 20 * dayMix);
+      for (let a = 0; a < TWO_PI; a += 0.15) {
+        let fx = sx + cos(a + t * 0.3) * srx * 1.15;
+        let fy = sy + sin(a + t * 0.3) * sry * 1.15;
+        let foamW = 3 + sin(a * 3 + t * 2) * 2;
+        if (sin(a * 5 + t * 1.5 + rv.isleX * 0.01) > 0.2) {
+          rect(fx, fy, foamW, 2);
         }
       }
     }

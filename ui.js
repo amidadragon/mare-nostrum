@@ -2018,9 +2018,9 @@ function drawHUD() {
     let _minFade = _psy2 < barH + 30 ? 0.35 : 1.0;
     drawingContext.globalAlpha = _minFade;
     noStroke();
-    fill(20, 18, 14, 200);
+    fill(45, 38, 30, 230);
     rect(0, 0, width, barH, 0, 0, 4, 4);
-    stroke(80, 70, 50, 120);
+    stroke(180, 150, 80, 150);
     strokeWeight(1);
     line(0, barH, width, barH);
     noStroke();

@@ -1638,31 +1638,155 @@ function drawSingleNationIsleDistant(key) {
 
 // ─── VISITABLE NATION ISLANDS ──────────────────────────────────────────────
 
+const FACTION_BIOMES = {
+  rome: {
+    groundColor: [145, 130, 100],
+    grassColor: [120, 145, 80],
+    landmark: 'forum',
+    treeType: 'stone_pine',
+    accent: [185, 38, 28],
+    wallColor: [220, 210, 195],
+    roofColor: [180, 80, 40],
+    waterTint: [40, 100, 160],
+    fauna: 'eagle',
+    floraAccent: [140, 160, 90]
+  },
+  carthage: {
+    groundColor: [190, 170, 130],
+    grassColor: [100, 130, 70],
+    landmark: 'harbor',
+    treeType: 'date_palm',
+    accent: [120, 50, 160],
+    wallColor: [230, 220, 200],
+    roofColor: [100, 40, 130],
+    waterTint: [30, 90, 140],
+    fauna: 'elephant',
+    floraAccent: [180, 140, 60]
+  },
+  egypt: {
+    groundColor: [200, 180, 120],
+    grassColor: [60, 130, 60],
+    landmark: 'temple',
+    treeType: 'papyrus',
+    accent: [200, 170, 40],
+    wallColor: [210, 190, 140],
+    roofColor: [40, 150, 160],
+    waterTint: [40, 120, 100],
+    fauna: 'ibis',
+    floraAccent: [180, 60, 120]
+  },
+  greece: {
+    groundColor: [170, 160, 140],
+    grassColor: [130, 150, 100],
+    landmark: 'temple_columns',
+    treeType: 'olive',
+    accent: [50, 100, 170],
+    wallColor: [240, 235, 225],
+    roofColor: [50, 90, 150],
+    waterTint: [20, 60, 140],
+    fauna: 'owl',
+    floraAccent: [160, 170, 130]
+  },
+  persia: {
+    groundColor: [160, 130, 100],
+    grassColor: [40, 110, 60],
+    landmark: 'garden',
+    treeType: 'cypress',
+    accent: [106, 42, 138],
+    wallColor: [60, 100, 170],
+    roofColor: [170, 130, 50],
+    waterTint: [30, 80, 130],
+    fauna: 'lion',
+    floraAccent: [200, 50, 70]
+  },
+  gaul: {
+    groundColor: [90, 100, 60],
+    grassColor: [70, 120, 50],
+    landmark: 'oak',
+    treeType: 'oak',
+    accent: [42, 106, 48],
+    wallColor: [120, 100, 70],
+    roofColor: [80, 90, 50],
+    waterTint: [40, 90, 110],
+    fauna: 'boar',
+    floraAccent: [180, 130, 40]
+  },
+  phoenicia: {
+    groundColor: [160, 150, 120],
+    grassColor: [80, 120, 60],
+    landmark: 'shipyard',
+    treeType: 'cedar',
+    accent: [138, 16, 80],
+    wallColor: [210, 200, 180],
+    roofColor: [120, 20, 70],
+    waterTint: [30, 100, 150],
+    fauna: 'turtle',
+    floraAccent: [60, 130, 70]
+  },
+  seapeople: {
+    groundColor: [60, 60, 55],
+    grassColor: [40, 50, 40],
+    landmark: 'leviathan',
+    treeType: 'driftwood',
+    accent: [180, 40, 40],
+    wallColor: [70, 65, 55],
+    roofColor: [50, 45, 40],
+    waterTint: [20, 40, 60],
+    fauna: 'shark',
+    floraAccent: [60, 80, 60]
+  }
+};
+
 function getNationIslandPalette(key) {
+  let b = FACTION_BIOMES[key] || FACTION_BIOMES.rome;
   let palettes = {
     carthage: {
-      terrain: [210, 185, 130], terrainDark: [180, 155, 100], terrainRim: [195, 170, 115],
-      path: [190, 165, 110], sand: [225, 205, 155], water: [40, 90, 140],
-      treeLeaf: [60, 120, 50], treeTrunk: [130, 95, 55],
-      special1: [160, 80, 40], special2: [200, 170, 100], // columns, market
+      terrain: b.groundColor, terrainDark: [b.groundColor[0]-30, b.groundColor[1]-30, b.groundColor[2]-30], terrainRim: [b.groundColor[0]-10, b.groundColor[1]-10, b.groundColor[2]-10],
+      path: [b.groundColor[0]-20, b.groundColor[1]-10, b.groundColor[2]-20], sand: [b.groundColor[0]+30, b.groundColor[1]+30, b.groundColor[2]+20], water: b.waterTint,
+      treeLeaf: b.grassColor, treeTrunk: [130, 95, 55],
+      special1: b.wallColor, special2: b.accent,
     },
     egypt: {
-      terrain: [220, 195, 120], terrainDark: [195, 170, 95], terrainRim: [210, 185, 110],
-      path: [210, 185, 110], sand: [235, 215, 140], water: [30, 80, 120],
-      treeLeaf: [50, 100, 40], treeTrunk: [120, 85, 45],
-      special1: [200, 170, 40], special2: [64, 176, 160], // gold, teal
+      terrain: b.groundColor, terrainDark: [b.groundColor[0]-30, b.groundColor[1]-30, b.groundColor[2]-30], terrainRim: [b.groundColor[0]-10, b.groundColor[1]-10, b.groundColor[2]-10],
+      path: [b.groundColor[0]-10, b.groundColor[1]-10, b.groundColor[2]-10], sand: [b.groundColor[0]+30, b.groundColor[1]+30, b.groundColor[2]+20], water: b.waterTint,
+      treeLeaf: b.grassColor, treeTrunk: [120, 85, 45],
+      special1: b.wallColor, special2: b.accent,
     },
     greece: {
-      terrain: [195, 195, 185], terrainDark: [170, 170, 160], terrainRim: [185, 185, 175],
-      path: [220, 218, 210], sand: [205, 200, 190], water: [50, 110, 180],
-      treeLeaf: [70, 110, 50], treeTrunk: [100, 80, 50],
-      special1: [240, 240, 248], special2: [80, 144, 192], // marble, blue
+      terrain: b.groundColor, terrainDark: [b.groundColor[0]-25, b.groundColor[1]-25, b.groundColor[2]-25], terrainRim: [b.groundColor[0]-10, b.groundColor[1]-10, b.groundColor[2]-10],
+      path: [b.groundColor[0]+20, b.groundColor[1]+20, b.groundColor[2]+20], sand: [b.groundColor[0]+20, b.groundColor[1]+20, b.groundColor[2]+15], water: b.waterTint,
+      treeLeaf: b.grassColor, treeTrunk: [100, 80, 50],
+      special1: b.wallColor, special2: b.accent,
     },
     rome: {
-      terrain: [160, 140, 110], terrainDark: [130, 115, 85], terrainRim: [150, 130, 100],
-      path: [175, 160, 130], sand: [195, 175, 140], water: [35, 85, 130],
-      treeLeaf: [55, 110, 45], treeTrunk: [115, 80, 45],
-      special1: [175, 28, 28], special2: [180, 120, 50], // red, gold
+      terrain: b.groundColor, terrainDark: [b.groundColor[0]-20, b.groundColor[1]-20, b.groundColor[2]-20], terrainRim: [b.groundColor[0]-10, b.groundColor[1]-10, b.groundColor[2]-10],
+      path: [b.groundColor[0]+20, b.groundColor[1]+20, b.groundColor[2]+20], sand: [b.groundColor[0]+40, b.groundColor[1]+35, b.groundColor[2]+30], water: b.waterTint,
+      treeLeaf: b.grassColor, treeTrunk: [115, 80, 45],
+      special1: b.wallColor, special2: b.accent,
+    },
+    persia: {
+      terrain: b.groundColor, terrainDark: [b.groundColor[0]-25, b.groundColor[1]-25, b.groundColor[2]-25], terrainRim: [b.groundColor[0]-10, b.groundColor[1]-10, b.groundColor[2]-10],
+      path: [b.groundColor[0]+15, b.groundColor[1]+15, b.groundColor[2]+15], sand: [b.groundColor[0]+30, b.groundColor[1]+30, b.groundColor[2]+20], water: b.waterTint,
+      treeLeaf: b.grassColor, treeTrunk: [100, 70, 40],
+      special1: b.wallColor, special2: b.accent,
+    },
+    gaul: {
+      terrain: b.groundColor, terrainDark: [b.groundColor[0]-20, b.groundColor[1]-20, b.groundColor[2]-20], terrainRim: [b.groundColor[0]-10, b.groundColor[1]-10, b.groundColor[2]-10],
+      path: [b.groundColor[0]+20, b.groundColor[1]+15, b.groundColor[2]+10], sand: [b.groundColor[0]+30, b.groundColor[1]+25, b.groundColor[2]+20], water: b.waterTint,
+      treeLeaf: b.grassColor, treeTrunk: [90, 65, 35],
+      special1: b.wallColor, special2: b.accent,
+    },
+    phoenicia: {
+      terrain: b.groundColor, terrainDark: [b.groundColor[0]-25, b.groundColor[1]-25, b.groundColor[2]-25], terrainRim: [b.groundColor[0]-10, b.groundColor[1]-10, b.groundColor[2]-10],
+      path: [b.groundColor[0]+15, b.groundColor[1]+15, b.groundColor[2]+15], sand: [b.groundColor[0]+30, b.groundColor[1]+30, b.groundColor[2]+25], water: b.waterTint,
+      treeLeaf: b.grassColor, treeTrunk: [110, 80, 45],
+      special1: b.wallColor, special2: b.accent,
+    },
+    seapeople: {
+      terrain: b.groundColor, terrainDark: [b.groundColor[0]-15, b.groundColor[1]-15, b.groundColor[2]-15], terrainRim: [b.groundColor[0]-8, b.groundColor[1]-8, b.groundColor[2]-8],
+      path: [b.groundColor[0]+10, b.groundColor[1]+10, b.groundColor[2]+10], sand: [b.groundColor[0]+20, b.groundColor[1]+20, b.groundColor[2]+20], water: b.waterTint,
+      treeLeaf: b.grassColor, treeTrunk: [70, 60, 45],
+      special1: b.wallColor, special2: b.accent,
     },
   };
   return palettes[key] || palettes.rome;
@@ -1749,7 +1873,19 @@ function generateNationIslandContent(key) {
     let ft = floraConfig[fi % floraConfig.length];
     flora.push({ x: cx + cos(fa) * fd, y: cy + sin(fa) * fd * (ry / rx), col: ft.col, w: ft.w, h: ft.h, phase: random(TWO_PI) });
   }
-  return { dock, palace, buildings, npcs, trees, wildlife, flora, hasWalls, hasTowers, style, bannerCol };
+
+  // Landmark position (offset from palace)
+  let landmark = { x: cx + rx * 0.25, y: cy - ry * 0.05 };
+
+  // Grass patches for biome ground
+  let biome = FACTION_BIOMES[key] || FACTION_BIOMES.rome;
+  let grassPatches = [];
+  for (let gi = 0; gi < 12; gi++) {
+    let ga = random(TWO_PI), gd = random(0.1, 0.6) * rx;
+    grassPatches.push({ x: cx + cos(ga) * gd, y: cy + sin(ga) * gd * (ry / rx), r: random(12, 30) });
+  }
+
+  return { dock, palace, buildings, npcs, trees, wildlife, flora, hasWalls, hasTowers, style, bannerCol, landmark, grassPatches, factionKey: key };
 }
 
 function enterNationIsland(key) { console.warn('enterNationIsland deprecated -- openworld mode'); }
@@ -1857,7 +1993,507 @@ function handleNationIslandInteract() {
   return false;
 }
 
-// ─── SEAMLESS NATION ISLAND RENDERING (V4.0) ─────────────────────────────
+// ─── FACTION LANDMARK DRAWING ─────────────────────────────────────────────
+function drawFactionLandmark(nk, cx, cy, biome) {
+  let sx = w2sX(cx), sy = w2sY(cy);
+  if (sx < -120 || sx > width + 120 || sy < -120 || sy > height + 120) return;
+  push();
+  translate(floor(sx), floor(sy));
+  noStroke();
+
+  switch (biome.landmark) {
+    case 'forum': {
+      // Stone floor
+      fill(180, 170, 155);
+      rect(-30, -4, 60, 10, 1);
+      // 4 marble columns
+      for (let i = 0; i < 4; i++) {
+        let cx2 = -22 + i * 15;
+        fill(220, 215, 205);
+        rect(cx2, -30, 5, 28);
+        // Capital
+        fill(235, 230, 220);
+        rect(cx2 - 1, -32, 7, 3);
+        // Base
+        fill(200, 195, 185);
+        rect(cx2 - 1, -3, 7, 3);
+      }
+      // Terracotta roof triangle
+      fill(biome.roofColor[0], biome.roofColor[1], biome.roofColor[2]);
+      beginShape();
+      vertex(-26, -32);
+      vertex(0, -45);
+      vertex(26, -32);
+      endShape(CLOSE);
+      break;
+    }
+    case 'harbor': {
+      // Circular Cothon harbor (arc in water)
+      fill(biome.waterTint[0], biome.waterTint[1], biome.waterTint[2], 140);
+      ellipse(0, 8, 50, 30);
+      // Harbor walls
+      stroke(biome.wallColor[0], biome.wallColor[1], biome.wallColor[2]);
+      strokeWeight(2);
+      noFill();
+      arc(0, 8, 50, 30, PI + 0.3, TWO_PI - 0.3);
+      noStroke();
+      // Inner water
+      fill(biome.waterTint[0] + 10, biome.waterTint[1] + 10, biome.waterTint[2] + 15, 160);
+      ellipse(0, 8, 34, 18);
+      // Small stepped pyramid
+      fill(biome.wallColor[0], biome.wallColor[1], biome.wallColor[2]);
+      rect(-12, -20, 24, 8);
+      fill(biome.wallColor[0] - 10, biome.wallColor[1] - 10, biome.wallColor[2] - 10);
+      rect(-8, -28, 16, 8);
+      fill(biome.accent[0], biome.accent[1], biome.accent[2]);
+      rect(-4, -34, 8, 6);
+      break;
+    }
+    case 'temple': {
+      // Two pylons (trapezoids)
+      fill(biome.wallColor[0], biome.wallColor[1], biome.wallColor[2]);
+      beginShape();
+      vertex(-28, 0); vertex(-22, -40); vertex(-10, -40); vertex(-6, 0);
+      endShape(CLOSE);
+      beginShape();
+      vertex(6, 0); vertex(10, -40); vertex(22, -40); vertex(28, 0);
+      endShape(CLOSE);
+      // Lintel
+      fill(biome.wallColor[0] - 15, biome.wallColor[1] - 15, biome.wallColor[2] - 15);
+      rect(-6, -30, 12, 6);
+      // Obelisk
+      fill(biome.accent[0], biome.accent[1], biome.accent[2]);
+      rect(-2, -55, 4, 30);
+      // Obelisk tip (pyramid)
+      beginShape();
+      vertex(-3, -55); vertex(0, -62); vertex(3, -55);
+      endShape(CLOSE);
+      // Hieroglyph accents on pylons
+      fill(biome.accent[0], biome.accent[1], biome.accent[2], 120);
+      rect(-20, -30, 4, 3);
+      rect(-18, -24, 3, 3);
+      rect(14, -30, 4, 3);
+      rect(16, -24, 3, 3);
+      break;
+    }
+    case 'temple_columns': {
+      // Marble steps
+      fill(235, 230, 220);
+      rect(-32, 0, 64, 4);
+      fill(240, 236, 228);
+      rect(-30, -3, 60, 3);
+      // 5 white columns
+      for (let i = 0; i < 5; i++) {
+        let cx2 = -24 + i * 12;
+        fill(240, 238, 230);
+        rect(cx2, -35, 4, 33);
+        fill(245, 242, 235);
+        rect(cx2 - 1, -37, 6, 3);
+      }
+      // Triangular pediment
+      fill(biome.accent[0], biome.accent[1], biome.accent[2]);
+      beginShape();
+      vertex(-28, -37);
+      vertex(0, -50);
+      vertex(28, -37);
+      endShape(CLOSE);
+      // Pediment inner
+      fill(biome.accent[0] + 20, biome.accent[1] + 20, biome.accent[2] + 20, 120);
+      beginShape();
+      vertex(-22, -37);
+      vertex(0, -46);
+      vertex(22, -37);
+      endShape(CLOSE);
+      break;
+    }
+    case 'garden': {
+      // 3 terraced levels
+      fill(biome.wallColor[0], biome.wallColor[1], biome.wallColor[2]);
+      rect(-28, -5, 56, 10, 1);
+      fill(biome.wallColor[0] - 10, biome.wallColor[1] - 10, biome.wallColor[2] - 10);
+      rect(-20, -18, 40, 13, 1);
+      fill(biome.wallColor[0] - 20, biome.wallColor[1] - 20, biome.wallColor[2] - 20);
+      rect(-12, -28, 24, 10, 1);
+      // Green on terraces
+      fill(biome.grassColor[0], biome.grassColor[1], biome.grassColor[2]);
+      rect(-26, -5, 12, 4); rect(14, -5, 12, 4);
+      rect(-18, -18, 8, 4); rect(10, -18, 8, 4);
+      // Cypress trees on sides
+      fill(30, 80, 40);
+      rect(-30, -30, 4, 25); rect(26, -30, 4, 25);
+      // Rose dots
+      fill(biome.floraAccent[0], biome.floraAccent[1], biome.floraAccent[2]);
+      ellipse(-22, -7, 3, 3); ellipse(20, -7, 3, 3);
+      ellipse(-14, -20, 3, 3); ellipse(14, -20, 3, 3);
+      // Gold dome on top
+      fill(biome.roofColor[0], biome.roofColor[1], biome.roofColor[2]);
+      arc(0, -28, 16, 14, PI, TWO_PI);
+      break;
+    }
+    case 'oak': {
+      // MASSIVE oak tree (3x normal)
+      // Thick trunk
+      fill(80, 60, 30);
+      rect(-8, -20, 16, 30);
+      // Wide spreading canopy
+      fill(biome.grassColor[0], biome.grassColor[1], biome.grassColor[2]);
+      ellipse(0, -30, 60, 40);
+      fill(biome.grassColor[0] + 15, biome.grassColor[1] + 10, biome.grassColor[2] + 5, 160);
+      ellipse(3, -33, 44, 28);
+      // Ring of 8 standing stones
+      for (let i = 0; i < 8; i++) {
+        let a = (i / 8) * TWO_PI;
+        let stx = cos(a) * 36, sty = sin(a) * 20;
+        fill(140, 140, 135);
+        rect(floor(stx - 2), floor(sty - 10), 5, 12, 1);
+        fill(155, 155, 150, 120);
+        rect(floor(stx - 1), floor(sty - 10), 3, 4, 1);
+      }
+      break;
+    }
+    case 'shipyard': {
+      // Large cedar tree
+      fill(100, 70, 35);
+      rect(-3, -30, 6, 28);
+      fill(biome.floraAccent[0], biome.floraAccent[1], biome.floraAccent[2]);
+      // Layered horizontal branches
+      for (let li = 0; li < 4; li++) {
+        let lw = (4 - li) * 7;
+        rect(floor(-lw), floor(-32 - li * 7), floor(lw * 2), 5, 1);
+      }
+      // Ship frame (hull outline) to the right
+      fill(110, 80, 40);
+      // Hull bottom
+      beginShape();
+      vertex(15, 0); vertex(20, -8); vertex(40, -10); vertex(45, -6); vertex(42, 0);
+      endShape(CLOSE);
+      // Ribs
+      fill(130, 95, 50);
+      rect(22, -8, 2, 8); rect(28, -9, 2, 9); rect(34, -9, 2, 9);
+      // Sawpit
+      fill(90, 65, 30);
+      rect(-20, 2, 14, 4);
+      fill(70, 50, 25);
+      rect(-18, 0, 2, 6); rect(-10, 0, 2, 6);
+      break;
+    }
+    case 'leviathan': {
+      // Dragon ship hull (large)
+      fill(biome.wallColor[0], biome.wallColor[1], biome.wallColor[2]);
+      beginShape();
+      vertex(-35, 0); vertex(-30, -8); vertex(25, -10); vertex(35, -6); vertex(32, 2); vertex(-32, 2);
+      endShape(CLOSE);
+      // Dragon head prow
+      fill(biome.accent[0], biome.accent[1], biome.accent[2]);
+      rect(-35, -18, 4, 14);
+      // Dragon head
+      rect(-38, -22, 8, 6);
+      rect(-40, -20, 3, 2); // jaw
+      // Eye
+      fill(200, 180, 40);
+      rect(-36, -21, 2, 2);
+      // Oar holes
+      fill(40, 35, 30);
+      for (let oi = 0; oi < 5; oi++) {
+        rect(-20 + oi * 10, -6, 3, 3);
+      }
+      // Dark flag/sail
+      fill(biome.accent[0], biome.accent[1], biome.accent[2], 180);
+      rect(0, -30, 2, 22);
+      rect(0, -30, 12, 8);
+      // Bone decorations
+      fill(220, 210, 190);
+      rect(28, -14, 2, 8);
+      ellipse(29, -15, 4, 4);
+      break;
+    }
+  }
+  pop();
+}
+
+// ─── FACTION FAUNA DRAWING ────────────────────────────────────────────────
+function drawFactionFauna(nk, rv, biome) {
+  let cx = rv.isleX, cy = rv.isleY;
+  let rx = rv.isleRX * 0.7;
+  let t = frameCount * 0.02;
+
+  switch (biome.fauna) {
+    case 'eagle': {
+      // V-shape circling in sky
+      let ex = cx + cos(t) * rx * 0.3;
+      let ey = cy - rv.isleRY * 0.5 + sin(t * 1.3) * 15;
+      let sx = w2sX(ex), sy = w2sY(ey);
+      if (sx > -30 && sx < width + 30) {
+        push(); translate(floor(sx), floor(sy)); noStroke();
+        fill(90, 70, 40);
+        // Wings as V
+        let wingA = sin(t * 3) * 3;
+        rect(-8, wingA, 7, 2);
+        rect(1, -wingA, 7, 2);
+        // Body
+        fill(70, 55, 30);
+        ellipse(0, 0, 4, 3);
+        pop();
+      }
+      break;
+    }
+    case 'elephant': {
+      let ex = cx + rx * 0.15, ey = cy + rv.isleRY * 0.15;
+      let sx = w2sX(ex), sy = w2sY(ey);
+      if (sx > -30 && sx < width + 30) {
+        push(); translate(floor(sx), floor(sy)); noStroke();
+        // Grey body
+        fill(140, 138, 130);
+        ellipse(0, -4, 20, 14);
+        // Head
+        fill(150, 148, 140);
+        ellipse(8, -6, 10, 9);
+        // Trunk
+        fill(135, 133, 125);
+        rect(11, -4, 2, 7);
+        // Legs
+        fill(120, 118, 110);
+        rect(-6, 2, 3, 5); rect(2, 2, 3, 5);
+        // Ear
+        fill(155, 150, 142);
+        ellipse(5, -8, 5, 6);
+        pop();
+      }
+      break;
+    }
+    case 'ibis': {
+      let ex = cx - rx * 0.3, ey = cy + rv.isleRY * 0.3;
+      let bob = sin(t * 2) * 2;
+      let sx = w2sX(ex), sy = w2sY(ey);
+      if (sx > -30 && sx < width + 30) {
+        push(); translate(floor(sx), floor(sy + bob)); noStroke();
+        fill(240, 238, 230);
+        ellipse(0, -2, 8, 6);
+        // Long beak
+        fill(40, 40, 40);
+        rect(4, -3, 5, 1);
+        // Legs
+        fill(180, 100, 80);
+        rect(-1, 1, 1, 5); rect(1, 1, 1, 5);
+        pop();
+      }
+      break;
+    }
+    case 'owl': {
+      // Perched on something near landmark
+      let ex = cx + rx * 0.28, ey = cy - rv.isleRY * 0.12;
+      let sx = w2sX(ex), sy = w2sY(ey);
+      if (sx > -30 && sx < width + 30) {
+        push(); translate(floor(sx), floor(sy)); noStroke();
+        fill(160, 140, 100);
+        ellipse(0, -3, 8, 9);
+        // Eyes
+        fill(220, 200, 60);
+        ellipse(-2, -4, 3, 3);
+        ellipse(2, -4, 3, 3);
+        fill(20, 20, 20);
+        ellipse(-2, -4, 1.5, 1.5);
+        ellipse(2, -4, 1.5, 1.5);
+        // Ear tufts
+        fill(140, 120, 80);
+        rect(-3, -8, 2, 3); rect(1, -8, 2, 3);
+        pop();
+      }
+      break;
+    }
+    case 'lion': {
+      let ex = cx + rx * 0.2, ey = cy + rv.isleRY * 0.05;
+      let sx = w2sX(ex), sy = w2sY(ey);
+      if (sx > -30 && sx < width + 30) {
+        push(); translate(floor(sx), floor(sy)); noStroke();
+        // Body
+        fill(190, 160, 80);
+        ellipse(0, -3, 16, 10);
+        // Mane
+        fill(170, 130, 50);
+        ellipse(6, -5, 12, 11);
+        // Head
+        fill(200, 170, 90);
+        ellipse(8, -5, 8, 7);
+        // Legs
+        fill(175, 145, 70);
+        rect(-5, 2, 2, 4); rect(3, 2, 2, 4);
+        pop();
+      }
+      break;
+    }
+    case 'boar': {
+      let ex = cx - rx * 0.2, ey = cy + rv.isleRY * 0.1;
+      let sx = w2sX(ex), sy = w2sY(ey);
+      if (sx > -30 && sx < width + 30) {
+        push(); translate(floor(sx), floor(sy)); noStroke();
+        fill(80, 60, 40);
+        ellipse(0, -3, 14, 10);
+        // Head
+        fill(90, 70, 45);
+        ellipse(6, -3, 7, 6);
+        // Tusks
+        fill(220, 210, 190);
+        rect(8, -2, 2, 1); rect(8, 0, 2, 1);
+        // Legs
+        fill(60, 45, 30);
+        rect(-4, 2, 2, 4); rect(2, 2, 2, 4);
+        pop();
+      }
+      break;
+    }
+    case 'turtle': {
+      let ex = cx + rx * 0.4, ey = cy + rv.isleRY * 0.35;
+      let sx = w2sX(ex), sy = w2sY(ey);
+      if (sx > -30 && sx < width + 30) {
+        push(); translate(floor(sx), floor(sy)); noStroke();
+        // Shell dome
+        fill(80, 110, 60);
+        ellipse(0, -2, 12, 8);
+        fill(60, 90, 45, 140);
+        ellipse(0, -3, 8, 5);
+        // Head
+        fill(100, 130, 80);
+        ellipse(5, -1, 4, 3);
+        // Flippers
+        fill(90, 120, 70);
+        rect(-5, 1, 3, 2); rect(3, 1, 3, 2);
+        pop();
+      }
+      break;
+    }
+    case 'shark': {
+      // Dark fin in water near island edge
+      let angle = t * 0.5;
+      let ex = cx + cos(angle) * rx * 0.8;
+      let ey = cy + sin(angle) * rv.isleRY * 0.55;
+      let sx = w2sX(ex), sy = w2sY(ey);
+      if (sx > -30 && sx < width + 30) {
+        push(); translate(floor(sx), floor(sy)); noStroke();
+        // Fin triangle
+        fill(50, 50, 55);
+        beginShape();
+        vertex(-3, 2); vertex(0, -8); vertex(3, 2);
+        endShape(CLOSE);
+        // Wake
+        fill(biome.waterTint[0] + 30, biome.waterTint[1] + 30, biome.waterTint[2] + 30, 80);
+        ellipse(0, 2, 10, 3);
+        pop();
+      }
+      break;
+    }
+  }
+}
+
+// ─── BIOME-SPECIFIC TREE DRAWING ──────────────────────────────────────────
+function drawBiomeTree(t, s, sway, biome, pal) {
+  // Trunk
+  fill(pal.treeTrunk[0], pal.treeTrunk[1], pal.treeTrunk[2]);
+
+  if (t.type === 'stone_pine' || t.type === 'pine') {
+    // Tall thin trunk, flat umbrella canopy
+    rect(-1.5 * s, -20 * s, 3 * s, 22 * s);
+    fill(pal.treeLeaf[0], pal.treeLeaf[1], pal.treeLeaf[2]);
+    ellipse(sway, -22 * s, 18 * s, 8 * s);
+    fill(pal.treeLeaf[0] + 10, pal.treeLeaf[1] + 8, pal.treeLeaf[2] + 5, 140);
+    ellipse(sway + 1, -23 * s, 14 * s, 5 * s);
+  } else if (t.type === 'date_palm' || t.type === 'palm' || t.type === 'datepalm') {
+    // Curved trunk, frond crown
+    // Slight curve via offset rects
+    rect(-2 * s, -8 * s, 4 * s, 10 * s);
+    rect(-1.5 * s - 1, -16 * s, 3 * s, 9 * s);
+    fill(pal.treeLeaf[0], pal.treeLeaf[1], pal.treeLeaf[2]);
+    // Radiating fronds
+    for (let fi = 0; fi < 6; fi++) {
+      let fa = fi * 1.05 - 2.6;
+      let fx = sway + cos(fa) * 10 * s;
+      let fy = -18 * s + sin(fa) * 4 * s;
+      rect(floor(fx - 3 * s), floor(fy - 1.5 * s), floor(7 * s), floor(2.5 * s), 1);
+    }
+    // Dates cluster
+    fill(biome.floraAccent[0], biome.floraAccent[1], biome.floraAccent[2]);
+    ellipse(sway, -16 * s, 4 * s, 3 * s);
+  } else if (t.type === 'papyrus') {
+    // Thin reeds clustered, fan-shaped tops
+    fill(pal.treeTrunk[0] - 10, pal.treeTrunk[1] + 10, pal.treeTrunk[2]);
+    rect(-1 * s, -18 * s, 2 * s, 20 * s);
+    rect(-3 * s, -16 * s, 2 * s, 18 * s);
+    rect(2 * s, -15 * s, 2 * s, 17 * s);
+    // Fan tops
+    fill(pal.treeLeaf[0], pal.treeLeaf[1] + 10, pal.treeLeaf[2]);
+    // Fan burst at top of each reed
+    for (let fi = 0; fi < 5; fi++) {
+      let fa = fi * 0.8 - 1.6;
+      rect(floor(sway + cos(fa) * 3 * s - 1), floor(-20 * s + sin(fa) * 2 * s), floor(3 * s), floor(2 * s), 1);
+    }
+  } else if (t.type === 'olive') {
+    // Gnarled short trunk, silver-green round canopy
+    rect(-2.5 * s, -10 * s, 5 * s, 12 * s);
+    // Gnarl
+    fill(pal.treeTrunk[0] - 10, pal.treeTrunk[1] - 10, pal.treeTrunk[2] - 5);
+    rect(-3.5 * s, -8 * s, 2 * s, 4 * s);
+    fill(biome.floraAccent[0], biome.floraAccent[1], biome.floraAccent[2]);
+    ellipse(sway, -14 * s, 16 * s, 12 * s);
+    fill(biome.floraAccent[0] + 15, biome.floraAccent[1] + 10, biome.floraAccent[2] + 10, 140);
+    ellipse(sway + 1, -15 * s, 12 * s, 8 * s);
+  } else if (t.type === 'cypress') {
+    // Very tall, very narrow, dark green pointed
+    rect(-1.5 * s, -12 * s, 3 * s, 14 * s);
+    fill(30, 80, 40);
+    // Tall narrow shape
+    beginShape();
+    vertex(floor(sway - 4 * s), 0);
+    vertex(floor(sway), floor(-32 * s));
+    vertex(floor(sway + 4 * s), 0);
+    endShape(CLOSE);
+    fill(35, 90, 45, 140);
+    beginShape();
+    vertex(floor(sway - 2.5 * s), floor(-5 * s));
+    vertex(floor(sway), floor(-30 * s));
+    vertex(floor(sway + 2.5 * s), floor(-5 * s));
+    endShape(CLOSE);
+  } else if (t.type === 'oak' || t.type === 'birch' || t.type === 'elm') {
+    // Thick trunk, wide spreading round canopy
+    rect(-3 * s, -14 * s, 6 * s, 16 * s);
+    fill(pal.treeLeaf[0], pal.treeLeaf[1], pal.treeLeaf[2]);
+    ellipse(sway, -18 * s, 18 * s, 14 * s);
+    fill(pal.treeLeaf[0] + 12, pal.treeLeaf[1] + 8, pal.treeLeaf[2] + 5, 150);
+    ellipse(sway - 2, -19 * s, 12 * s, 10 * s);
+    ellipse(sway + 4, -17 * s, 10 * s, 8 * s);
+  } else if (t.type === 'cedar') {
+    // Wide spreading horizontal branches, layered
+    rect(-2 * s, -14 * s, 4 * s, 16 * s);
+    fill(biome.floraAccent[0], biome.floraAccent[1], biome.floraAccent[2]);
+    for (let li = 0; li < 4; li++) {
+      let lw = (5 - li) * 3 * s;
+      let ly = -16 * s - li * 5 * s;
+      fill(biome.floraAccent[0] - li * 8, biome.floraAccent[1] + li * 4, biome.floraAccent[2] - li * 4);
+      rect(floor(sway - lw), floor(ly), floor(lw * 2), floor(4 * s), 1);
+    }
+  } else if (t.type === 'driftwood') {
+    // Dead tree, no leaves, twisted shape
+    fill(110, 100, 80);
+    rect(-2 * s, -14 * s, 4 * s, 16 * s);
+    // Twisted branches (no leaves)
+    fill(100, 90, 70);
+    rect(-6 * s, -16 * s, 5 * s, 2 * s);
+    rect(2 * s, -13 * s, 5 * s, 2 * s);
+    rect(-4 * s, -20 * s, 3 * s, 2 * s);
+    rect(1 * s, -18 * s, 4 * s, 1.5 * s);
+    // Barnacle
+    fill(140, 130, 110);
+    ellipse(0, -5 * s, 2 * s, 2 * s);
+  } else {
+    // Fallback: generic round canopy
+    rect(-2 * s, -16 * s, 4 * s, 18 * s);
+    fill(pal.treeLeaf[0], pal.treeLeaf[1], pal.treeLeaf[2]);
+    ellipse(sway, -20 * s, 14 * s, 12 * s);
+    fill(pal.treeLeaf[0] + 15, pal.treeLeaf[1] + 10, pal.treeLeaf[2] + 5, 160);
+    ellipse(sway + 1, -21 * s, 10 * s, 8 * s);
+  }
+}
+
+// ─── SEAMLESS NATION ISLAND RENDERING (V5.0 — BIOME OVERHAUL) ────────────
 function drawActiveNationContent() {
   let nk = state._activeNation;
   if (!nk) return;
@@ -1867,6 +2503,18 @@ function drawActiveNationContent() {
   let fm = FACTION_MILITARY[nk] || FACTION_MILITARY.rome;
   let flagCol = fm.conquestFlag;
   let pal = getNationIslandPalette(nk);
+  let biome = FACTION_BIOMES[nk] || FACTION_BIOMES.rome;
+
+  // --- Biome ground patches (grass color variation) ---
+  if (nc.grassPatches) {
+    noStroke();
+    for (let gp of nc.grassPatches) {
+      let gsx = w2sX(gp.x), gsy = w2sY(gp.y);
+      if (gsx < -60 || gsx > width + 60 || gsy < -60 || gsy > height + 60) continue;
+      fill(biome.grassColor[0], biome.grassColor[1], biome.grassColor[2], 70);
+      ellipse(floor(gsx), floor(gsy), gp.r * 2, gp.r * 1.2);
+    }
+  }
 
   // --- Dock (pier at south of island) ---
   let dsx = w2sX(nc.dock.x), dsy = w2sY(nc.dock.y);
@@ -1874,25 +2522,21 @@ function drawActiveNationContent() {
     push();
     translate(floor(dsx), floor(dsy));
     noStroke();
-    // Pier planks
     fill(110, 80, 45);
     rect(-18, -3, 36, 6);
     rect(-14, -9, 28, 6);
-    // Pier posts
     fill(90, 65, 35);
     rect(-16, 3, 4, 10);
     rect(12, 3, 4, 10);
     rect(-2, 3, 4, 10);
-    // Rope coil
     fill(160, 140, 100);
     ellipse(14, -5, 5, 4);
-    // Mooring post
     fill(80, 60, 30);
     rect(-19, -6, 3, 8);
     pop();
   }
 
-  // --- Walls (if level >= 3) ---
+  // --- Walls (if level >= 3) — use biome wallColor ---
   if (nc.hasWalls) {
     let cx = rv.isleX, cy = rv.isleY;
     let wrx = rv.isleRX * 0.52, wry = rv.isleRY * 0.52;
@@ -1904,13 +2548,12 @@ function drawActiveNationContent() {
       let x2 = w2sX(cx + cos(a2) * wrx), y2 = w2sY(cy + sin(a2) * wry);
       if (x1 < -100 && x2 < -100) continue;
       if (x1 > width + 100 && x2 > width + 100) continue;
-      stroke(pal.special1[0], pal.special1[1], pal.special1[2], 180);
+      stroke(biome.wallColor[0] - 20, biome.wallColor[1] - 20, biome.wallColor[2] - 20, 180);
       strokeWeight(3);
       line(x1, y1, x2, y2);
-      // Towers at corners
       if (nc.hasTowers && i % 4 === 0) {
         noStroke();
-        fill(pal.special1[0], pal.special1[1], pal.special1[2]);
+        fill(biome.wallColor[0], biome.wallColor[1], biome.wallColor[2]);
         rect(floor(x1) - 5, floor(y1) - 10, 10, 12);
         fill(flagCol[0], flagCol[1], flagCol[2]);
         rect(floor(x1) - 1, floor(y1) - 16, 2, 8);
@@ -1919,30 +2562,33 @@ function drawActiveNationContent() {
     noStroke();
   }
 
-  // --- Palace (large central building) ---
+  // --- Faction Landmark ---
+  if (nc.landmark) {
+    drawFactionLandmark(nk, nc.landmark.x, nc.landmark.y, biome);
+  }
+
+  // --- Palace (large central building — biome colors) ---
   let psx = w2sX(nc.palace.x), psy = w2sY(nc.palace.y);
   if (psx > -80 && psx < width + 80 && psy > -80 && psy < height + 80) {
     let pw = nc.palace.w, ph = nc.palace.h;
     push();
     translate(floor(psx), floor(psy));
     noStroke();
-    // Shadow
     fill(0, 0, 0, 25);
     ellipse(3, 4, pw + 8, 8);
-    // Base/foundation
-    fill(pal.terrainDark[0], pal.terrainDark[1], pal.terrainDark[2]);
+    // Foundation
+    fill(biome.groundColor[0] - 20, biome.groundColor[1] - 20, biome.groundColor[2] - 20);
     rect(-pw / 2 - 2, -2, pw + 4, 6, 1);
-    // Main structure
-    fill(pal.special1[0], pal.special1[1], pal.special1[2]);
+    // Main structure — biome wall color
+    fill(biome.wallColor[0], biome.wallColor[1], biome.wallColor[2]);
     rect(-pw / 2, -ph, pw, ph, 1);
-    // Lighter face
-    fill(pal.special1[0] + 20, pal.special1[1] + 15, pal.special1[2] + 15, 120);
+    fill(biome.wallColor[0] + 15, biome.wallColor[1] + 12, biome.wallColor[2] + 12, 120);
     rect(-pw / 2 + 2, -ph + 2, pw - 4, ph - 4);
-    // Roof
-    fill(flagCol[0], flagCol[1], flagCol[2]);
+    // Roof — biome roof color
+    fill(biome.roofColor[0], biome.roofColor[1], biome.roofColor[2]);
     rect(-pw / 2 - 3, -ph - 4, pw + 6, 5, 1);
     // Columns
-    fill(pal.special1[0] + 30, pal.special1[1] + 25, pal.special1[2] + 25);
+    fill(biome.wallColor[0] + 20, biome.wallColor[1] + 18, biome.wallColor[2] + 18);
     for (let ci = 0; ci < 4; ci++) {
       let cx2 = -pw / 2 + 4 + ci * (pw - 8) / 3;
       rect(cx2, -ph + 3, 3, ph - 5);
@@ -1957,35 +2603,34 @@ function drawActiveNationContent() {
     pop();
   }
 
-  // --- Buildings ---
+  // --- Buildings (biome wallColor + roofColor) ---
   for (let b of nc.buildings) {
     let bsx = w2sX(b.x), bsy = w2sY(b.y);
     if (bsx < -60 || bsx > width + 60 || bsy < -60 || bsy > height + 60) continue;
     push();
     translate(floor(bsx), floor(bsy));
     noStroke();
-    // Shadow
     fill(0, 0, 0, 22);
     ellipse(2, 3, b.w + 4, 5);
     switch (b.type) {
       case 'hut':
-        fill(pal.terrain[0], pal.terrain[1], pal.terrain[2]);
+        fill(biome.wallColor[0], biome.wallColor[1], biome.wallColor[2]);
         rect(-b.w / 2, -b.h * 0.7, b.w, b.h * 0.7, 1);
-        fill(pal.terrainDark[0], pal.terrainDark[1], pal.terrainDark[2]);
+        fill(biome.roofColor[0], biome.roofColor[1], biome.roofColor[2]);
         rect(-b.w / 2 - 1, -b.h * 0.7 - 3, b.w + 2, 4, 1);
         fill(70, 50, 25);
         rect(-2, -5, 4, 5);
         break;
       case 'market':
-        fill(pal.terrain[0] + 10, pal.terrain[1] + 5, pal.terrain[2]);
+        fill(biome.wallColor[0] - 10, biome.wallColor[1] - 10, biome.wallColor[2] - 10);
         rect(-b.w / 2, -b.h * 0.6, b.w, b.h * 0.6);
-        fill(flagCol[0], flagCol[1], flagCol[2], 180);
+        fill(biome.accent[0], biome.accent[1], biome.accent[2], 180);
         rect(-b.w / 2 - 2, -b.h * 0.6 - 3, b.w + 4, 4, 1);
         fill(200, 170, 60);
         rect(-b.w / 4, -3, b.w / 2, 3);
         break;
       case 'barracks':
-        fill(pal.terrainDark[0] - 10, pal.terrainDark[1] - 10, pal.terrainDark[2] - 10);
+        fill(biome.wallColor[0] - 30, biome.wallColor[1] - 30, biome.wallColor[2] - 30);
         rect(-b.w / 2, -b.h * 0.8, b.w, b.h * 0.8, 1);
         fill(fm.armor[0], fm.armor[1], fm.armor[2]);
         rect(-b.w / 2 - 1, -b.h * 0.8 - 2, b.w + 2, 3);
@@ -1994,13 +2639,13 @@ function drawActiveNationContent() {
         rect(b.w / 2 - 2, -b.h * 0.8 - 10, 5, 3);
         break;
       case 'temple':
-        fill(pal.special1[0] + 20, pal.special1[1] + 15, pal.special1[2] + 15);
+        fill(biome.wallColor[0] + 10, biome.wallColor[1] + 8, biome.wallColor[2] + 8);
         rect(-b.w / 2, -b.h * 0.8, b.w, b.h * 0.8);
-        fill(pal.special1[0] + 30, pal.special1[1] + 25, pal.special1[2] + 25);
+        fill(biome.wallColor[0] + 20, biome.wallColor[1] + 16, biome.wallColor[2] + 16);
         for (let ti = 0; ti < 3; ti++) {
           rect(-b.w / 2 + 2 + ti * (b.w - 4) / 2, -b.h * 0.8 + 2, 2, b.h * 0.8 - 4);
         }
-        fill(flagCol[0], flagCol[1], flagCol[2]);
+        fill(biome.roofColor[0], biome.roofColor[1], biome.roofColor[2]);
         beginShape();
         vertex(-b.w / 2 - 2, -b.h * 0.8);
         vertex(0, -b.h * 0.8 - 8);
@@ -2008,9 +2653,9 @@ function drawActiveNationContent() {
         endShape(CLOSE);
         break;
       case 'tower':
-        fill(pal.terrainDark[0], pal.terrainDark[1], pal.terrainDark[2]);
+        fill(biome.wallColor[0] - 20, biome.wallColor[1] - 20, biome.wallColor[2] - 20);
         rect(-5, -b.h, 10, b.h);
-        fill(pal.terrainDark[0] + 15, pal.terrainDark[1] + 10, pal.terrainDark[2] + 10);
+        fill(biome.wallColor[0], biome.wallColor[1], biome.wallColor[2]);
         rect(-7, -b.h - 3, 14, 4, 1);
         fill(flagCol[0], flagCol[1], flagCol[2]);
         rect(-1, -b.h - 12, 2, 10);
@@ -2021,42 +2666,42 @@ function drawActiveNationContent() {
         rect(-b.w / 2, -3, b.w, 5);
         fill(90, 70, 40);
         rect(-b.w / 2 + 2, -b.h * 0.5, b.w - 4, b.h * 0.5);
-        fill(pal.water[0], pal.water[1], pal.water[2], 100);
+        fill(biome.waterTint[0], biome.waterTint[1], biome.waterTint[2], 100);
         ellipse(0, 5, b.w + 6, 6);
         break;
       case 'forge':
-        fill(80, 65, 50);
+        fill(biome.wallColor[0] - 40, biome.wallColor[1] - 40, biome.wallColor[2] - 40);
         rect(-b.w / 2, -b.h * 0.7, b.w, b.h * 0.7, 1);
-        fill(60, 50, 35);
+        fill(biome.wallColor[0] - 55, biome.wallColor[1] - 55, biome.wallColor[2] - 55);
         rect(-b.w / 2 - 1, -b.h * 0.7 - 2, b.w + 2, 3);
         fill(200, 80, 20, 160 + sin(frameCount * 0.1) * 60);
         ellipse(0, -b.h * 0.35, 6, 5);
         break;
       case 'granary':
-        fill(pal.terrain[0] + 5, pal.terrain[1] + 10, pal.terrain[2]);
+        fill(biome.wallColor[0] - 5, biome.wallColor[1] + 5, biome.wallColor[2]);
         rect(-b.w / 2, -b.h * 0.6, b.w, b.h * 0.6, 2);
         fill(180, 160, 80);
         rect(-b.w / 2 + 2, -b.h * 0.5, b.w - 4, b.h * 0.3);
-        fill(pal.terrainDark[0], pal.terrainDark[1], pal.terrainDark[2]);
+        fill(biome.roofColor[0], biome.roofColor[1], biome.roofColor[2]);
         rect(-b.w / 2 - 1, -b.h * 0.6 - 2, b.w + 2, 3, 1);
         break;
       case 'wall':
-        fill(pal.terrainDark[0], pal.terrainDark[1], pal.terrainDark[2]);
+        fill(biome.wallColor[0] - 20, biome.wallColor[1] - 20, biome.wallColor[2] - 20);
         rect(-b.w / 2, -10, b.w, 12, 1);
-        fill(pal.terrainDark[0] + 10, pal.terrainDark[1] + 8, pal.terrainDark[2] + 8);
+        fill(biome.wallColor[0] - 10, biome.wallColor[1] - 10, biome.wallColor[2] - 10);
         rect(-b.w / 2, -12, b.w, 3, 1);
         break;
       default:
-        fill(pal.terrain[0], pal.terrain[1], pal.terrain[2]);
+        fill(biome.wallColor[0], biome.wallColor[1], biome.wallColor[2]);
         rect(-b.w / 2, -b.h * 0.6, b.w, b.h * 0.6, 1);
-        fill(pal.terrainDark[0], pal.terrainDark[1], pal.terrainDark[2]);
+        fill(biome.roofColor[0], biome.roofColor[1], biome.roofColor[2]);
         rect(-b.w / 2 - 1, -b.h * 0.6 - 2, b.w + 2, 3, 1);
         break;
     }
     pop();
   }
 
-  // --- Trees ---
+  // --- Trees (biome-specific rendering) ---
   for (let t of nc.trees) {
     let tsx = w2sX(t.x), tsy = w2sY(t.y);
     if (tsx < -40 || tsx > width + 40 || tsy < -40 || tsy > height + 40) continue;
@@ -2065,41 +2710,9 @@ function drawActiveNationContent() {
     push();
     translate(floor(tsx), floor(tsy));
     noStroke();
-    // Shadow
     fill(0, 0, 0, 25);
     ellipse(1, 2, 12 * s, 4 * s);
-    // Trunk
-    fill(pal.treeTrunk[0], pal.treeTrunk[1], pal.treeTrunk[2]);
-    rect(-2 * s, -16 * s, 4 * s, 18 * s);
-    // Canopy
-    fill(pal.treeLeaf[0], pal.treeLeaf[1], pal.treeLeaf[2]);
-    if (t.type === 'palm' || t.type === 'datepalm') {
-      // Palm fronds
-      for (let fi = 0; fi < 5; fi++) {
-        let fa = fi * 1.25 - 2.5;
-        let fx = sway + cos(fa) * 10 * s;
-        let fy = -18 * s + sin(fa) * 4 * s;
-        rect(floor(fx - 3 * s), floor(fy - 2 * s), floor(7 * s), floor(3 * s), 1);
-      }
-    } else if (t.type === 'cypress' || t.type === 'cedar') {
-      // Tall narrow canopy
-      for (let li = 0; li < 4; li++) {
-        let lw = (4 - li) * 2.5 * s;
-        fill(pal.treeLeaf[0] - li * 5, pal.treeLeaf[1] + li * 3, pal.treeLeaf[2] - li * 3);
-        rect(floor(sway * (li / 3) - lw), floor(-20 * s - li * 6 * s), floor(lw * 2), floor(7 * s), 1);
-      }
-    } else if (t.type === 'papyrus') {
-      // Thin reedy top
-      fill(pal.treeLeaf[0], pal.treeLeaf[1] + 10, pal.treeLeaf[2]);
-      rect(floor(sway - 4 * s), floor(-20 * s), floor(8 * s), floor(5 * s), 2);
-      fill(pal.treeLeaf[0] + 20, pal.treeLeaf[1] + 20, pal.treeLeaf[2] + 10, 140);
-      rect(floor(sway - 3 * s), floor(-22 * s), floor(6 * s), floor(3 * s), 1);
-    } else {
-      // Round canopy (oak, olive, etc.)
-      ellipse(sway, -20 * s, 14 * s, 12 * s);
-      fill(pal.treeLeaf[0] + 15, pal.treeLeaf[1] + 10, pal.treeLeaf[2] + 5, 160);
-      ellipse(sway + 1, -21 * s, 10 * s, 8 * s);
-    }
+    drawBiomeTree(t, s, sway, biome, pal);
     pop();
   }
 
@@ -2123,16 +2736,13 @@ function drawActiveNationContent() {
       push();
       translate(floor(wsx), floor(wsy));
       noStroke();
-      // Shadow
       fill(0, 0, 0, 20);
       ellipse(0, 2, w.size * 2 + 4, 3);
       let dir = w.facing || 1;
       scale(dir, 1);
-      // Body
       if (w.type === 'bird' || w.type === 'ibis' || w.type === 'raven' || w.type === 'parrot' || w.type === 'falcon') {
         fill(80, 70, 60);
         ellipse(0, -2, w.size * 1.5, w.size);
-        // Wing flap
         let wingY = sin(frameCount * 0.08 + w.phase) * 2;
         fill(70, 60, 50);
         rect(-w.size * 0.8, -4 + wingY, w.size * 0.6, 2);
@@ -2145,13 +2755,10 @@ function drawActiveNationContent() {
         fill(120, 80, 40);
         rect(w.size * 0.5, -1, 3, 2);
       } else {
-        // Generic quadruped (wolf, deer, lion, etc.)
         fill(140, 110, 70);
         ellipse(0, -w.size * 0.4, w.size * 2, w.size);
-        // Head
         fill(150, 120, 80);
         ellipse(w.size * 0.8, -w.size * 0.5, w.size * 0.7, w.size * 0.6);
-        // Legs
         fill(120, 90, 55);
         rect(-w.size * 0.5, 0, 2, w.size * 0.4);
         rect(w.size * 0.3, 0, 2, w.size * 0.4);
@@ -2159,6 +2766,9 @@ function drawActiveNationContent() {
       pop();
     }
   }
+
+  // --- Faction Fauna (animated biome-specific creature) ---
+  drawFactionFauna(nk, rv, biome);
 
   // --- NPCs ---
   for (let n of nc.npcs) {
@@ -2169,36 +2779,27 @@ function drawActiveNationContent() {
     noStroke();
     let dir = n.facing || 1;
     let bob = (n.vx !== 0 || n.vy !== 0) ? sin(frameCount * 0.12 + n.x) * 1.5 : 0;
-    // Shadow
     fill(0, 0, 0, 30);
     ellipse(0, 10, 10, 4);
     scale(dir * 0.6, 0.6);
     translate(0, bob);
-    // Feet
     fill(100, 75, 45);
     rect(-5, 12, 4, 3);
     rect(2, 12, 4, 3);
-    // Legs
     fill(pal.terrain[0] - 20, pal.terrain[1] - 15, pal.terrain[2] - 10);
     rect(-4, 5, 3, 8);
     rect(1, 5, 3, 8);
-    // Tunic (faction-colored)
     fill(n.col[0], n.col[1], n.col[2]);
     rect(-6, -6, 12, 12);
-    // Belt
     fill(n.col[0] - 30, n.col[1] - 25, n.col[2] - 20);
     rect(-6, 1, 12, 2);
-    // Arms
     fill(185, 145, 105);
     rect(-8, -4, 2, 7);
     rect(6, -4, 2, 7);
-    // Head
     fill(190, 150, 110);
     rect(-5, -15, 10, 10, 1);
-    // Hair
     fill(60, 40, 25);
     rect(-5, -16, 10, 4, 1);
-    // Role-specific accent
     if (n.role === 'soldier') {
       fill(fm.helm[0], fm.helm[1], fm.helm[2]);
       rect(-5, -17, 10, 3);
