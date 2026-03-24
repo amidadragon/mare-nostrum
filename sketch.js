@@ -1295,7 +1295,7 @@ function startConquestGame(playerFaction) {
   if (typeof addNotification === 'function') {
     addNotification('CONQUEST MODE — Rise above all nations!', '#ffdd44');
     addNotification('Expand, build armies, forge alliances, and dominate.', '#aaddff');
-    addNotification('First to level 15 OR last faction standing wins!', '#88ff88');
+    addNotification('Capture 6 capitals, control 4 trade hubs + 100k gold, or hold the Senate with 4 allies to win!', '#88ff88');
   }
 }
 

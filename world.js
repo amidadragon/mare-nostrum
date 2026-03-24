@@ -1589,9 +1589,10 @@ function drawPort() {
 
   push();
   translate(px, py);
+  scale(-1, 1);
   noStroke();
 
-  // === ROMAN HARBOR (Portus Magnus) — pier extends right into water ===
+  // === ROMAN HARBOR (Portus Magnus) — pier extends left into water ===
 
   // --- Long stone pier extending far into the sea ---
   // Main pier — long stone walkway
@@ -1945,7 +1946,6 @@ function drawMerchantPort() {
 
   push();
   translate(px, py);
-  scale(-1, 1); // Mirror — pier extends left into water
   noStroke();
 
   // === MERCHANT DOCK (Emporium) ===

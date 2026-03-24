@@ -249,17 +249,7 @@ const StrategyEngine = {
     if (state._gameMode !== 'conquest' || !state.nations) return null;
     if (state._victoryShown) return null;
 
-    // EXPANSION VICTORY: first to level 15
-    if ((state.islandLevel || 1) >= 15) {
-      return { winner: state.faction, name: 'You', condition: 'expansion', message: 'Your civilization reached Level 15!' };
-    }
-    for (let k of Object.keys(state.nations)) {
-      let n = state.nations[k];
-      if (n.islandState && (n.islandState.islandLevel || 1) >= 15) {
-        let name = typeof getNationName === 'function' ? getNationName(k) : k;
-        return { winner: k, name: name, condition: 'expansion', isPlayer: false, message: name + ' reached Level 15!' };
-      }
-    }
+    // EXPANSION VICTORY (level 15) removed — victory handled by diplomacy.js checkVictoryConditions
 
     // DOMINATION VICTORY: all other nations defeated or vassalized
     let activeNations = Object.keys(state.nations).filter(k => !state.nations[k].defeated || state.nations[k].vassal);
