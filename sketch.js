@@ -3207,7 +3207,7 @@ function drawInner() {
       if (typeof drawRecipeBookUI === 'function') drawRecipeBookUI();
       drawLegiaUI();
       if (typeof drawArmyBattle === 'function') drawArmyBattle();
-      if (typeof drawVisualInvasion === 'function' && typeof isInvasionBattleActive === 'function' && isInvasionBattleActive()) drawVisualInvasion();
+      // drawVisualInvasion is called in the world render pass (lines 2383/3172), not here
       if (typeof drawInvasionHUD === 'function') drawInvasionHUD();
       drawRivalDiplomacyUI();
       if (state._activeNation && state.nationDiplomacyOpen) drawNationDiplomacyUI();
@@ -6008,28 +6008,7 @@ function drawWorldObjectsSorted() {
   _sortItems.sort((a, b) => a.y - b.y);
   for (let i = 0; i < _sortItems.length; i++) _sortItems[i].draw();
   if (typeof drawPet === 'function') drawPet();
-  // Draw army followers near player
-  if (!state.rowing || !state.rowing.active) {
-    let lg = state.legia;
-    if (lg && lg.army && lg.army.length > 0) {
-      let px = w2sX(state.player.x);
-      let py = w2sY(state.player.y);
-      let fm = typeof getFactionMilitary === 'function' ? getFactionMilitary() : null;
-      let col = fm ? fm.conquestFlag : [185, 38, 28];
-      noStroke();
-      let count = Math.min(lg.army.length, 12);
-      for (let i = 0; i < count; i++) {
-        let angle = (i / count) * TWO_PI + frameCount * 0.005;
-        let dist = 20 + (i % 3) * 8;
-        let sx = px + cos(angle) * dist;
-        let sy = py + sin(angle) * dist * 0.5 + 5;
-        fill(col[0], col[1], col[2], 200);
-        ellipse(sx, sy, 3, 3);
-        fill(200, 170, 130, 180);
-        ellipse(sx, sy - 2, 2, 2);
-      }
-    }
-  }
+  // Army escort soldiers rendered by drawEscortSoldier in the Y-sorted pass above
 }
 
 // [MOVED TO building.js] drawBuildings+drawOneBuilding
