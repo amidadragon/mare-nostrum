@@ -4266,6 +4266,22 @@ function _getCompassIslands() {
       islands.push({ name: _nv.isHuman ? (_nv.humanName || getNationName(_nk)) : getNationName(_nk), x: _nv.isleX, y: _nv.isleY, col: getNationStanceColor(_nv), icon: _nv.isHuman ? '\u263A' : '\u2694', nation: true, isHuman: !!_nv.isHuman });
     }
   }
+  // Add world islands (trade hubs, military forts, resource islands, etc.)
+  if (typeof getAllWorldIslands === 'function') {
+    let _typeIcon = { capital: '\u265C', resource: '\u2741', military: '\u2694', economic: '\u2605', wonder: '\u2605', special: '\u2665' };
+    let _typeCol = { capital: '#ffcc44', resource: '#88cc44', military: '#cc4444', economic: '#44aaff', wonder: '#ffaaff', special: '#ffaa44' };
+    for (let _wi of getAllWorldIslands()) {
+      // Skip faction capitals — already covered by nation islands above
+      if (_wi.faction) continue;
+      let _controlled = state._controlledIslands && state._controlledIslands.includes(_wi.key);
+      islands.push({
+        name: _wi.name,
+        x: _wi.isleX, y: _wi.isleY,
+        col: _controlled ? '#88cc88' : (_typeCol[_wi.type] || '#ccaa66'),
+        icon: _controlled ? '\u2713' : (_typeIcon[_wi.type] || '\u25cb')
+      });
+    }
+  }
   return islands;
 }
 

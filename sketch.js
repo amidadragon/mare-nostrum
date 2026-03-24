@@ -3062,6 +3062,14 @@ function drawInner() {
       }
     }
 
+    // Sailing speed indicator
+    if (state.rowing && state.rowing.active) {
+      let spd = state.rowing.speed || 0;
+      fill(200, 200, 180, 150);
+      textSize(9); textAlign(RIGHT);
+      text('Speed: ' + spd.toFixed(1), width - 20, height - 20);
+    }
+
     // Compass arrows when sailing
     if (state.rowing.active) {
       let r = state.rowing;

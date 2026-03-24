@@ -5840,6 +5840,19 @@ function updateVisualInvasion(dt) {
   }
 
   if (b.phase === 'fighting') {
+    // Retreat check — R key
+    if (typeof keyIsDown === 'function' && keyIsDown(82)) { // R key
+      b.phase = 'result';
+      b.winner = 'defender'; // retreat = lose
+      b.resultTimer = 120; // shorter display
+      // Mark 30% of remaining attackers as dead (retreat casualties)
+      let alive = b.attackers.filter(u => !u.dead);
+      let casualties = Math.floor(alive.length * 0.3);
+      for (let i = 0; i < casualties && i < alive.length; i++) {
+        alive[i].dead = true;
+      }
+    }
+
     let allUnits = [...b.attackers, ...b.defenders];
 
     for (let u of allUnits) {
@@ -5866,6 +5879,9 @@ function updateVisualInvasion(dt) {
         if (u.attackTimer > 20) {
           u.attackTimer = 0;
           nearest.hp -= u.damage * (0.8 + Math.random() * 0.4);
+          if (typeof snd !== 'undefined' && snd && typeof snd.playSFX === 'function') {
+            if (Math.random() < 0.3) snd.playSFX('hit'); // don't play every hit
+          }
           if (typeof spawnParticles === 'function') spawnParticles(width/2 + nearest.x, height/2 + nearest.y, 'hit', 1);
           if (nearest.hp <= 0) {
             nearest.dead = true;
@@ -6037,7 +6053,12 @@ function drawVisualInvasion() {
 
   textAlign(CENTER); fill(220, 200, 140); textSize(14);
   if (b.phase === 'deploy') text('DEPLOYING...', width/2, arenaY - 12);
-  if (b.phase === 'fighting') text('BATTLE!', width/2, arenaY - 12);
+  if (b.phase === 'fighting') {
+    text('BATTLE!', width/2, arenaY - 12);
+    fill(180, 160, 120, 150);
+    textSize(10); textAlign(CENTER);
+    text('[R] Retreat (lose 30% army)', width/2, arenaY + arenaH + 15);
+  }
   if (b.phase === 'result') {
     textSize(20);
     if (b.winner === 'attacker') {
