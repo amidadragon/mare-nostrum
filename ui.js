@@ -1182,9 +1182,24 @@ function drawLegiaUI() {
     let nameStr = def ? def.name : t;
     if (t === 'legionary') nameStr = _ft.soldier;
     else if (t === 'centurion') nameStr = 'Elite ' + _ft.elite;
-    fill(armyCount < maxSoldiers ? color(180, 160, 120) : color(100, 80, 60));
-    textSize(10);
+    let canAfford = def && state.gold >= def.cost && armyCount < maxSoldiers;
+    // Clickable button
+    let btnX = px + 14, btnY = sy - 2, btnW = pw - 28, btnH = 16;
+    let isHover = mouseX >= btnX && mouseX <= btnX + btnW && mouseY >= btnY && mouseY <= btnY + btnH;
+    if (isHover && canAfford) {
+      fill(80, 70, 50, 120);
+      rect(btnX, btnY, btnW, btnH, 3);
+      stroke(180, 150, 80, 100); strokeWeight(1); noFill();
+      rect(btnX, btnY, btnW, btnH, 3); noStroke();
+    }
+    fill(canAfford ? (isHover ? color(220, 200, 140) : color(180, 160, 120)) : color(100, 80, 60));
+    textSize(10); textAlign(LEFT, TOP);
     text('[' + k + '] ' + nameStr + ' (' + costStr + ')', px + 20, sy);
+    // Click to recruit
+    if (isHover && canAfford && mouseIsPressed && typeof trainUnit === 'function') {
+      trainUnit(t);
+      mouseIsPressed = false; // prevent double-click
+    }
     sy += 13;
     // Counter info line
     let cInfo = (typeof UNIT_COUNTER_INFO !== 'undefined') ? UNIT_COUNTER_INFO[t] : null;
