@@ -512,9 +512,9 @@ function drawMenuScreen() {
   let hasSave = false;
   if (_rs) { try { let _d = JSON.parse(_rs); hasSave = _d && _d.version >= 8; } catch(e) {} }
   if (!hasSave && _rs) { try { localStorage.removeItem('sunlitIsles_save'); } catch(e) {} }
-  let items = ['NEW VOYAGE'];
+  let items = ['NEW GAME'];
   if (hasSave) items.splice(1, 0, 'CONTINUE');
-  items.push('1v1 BATTLE', 'CONQUEST', 'MULTIPLAYER', 'SETTINGS', 'CREDITS');
+  items.push('CONQUEST', 'SETTINGS', 'CREDITS');
   let itemCount = items.length;
 
   let menuStartY = floor(h * 0.68);
@@ -1386,11 +1386,9 @@ function handleMenuClick() {
   if (!hasSave && _rs) { try { localStorage.removeItem('sunlitIsles_save'); } catch(e) {} }
   let btns = ['new'];
   if (hasSave) btns.splice(1, 0, 'load');
-  btns.push('1v1', 'conquest', 'multiplayer', 'settings', 'credits');
+  btns.push('conquest', 'settings', 'credits');
   let action = btns[menuHover];
-  if (action === '1v1') { menuFadeOut = 1; menuFadeAction = function() { if (typeof start1v1Game === 'function') start1v1Game(); }; return; }
   if (action === 'conquest') { menuFadeOut = 1; menuFadeAction = function() { if (typeof startConquestGame === 'function') startConquestGame(); }; return; }
-  if (action === 'multiplayer') { gameScreen = 'multiplayer'; state._mpMenuOpen = true; return; }
   if (action === 'settings') { gameScreen = 'settings'; return; }
   if (action === 'credits') { gameScreen = 'credits'; return; }
   // Fade to black, then execute action
