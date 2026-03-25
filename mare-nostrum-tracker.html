@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mare Nostrum — Project Tracker</title>
+<style>
+  :root {
+    --bg: #0f0d0a;
+    --surface: #1a1712;
+    --surface2: #231f19;
+    --surface3: #2c2820;
+    --border: #3a3428;
+    --gold: #c9a84c;
+    --gold-dim: #7a6530;
+    --amber: #e8b84b;
+    --text: #e8dcc8;
+    --text-dim: #8a7d68;
+    --text-muted: #5a5040;
+    --critical: #e05c4b;
+    --high: #e07c4b;
+    --med: #c9a84c;
+    --low: #7a9e7e;
+    --done: #5a8c5a;
+    --in-progress: #4a7aab;
+    --blocked: #ab4a4a;
+    --todo: #5a5040;
+    --radius: 6px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Georgia', serif;
+    font-size: 13px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  /* ── TOP BAR ── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .logo-icon {
+    width: 32px; height: 32px;
+    background: var(--gold);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+  .logo h1 { font-size: 17px; color: var(--gold); letter-spacing: 0.04em; }
+  .logo small { font-size: 11px; color: var(--text-dim); font-style: italic; display: block; margin-top: 1px; }
+  .header-meta {
+    display: flex; gap: 16px; align-items: center;
+  }
+  .badge {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 3px 10px;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  .badge.gold { border-color: var(--gold-dim); color: var(--gold); }
+
+  /* ── LAYOUT ── */
+  .layout {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    min-height: calc(100vh - 57px);
+  }
+  nav {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 16px 0;
+    position: sticky;
+    top: 57px;
+    height: calc(100vh - 57px);
+    overflow-y: auto;
+  }
+  nav .section-label {
+    padding: 6px 16px 4px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-muted);
+  }
+  nav a {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    color: var(--text-dim);
+    text-decoration: none;
+    font-size: 12px;
+    transition: all 0.15s;
+    cursor: pointer;
+    border-left: 2px solid transparent;
+  }
+  nav a:hover, nav a.active {
+    color: var(--text);
+    background: var(--surface2);
+    border-left-color: var(--gold);
+  }
+  nav a .nav-count {
+    margin-left: auto;
+    font-size: 10px;
+    background: var(--surface3);
+    border-radius: 8px;
+    padding: 1px 6px;
+    color: var(--text-dim);
+  }
+
+  main {
+    padding: 24px;
+    overflow-y: auto;
+  }
+
+  /* ── OVERVIEW CARDS ── */
+  .overview-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+  }
+  .card-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+  .card-value {
+    font-size: 28px;
+    font-weight: bold;
+    color: var(--gold);
+    line-height: 1;
+  }
+  .card-sub { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+  /* ── PROGRESS BAR ── */
+  .progress-bar-wrap {
+    background: var(--surface3);
+    border-radius: 4px;
+    height: 6px;
+    overflow: hidden;
+    margin-top: 8px;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: var(--gold);
+    border-radius: 4px;
+    transition: width 0.4s;
+  }
+
+  /* ── SECTION HEADERS ── */
+  .section {
+    margin-bottom: 32px;
+  }
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .section-header h2 {
+    font-size: 14px;
+    color: var(--amber);
+    letter-spacing: 0.04em;
+  }
+  .section-header .count {
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  /* ── SPRINT CARDS ── */
+  .sprint-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 10px;
+  }
+  .sprint-item {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .sprint-item:hover { border-color: var(--gold-dim); }
+  .sprint-item-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .sprint-item-title { font-size: 12px; color: var(--text); flex: 1; }
+  .sprint-item-meta {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .sprint-item-file {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-family: monospace;
+  }
+  .sprint-item-effort {
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+
+  /* ── STATUS PILLS ── */
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border-radius: 10px;
+    padding: 2px 8px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    white-space: nowrap;
+    border: none;
+    transition: opacity 0.15s;
+    user-select: none;
+  }
+  .status-pill:hover { opacity: 0.8; }
+  .s-todo     { background: #3a3428; color: #a09070; }
+  .s-progress { background: #1e3150; color: #6aaae0; }
+  .s-done     { background: #1e3a1e; color: #70c070; }
+  .s-blocked  { background: #3a1e1e; color: #e07070; }
+  .s-cut      { background: #2a2a2a; color: #606060; text-decoration: line-through; }
+
+  /* ── IMPACT / PRIORITY DOTS ── */
+  .impact {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+  .impact-massive { background: #e05c4b; }
+  .impact-high    { background: #e07c4b; }
+  .impact-med     { background: #c9a84c; }
+  .impact-low     { background: #7a9e7e; }
+
+  /* ── FILTER BAR ── */
+  .filter-bar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+  .filter-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 4px 12px;
+    font-size: 11px;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s;
+  }
+  .filter-btn:hover, .filter-btn.active {
+    border-color: var(--gold-dim);
+    color: var(--gold);
+    background: var(--surface3);
+  }
+  .search-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 5px 10px;
+    color: var(--text);
+    font-size: 11px;
+    font-family: inherit;
+    outline: none;
+    width: 200px;
+  }
+  .search-box:focus { border-color: var(--gold-dim); }
+  .search-box::placeholder { color: var(--text-muted); }
+
+  /* ── MASTER TABLE ── */
+  .master-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .master-table th {
+    text-align: left;
+    padding: 8px 10px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+    font-weight: normal;
+  }
+  .master-table td {
+    padding: 9px 10px;
+    border-bottom: 1px solid #1e1b15;
+    vertical-align: middle;
+  }
+  .master-table tr:hover td { background: var(--surface2); }
+  .master-table tr.row-cut td { opacity: 0.4; }
+  .master-table .col-num { color: var(--text-muted); width: 32px; }
+  .master-table .col-title { }
+  .master-table .col-file { font-family: monospace; color: var(--text-dim); font-size: 11px; }
+  .master-table .col-effort { color: var(--text-dim); white-space: nowrap; }
+  .master-table .col-impact { width: 80px; }
+  .master-table .col-status { width: 120px; }
+
+  /* ── CATEGORY BADGE ── */
+  .cat-badge {
+    display: inline-block;
+    border-radius: 3px;
+    padding: 1px 6px;
+    font-size: 9px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .cat-critical   { background: #3a1a1a; color: #e05c4b; }
+  .cat-perf       { background: #1e2a1e; color: #78c878; }
+  .cat-visual     { background: #1e1e3a; color: #78a8e8; }
+  .cat-audio      { background: #2a1e3a; color: #b878e8; }
+  .cat-mechanics  { background: #3a2a1a; color: #e8a050; }
+  .cat-impressions{ background: #3a2a2a; color: #e87878; }
+  .cat-infra      { background: #1e2a2a; color: #78c8c8; }
+
+  /* ── EFFORT TOTAL ── */
+  .effort-summary {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+  .effort-chip {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 6px 12px;
+    font-size: 11px;
+  }
+  .effort-chip span { color: var(--gold); font-weight: bold; }
+
+  /* ── HIDDEN ── */
+  .hidden { display: none !important; }
+
+  /* ── MILESTONE ── */
+  .milestone-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .milestone-item {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--gold-dim);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .milestone-item.ms-done { border-left-color: var(--done); }
+  .milestone-item.ms-now  { border-left-color: var(--amber); }
+  .milestone-item.ms-next { border-left-color: var(--text-muted); }
+  .ms-label { font-size: 11px; color: var(--text-dim); min-width: 80px; }
+  .ms-name { font-size: 13px; color: var(--text); flex: 1; }
+  .ms-date { font-size: 11px; color: var(--text-dim); }
+  .ms-status { }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--gold-dim); }
+
+  @media (max-width: 768px) {
+    .layout { grid-template-columns: 1fr; }
+    nav { display: none; }
+    .overview-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">⛵</div>
+    <div>
+      <h1>Mare Nostrum</h1>
+      <small>Cozy Roman solarpunk life-sim · p5.js browser game</small>
+    </div>
+  </div>
+  <div class="header-meta">
+    <span class="badge gold">v3.1</span>
+    <span class="badge">376 commits</span>
+    <span class="badge">Last push: Mar 24 2026</span>
+    <span class="badge">amidadragon + claude</span>
+  </div>
+</header>
+
+<div class="layout">
+  <nav>
+    <div class="section-label">Views</div>
+    <a onclick="showSection('overview')" class="active" id="nav-overview">📊 Overview</a>
+    <a onclick="showSection('sprint')" id="nav-sprint">🏃 Current Sprint</a>
+    <a onclick="showSection('milestones')" id="nav-milestones">🎯 Milestones</a>
+    <a onclick="showSection('master')" id="nav-master">📋 All Tasks</a>
+
+    <div class="section-label" style="margin-top:12px">Categories</div>
+    <a onclick="filterCat('CRITICAL')" id="cat-CRITICAL">🔴 Critical <span class="nav-count" id="cnt-CRITICAL">7</span></a>
+    <a onclick="filterCat('PERFORMANCE')" id="cat-PERFORMANCE">⚡ Performance <span class="nav-count" id="cnt-PERFORMANCE">4</span></a>
+    <a onclick="filterCat('VISUAL')" id="cat-VISUAL">🎨 Visual <span class="nav-count" id="cnt-VISUAL">8</span></a>
+    <a onclick="filterCat('AUDIO')" id="cat-AUDIO">🎵 Audio <span class="nav-count" id="cnt-AUDIO">8</span></a>
+    <a onclick="filterCat('MECHANICS')" id="cat-MECHANICS">⚙️ Mechanics <span class="nav-count" id="cnt-MECHANICS">9</span></a>
+    <a onclick="filterCat('IMPRESSIONS')" id="cat-IMPRESSIONS">✨ First Impressions <span class="nav-count" id="cnt-IMPRESSIONS">5</span></a>
+    <a onclick="filterCat('INFRA')" id="cat-INFRA">🔧 Infrastructure <span class="nav-count" id="cnt-INFRA">7</span></a>
+  </nav>
+
+  <main>
+
+    <!-- ══ OVERVIEW ══ -->
+    <div id="section-overview" class="section">
+      <div class="section-header">
+        <h2>📊 Project Overview</h2>
+      </div>
+
+      <div class="overview-grid">
+        <div class="card">
+          <div class="card-label">Total Tasks</div>
+          <div class="card-value" id="stat-total">52</div>
+          <div class="card-sub">Master list + sprint</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Done</div>
+          <div class="card-value" id="stat-done" style="color: var(--done)">0</div>
+          <div class="card-sub">Click status pills to update</div>
+          <div class="progress-bar-wrap"><div class="progress-bar-fill" id="done-bar" style="width:0%"></div></div>
+        </div>
+        <div class="card">
+          <div class="card-label">In Progress</div>
+          <div class="card-value" id="stat-progress" style="color: var(--in-progress)">3</div>
+          <div class="card-sub">Cycle 4 bug fixes</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Blocked</div>
+          <div class="card-value" id="stat-blocked" style="color: var(--blocked)">0</div>
+          <div class="card-sub">Needs attention</div>
+        </div>
+      </div>
+
+      <div class="effort-summary" style="margin-bottom:20px">
+        <div class="effort-chip">Critical: <span>~1h 40m</span></div>
+        <div class="effort-chip">Performance: <span>~3h 30m</span></div>
+        <div class="effort-chip">Visual: <span>~14–20h</span></div>
+        <div class="effort-chip">Audio: <span>~5–8h</span></div>
+        <div class="effort-chip">Mechanics: <span>~22–30h</span></div>
+        <div class="effort-chip">First Impressions: <span>~13h</span></div>
+        <div class="effort-chip">Infrastructure: <span>~3h 25m</span></div>
+      </div>
+
+      <div class="section-header"><h2>🔴 Critical Bugs (fix before any feature work)</h2></div>
+      <div class="sprint-grid">
+        <div class="sprint-item" id="crit-1">
+          <div class="sprint-item-top">
+            <div class="sprint-item-title">Broken comment <code style="font-size:10px">/ Sanity:</code> → <code style="font-size:10px">// Sanity:</code></div>
+            <span class="status-pill s-todo" onclick="cycleStatus(this)">● Todo</span>
+          </div>
+          <div class="sprint-item-meta">
+            <span class="sprint-item-file">sketch.js:12604</span>
+            <span class="sprint-item-effort">⏱ 1 min</span>
+            <span class="cat-badge cat-critical">Critical</span>
+          </div>
+        </div>
+        <div class="sprint-item">
+          <div class="sprint-item-top">
+            <div class="sprint-item-title"><code style="font-size:10px">_particleCap</code> never recovers after FPS drop</div>
+            <span class="status-pill s-todo" onclick="cycleStatus(this)">● Todo</span>
+          </div>
+          <div class="sprint-item-meta">
+            <span class="sprint-item-file">sketch.js:1488</span>
+            <span class="sprint-item-effort">⏱ 15 min</span>
+            <span class="cat-badge cat-critical">Critical</span>
+          </div>
+        </div>
+        <div class="sprint-item">
+          <div class="sprint-item-top">
+            <div class="sprint-item-title"><code style="font-size:10px">jumpingFish</code> implicit global, no <code style="font-size:10px">let</code> declaration</div>
+            <span class="status-pill s-todo" onclick="cycleStatus(this)">● Todo</span>
+          </div>
+          <div class="sprint-item-meta">
+            <span class="sprint-item-file">sketch.js:2590</span>
+            <span class="sprint-item-effort">⏱ 5 min</span>
+            <span class="cat-badge cat-critical">Critical</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ SPRINT ══ -->
+    <div id="section-sprint" class="section hidden">
+      <div class="section-header">
+        <h2>🏃 CEO Cycle 4 — Playtest Bug Fixes</h2>
+        <span class="count">Aurelian Forge Studio · March 2026</span>
+      </div>
+
+      <div class="effort-summary">
+        <div class="effort-chip">Scope: <span>4 bugs → 3 planned fixes</span></div>
+        <div class="effort-chip">Est. total: <span>~25 min code + 10 min QA</span></div>
+      </div>
+
+      <div class="sprint-grid">
+        <div class="sprint-item">
+          <div class="sprint-item-top">
+            <div>
+              <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">FIX 1</div>
+              <div class="sprint-item-title">Duplicate "Arena Isle" label renders twice on horizon</div>
+            </div>
+            <span class="status-pill s-todo" onclick="cycleStatus(this)">● Todo</span>
+          </div>
+          <div class="sprint-item-meta">
+            <span class="sprint-item-file">sketch.js:13058-13068</span>
+            <span class="sprint-item-effort">⏱ 2 min</span>
+          </div>
+          <div style="font-size:11px;color:var(--text-dim);margin-top:4px">Remove label block from <code>drawArenaIsleDistant()</code> — 10 deletions, 0 additions. <code>drawArenaDistantLabel()</code> is the source of truth.</div>
+        </div>
+
+        <div class="sprint-item">
+          <div class="sprint-item-top">
+            <div>
+              <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">FIX 2</div>
+              <div class="sprint-item-title">Quest tracker clips right screen edge</div>
+            </div>
+            <span class="status-pill s-todo" onclick="cycleStatus(this)">● Todo</span>
+          </div>
+          <div class="sprint-item-meta">
+            <span class="sprint-item-file">narrative.js:796, 809</span>
+            <span class="sprint-item-effort">⏱ 5 min</span>
+          </div>
+          <div style="font-size:11px;color:var(--text-dim);margin-top:4px">Widen panel: <code>rw 208→228, rx width-220→-240</code>. Add truncation loop with <code>textWidth()</code> guard. Also fix NPC side-quest at line 832.</div>
+        </div>
+
+        <div class="sprint-item">
+          <div class="sprint-item-top">
+            <div>
+              <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">FIX 3</div>
+              <div class="sprint-item-title">Menu button click targets imprecise</div>
+            </div>
+            <span class="status-pill s-todo" onclick="cycleStatus(this)">● Todo</span>
+          </div>
+          <div class="sprint-item-meta">
+            <span class="sprint-item-file">menu.js:481-483</span>
+            <span class="sprint-item-effort">⏱ 5 min</span>
+          </div>
+          <div style="font-size:11px;color:var(--text-dim);margin-top:4px">Align hitbox to actual text render position using <code>textTop = iy - itemSize * 0.8</code>. Widen <code>hitPad 16→20</code>. Test with and without saved game.</div>
+        </div>
+
+        <div class="sprint-item" style="opacity:0.5">
+          <div class="sprint-item-top">
+            <div>
+              <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">CUT</div>
+              <div class="sprint-item-title">Cloud shapes repetitive (ellipses)</div>
+            </div>
+            <span class="status-pill s-cut">✕ Deferred</span>
+          </div>
+          <div class="sprint-item-meta">
+            <span class="sprint-item-file">world.js</span>
+            <span class="sprint-item-effort">⏱ 1h</span>
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Background polish — deferred to next cycle. Moment-to-moment visibility is low.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ MILESTONES ══ -->
+    <div id="section-milestones" class="section hidden">
+      <div class="section-header">
+        <h2>🎯 Milestones</h2>
+      </div>
+      <div class="milestone-list">
+        <div class="milestone-item ms-done">
+          <div class="ms-label">v0.9.0</div>
+          <div class="ms-name">Initial commit from worktree</div>
+          <div class="ms-date">Mar 18 2026</div>
+          <span class="status-pill s-done">✓ Done</span>
+        </div>
+        <div class="milestone-item ms-done">
+          <div class="ms-label">v1.0.0</div>
+          <div class="ms-name">Release candidate — playtest ready</div>
+          <div class="ms-date">Mar 19 2026</div>
+          <span class="status-pill s-done">✓ Done</span>
+        </div>
+        <div class="milestone-item ms-done">
+          <div class="ms-label">Sprint 1</div>
+          <div class="ms-name">52K lines, factions, nations, tech tree, army, 123 sounds</div>
+          <div class="ms-date">Mar 21 2026</div>
+          <span class="status-pill s-done">✓ Done</span>
+        </div>
+        <div class="milestone-item ms-done">
+          <div class="ms-label">v3.1</div>
+          <div class="ms-name">Tools overhaul: q5.js, EasyStar pathfinding, LZ-String saves, CI/CD</div>
+          <div class="ms-date">Mar 22 2026</div>
+          <span class="status-pill s-done">✓ Done</span>
+        </div>
+        <div class="milestone-item ms-now">
+          <div class="ms-label">Cycle 4</div>
+          <div class="ms-name">Playtest bug fixes (arena label, quest clip, menu hitbox)</div>
+          <div class="ms-date">Mar 25 2026</div>
+          <span class="status-pill s-progress" onclick="cycleStatus(this)">▶ In Progress</span>
+        </div>
+        <div class="milestone-item ms-next">
+          <div class="ms-label">v1.1</div>
+          <div class="ms-name">Post-playtest polish sprint</div>
+          <div class="ms-date">TBD</div>
+          <span class="status-pill s-todo" onclick="cycleStatus(this)">● Todo</span>
+        </div>
+        <div class="milestone-item ms-next">
+          <div class="ms-label">Launch</div>
+          <div class="ms-name">itch.io release — Cinzel font self-hosted, esbuild minified</div>
+          <div class="ms-date">TBD</div>
+          <span class="status-pill s-todo" onclick="cycleStatus(this)">● Todo</span>
+        </div>
+        <div class="milestone-item ms-next">
+          <div class="ms-label">Multiplayer</div>
+          <div class="ms-name">WebSocket lobby, 8-faction conquest mode</div>
+          <div class="ms-date">Future</div>
+          <span class="status-pill s-todo" onclick="cycleStatus(this)">● Todo</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ MASTER LIST ══ -->
+    <div id="section-master" class="section hidden">
+      <div class="section-header">
+        <h2>📋 Master Improvement List</h2>
+        <span class="count" id="visible-count">48 items</span>
+      </div>
+
+      <div class="filter-bar">
+        <input class="search-box" type="text" placeholder="Search tasks…" id="search-input" oninput="filterTable()">
+        <button class="filter-btn active" onclick="setStatusFilter('all', this)">All</button>
+        <button class="filter-btn" onclick="setStatusFilter('todo', this)">Todo</button>
+        <button class="filter-btn" onclick="setStatusFilter('in-progress', this)">In Progress</button>
+        <button class="filter-btn" onclick="setStatusFilter('blocked', this)">Blocked</button>
+        <button class="filter-btn" onclick="setStatusFilter('done', this)">Done</button>
+      </div>
+
+      <table class="master-table" id="master-table">
+        <thead>
+          <tr>
+            <th class="col-num">#</th>
+            <th>Category</th>
+            <th class="col-title">Task</th>
+            <th class="col-file">File</th>
+            <th class="col-effort">Effort</th>
+            <th class="col-impact">Impact</th>
+            <th class="col-status">Status</th>
+          </tr>
+        </thead>
+        <tbody id="master-tbody">
+        </tbody>
+      </table>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ── DATA ──
+const tasks = [
+  // CRITICAL
+  { id:1,  cat:'CRITICAL',    title:'Broken comment `/ Sanity:` → `// Sanity:`',                            file:'sketch.js:12604',              effort:'1 min',    impact:'high'    },
+  { id:2,  cat:'CRITICAL',    title:'`_particleCap` never recovers after FPS drop',                         file:'sketch.js:1488',               effort:'15 min',   impact:'high'    },
+  { id:3,  cat:'CRITICAL',    title:'`jumpingFish` implicit global, no `let` declaration',                  file:'sketch.js:2590',               effort:'5 min',    impact:'high'    },
+  { id:4,  cat:'CRITICAL',    title:'`/home` debug cmd doesn\'t set homeIslandReached',                     file:'debug.js:164',                 effort:'5 min',    impact:'high'    },
+  { id:5,  cat:'CRITICAL',    title:'`tutorialsSeen.gather` unguarded in wreck.js',                         file:'wreck.js:116',                 effort:'5 min',    impact:'high'    },
+  { id:6,  cat:'CRITICAL',    title:'sw.js missing 7 extracted files + cache mismatch',                     file:'sw.js',                        effort:'15 min',   impact:'high'    },
+  { id:7,  cat:'CRITICAL',    title:'Missing SFX: visitor_arrive, crystal_charge',                          file:'sound.js',                     effort:'15 min',   impact:'high'    },
+  // PERFORMANCE
+  { id:8,  cat:'PERFORMANCE', title:'drawOcean triple-nested loop: ~3500 rects/frame',                      file:'sketch.js:2474',               effort:'2h',       impact:'high'    },
+  { id:9,  cat:'PERFORMANCE', title:'particles.filter() butterfly count scan every 45 frames',              file:'sketch.js:8381',               effort:'15 min',   impact:'med'     },
+  { id:10, cat:'PERFORMANCE', title:'Heatwave: 55 fill+rect calls/frame',                                   file:'sketch.js:3465',               effort:'10 min',   impact:'med'     },
+  { id:11, cat:'PERFORMANCE', title:'Raindrop hard cap removes visible mid-air drops',                      file:'sketch.js:3503',               effort:'15 min',   impact:'low'     },
+  // VISUAL
+  { id:12, cat:'VISUAL',      title:'No night darkness overlay — island bright at midnight',                 file:'world.js',                     effort:'2–3h',     impact:'massive' },
+  { id:13, cat:'VISUAL',      title:'No building cast shadows (directional)',                                file:'sketch.js',                    effort:'2h',       impact:'high'    },
+  { id:14, cat:'VISUAL',      title:'Island has no visible 3D cliff edge',                                   file:'world.js',                     effort:'1–2h',     impact:'high'    },
+  { id:15, cat:'VISUAL',      title:'Citizens are 5-rect blobs',                                             file:'npc.js',                       effort:'2–3h',     impact:'high'    },
+  { id:16, cat:'VISUAL',      title:'No ambient color temperature (golden hour)',                             file:'sketch.js',                    effort:'15 min',   impact:'med'     },
+  { id:17, cat:'VISUAL',      title:'Home island missing vignette call',                                     file:'sketch.js',                    effort:'2 min',    impact:'med'     },
+  { id:18, cat:'VISUAL',      title:'Clouds use ellipses not pixel rects',                                   file:'world.js',                     effort:'1h',       impact:'med'     },
+  { id:19, cat:'VISUAL',      title:'No water reflections at coastline',                                     file:'world.js',                     effort:'1h',       impact:'med'     },
+  // AUDIO
+  { id:20, cat:'AUDIO',       title:'No campfire crackle — Era 1 emotional anchor silent',                   file:'sound.js',                     effort:'45 min',   impact:'high'    },
+  { id:21, cat:'AUDIO',       title:'No NPC interaction sounds (dialogue/gift/favor)',                       file:'sound.js, npc.js',             effort:'50 min',   impact:'high'    },
+  { id:22, cat:'AUDIO',       title:'Lyre doesn\'t evolve with era (no Era 3 echo)',                         file:'sound.js',                     effort:'1–2h',     impact:'high'    },
+  { id:23, cat:'AUDIO',       title:'Ocean waves too mechanical (single sine)',                               file:'sound.js',                     effort:'20 min',   impact:'med'     },
+  { id:24, cat:'AUDIO',       title:'No footstep pitch variation',                                           file:'sound.js',                     effort:'30 min',   impact:'med'     },
+  { id:25, cat:'AUDIO',       title:'No dawn/dusk transition sounds',                                        file:'sound.js',                     effort:'30 min',   impact:'med'     },
+  { id:26, cat:'AUDIO',       title:'Crickets too mechanical (single gate)',                                  file:'sound.js',                     effort:'20 min',   impact:'med'     },
+  { id:27, cat:'AUDIO',       title:'SFX pool too small (4 slots, needs 6)',                                  file:'sound.js',                     effort:'15 min',   impact:'med'     },
+  // MECHANICS
+  { id:28, cat:'MECHANICS',   title:'NPC daily wants loop broken at max favor',                              file:'npc.js, narrative.js',         effort:'2–3h',     impact:'high'    },
+  { id:29, cat:'MECHANICS',   title:'Trade routes passive, no market demand signal',                         file:'economy.js',                   effort:'3–4h',     impact:'high'    },
+  { id:30, cat:'MECHANICS',   title:'Fishing wait has no skill expression',                                  file:'fishing.js',                   effort:'2–3h',     impact:'med'     },
+  { id:31, cat:'MECHANICS',   title:'Harvest combo HUD counter invisible',                                   file:'sketch.js',                    effort:'1–2h',     impact:'med'     },
+  { id:32, cat:'MECHANICS',   title:'Night market hidden, no herald notification',                           file:'sketch.js, events.js',         effort:'1–2h',     impact:'med'     },
+  { id:33, cat:'MECHANICS',   title:'Combat skill effects invisible (fortify, battleCry)',                   file:'sketch.js, combat.js',         effort:'3–4h',     impact:'med'     },
+  { id:34, cat:'MECHANICS',   title:'NPC hearts cliff at max — NPCs become scenery',                         file:'npc.js, narrative.js',         effort:'3–4h',     impact:'med'     },
+  { id:35, cat:'MECHANICS',   title:'Cooking recipes invisible, no recipe UI',                               file:'ui.js',                        effort:'2–3h',     impact:'med'     },
+  { id:36, cat:'MECHANICS',   title:'Island level milestones are silent',                                    file:'sketch.js, narrative.js',      effort:'6–10h',    impact:'high'    },
+  // FIRST IMPRESSIONS
+  { id:37, cat:'IMPRESSIONS', title:'No companion personality in first 10 min',                              file:'sketch.js',                    effort:'2h',       impact:'high'    },
+  { id:38, cat:'IMPRESSIONS', title:'No "GET IT" moment by minute 3',                                        file:'narrative.js',                 effort:'3h',       impact:'high'    },
+  { id:39, cat:'IMPRESSIONS', title:'Island naming at level 10 — player ownership',                          file:'sketch.js',                    effort:'2h',       impact:'high'    },
+  { id:40, cat:'IMPRESSIONS', title:'Secret areas (Ice Mirror, Room 13) — viral potential',                  file:'islands.js',                   effort:'4–6h',     impact:'high'    },
+  { id:41, cat:'IMPRESSIONS', title:'60-second atmosphere video needed',                                     file:'N/A',                          effort:'2h',       impact:'high'    },
+  // INFRASTRUCTURE
+  { id:42, cat:'INFRA',       title:'Self-host Cinzel font (blocked in itch.io iframe)',                     file:'index.html',                   effort:'30 min',   impact:'high'    },
+  { id:43, cat:'INFRA',       title:'Self-host p5.js (eliminate CDN dependency)',                            file:'index.html',                   effort:'10 min',   impact:'med'     },
+  { id:44, cat:'INFRA',       title:'GitHub Actions CI (syntax check on push)',                              file:'.github/',                     effort:'30 min',   impact:'med'     },
+  { id:45, cat:'INFRA',       title:'esbuild minification (1.4MB → ~400KB)',                                 file:'build.mjs',                    effort:'1h',       impact:'med'     },
+  { id:46, cat:'INFRA',       title:'Error tracking in engine.js',                                          file:'engine.js',                    effort:'15 min',   impact:'med'     },
+  { id:47, cat:'INFRA',       title:'Playwright smoke tests',                                                file:'tests/',                       effort:'1h',       impact:'med'     },
+  { id:48, cat:'INFRA',       title:'Save migration formalization',                                          file:'sketch.js',                    effort:'30 min',   impact:'med'     },
+];
+
+// Status storage
+const statuses = {};
+tasks.forEach(t => { statuses[t.id] = 'todo'; });
+
+// ── STATE ──
+let currentSection = 'overview';
+let currentCatFilter = 'all';
+let currentStatusFilter = 'all';
+
+const catMeta = {
+  CRITICAL:    { cls: 'cat-critical',    label: 'Critical'         },
+  PERFORMANCE: { cls: 'cat-perf',        label: 'Performance'      },
+  VISUAL:      { cls: 'cat-visual',      label: 'Visual'           },
+  AUDIO:       { cls: 'cat-audio',       label: 'Audio'            },
+  MECHANICS:   { cls: 'cat-mechanics',   label: 'Mechanics'        },
+  IMPRESSIONS: { cls: 'cat-impressions', label: 'First Impressions' },
+  INFRA:       { cls: 'cat-infra',       label: 'Infrastructure'   },
+};
+
+const impactMeta = {
+  massive: { cls: 'impact-massive', label: 'Massive' },
+  high:    { cls: 'impact-high',    label: 'High'    },
+  med:     { cls: 'impact-med',     label: 'Med'     },
+  low:     { cls: 'impact-low',     label: 'Low'     },
+};
+
+const statusCycle = ['todo', 'in-progress', 'done', 'blocked'];
+const statusMeta = {
+  'todo':        { cls: 's-todo',     label: '● Todo'       },
+  'in-progress': { cls: 's-progress', label: '▶ In Progress' },
+  'done':        { cls: 's-done',     label: '✓ Done'       },
+  'blocked':     { cls: 's-blocked',  label: '⚠ Blocked'    },
+};
+
+// ── RENDER TABLE ──
+function renderTable() {
+  const tbody = document.getElementById('master-tbody');
+  const q = (document.getElementById('search-input')?.value || '').toLowerCase();
+  let visible = 0;
+  let html = '';
+
+  tasks.forEach(t => {
+    const status = statuses[t.id];
+    const sm = statusMeta[status];
+    const cm = catMeta[t.cat];
+    const im = impactMeta[t.impact];
+
+    const matchCat    = currentCatFilter === 'all' || t.cat === currentCatFilter;
+    const matchStatus = currentStatusFilter === 'all' || status === currentStatusFilter;
+    const matchSearch = !q || t.title.toLowerCase().includes(q) || t.file.toLowerCase().includes(q);
+
+    const hidden = (!matchCat || !matchStatus || !matchSearch) ? 'style="display:none"' : '';
+    if (!hidden) visible++;
+
+    html += `<tr class="task-row${status==='done'?' row-done':''}" data-id="${t.id}" ${hidden}>
+      <td class="col-num">${t.id}</td>
+      <td><span class="cat-badge ${cm.cls}">${cm.label}</span></td>
+      <td class="col-title">${t.title.replace(/`([^`]+)`/g, '<code style="font-size:10px">$1</code>')}</td>
+      <td class="col-file">${t.file}</td>
+      <td class="col-effort">${t.effort}</td>
+      <td class="col-impact"><span class="impact ${im.cls}"></span> ${im.label}</td>
+      <td class="col-status"><span class="status-pill ${sm.cls}" onclick="cycleTaskStatus(${t.id}, this)">${sm.label}</span></td>
+    </tr>`;
+  });
+
+  tbody.innerHTML = html;
+  const vc = document.getElementById('visible-count');
+  if (vc) vc.textContent = `${visible} of 48 items`;
+  updateStats();
+}
+
+// ── CYCLE STATUS (table tasks) ──
+function cycleTaskStatus(id, el) {
+  const cur = statuses[id];
+  const idx = statusCycle.indexOf(cur);
+  const next = statusCycle[(idx + 1) % statusCycle.length];
+  statuses[id] = next;
+  const sm = statusMeta[next];
+  el.className = `status-pill ${sm.cls}`;
+  el.textContent = sm.label;
+  const row = el.closest('tr');
+  if (row) row.className = `task-row${next==='done'?' row-done':''}`;
+  updateStats();
+}
+
+// ── CYCLE STATUS (sprint/card pills) ──
+function cycleStatus(el) {
+  const classes = ['s-todo', 's-progress', 's-done', 's-blocked'];
+  const labels  = ['● Todo', '▶ In Progress', '✓ Done', '⚠ Blocked'];
+  let cur = classes.findIndex(c => el.classList.contains(c));
+  if (cur < 0) cur = 0;
+  const next = (cur + 1) % classes.length;
+  classes.forEach(c => el.classList.remove(c));
+  el.classList.add(classes[next]);
+  el.textContent = labels[next];
+  updateStats();
+}
+
+// ── UPDATE STATS ──
+function updateStats() {
+  let done = 0, inProgress = 0, blocked = 0;
+  Object.values(statuses).forEach(s => {
+    if (s === 'done') done++;
+    else if (s === 'in-progress') inProgress++;
+    else if (s === 'blocked') blocked++;
+  });
+  // Also count sprint pills
+  document.querySelectorAll('.sprint-item .status-pill, .milestone-item .status-pill').forEach(el => {
+    if (el.classList.contains('s-done')) done++;
+    else if (el.classList.contains('s-progress')) inProgress++;
+    else if (el.classList.contains('s-blocked')) blocked++;
+  });
+
+  const total = tasks.length + 4; // 4 sprint items
+  document.getElementById('stat-done').textContent = done;
+  document.getElementById('stat-progress').textContent = inProgress;
+  document.getElementById('stat-blocked').textContent = blocked;
+  const pct = Math.round((done / total) * 100);
+  document.getElementById('done-bar').style.width = pct + '%';
+}
+
+// ── SHOW SECTION ──
+function showSection(name) {
+  ['overview','sprint','milestones','master'].forEach(s => {
+    document.getElementById('section-' + s).classList.toggle('hidden', s !== name);
+    const navEl = document.getElementById('nav-' + s);
+    if (navEl) navEl.classList.toggle('active', s === name);
+  });
+  currentSection = name;
+  if (name === 'master') renderTable();
+}
+
+// ── FILTER BY CAT ──
+function filterCat(cat) {
+  currentCatFilter = cat;
+  showSection('master');
+  // Highlight nav
+  ['CRITICAL','PERFORMANCE','VISUAL','AUDIO','MECHANICS','IMPRESSIONS','INFRA'].forEach(c => {
+    const el = document.getElementById('cat-' + c);
+    if (el) el.classList.toggle('active', c === cat);
+  });
+  renderTable();
+}
+
+// ── FILTER BY STATUS ──
+function setStatusFilter(status, btn) {
+  currentStatusFilter = status;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTable();
+}
+
+// ── SEARCH ──
+function filterTable() {
+  renderTable();
+}
+
+// ── INIT ──
+renderTable();
+updateStats();
+</script>
+</body>
+</html>
