@@ -1149,10 +1149,11 @@ function drawLegiaUI() {
   }
   sy += 4;
 
+    // Faction terms — needed for both unit counts and train buttons
+      let _ft = (typeof getFactionTerms === 'function') ? getFactionTerms() : { soldier: 'Legionary', elite: 'Centurion' };
   // Unit counts by type
   if (armyCount > 0 && hasArmy) {
     fill(160, 140, 100); textSize(9);
-    let _ft = (typeof getFactionTerms === 'function') ? getFactionTerms() : { soldier: 'Legionary', elite: 'Centurion' };
     let typeNames = { legionary: _ft.soldier, archer: 'Archer', cavalry: 'Cavalry', siege_ram: 'Siege Ram', centurion: _ft.elite };
     for (let t of unlockedTypes) {
       let cnt = typeof getArmyCountByType === 'function' ? getArmyCountByType(t) : 0;
