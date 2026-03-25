@@ -163,7 +163,8 @@
         }
 
         // Reputation boost (more generous = bigger boost)
-        var fairnessRatio = ship.request.length > 0 ? this.getTotalValue(ship.offer) / this.getTotalValue(ship.request) : 1;
+        var requestValue = this.getTotalValue(ship.request);
+        var fairnessRatio = requestValue > 0 ? this.getTotalValue(ship.offer) / requestValue : 1;
         var repBoost = 5 + (fairnessRatio > 1 ? 5 : 0);
         nation.reputation = (nation.reputation || 0) + repBoost;
 
@@ -551,20 +552,19 @@
     },
 
     handleKey: function(key) {
+      // Only toggle trade panel with T when NOT inside temple/castrum
+      // (T is used for temple prayer in the base game)
       if (key === 't' || key === 'T') {
-        if (!this.panelOpen) {
-          this.togglePanel();
-        } else {
-          this.togglePanel();
-        }
-        return;
+        if (state.insideTemple || state.insideCastrum) return false;
+        this.togglePanel();
+        return true;
       }
 
       // Y/N for incoming offers
       if (key === 'y' || key === 'Y') {
         if (this.incomingOffers.length > 0) {
           var offer = this.incomingOffers[0];
-          this.dispatchMerchant(offer.nationKey, offer.request, offer.offer);
+          this.dispatchMerchant(offer.nationKey, offer.offer, offer.request);
           this.incomingOffers.splice(0, 1);
         }
         return;
@@ -601,7 +601,8 @@
   if (typeof window !== 'undefined') {
     window.keyPressed = function() {
       if (typeof key !== 'undefined') {
-        TradeSystem.handleKey(key);
+        var handled = TradeSystem.handleKey(key);
+        if (handled) return false;
       }
       if (originalKeyPressed) {
         return originalKeyPressed();

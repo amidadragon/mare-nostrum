@@ -1398,6 +1398,7 @@ function keyPressed() {
         state.player.y = WRECK.cy + 10;
         state.player.vx = 0; state.player.vy = 0;
         cam.x = state.player.x; cam.y = state.player.y;
+        camSmooth.x = cam.x; camSmooth.y = cam.y;
         _startCamTransition(); camZoomTarget = 1.0;
         addFloatingText(width / 2, height * 0.35, 'Wreck Beach', C.sand);
         return;
@@ -1410,6 +1411,7 @@ function keyPressed() {
         state.player.y = _ei.isleY + sin(_da) * _ei.isleRY * 0.6;
         state.player.vx = 0; state.player.vy = 0;
         cam.x = state.player.x; cam.y = state.player.y;
+        camSmooth.x = cam.x; camSmooth.y = cam.y;
         _startCamTransition(); camZoomTarget = 1.0;
         return;
       }
@@ -1422,6 +1424,7 @@ function keyPressed() {
         state.player.y = _nv.isleY + sin(_dockAng) * _nv.isleRY * 0.6;
         state.player.vx = 0; state.player.vy = 0;
         cam.x = state.player.x; cam.y = state.player.y;
+        camSmooth.x = cam.x; camSmooth.y = cam.y;
         _startCamTransition(); camZoomTarget = 1.0;
         // Set invasion target if player has army
         if (state.legia && state.legia.army && state.legia.army.length > 0 && !_nv.defeated && !_nv.vassal) {

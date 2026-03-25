@@ -393,13 +393,15 @@
           }
         } else if (stations[i].action === 'recruit') {
           addFloatingText(psx, psy - 30, 'Open Recruitment...', [100, 150, 200]);
-          if (typeof SHOW_LEGIA_UI !== 'undefined') {
-            SHOW_LEGIA_UI = true;
+          if (state.legia) {
+            state.legia.legiaUIOpen = !state.legia.legiaUIOpen;
           }
         } else if (stations[i].action === 'war_table') {
           addFloatingText(psx, psy - 30, 'Consulting nations...', [200, 200, 100]);
-          if (typeof SHOW_NATIONS_PANEL !== 'undefined') {
-            SHOW_NATIONS_PANEL = !SHOW_NATIONS_PANEL;
+          if (typeof state.nationPanelOpen !== 'undefined') {
+            state.nationPanelOpen = !state.nationPanelOpen;
+          } else {
+            state.nationPanelOpen = true;
           }
         } else if (stations[i].action === 'exit') {
           state.insideCastrum = false;
@@ -656,11 +658,15 @@
       items[i].draw();
     }
 
-    // Draw pet (follows player)
-    if (typeof _drawTemplePet !== 'undefined' && state.player) {
-      var petX = state.player.x - 30;
-      var petY = state.player.y + 20;
-      _drawTemplePet({}, w2sX(petX), w2sY(petY));
+    // Draw pet (follows player) — needs a valid temple hall with petColor
+    if (typeof _drawTemplePet === 'function' && state.player && typeof TEMPLE_HALLS !== 'undefined') {
+      var fk = state.faction || 'rome';
+      var hall = TEMPLE_HALLS[fk];
+      if (hall && hall.petColor) {
+        var petX = state.player.x - 30;
+        var petY = state.player.y + 20;
+        _drawTemplePet(hall, w2sX(petX), w2sY(petY));
+      }
     }
 
     // Draw player on top
@@ -799,20 +805,22 @@
   };
 
   var drawSoldier = function(sx, sy, fk, facing) {
-    var colors = FACTION_MILITARY[fk];
-    
+    push();
+    var colors = FACTION_MILITARY[fk] || FACTION_MILITARY['rome'];
+
     // Body
+    noStroke();
     fill(colors.tunic[0], colors.tunic[1], colors.tunic[2]);
     rect(sx - 5, sy - 3, 10, 10);
-    
+
     // Head
     fill(200, 160, 140);
     circle(sx, sy - 8, 4);
-    
+
     // Helm
     fill(colors.helm[0], colors.helm[1], colors.helm[2]);
     circle(sx, sy - 10, 5);
-    
+
     // Weapon
     stroke(180, 160, 120);
     strokeWeight(2);
@@ -821,6 +829,7 @@
     } else {
       line(sx - 5, sy - 2, sx - 10, sy - 8);
     }
+    pop();
   };
 
   var drawOfficer = function(sx, sy) {
@@ -833,7 +842,7 @@
   };
 
   var drawCommander = function(sx, sy, fk) {
-    var colors = FACTION_MILITARY[fk];
+    var colors = FACTION_MILITARY[fk] || FACTION_MILITARY['rome'];
     
     // Full armor
     fill(colors.armor[0], colors.armor[1], colors.armor[2]);

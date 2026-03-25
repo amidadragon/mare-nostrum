@@ -273,6 +273,9 @@ drawHyperboreIsland = function() {
     for (let pg of h.penguins) {
       let px2 = w2sX(pg.x), py2 = w2sY(pg.y);
       let sz = 5 * camZoom;
+      // Waddle offset
+      let wobble = (pg.state === 'waddle') ? sin(frameCount * 0.15 + pg.x) * 2 * camZoom : 0;
+      px2 += wobble;
       // Body
       fill(30, 30, 40);
       ellipse(px2, py2, sz * 2, sz * 2.5);
@@ -289,11 +292,6 @@ drawHyperboreIsland = function() {
       fill(0);
       ellipse(px2 - sz * 0.3, py2 - sz * 0.8, sz * 0.2, sz * 0.2);
       ellipse(px2 + sz * 0.3, py2 - sz * 0.8, sz * 0.2, sz * 0.2);
-      // Waddle animation
-      if (pg.state === 'waddle') {
-        let wobble = sin(frameCount * 0.15) * 2 * camZoom;
-        translate(wobble, 0);
-      }
     }
   }
 

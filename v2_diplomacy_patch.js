@@ -425,11 +425,15 @@
   var originalKeyPressed = typeof keyPressed !== 'undefined' ? keyPressed : null;
 
   window.keyPressed = function() {
-    if (key === 'd' || key === 'D') {
-      DiplomacySystem.worldViewOpen = !DiplomacySystem.worldViewOpen;
-      return false;
+    // Close diplomacy views with ESC
+    if (keyCode === 27) {
+      if (DiplomacySystem.worldViewOpen) {
+        DiplomacySystem.worldViewOpen = false;
+        return false;
+      }
     }
 
+    // Intercept keys when diplomacy world view is open
     if (DiplomacySystem.worldViewOpen) {
       if (keyCode === 27) {
         DiplomacySystem.worldViewOpen = false;
@@ -437,11 +441,10 @@
       return false;
     }
 
-    if (state.diplomacyPanel) {
-      handleNationDiplomacyKey(key, keyCode);
-      return false;
-    }
+    // Nation diplomacy panel is handled by the base game's input.js
+    // (state.nationDiplomacyOpen is checked there already)
 
+    // Pass through to previous handler (trade patch or base game)
     if (originalKeyPressed) {
       return originalKeyPressed();
     }
