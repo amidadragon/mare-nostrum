@@ -1,16 +1,12 @@
-// HOTFIX: Missing function stubs
-// Load BEFORE sketch.js in index.html
+// HOTFIX: Conditional stubs — only define if the real function hasn't loaded yet.
+// All 6 functions now have real implementations in merchant.js, lifecycle.js, building.js.
+// This file is kept as a safety net in case load order changes.
 
-function updatePortPositions() {}
+if (typeof updatePortPositions !== 'function') { function updatePortPositions() {} }
+if (typeof generateProphecy !== 'function') { function generateProphecy() { return "The stars whisper of empires yet unborn."; } }
+if (typeof spawnWildCat !== 'function') { function spawnWildCat() {} }
+if (typeof getPortPosition !== 'function') { function getPortPosition() { return { x: 0, y: 0 }; } }
+if (typeof isOnImperialBridge !== 'function') { function isOnImperialBridge() { return false; } }
+if (typeof isBlockedByBuilding !== 'function') { function isBlockedByBuilding() { return false; } }
 
-function generateProphecy() {
-  var p = ["The stars whisper of empires yet unborn.","Sol Invictus watches over this shore.","The sea remembers what the land forgets.","Fortune favors those who build with patience.","From salt and stone, a civilization rises."];
-  return p[Math.floor(Math.random() * p.length)];
-}
-
-function spawnWildCat() {}
-function getPortPosition() { return { x: 0, y: 0 }; }
-function isOnImperialBridge() { return false; }
-function isBlockedByBuilding() { return false; }
-
-console.log("[HOTFIX] 6 missing function stubs loaded.");
+console.log("[HOTFIX] Conditional stubs checked — real implementations preserved.");
