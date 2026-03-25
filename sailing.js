@@ -224,6 +224,22 @@ function updateRowing(dt) {
     }
   }
 
+  // Wreck Beach proximity detection + collision
+  if (typeof WRECK !== 'undefined' && state.wreck) {
+    let _wr = WRECK;
+    let _wrRX = _wr.rx || 120, _wrRY = _wr.ry || 80;
+    let _wrNx = (r.x - _wr.cx) / _wrRX;
+    let _wrNy = (r.y - _wr.cy) / _wrRY;
+    let _wrDist = _wrNx * _wrNx + _wrNy * _wrNy;
+    if (_wrDist < 1.5 * 1.5) r.nearIsle = 'wreck';
+    if (_wrDist < 0.8 * 0.8) {
+      let ang = atan2(r.y - _wr.cy, r.x - _wr.cx);
+      r.x = _wr.cx + cos(ang) * _wrRX * 0.82;
+      r.y = _wr.cy + sin(ang) * _wrRY * 0.82;
+      r.speed *= 0.3;
+    }
+  }
+
   // New islands — elliptical proximity detection + collision
   let _newIsles = [
     { key: 'vulcan',    s: state.vulcan },

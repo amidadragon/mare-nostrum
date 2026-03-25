@@ -229,10 +229,10 @@ function updateLegia(dt) {
   if (lg.trainingQueue > 0 && lg.trainingTimer > 0) {
     lg.trainingTimer -= dt;
     if (lg.trainingTimer <= 0) {
-      lg.recruits = min(lg.recruits + 1, lg.maxRecruits + getFactionData().recruitBonus);
+      lg.recruits = min(lg.recruits + 1, lg.maxRecruits + (typeof getFactionData === 'function' && getFactionData() ? getFactionData().recruitBonus || 0 : 0));
       lg.trainingQueue--;
       lg.trainingTimer = lg.trainingQueue > 0 ? 300 : 0;
-      addFloatingText(w2sX(lg.castrumX), w2sY(lg.castrumY) - 30, getFactionTerms().soldier + ' Ready!', '#cc4444');
+      addFloatingText(w2sX(lg.castrumX), w2sY(lg.castrumY) - 30, (typeof getFactionTerms === 'function' ? getFactionTerms().soldier : 'Soldier') + ' Ready!', '#cc4444');
       // Spawn ambient soldier entity near castrum
       let cx = lg.castrumX, cy = lg.castrumY;
       let soldierMaxHP = 60 + (state.expeditionUpgrades ? state.expeditionUpgrades.soldierHP : 0) * 20;
@@ -258,7 +258,8 @@ function handleLegiaKey(k) {
     } else {
       if (state.gold < 20) { addFloatingText(width / 2, height * 0.3, 'Need 20 gold', '#ff6644'); return true; }
       if (state.meals < 1) { addFloatingText(width / 2, height * 0.3, 'Need 1 meal', '#ff6644'); return true; }
-      if (lg.recruits + lg.trainingQueue >= lg.maxRecruits + getFactionData().recruitBonus) { addFloatingText(width / 2, height * 0.3, getFactionTerms().army + ' at capacity!', '#ff6644'); return true; }
+      var _rb = (typeof getFactionData === 'function' && getFactionData()) ? getFactionData().recruitBonus || 0 : 0;
+      if (lg.recruits + lg.trainingQueue >= lg.maxRecruits + _rb) { addFloatingText(width / 2, height * 0.3, (typeof getFactionTerms === 'function' ? getFactionTerms().army : 'Army') + ' at capacity!', '#ff6644'); return true; }
       state.gold = max(0, state.gold - 20); state.meals = max(0, state.meals - 1);
       lg.trainingQueue++; if (lg.trainingTimer <= 0) lg.trainingTimer = 300;
       addFloatingText(width / 2, height * 0.3, 'Training ' + getFactionTerms().soldier.toLowerCase() + '...', '#cc8844');

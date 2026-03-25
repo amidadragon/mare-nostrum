@@ -1380,9 +1380,18 @@ function keyPressed() {
       // Board enemy ship if boarding target available
       if (state.naval && state.naval.boardingTarget && typeof startBoardingCombat === 'function') { startBoardingCombat(); return; }
       if (r.nearIsle === 'conquest') {
-        if (state.conquest.colonized) {
-          // Colonized — free, peaceful entry
-          // enterConquest() deprecated -- openworld seamless
+        if (state.conquest && state.conquest.colonized) {
+          // Colonized — seamless disembark onto Terra Nova
+          state.rowing.active = false;
+          let cq = state.conquest;
+          let _da = atan2(r.y - cq.isleY, r.x - cq.isleX);
+          state.player.x = cq.isleX + cos(_da) * (cq.isleRX || 200) * 0.6;
+          state.player.y = cq.isleY + sin(_da) * (cq.isleRY || 150) * 0.6;
+          state.player.vx = 0; state.player.vy = 0;
+          cam.x = state.player.x; cam.y = state.player.y;
+          camSmooth.x = cam.x; camSmooth.y = cam.y;
+          _startCamTransition(); camZoomTarget = 1.0;
+          addFloatingText(width / 2, height * 0.35, 'Terra Nova', C.textBright);
           return;
         }
         // Open modifier selection UI

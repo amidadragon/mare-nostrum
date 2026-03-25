@@ -2245,6 +2245,7 @@ function drawInner() {
   }
   updateTutorialHint(dt);
   if (snd && frameCount % 10 === 0) { snd.updateAmbient(); }
+  if (typeof _updateCycle5SoundHooks === 'function') _updateCycle5SoundHooks(dt);
 
   // === WRECK BEACH MODE — before home island is reached, or revisiting ===
   if (((state.progression.gameStarted && !state.progression.homeIslandReached) || state.wreck._visiting) &&
@@ -2567,6 +2568,8 @@ function drawInner() {
         if (_owKey) {
           let _own = state.nations[_owKey];
           if (!_own || _own.defeated) continue;
+          // Skip the active nation island to prevent double-render during invasion
+          if (_owKey === state._activeNation && !_isTraveling) continue;
           let botCX = _own.isleX || WORLD.islandCX + 1200;
           let botCY = _own.isleY || WORLD.islandCY;
           // Screen-cull: skip islands far off-screen
