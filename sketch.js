@@ -2766,30 +2766,30 @@ function drawInner() {
           let sc = Math.max(0.3, 1 - dist/3000);
           let rx = (isle.isleRX || 300) * sc;
           let ry = (isle.isleRY || 200) * sc;
-          // Full terrain render when close
-          if (dist < 600 && typeof drawIslandAt === 'function') {
-            drawIslandAt({ cx: pos.x, cy: pos.y, rx: isle.isleRX || 300, ry: isle.isleRY || 200, level: 3, seed: isle.key.length * 7 });
-            if (typeof drawWorldIslandContent === 'function') {
-              drawWorldIslandContent(isle, sx, sy, sc);
-            }
-          } else {
-          push();
-          translate(sx, sy);
-          // Water ring
-          noStroke();
-          fill(40, 120, 160, 80);
-          ellipse(0, 0, rx*2.2, ry*2.2);
-          // Island body
-          let tc = isle.type === 'military' ? [140,110,80] : isle.type === 'economic' ? [160,140,90] : isle.type === 'diplomatic' ? [130,140,120] : [100,150,80];
-          fill(tc[0], tc[1], tc[2]);
-          ellipse(0, 0, rx*1.6, ry*1.6);
-          // Beach ring
-          fill(200, 180, 130);
-          ellipse(0, 0, rx*1.8, ry*1.8);
-          fill(tc[0], tc[1], tc[2]);
-          ellipse(0, 0, rx*1.4, ry*1.4);
-          // Per-island unique visual rendering
-          if (dist < 1200) {
+          // Determine LOD level and render full terrain for all distances
+          let lodLevel = 3;
+          if (dist >= 800) lodLevel = 2;
+          if (dist >= 1800) lodLevel = 1;
+
+          // Use full terrain engine with unique seed per island
+          let islandSeed = isle.key.length * 7 + isle.angle * 100;
+          if (typeof drawIslandAt === 'function') {
+            drawIslandAt({
+              cx: pos.x,
+              cy: pos.y,
+              rx: isle.isleRX || 300,
+              ry: isle.isleRY || 200,
+              level: lodLevel,
+              seed: islandSeed
+            });
+          }
+
+          // Draw unique feature overlays at reduced distance (LOD-based)
+          if (dist < 1200 && typeof drawIslandAt === 'function') {
+            push();
+            translate(sx, sy);
+
+            // Per-island unique visual overlays (rendered in screen space after island)
             switch(isle.key) {
               // RESOURCE ISLANDS
               case 'ironwood_forest':
@@ -3026,8 +3026,12 @@ function drawInner() {
                 ellipse(ry*0.15, -ry*0.12, 3, 3);
                 break;
             }
+            pop();
           }
-          // Icon indicator
+
+          // Island name label and controlled marker
+          push();
+          translate(sx, sy);
           if (dist < 1500) {
             fill(255, 255, 220, 200);
             textSize(10);
@@ -3040,7 +3044,6 @@ function drawInner() {
             }
           }
           pop();
-          }
         }
       }
       if (!_frameBudget.throttled || frameCount % 2 === 0) drawShoreWaves();
