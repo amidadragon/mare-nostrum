@@ -889,12 +889,9 @@ function keyPressed() {
     if (key === 'e' || key === 'E') { if (handleActiveNationInteract()) return; }
   }
 
-  // Seamless exploration island E-key
+  // Seamless exploration island E-key (old islands removed)
   if (state._activeExploration && (key === 'e' || key === 'E')) {
-    if (state._activeExploration === 'vulcan') { handleVulcanInteract(); return; }
-    if (state._activeExploration === 'hyperborea') { handleHyperboreInteract(); return; }
-    if (state._activeExploration === 'plenty') { handlePlentyInteract(); return; }
-    if (state._activeExploration === 'necropolis') { handleNecropolisInteract(); return; }
+    // Old expedition islands removed
   }
 
   // ─── WRECK BEACH KEYS ───
@@ -1456,17 +1453,7 @@ function keyPressed() {
         addFloatingText(width / 2, height * 0.35, 'Wreck Beach', C.sand);
         return;
       }
-      if (['vulcan','hyperborea','plenty','necropolis'].includes(r.nearIsle)) {
-        let _ei = state[r.nearIsle];
-        state.rowing.active = false;
-        let _da = atan2(r.y - _ei.isleY, r.x - _ei.isleX);
-        state.player.x = _ei.isleX + cos(_da) * _ei.isleRX * 0.6;
-        state.player.y = _ei.isleY + sin(_da) * _ei.isleRY * 0.6;
-        state.player.vx = 0; state.player.vy = 0;
-        cam.x = state.player.x; cam.y = state.player.y;
-        _startCamTransition(); camZoomTarget = 1.0;
-        return;
-      }
+      // Old expedition islands removed
       if (state.nations && state.nations[r.nearIsle]) {
         // Dock at nation island — enter foreign island visit mode
         let _nv = state.nations[r.nearIsle];

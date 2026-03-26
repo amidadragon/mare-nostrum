@@ -722,12 +722,6 @@ function initState() {
       segments: [],        // visual bridge segments (generated on build)
     },
 
-    // New island resources
-    obsidian: 0,       // Isle of Vulcan — crafting legendary weapons
-    frostCrystal: 0,   // Hyperborea — enchantments
-    exoticSpices: 0,   // Isle of Plenty — trade / cooking
-    soulEssence: 0,    // Necropolis — powerful enchantments
-
     // Expedition resources (earned on Terra Nova, spent at home)
     ironOre: 0, rareHide: 0, ancientRelic: 0, titanBone: 0,
     expeditionUpgrades: {
@@ -807,67 +801,6 @@ function initState() {
     // Auto-save
     autoSaveTimer: 0,
     autoSaveInterval: 18000, // every 5 min at 60fps
-
-    // ─── ISLE OF VULCAN (Northwest) — Volcanic island ───
-    vulcan: {
-      active: false,
-      isleX: WORLD.islandCX - 1800, isleY: WORLD.islandCY - 1800,
-      isleRX: 320, isleRY: 220,
-      phase: 'unexplored', // unexplored | explored | forged
-      lavaPools: [],      // { x, y, r, phase } — generated on first visit
-      hotSprings: [],     // { x, y, healTimer }
-      obsidianNodes: [],  // { x, y, collected }
-      forgeBuilt: false,
-      forgeRecipes: [],
-      ambientAsh: [],     // particle system
-      smokeVents: [],     // { x, y, phase }
-      returnX: 0, returnY: 0,
-    },
-
-    // ─── HYPERBOREA (North) — Frozen island ───
-    hyperborea: {
-      active: false,
-      isleX: WORLD.islandCX + 0, isleY: WORLD.islandCY - 2600,
-      isleRX: 350, isleRY: 240,
-      phase: 'unexplored', // unexplored | explored | settled
-      frozenRuins: [],    // { x, y, looted }
-      iceFishing: { active: false, timer: 0, caught: false },
-      frostNodes: [],     // { x, y, collected }
-      penguins: [],       // { x, y, vx, vy, state, timer }
-      snowflakes: [],     // particle system
-      auroraBorealis: 0,  // intensity 0-1, active at night
-      returnX: 0, returnY: 0,
-    },
-
-    // ─── ISLE OF PLENTY (Southeast) — Tropical paradise ───
-    plenty: {
-      active: false,
-      isleX: WORLD.islandCX + 1800, isleY: WORLD.islandCY + 1800,
-      isleRX: 380, isleRY: 260,
-      phase: 'unexplored', // unexplored | explored | colonized
-      fruitTrees: [],     // { x, y, type, fruit, timer }
-      parrots: [],        // { x, y, vx, vy, color, state }
-      waterfalls: [],     // { x, y, h }
-      spiceNodes: [],     // { x, y, collected }
-      colonyFarms: [],    // farm plots (3x harvest)
-      fallingLeaves: [],  // particle system
-      returnX: 0, returnY: 0,
-    },
-
-    // ─── NECROPOLIS (Southwest) — Ancient burial island ───
-    necropolis: {
-      active: false,
-      isleX: WORLD.islandCX - 1800, isleY: WORLD.islandCY + 1800,
-      isleRX: 300, isleRY: 200,
-      phase: 'unexplored', // unexplored | explored | cleansed
-      tombs: [],          // { x, y, looted, trapped }
-      skeletons: [],      // enemies { x, y, vx, vy, hp, maxHp, attackTimer, facing, flashTimer }
-      ghostNPCs: [],      // { x, y, name, line, talked }
-      soulNodes: [],      // { x, y, collected }
-      wisps: [],          // particle system — ghostly lights
-      darkAura: 0,        // atmospheric darkness level
-      returnX: 0, returnY: 0,
-    },
 
     // ─── RIVAL (Carthage AI) ─────────────────────────────────────────────
     rival: {

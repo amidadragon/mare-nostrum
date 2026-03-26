@@ -1714,18 +1714,12 @@ function onIslandTransition(from, to) {
   if (_exploIsles.includes(to)) {
     let isle = state[to];
     if (isle && isle.phase === 'unexplored') {
-      if (to === 'vulcan') enterVulcanContent();
-      else if (to === 'hyperborea') enterHyperboreContent();
-      else if (to === 'plenty') enterPlentyContent();
-      else if (to === 'necropolis') enterNecropolisContent();
+      // Old expedition islands removed - no phase transition needed
     }
-    if (!isle.frozenObelisk && to === 'hyperborea') isle.frozenObelisk = { x: isle.isleX, y: isle.isleY };
     if (state.narrativeFlags) state.narrativeFlags['discover_' + to] = true;
     // Play island-specific narration on first visit
     if (snd && snd.playNarration) {
-      if (to === 'vulcan') snd.playNarration('vulcan');
-      else if (to === 'necropolis') snd.playNarration('necropolis');
-      else if (to === 'hyperborea') snd.playNarration('hyperborea');
+      // Old expedition island narrations removed
     }
     trackMilestone('first_island');
     state._activeExploration = to;
@@ -2270,10 +2264,13 @@ function drawInner() {
   }
   // Openworld: force-clear legacy teleport flags every frame
   if (state.visitingNation) state.visitingNation = null;
-  if (state.vulcan && state.vulcan.active) state.vulcan.active = false;
-  if (state.hyperborea && state.hyperborea.active) state.hyperborea.active = false;
-  if (state.plenty && state.plenty.active) state.plenty.active = false;
-  if (state.necropolis && state.necropolis.active) state.necropolis.active = false;
+  // Special islands: activate when sailing (proximity-based rendering handled in draw functions)
+  if (state.rowing && state.rowing.active) {
+    if (state.vulcan) state.vulcan.active = true;
+    if (state.hyperborea) state.hyperborea.active = true;
+    if (state.plenty) state.plenty.active = true;
+    if (state.necropolis) state.necropolis.active = true;
+  }
   // Safety: if player is lost in deep ocean (not near any island, not rowing), teleport home
   // Skip during wreck beach (player is at -4800,0 which is far from all islands)
   let _onWreck = (state.progression.gameStarted && !state.progression.homeIslandReached) || (state.wreck && state.wreck._visiting);
@@ -2447,10 +2444,7 @@ function drawInner() {
     if (frameCount % 5 === 0) updateFactionWildlife(dt * 5);
     if (state._activeNation) updateActiveNationEntities(dt);
     if (state._activeExploration) {
-      if (state._activeExploration === 'vulcan') updateVulcanIsland(dt);
-      else if (state._activeExploration === 'hyperborea') updateHyperboreIsland(dt);
-      else if (state._activeExploration === 'plenty') updatePlentyIsland(dt);
-      else if (state._activeExploration === 'necropolis') updateNecropolisIsland(dt);
+      // Old expedition islands update calls removed
     }
     { let _pg = state.progression;
       let _full = !_pg.gameStarted || _pg.villaCleared;
@@ -2575,10 +2569,7 @@ function drawInner() {
     if (typeof drawInvasion === 'function') drawInvasion();
     // Seamless exploration island content
     if (state._activeExploration) {
-      if (state._activeExploration === 'vulcan') { drawVulcanEntities(); }
-      else if (state._activeExploration === 'hyperborea') { drawHyperboreEntities(); }
-      else if (state._activeExploration === 'plenty') { drawPlentyEntities(); }
-      else if (state._activeExploration === 'necropolis') { drawNecropolisEntities(); }
+      // Old expedition islands removed
     }
     // Fog dims distant islands
     if (state.weather.type === 'fog') {
@@ -2605,14 +2596,7 @@ function drawInner() {
         text('Wreck Beach', floor(wsx), floor(wsy - WRECK.ry * 0.5 * (_wreckDS ? _wreckDS.scale : 1)));
         textAlign(LEFT, TOP);
       }
-      drawVulcanIsland();
-      drawVulcanDistantLabel();
-      drawHyperboreIsland();
-      drawHyperboreDistantLabel();
-      drawPlentyIsland();
-      drawPlentyDistantLabel();
-      drawNecropolisIsland();
-      drawNecropolisDistantLabel();
+      // Old expedition islands removed
     }
     if (state.rowing.active) {
       drawHomeIslandDistant();
@@ -2680,6 +2664,8 @@ function drawInner() {
             // ═══ TIER 3: FULL RENDER (close or visiting) ═══
             let _owt = (typeof FACTION_TERRAIN !== 'undefined') ? (FACTION_TERRAIN[_owKey] || FACTION_TERRAIN.rome) : { seed: 42 };
             drawIslandAt({ cx: botCX, cy: botCY, rx: _isRX, ry: _isRY, level: _isLevel, seed: _owt.seed, factionKey: _owKey });
+            // Faction flora visible at TIER 3 distance (sailing view)
+            drawFactionFlora(_owKey, botCX, botCY, _isRX, _isRY);
             if (_isVisiting && !(typeof isInvasionBattleActive === 'function' && isInvasionBattleActive())) {
               // Draw biome content AFTER terrain — skip during invasion battle (battle units replace NPCs)
               drawActiveNationContent();
@@ -2728,6 +2714,8 @@ function drawInner() {
                 rect(Math.floor(_bbx - (_b.w || 20) / 2), Math.floor(_bby - (_b.h || 16)), _b.w || 20, _b.h || 16, 2);
               }
             }
+            // Faction-specific flora decoration
+            drawFactionFlora(_owKey, botCX, botCY, _isRX, _isRY);
             // Faction banner
             let _bfx = w2sX(botCX), _bfy = w2sY(botCY - _isRY * 0.3);
             push(); noStroke();
@@ -2800,38 +2788,243 @@ function drawInner() {
           ellipse(0, 0, rx*1.8, ry*1.8);
           fill(tc[0], tc[1], tc[2]);
           ellipse(0, 0, rx*1.4, ry*1.4);
-          // Type-specific visual indicators
+          // Per-island unique visual rendering
           if (dist < 1200) {
-            // Military islands — small tower
-            if (isle.type === 'military') {
-              fill(140, 120, 100);
-              rect(-4, -ry*0.4, 8, ry*0.3);
-              fill(160, 140, 120);
-              rect(-6, -ry*0.4 - 4, 12, 4);
-              // Flag
-              fill(200, 60, 60);
-              rect(-1, -ry*0.4 - 12, 8, 6);
-            }
-            // Economic islands — market tent
-            if (isle.type === 'economic') {
-              fill(200, 180, 100);
-              triangle(-8, -ry*0.3, 0, -ry*0.3 - 10, 8, -ry*0.3);
-              fill(180, 160, 80);
-              rect(-6, -ry*0.3, 12, 6);
-            }
-            // Diplomatic islands — column
-            if (isle.type === 'diplomatic') {
-              fill(220, 215, 200);
-              rect(-3, -ry*0.4, 6, ry*0.3);
-              rect(-5, -ry*0.4 - 2, 10, 3);
-              rect(-5, -ry*0.4 + ry*0.3 - 1, 10, 3);
-            }
-            // Resource islands — tree
-            if (isle.type === 'resource') {
-              fill(100, 70, 40);
-              rect(-2, -ry*0.3, 4, ry*0.2);
-              fill(60, 130, 50);
-              ellipse(0, -ry*0.35, 14, 12);
+            switch(isle.key) {
+              // RESOURCE ISLANDS
+              case 'ironwood_forest':
+                // Dense dark forest: multiple tall dark trees with broad canopies
+                fill(40, 60, 35);
+                for (let i = 0; i < 5; i++) {
+                  let ox = (i - 2) * ry * 0.25;
+                  let treeH = ry * (0.25 + i * 0.05);
+                  fill(60, 40, 20); rect(ox - 2, -treeH, 4, treeH);
+                  fill(30, 70, 40); ellipse(ox, -treeH - ry*0.15, ry*0.2, ry*0.18);
+                }
+                break;
+              case 'stoneheart':
+                // Rocky grey terrain: quarry pit in center with stone blocks
+                fill(150, 150, 150); ellipse(0, 0, rx*1.3, ry*1.3);
+                fill(100, 100, 100); ellipse(0, 0, rx*0.7, ry*0.7); // quarry pit
+                fill(120, 120, 120);
+                for (let i = 0; i < 4; i++) {
+                  let a = (i * PI / 2);
+                  rect(cos(a) * ry*0.3 - 3, sin(a) * ry*0.3 - 3, 6, 6);
+                }
+                break;
+              case 'grain_sea':
+                // Golden wheat fields: rows of crops, windmill
+                fill(200, 180, 80); // golden terrain base
+                // Wheat rows
+                stroke(160, 140, 60); strokeWeight(1);
+                for (let i = -ry*0.35; i < ry*0.35; i += ry*0.1) {
+                  line(-rx*0.4, i, rx*0.4, i);
+                }
+                noStroke();
+                // Windmill
+                fill(140, 100, 60); rect(-3, -ry*0.3, 6, ry*0.2);
+                fill(200, 180, 100); ellipse(0, -ry*0.35, 8, 8);
+                break;
+              case 'golden_hills':
+                // Hilly terrain with gold tones: mine entrance and sparkles
+                fill(180, 160, 80); // gold/amber hills
+                // Mine entrance
+                fill(60, 40, 20); ellipse(0, ry*0.1, ry*0.25, ry*0.18);
+                fill(80, 50, 20); ellipse(0, ry*0.1, ry*0.15, ry*0.12);
+                // Gold sparkles
+                fill(255, 230, 100); noStroke();
+                for (let i = 0; i < 4; i++) {
+                  ellipse((i-1.5)*ry*0.15, (i%2)*ry*0.2 - ry*0.2, 3, 3);
+                }
+                break;
+              // MILITARY ISLANDS
+              case 'iron_keep':
+                // Fortress: thick stone walls with watchtower
+                fill(100, 100, 110);
+                rect(-rx*0.3, -ry*0.3, rx*0.6, ry*0.6); // outer wall
+                fill(70, 70, 80);
+                rect(-rx*0.25, -ry*0.25, rx*0.5, ry*0.5); // inner
+                // Watchtower
+                fill(90, 90, 100); rect(-3, -ry*0.35, 6, ry*0.3);
+                fill(120, 120, 130); rect(-5, -ry*0.38, 10, 3);
+                break;
+              case 'warhorse':
+                // Pastures with horses and stable
+                fill(120, 150, 80); // green pasture
+                // Fenced paddocks
+                stroke(100, 80, 60); strokeWeight(1);
+                rect(-rx*0.3, -ry*0.25, rx*0.6, ry*0.5);
+                noStroke();
+                // Stable building
+                fill(120, 90, 60); rect(-ry*0.2, ry*0.1, ry*0.4, ry*0.15);
+                // Horses (small brown shapes)
+                fill(80, 50, 30);
+                ellipse(-ry*0.25, -ry*0.1, 6, 4);
+                ellipse(ry*0.15, -ry*0.15, 6, 4);
+                break;
+              case 'castrum_maris':
+                // Roman fort: rectangular walls, training grounds
+                fill(120, 90, 60); // tan terrain
+                stroke(80, 60, 40); strokeWeight(2);
+                rect(-rx*0.35, -ry*0.3, rx*0.7, ry*0.6); // fort walls
+                noStroke();
+                // Legion banner
+                fill(200, 50, 50); rect(-2, -ry*0.35, 4, 12);
+                fill(255, 200, 0); ellipse(0, -ry*0.32, 5, 4);
+                break;
+              case 'siege_works':
+                // Workshop: catapult, woodpiles, forge
+                fill(130, 100, 70);
+                // Catapult frame
+                stroke(80, 50, 30); strokeWeight(2);
+                line(-ry*0.1, -ry*0.2, ry*0.15, -ry*0.1);
+                line(-ry*0.1, -ry*0.2, ry*0.1, ry*0.15);
+                noStroke();
+                // Woodpiles
+                fill(90, 60, 40);
+                rect(-ry*0.25, ry*0.05, ry*0.2, ry*0.2);
+                rect(ry*0.15, ry*0.05, ry*0.2, ry*0.2);
+                break;
+              case 'heros_grave':
+                // Ancient tomb: mausoleum with eternal flame glow
+                fill(160, 160, 150); // pale stone
+                rect(-rx*0.25, -ry*0.25, rx*0.5, ry*0.45);
+                fill(200, 200, 190); // marble columns
+                rect(-rx*0.2, -ry*0.2, 6, ry*0.3);
+                rect(rx*0.14, -ry*0.2, 6, ry*0.3);
+                // Eternal flame
+                fill(255, 150, 50, 150);
+                ellipse(0, -ry*0.25, 8, 12);
+                fill(255, 200, 100, 100);
+                ellipse(0, -ry*0.28, 12, 14);
+                break;
+              // ECONOMIC ISLANDS
+              case 'golden_bazaar':
+                // Colorful market stalls with tent tops
+                fill(200, 140, 80); // market ground
+                // Multiple colored tents
+                let colors = [[255,100,100], [100,150,255], [255,200,50], [200,100,200]];
+                for (let i = 0; i < 4; i++) {
+                  fill(colors[i][0], colors[i][1], colors[i][2]);
+                  triangle((i-1.5)*ry*0.18 - 4, ry*0.1, (i-1.5)*ry*0.18, ry*0.1 - 8, (i-1.5)*ry*0.18 + 4, ry*0.1);
+                }
+                // Gold coin
+                fill(255, 200, 0); ellipse(0, -ry*0.2, 6, 6);
+                break;
+              case 'emporium':
+                // Grand warehouse with docked ships
+                fill(150, 120, 80); // warehouse
+                rect(-rx*0.3, -ry*0.2, rx*0.6, ry*0.35);
+                fill(200, 200, 200); // roof
+                triangle(-rx*0.3, -ry*0.2, 0, -ry*0.35, rx*0.3, -ry*0.2);
+                // Cargo crates
+                fill(100, 80, 60);
+                rect(-ry*0.15, ry*0.05, ry*0.1, ry*0.1);
+                rect(ry*0.1, ry*0.05, ry*0.1, ry*0.1);
+                break;
+              case 'silk_road':
+                // Exotic tent with silk banners and camel
+                fill(200, 140, 70); // sandy terrain
+                fill(180, 80, 180); // purple tent
+                triangle(-ry*0.2, ry*0.05, 0, -ry*0.2, ry*0.2, ry*0.05);
+                // Camel silhouette
+                fill(100, 70, 40);
+                ellipse(-ry*0.15, ry*0.15, 8, 6);
+                ellipse(-ry*0.1, ry*0.1, 4, 5);
+                break;
+              case 'amber_coast':
+                // Amber beach: lighthouse and amber nodes
+                fill(210, 170, 100); // amber sand
+                // Lighthouse
+                fill(220, 150, 80); rect(-2, -ry*0.35, 4, ry*0.3);
+                fill(255, 200, 100); ellipse(0, -ry*0.38, 8, 6);
+                // Crystallized amber nodes
+                fill(255, 180, 50);
+                for (let i = 0; i < 4; i++) {
+                  let a = (i * PI/2);
+                  ellipse(cos(a)*ry*0.25, sin(a)*ry*0.25, 4, 4);
+                }
+                break;
+              case 'spice_islands':
+                // Tropical: palm trees and exotic flowers
+                fill(120, 160, 90); // lush green
+                // Palm trees
+                fill(100, 60, 20);
+                rect(-ry*0.2, -ry*0.25, 3, ry*0.3);
+                rect(ry*0.15, -ry*0.2, 3, ry*0.25);
+                fill(80, 150, 60);
+                ellipse(-ry*0.2, -ry*0.3, 12, 10);
+                ellipse(ry*0.15, -ry*0.25, 12, 10);
+                // Exotic flowers
+                fill(200, 50, 100);
+                ellipse(-ry*0.05, 0, 4, 4);
+                ellipse(ry*0.2, -ry*0.05, 4, 4);
+                break;
+              case 'ivory_port':
+                // White/cream terrain with elephant tusk icon
+                fill(220, 210, 190); // ivory/cream
+                // Elephant tusk
+                fill(240, 235, 210);
+                arc(0, 0, ry*0.3, ry*0.4, -PI/4, PI/4, CHORD);
+                // Stacked ivory goods
+                fill(200, 190, 170);
+                rect(-ry*0.15, ry*0.1, ry*0.12, ry*0.08);
+                rect(ry*0.1, ry*0.12, ry*0.12, ry*0.08);
+                break;
+              // DIPLOMATIC ISLANDS
+              case 'senate_house':
+                // Grand marble building with columns and laurel wreath
+                fill(200, 200, 190); // white marble
+                rect(-rx*0.3, -ry*0.25, rx*0.6, ry*0.45);
+                fill(220, 220, 210);
+                for (let i = 0; i < 4; i++) {
+                  rect((i-1.5)*rx*0.15 - 2, -ry*0.25, 4, ry*0.3);
+                }
+                // Laurel wreath
+                fill(100, 150, 50);
+                arc(0, -ry*0.3, 14, 12, 0, PI);
+                break;
+              case 'oracle':
+                // Mysterious temple with swirling mist
+                fill(150, 140, 160); // temple stone
+                rect(-rx*0.2, -ry*0.2, rx*0.4, ry*0.4);
+                // Ancient pillars
+                fill(170, 160, 180);
+                rect(-rx*0.15, -ry*0.15, 4, ry*0.3);
+                rect(rx*0.11, -ry*0.15, 4, ry*0.3);
+                // Crystal ball glow
+                fill(150, 100, 200, 120);
+                ellipse(0, -ry*0.05, 8, 8);
+                fill(200, 150, 255, 80);
+                ellipse(0, -ry*0.05, 12, 12);
+                break;
+              case 'neutral_port':
+                // Harbor with docks and white peace flag
+                fill(160, 150, 140); // grey buildings
+                rect(-rx*0.25, -ry*0.2, rx*0.5, ry*0.3);
+                fill(120, 120, 120);
+                rect(-rx*0.3, -ry*0.15, 10, ry*0.25);
+                // Peace flag (white)
+                fill(255, 255, 255); rect(-1, -ry*0.3, 4, 8);
+                fill(200, 200, 255); ellipse(1, -ry*0.28, 6, 4);
+                break;
+              case 'temple_concord':
+                // Beautiful temple with golden roof and doves
+                fill(200, 190, 170); // marble
+                rect(-rx*0.25, -ry*0.2, rx*0.5, ry*0.35);
+                // Golden roof
+                fill(255, 200, 50);
+                triangle(-rx*0.25, -ry*0.2, 0, -ry*0.3, rx*0.25, -ry*0.2);
+                // Olive tree
+                fill(80, 100, 60);
+                rect(-1, ry*0.05, 2, ry*0.15);
+                fill(100, 140, 80);
+                ellipse(0, -ry*0.05, 10, 10);
+                // Doves (white dots)
+                fill(255, 255, 255);
+                ellipse(-ry*0.2, -ry*0.15, 3, 3);
+                ellipse(ry*0.15, -ry*0.12, 3, 3);
+                break;
             }
           }
           // Icon indicator
@@ -3125,10 +3318,6 @@ function drawInner() {
         { name: 'Home', x: WORLD.islandCX, y: WORLD.islandCY, col: '#88cc88' },
         { name: state.conquest.colonized ? 'Colony LV.' + state.conquest.colonyLevel : 'Terra Nova', x: state.conquest.isleX, y: state.conquest.isleY, col: state.conquest.colonized ? '#88cc88' : '#88aacc' },
         { name: 'Wreck Beach', x: WRECK.cx, y: WRECK.cy, col: '#ccaa66' },
-        { name: 'Isle of Vulcan', x: state.vulcan.isleX, y: state.vulcan.isleY, col: '#ff5533' },
-        { name: 'Hyperborea', x: state.hyperborea.isleX, y: state.hyperborea.isleY, col: '#88ddff' },
-        { name: 'Isle of Plenty', x: state.plenty.isleX, y: state.plenty.isleY, col: '#44cc44' },
-        { name: 'Necropolis', x: state.necropolis.isleX, y: state.necropolis.isleY, col: '#9944cc' },
       ];
       // Add all nation islands to compass
       let _nKeys = Object.keys(state.nations || {});
@@ -3223,10 +3412,7 @@ function drawInner() {
       drawRivalDiplomacyUI();
       if (state._activeNation && state.nationDiplomacyOpen) drawNationDiplomacyUI();
       if (state._activeExploration) {
-        if (state._activeExploration === 'vulcan') drawVulcanHUD();
-        else if (state._activeExploration === 'hyperborea') drawHyperboreHUD();
-        else if (state._activeExploration === 'plenty') drawPlentyHUD();
-        else if (state._activeExploration === 'necropolis') drawNecropolisHUD();
+        // Old expedition islands HUD removed
       }
       if (typeof drawTechTreeUI === 'function') drawTechTreeUI();
       if (typeof drawVictoryScreen === 'function') drawVictoryScreen();
@@ -7354,6 +7540,180 @@ function drawOneFactionCreature(w) {
   pop();
 }
 
+// ─── FACTION-SPECIFIC FLORA (for capital islands during sailing) ─────────────
+function drawFactionFlora(factionKey, botCX, botCY, isRX, isRY) {
+  if (!factionKey) factionKey = 'rome';
+  noStroke();
+
+  // Vegetation placed around island perimeter, scaled by island size
+  // Alpha decays with distance (handled by caller via _bAlpha pattern)
+
+  if (factionKey === 'rome') {
+    // Italian cypress (tall narrow dark green), olive trees (round), stone pine
+    let h = isRY * 0.4;
+    // Italian cypress trees (tall triangles)
+    fill(34, 80, 20, 180);
+    let cy1 = w2sY(botCY + isRY * 0.35);
+    rect(w2sX(botCX - isRX * 0.4) - 2, cy1 - h, 4, h);
+    rect(w2sX(botCX + isRX * 0.4) - 2, cy1 - h, 4, h);
+    // Olive trees (round canopy on brown trunk)
+    fill(120, 100, 60); // brown trunk
+    rect(w2sX(botCX - isRX * 0.25) - 1, cy1 - 8, 2, 8);
+    rect(w2sX(botCX + isRX * 0.25) - 1, cy1 - 8, 2, 8);
+    fill(140, 150, 90, 180); // silvery-green canopy
+    ellipse(w2sX(botCX - isRX * 0.25), cy1 - 10, 16, 14);
+    ellipse(w2sX(botCX + isRX * 0.25), cy1 - 10, 16, 14);
+    // Stone pine umbrella shape
+    fill(100, 120, 50, 180);
+    ellipse(w2sX(botCX), w2sY(botCY - isRY * 0.25), 20, 18);
+  }
+  else if (factionKey === 'carthage') {
+    // Date palm (tall trunk + fan top), pomegranate (small red dots), desert scrub
+    let h = isRY * 0.5;
+    // Date palms (tall trunks with fan-like fronds)
+    fill(180, 140, 80); // trunk color
+    rect(w2sX(botCX - isRX * 0.35) - 2, w2sY(botCY + isRY * 0.35) - h, 4, h);
+    rect(w2sX(botCX + isRX * 0.35) - 2, w2sY(botCY + isRY * 0.35) - h, 4, h);
+    // Palm fronds (fan shape at top)
+    fill(120, 140, 70, 180);
+    ellipse(w2sX(botCX - isRX * 0.35), w2sY(botCY + isRY * 0.35) - h - 4, 14, 8);
+    ellipse(w2sX(botCX + isRX * 0.35), w2sY(botCY + isRY * 0.35) - h - 4, 14, 8);
+    // Pomegranate bushes (small red/orange dots on green)
+    fill(100, 120, 50, 180);
+    ellipse(w2sX(botCX - isRX * 0.1), w2sY(botCY + isRY * 0.2), 12, 10);
+    fill(200, 80, 40, 180);
+    rect(w2sX(botCX - isRX * 0.1) - 3, w2sY(botCY + isRY * 0.2) - 2, 2, 2);
+    rect(w2sX(botCX - isRX * 0.1) + 1, w2sY(botCY + isRY * 0.2) + 1, 2, 2);
+  }
+  else if (factionKey === 'egypt') {
+    // Papyrus reeds (thin tall green stalks), palm trees, lotus flowers (pink dots near shore)
+    let cy_shore = w2sY(botCY + isRY * 0.35);
+    // Papyrus reeds (thin vertical lines near water)
+    fill(100, 140, 80, 180);
+    for (let i = -2; i <= 2; i++) {
+      let px = w2sX(botCX + isRX * (0.25 + i * 0.1));
+      rect(px - 1, cy_shore - 20, 2, 20);
+    }
+    // Palm trees
+    fill(160, 120, 70); // trunk
+    rect(w2sX(botCX - isRX * 0.3) - 2, cy_shore - 25, 4, 25);
+    fill(110, 140, 70, 180); // canopy
+    ellipse(w2sX(botCX - isRX * 0.3), cy_shore - 28, 18, 16);
+    // Lotus flowers (pink dots near shore)
+    fill(200, 120, 160, 180);
+    ellipse(w2sX(botCX + isRX * 0.2), cy_shore - 4, 3, 3);
+    ellipse(w2sX(botCX - isRX * 0.2), cy_shore - 6, 3, 3);
+  }
+  else if (factionKey === 'greece') {
+    // Olive groves (silvery-green round canopies), laurel bushes, grape vines
+    let cy = w2sY(botCY - isRY * 0.2);
+    // Olive grove
+    fill(140, 150, 90, 180);
+    ellipse(w2sX(botCX - isRX * 0.3), cy, 18, 16);
+    ellipse(w2sX(botCX + isRX * 0.3), cy, 18, 16);
+    ellipse(w2sX(botCX), cy + 10, 16, 14);
+    // Laurel bushes
+    fill(80, 120, 60, 180);
+    ellipse(w2sX(botCX - isRX * 0.1), w2sY(botCY + isRY * 0.25), 12, 10);
+    // Grape vines (purple dots on trellis-like shapes)
+    fill(140, 80, 160, 180);
+    rect(w2sX(botCX + isRX * 0.2) - 1, w2sY(botCY + isRY * 0.15), 2, 12);
+    fill(120, 60, 140, 180);
+    for (let i = 0; i < 3; i++) {
+      ellipse(w2sX(botCX + isRX * 0.2) + 2, w2sY(botCY + isRY * 0.15) + 3 + i * 4, 3, 3);
+    }
+  }
+  else if (factionKey === 'persia') {
+    // Organized gardens (rows of trees), cypress avenue, rose bushes (red dots), fountains
+    let cy = w2sY(botCY - isRY * 0.15);
+    // Cypress avenue (row of narrow trees)
+    fill(60, 100, 40, 180);
+    for (let i = -1; i <= 1; i++) {
+      let cx = w2sX(botCX + isRX * (i * 0.2));
+      rect(cx - 2, cy - 30, 4, 30);
+    }
+    // Rose bushes (red dots on green mounds)
+    fill(80, 110, 60, 180);
+    ellipse(w2sX(botCX - isRX * 0.25), w2sY(botCY + isRY * 0.3), 14, 12);
+    fill(200, 50, 80, 180);
+    rect(w2sX(botCX - isRX * 0.25) - 2, w2sY(botCY + isRY * 0.3) - 2, 2, 2);
+    rect(w2sX(botCX - isRX * 0.25) + 2, w2sY(botCY + isRY * 0.3) + 1, 2, 2);
+    // Fountains (blue circles)
+    fill(60, 140, 180, 180);
+    ellipse(w2sX(botCX + isRX * 0.3), w2sY(botCY - isRY * 0.3), 8, 8);
+  }
+  else if (factionKey === 'gaul') {
+    // Dense oak forests (large round canopies), wildflowers (colored dots), mushrooms
+    let cy = w2sY(botCY - isRY * 0.1);
+    // Oak forest (large round canopies)
+    fill(80, 120, 50, 180);
+    ellipse(w2sX(botCX - isRX * 0.35), cy - 5, 24, 22);
+    ellipse(w2sX(botCX + isRX * 0.35), cy - 5, 24, 22);
+    ellipse(w2sX(botCX - isRX * 0.1), cy + 15, 20, 18);
+    // Wildflowers (scattered colored dots)
+    fill(240, 100, 100, 180); // red flowers
+    ellipse(w2sX(botCX - isRX * 0.25), w2sY(botCY + isRY * 0.25), 3, 3);
+    fill(100, 200, 100, 180); // green flowers
+    ellipse(w2sX(botCX + isRX * 0.15), w2sY(botCY + isRY * 0.2), 3, 3);
+    fill(200, 150, 50, 180); // yellow flowers
+    ellipse(w2sX(botCX), w2sY(botCY + isRY * 0.3), 3, 3);
+    // Mushrooms
+    fill(200, 100, 80, 180);
+    ellipse(w2sX(botCX + isRX * 0.1), w2sY(botCY + isRY * 0.35), 5, 4);
+  }
+  else if (factionKey === 'phoenicia') {
+    // Cedar trees (tall triangular), coastal grass, fishing nets
+    let h = isRY * 0.45;
+    // Cedar trees (Lebanese cedar - tall triangular)
+    fill(60, 90, 40, 180);
+    let cx_cedar = w2sX(botCX - isRX * 0.3);
+    let cy_cedar = w2sY(botCY + isRY * 0.3);
+    rect(cx_cedar - 2, cy_cedar - h, 4, h);
+    // Triangular canopy
+    for (let layer = 0; layer < 3; layer++) {
+      let w = 18 - layer * 4;
+      let y = cy_cedar - h + layer * 8;
+      fill(80, 110, 50, 180);
+      ellipse(cx_cedar, y - w / 2, w, w * 0.7);
+    }
+    // Coastal grass
+    fill(100, 130, 70, 180);
+    for (let i = 0; i < 4; i++) {
+      let gx = w2sX(botCX + isRX * (0.1 + i * 0.15));
+      let gy = w2sY(botCY + isRY * 0.35);
+      rect(gx - 1, gy - 8, 2, 8);
+    }
+    // Fishing nets (brown lines)
+    fill(100, 80, 50, 100);
+    line(w2sX(botCX + isRX * 0.4), w2sY(botCY + isRY * 0.3), w2sX(botCX + isRX * 0.45), w2sY(botCY + isRY * 0.35));
+    line(w2sX(botCX + isRX * 0.42), w2sY(botCY + isRY * 0.25), w2sX(botCX + isRX * 0.48), w2sY(botCY + isRY * 0.33));
+  }
+  else if (factionKey === 'seapeople') {
+    // Sparse scrub, driftwood, kelp/seaweed at shore, dark volcanic rock patches
+    let cy_shore = w2sY(botCY + isRY * 0.35);
+    // Sparse scrub bushes
+    fill(80, 100, 60, 150);
+    ellipse(w2sX(botCX - isRX * 0.3), cy_shore - 10, 12, 10);
+    ellipse(w2sX(botCX + isRX * 0.25), cy_shore - 5, 10, 8);
+    // Driftwood (brown angled lines)
+    stroke(100, 70, 40, 150);
+    strokeWeight(2);
+    line(w2sX(botCX - isRX * 0.1), cy_shore, w2sX(botCX - isRX * 0.1) + 15, cy_shore + 5);
+    line(w2sX(botCX + isRX * 0.15), cy_shore + 3, w2sX(botCX + isRX * 0.15) - 12, cy_shore + 8);
+    noStroke();
+    // Kelp/seaweed at shore (dark green wavy lines)
+    fill(40, 80, 50, 150);
+    for (let i = -1; i <= 1; i++) {
+      let kx = w2sX(botCX + isRX * (0.35 + i * 0.1));
+      ellipse(kx, cy_shore + 4, 3, 6);
+    }
+    // Dark volcanic rock patches
+    fill(50, 40, 30, 120);
+    ellipse(w2sX(botCX - isRX * 0.4), w2sY(botCY + isRY * 0.1), 14, 12);
+    ellipse(w2sX(botCX + isRX * 0.38), w2sY(botCY + isRY * 0.2), 10, 10);
+  }
+}
+
 function drawOneFlora(fl) {
   let sx = w2sX(fl.x), sy = w2sY(fl.y);
   if (sx < -10 || sx > width + 10 || sy < -10 || sy > height + 10) return;
@@ -7484,25 +7844,7 @@ function drawSeaMap() {
     }
   }
 
-  // Exploration islands (Vulcan, Hyperborea, Plenty, Necropolis)
-  let exploreIslands = [
-    { key: 'vulcan', name: 'Vulcan', color: [200, 80, 40] },
-    { key: 'hyperborea', name: 'Hyperborea', color: [100, 180, 220] },
-    { key: 'plenty', name: 'Plenty', color: [80, 180, 80] },
-    { key: 'necropolis', name: 'Necropolis', color: [140, 100, 160] },
-  ];
-  for (let ei of exploreIslands) {
-    let eState = state[ei.key];
-    if (!eState) continue;
-    let eix = centerX + ((eState.isleX || 0) - WORLD.islandCX) * scale;
-    let eiy = centerY + ((eState.isleY || 0) - WORLD.islandCY) * scale;
-    if (eix < mx || eix > mx + mapW || eiy < my || eiy > my + mapH) continue;
-    fill(ei.color[0], ei.color[1], ei.color[2], 180);
-    noStroke();
-    rect(eix - 3, eiy - 3, 6, 6, 1);
-    fill(ei.color[0], ei.color[1], ei.color[2]); textSize(5); textAlign(CENTER, TOP);
-    text(ei.name, eix, eiy + 5);
-  }
+  // Exploration islands removed
 
   // Draw world islands (neutral)
   if (typeof WORLD_ISLANDS !== 'undefined') {

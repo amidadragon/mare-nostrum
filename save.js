@@ -67,8 +67,6 @@ function saveGame() {
     // Expedition system
     ironOre: state.ironOre, rareHide: state.rareHide,
     ancientRelic: state.ancientRelic, titanBone: state.titanBone,
-    obsidian: state.obsidian, frostCrystal: state.frostCrystal,
-    exoticSpices: state.exoticSpices, soulEssence: state.soulEssence,
     steel: state.steel || 0, marble: state.marble || 0, perfume: state.perfume || 0, scrolls: state.scrolls || 0,
     expeditionUpgrades: state.expeditionUpgrades,
     expeditionLog: state.expeditionLog,
@@ -139,40 +137,7 @@ function saveGame() {
     bountyBoard: state.bountyBoard,
     cook: state.cook ? { unlocked: state.cook.unlocked, x: state.cook.x, y: state.cook.y } : null,
     fisherman: state.fisherman ? { unlocked: state.fisherman.unlocked, fishCaught: state.fisherman.fishCaught } : null,
-    // Island exploration phases
-    vulcanPhase: state.vulcan.phase,
-    hyperboreaPhase: state.hyperborea.phase,
-    plentyPhase: state.plenty.phase,
-    necropolisPhase: state.necropolis.phase,
-    // Island loot states (BUG-019)
-    vulcanLoot: {
-      obsidianCollected: (state.vulcan.obsidianNodes || []).map(n => n.collected),
-      hotSprings: (state.vulcan.hotSprings || []).map(h => ({ x: h.x, y: h.y })),
-      lavaPools: (state.vulcan.lavaPools || []).map(l => ({ x: l.x, y: l.y, r: l.r })),
-      obsidianPositions: (state.vulcan.obsidianNodes || []).map(n => ({ x: n.x, y: n.y })),
-      smokeVents: (state.vulcan.smokeVents || []).map(s => ({ x: s.x, y: s.y })),
-    },
-    hyperboreaLoot: {
-      ruinsLooted: (state.hyperborea.frozenRuins || []).map(r => r.looted),
-      ruinPositions: (state.hyperborea.frozenRuins || []).map(r => ({ x: r.x, y: r.y })),
-      iceNodes: (state.hyperborea.frostNodes || []).map(n => ({ x: n.x, y: n.y, collected: n.collected })),
-    },
-    plentyLoot: {
-      spiceCollected: (state.plenty.spiceNodes || []).map(n => n.collected),
-      spicePositions: (state.plenty.spiceNodes || []).map(n => ({ x: n.x, y: n.y })),
-      fruitTrees: (state.plenty.fruitTrees || []).map(t => ({ x: t.x, y: t.y, fruit: t.fruit })),
-    },
-    necropolisLoot: {
-      tombsLooted: (state.necropolis.tombs || []).map(t => t.looted),
-      tombTrapped: (state.necropolis.tombs || []).map(t => !!t.trapped),
-      tombPositions: (state.necropolis.tombs || []).map(t => ({ x: t.x, y: t.y })),
-      soulCollected: (state.necropolis.soulNodes || []).map(n => n.collected),
-      soulPositions: (state.necropolis.soulNodes || []).map(n => ({ x: n.x, y: n.y })),
-      ghostTalked: (state.necropolis.ghostNPCs || []).map(g => g.talked),
-      ghostNames: (state.necropolis.ghostNPCs || []).map(g => g.name || ''),
-      ghostLines: (state.necropolis.ghostNPCs || []).map(g => g.line || ''),
-      ghostPositions: (state.necropolis.ghostNPCs || []).map(g => ({ x: g.x, y: g.y })),
-    },
+    // Island exploration phases (old islands removed)
     // Legia military system
     legia: state.legia || null,
     legiaUnits: (state.legia ? state.legia.units : []) || [],
@@ -410,14 +375,6 @@ function migrateSave(d) {
 
   // v5 -> v6: Island exploration phases, loot states, legia, random events
   if (v < 6) {
-    d.vulcanPhase = d.vulcanPhase || 'unexplored';
-    d.hyperboreaPhase = d.hyperboreaPhase || 'unexplored';
-    d.plentyPhase = d.plentyPhase || 'unexplored';
-    d.necropolisPhase = d.necropolisPhase || 'unexplored';
-    d.vulcanLoot = d.vulcanLoot || null;
-    d.hyperboreaLoot = d.hyperboreaLoot || null;
-    d.plentyLoot = d.plentyLoot || null;
-    d.necropolisLoot = d.necropolisLoot || null;
     d.legia = d.legia || null;
     d.arenaHighWave = d.arenaHighWave || 0;
     d.arenaBridgeBuilt = d.arenaBridgeBuilt || false;
@@ -720,41 +677,7 @@ function loadGame() {
     state.nationDiplomacyOpen = null;
     state.visitingNation = null;
     state.nationIsland = null;
-    // Openworld: reset all legacy active flags on load
-    if (state.vulcan) state.vulcan.active = false;
-    if (state.hyperborea) state.hyperborea.active = false;
-    if (state.plenty) state.plenty.active = false;
-    if (state.necropolis) state.necropolis.active = false;
-    // Island exploration phases — prevents re-generating content on revisit
-    if (d.vulcanPhase) state.vulcan.phase = d.vulcanPhase;
-    if (d.hyperboreaPhase) state.hyperborea.phase = d.hyperboreaPhase;
-    if (d.plentyPhase) state.plenty.phase = d.plentyPhase;
-    if (d.necropolisPhase) state.necropolis.phase = d.necropolisPhase;
-    // Island loot states (BUG-019)
-    if (d.vulcanLoot && state.vulcan.phase !== 'unexplored') {
-      let vl = d.vulcanLoot;
-      if (vl.obsidianPositions) state.vulcan.obsidianNodes = vl.obsidianPositions.map((p, i) => ({ x: p.x, y: p.y, collected: vl.obsidianCollected[i] || false }));
-      if (vl.hotSprings) state.vulcan.hotSprings = vl.hotSprings.map(h => ({ x: h.x, y: h.y, healTimer: 0 }));
-      if (vl.lavaPools) state.vulcan.lavaPools = vl.lavaPools.map(l => ({ x: l.x, y: l.y, r: l.r, phase: random(TWO_PI) }));
-      if (vl.smokeVents) state.vulcan.smokeVents = vl.smokeVents.map(s => ({ x: s.x, y: s.y, phase: random(TWO_PI) }));
-    }
-    if (d.hyperboreaLoot && state.hyperborea.phase !== 'unexplored') {
-      let hl = d.hyperboreaLoot;
-      if (hl.ruinPositions) state.hyperborea.frozenRuins = hl.ruinPositions.map((p, i) => ({ x: p.x, y: p.y, looted: hl.ruinsLooted[i] || false }));
-      if (hl.iceNodes) state.hyperborea.frostNodes = hl.iceNodes.map(n => ({ x: n.x, y: n.y, collected: n.collected || false }));
-    }
-    if (d.plentyLoot && state.plenty.phase !== 'unexplored') {
-      let pl = d.plentyLoot;
-      if (pl.spicePositions) state.plenty.spiceNodes = pl.spicePositions.map((p, i) => ({ x: p.x, y: p.y, collected: pl.spiceCollected[i] || false }));
-      if (pl.fruitTrees) state.plenty.fruitTrees = pl.fruitTrees.map(t => ({ x: t.x, y: t.y, fruit: t.fruit }));
-    }
-    if (d.necropolisLoot && state.necropolis.phase !== 'unexplored') {
-      let nl = d.necropolisLoot;
-      if (nl.tombPositions) state.necropolis.tombs = nl.tombPositions.map((p, i) => ({ x: p.x, y: p.y, looted: nl.tombsLooted[i] || false, trapped: nl.tombTrapped ? nl.tombTrapped[i] || false : false }));
-      if (nl.soulPositions) state.necropolis.soulNodes = nl.soulPositions.map((p, i) => ({ x: p.x, y: p.y, collected: nl.soulCollected[i] || false }));
-      let _gn = ['Aurelius', 'Cornelia', 'Septimus'], _gl = ['The forge of Vulcan... obsidian tempered in soul fire creates weapons beyond mortal craft.', 'Frost crystals from the north... they bind enchantments to steel. Seek Hyperborea.', 'I once sailed to the Isle of Plenty... its spices could preserve food for centuries.'];
-      if (nl.ghostPositions) state.necropolis.ghostNPCs = nl.ghostPositions.map((p, i) => ({ x: p.x, y: p.y, talked: nl.ghostTalked[i] || false, name: nl.ghostNames ? nl.ghostNames[i] : _gn[i] || '', line: nl.ghostLines ? nl.ghostLines[i] : _gl[i] || '' }));
-    }
+    // Old expedition islands removed
     // Legia military system
     if (d.legia) {
       state.legia.recruits = d.legia.recruits || 0;

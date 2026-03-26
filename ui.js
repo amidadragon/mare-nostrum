@@ -1411,7 +1411,7 @@ function drawEmpireDashboard() {
   fill(20,25,35,200); rect(mX,mY,mW,mH,4);
   stroke(100,85,55,100); strokeWeight(0.5); noFill(); rect(mX,mY,mW,mH,4); noStroke();
   fill(140,120,80); textSize(10); textAlign(CENTER,TOP); text('WORLD MAP',mX+mW/2,mY+3);
-  let _isls=[{n:'Home',x:WORLD.islandCX,y:WORLD.islandCY,c:color(80,120,50),rx:18,ry:12},{n:'Terra Nova',x:state.conquest.isleX,y:state.conquest.isleY,c:state.conquest.colonized?color(80,160,80):color(80,120,160),rx:14,ry:10},{n:'Vulcan',x:state.vulcan.isleX,y:state.vulcan.isleY,c:color(180,60,30),rx:10,ry:8},{n:'Hyperborea',x:state.hyperborea.isleX,y:state.hyperborea.isleY,c:color(100,180,220),rx:11,ry:8},{n:'Plenty',x:state.plenty.isleX,y:state.plenty.isleY,c:color(60,160,60),rx:12,ry:9},{n:'Necropolis',x:state.necropolis.isleX,y:state.necropolis.isleY,c:color(120,50,160),rx:10,ry:7}];
+  let _isls=[{n:'Home',x:WORLD.islandCX,y:WORLD.islandCY,c:color(80,120,50),rx:18,ry:12},{n:'Terra Nova',x:state.conquest.isleX,y:state.conquest.isleY,c:state.conquest.colonized?color(80,160,80):color(80,120,160),rx:14,ry:10}];
   let _mnX=Infinity,_mxX=-Infinity,_mnY=Infinity,_mxY=-Infinity;
   _isls.forEach(i=>{_mnX=min(_mnX,i.x);_mxX=max(_mxX,i.x);_mnY=min(_mnY,i.y);_mxY=max(_mxY,i.y);});
   let _mSc=min((mW-40)/max(_mxX-_mnX,1),(mH-40)/max(_mxY-_mnY,1));
@@ -4296,10 +4296,6 @@ function _getCompassIslands() {
     { name: 'Home', x: WORLD.islandCX, y: WORLD.islandCY, col: '#88cc88', icon: '\u2302' },
     { name: state.conquest.colonized ? 'Colony' : 'Terra Nova', x: state.conquest.isleX, y: state.conquest.isleY, col: state.conquest.colonized ? '#88cc88' : '#88aacc', icon: '\u2694' },
     { name: 'Wreck Beach', x: WRECK.cx, y: WRECK.cy, col: '#ccaa66', icon: '\u2693' },
-    { name: 'Vulcan', x: state.vulcan.isleX, y: state.vulcan.isleY, col: '#ff5533', icon: '\u2740' },
-    { name: 'Hyperborea', x: state.hyperborea.isleX, y: state.hyperborea.isleY, col: '#88ddff', icon: '\u2744' },
-    { name: 'Plenty', x: state.plenty.isleX, y: state.plenty.isleY, col: '#44cc44', icon: '\u2618' },
-    { name: 'Necropolis', x: state.necropolis.isleX, y: state.necropolis.isleY, col: '#9944cc', icon: '\u2620' },
   ];
   let _nKeys = Object.keys(state.nations || {});
   for (let _nk of _nKeys) {
@@ -4537,10 +4533,7 @@ function _getDiscoveredIslandKeys() {
   let keys = ['Home'];
   if (state.conquest.phase !== 'unexplored' || state.conquest.colonized) keys.push(state.conquest.colonized ? 'Colony' : 'Terra Nova');
   keys.push('Wreck Beach');
-  if (state.vulcan.phase !== 'unexplored') keys.push('Vulcan');
-  if (state.hyperborea.phase !== 'unexplored') keys.push('Hyperborea');
-  if (state.plenty.phase !== 'unexplored') keys.push('Plenty');
-  if (state.necropolis.phase !== 'unexplored') keys.push('Necropolis');
+  // Old expedition islands removed
   let _nKeys = Object.keys(state.nations || {});
   for (let _nk of _nKeys) {
     let _nv = state.nations[_nk];

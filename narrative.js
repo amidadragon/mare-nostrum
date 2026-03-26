@@ -77,42 +77,7 @@ const MAIN_QUEST_CHAPTERS = [
     journalOnComplete: 'mq_taming_terra',
     dialogueOnComplete: { npc: 'livia', line: "Two islands, one people. My father dreamed of expansion without bloodshed. You've done what he could not — built an empire on trust, not steel." },
   },
-  {
-    id: 'volcanic_forge', title: 'VII — The Volcanic Forge',
-    desc: 'Discover the Isle of Vulcan. Forge a legendary weapon in its fire.',
-    objectives: [
-      { id: 'reach_vulcan', desc: 'Discover the Isle of Vulcan', interact: 'discover_vulcan' },
-      { id: 'gather_forge_mats', desc: 'Gather forge materials (10 iron, 5 titan bone)', check: () => state.ironOre >= 10 && state.titanBone >= 5 },
-      { id: 'forge_weapon', desc: 'Forge the Blade of Vulcan', interact: 'forge_vulcan_blade' },
-    ],
-    reward: { gold: 50 },
-    journalOnComplete: 'mq_volcanic_forge',
-    dialogueOnComplete: { npc: 'marcus', line: "By Mars... that blade glows like a dying star. The Ninth had legends about weapons forged in living fire. I thought they were stories. I was wrong about a lot of things." },
-  },
-  {
-    id: 'frozen_memories', title: 'VIII — Frozen Memories',
-    desc: "Hyperborea holds Rome's lost magic. Brave the frozen north.",
-    objectives: [
-      { id: 'reach_hyperborea', desc: 'Reach Hyperborea', interact: 'discover_hyperborea' },
-      { id: 'find_tablets_10', desc: 'Find 10 lore tablets', check: () => state.loreTablets && state.loreTablets.filter(t => t.found).length >= 10 },
-      { id: 'learn_ritual', desc: 'Learn the Ritual of Sol Invictus', interact: 'learn_ritual' },
-    ],
-    reward: { crystals: 20, ancientRelic: 3 },
-    journalOnComplete: 'mq_frozen_memories',
-    dialogueOnComplete: { npc: 'vesta', line: "The ritual is ancient — older than Rome, older than the gods we name. Sol Invictus was not born in a temple. He was born in the hearts of those who refused to let the light die." },
-  },
-  {
-    id: 'dead_speak', title: 'IX — The Dead Speak',
-    desc: 'Enter the Necropolis. Learn the truth about your exile.',
-    objectives: [
-      { id: 'reach_necropolis', desc: 'Enter the Necropolis', interact: 'discover_necropolis' },
-      { id: 'find_all_tablets', desc: 'Find all 20 lore tablets', check: () => state.loreTablets && state.loreTablets.filter(t => t.found).length >= 20 },
-      { id: 'learn_truth', desc: 'Read the Final Inscription', interact: 'final_inscription' },
-    ],
-    reward: { gold: 100, ancientRelic: 5 },
-    journalOnComplete: 'mq_dead_speak',
-    dialogueOnComplete: { npc: 'livia', line: "So it was never treason. My father... your commander... we were all pawns in a consul's game. He exiled us to keep a secret — that Rome's power came from these islands. From the crystals. From Sol Invictus himself." },
-  },
+  // Old expedition island quests removed
   {
     id: 'mare_nostrum', title: 'X — Mare Nostrum',
     desc: 'Unite all islands. Build the final bridge. Become Imperator.',

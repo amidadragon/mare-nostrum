@@ -153,40 +153,7 @@ class AmbientManager {
     // Bubble timer
     this._bubbleTimer = 0;
 
-    // --- ISLAND SPECIFIC ---
-    // Vulcan rumble
-    this._vulcanGain = ctx.createGain();
-    this._vulcanGain.gain.value = 0;
-    this._vulcanGain.connect(this._uwFilter);
-    this._vulcanRumble = this._makeLoopNoise('brown', 4);
-    this._vulcanFilter = ctx.createBiquadFilter();
-    this._vulcanFilter.type = 'lowpass';
-    this._vulcanFilter.frequency.value = 60;
-    this._vulcanFilter.Q.value = 6;
-    this._vulcanRumble.connect(this._vulcanFilter);
-    this._vulcanFilter.connect(this._vulcanGain);
-
-    // Hyperborea howl
-    this._hyperGain = ctx.createGain();
-    this._hyperGain.gain.value = 0;
-    this._hyperGain.connect(this._uwFilter);
-    this._hyperHowl = this._makeLoopNoise('white', 3);
-    this._hyperFilter = ctx.createBiquadFilter();
-    this._hyperFilter.type = 'bandpass';
-    this._hyperFilter.frequency.value = 1200;
-    this._hyperFilter.Q.value = 8;
-    this._hyperHowl.connect(this._hyperFilter);
-    this._hyperFilter.connect(this._hyperGain);
-
-    // Necropolis eerie
-    this._necroGain = ctx.createGain();
-    this._necroGain.gain.value = 0;
-    this._necroGain.connect(this._uwFilter);
-    this._necroOsc = ctx.createOscillator();
-    this._necroOsc.type = 'sine';
-    this._necroOsc.frequency.value = 60;
-    this._necroOsc.connect(this._necroGain);
-    this._necroOsc.start();
+    // --- ISLAND SPECIFIC (old islands removed) ---
 
     // Shore lap phase
     this._shorePhase = 0;
@@ -518,24 +485,7 @@ class AmbientManager {
       }
     }
 
-    // --- VULCAN RUMBLE ---
-    let vulcanTarget = island === 'vulcan' ? 0.10 : 0;
-    if (island === 'vulcan') vulcanTarget *= (0.7 + Math.sin(this._t * 0.3) * 0.3);
-    this._ramp(this._vulcanGain.gain, Math.max(0, vulcanTarget), 0.5);
-    if (island === 'vulcan') this._vulcanFilter.frequency.value = 55 + Math.sin(this._t * 0.2) * 15;
-
-    // --- HYPERBOREA HOWL ---
-    let hyperTarget = island === 'hyperborea' ? 0.12 : 0;
-    if (island === 'hyperborea') {
-      hyperTarget *= (0.5 + Math.sin(this._t * 0.4) * 0.3 + Math.sin(this._t * 0.7) * 0.2);
-      this._hyperFilter.frequency.value = 1200 + Math.sin(this._t * 0.25) * 400;
-    }
-    this._ramp(this._hyperGain.gain, Math.max(0, hyperTarget), 0.5);
-
-    // --- NECROPOLIS EERIE ---
-    let necroTarget = island === 'necropolis' ? 0.07 : 0;
-    if (island === 'necropolis') necroTarget *= (0.4 + Math.sin(this._t * 1.2) * 0.6);
-    this._ramp(this._necroGain.gain, Math.max(0, necroTarget), 0.3);
+    // --- ISLAND SPECIFIC AMBIENCE (old islands removed) ---
 
     // --- SHORE LAP ---
     if (island === 'home' && !diving) {
