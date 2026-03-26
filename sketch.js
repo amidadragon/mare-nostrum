@@ -2537,6 +2537,16 @@ function drawInner() {
         horizonOffset = (height * 0.25) - horizonY;
       }
     }
+    // When visiting a world island, recalculate horizon based on that island
+    if (state._activeWorldIsland && state._worldIslePos) {
+      let _wp = state._worldIslePos;
+      let islandScreenY = w2sY(_wp.y) + floatOffset;
+      let visualTopRadius = _wp.ry * 0.50 * 1.12;
+      let islandTopScreen = islandScreenY - visualTopRadius - 10;
+      let horizonY = min(islandTopScreen, height * 0.35);
+      horizonY = max(horizonY, height * 0.05);
+      horizonOffset = (height * 0.25) - horizonY;
+    }
     // ─── ZOOM TRANSFORM — scale world rendering around screen center ───
     push();
     translate(width / 2, height / 2);
@@ -2613,7 +2623,7 @@ function drawInner() {
     translate(shakeX, shakeY + floatOffset);
     // Home island: render when on it (not visiting another island), LOD when sailing away
     let _isSailing = state.rowing && state.rowing.active;
-    let _onOtherIsland = !!state._activeNation || !!state._activeExploration;
+    let _onOtherIsland = !!state._activeNation || !!state._activeExploration || !!state._activeWorldIsland;
     if ((!_isSailing && !_onOtherIsland) || (_isSailing && _homeDist < 800)) {
       drawIsland(); // Full home island render (on island or close while sailing)
     } else if (_isSailing && _homeDist < 2000) {
@@ -2630,6 +2640,20 @@ function drawInner() {
       fill(120, 160, 100, _hAlpha * 0.7); ellipse(_hsx, _hsy - 2, _hrx * 1.4, _hry * 0.8);
       fill(220, 200, 160, _hAlpha); textSize(7); textAlign(CENTER, BOTTOM);
       text('HOME', _hsx, _hsy - _hry - 4); textAlign(LEFT, TOP);
+    }
+    // ═══ WORLD ISLAND: render terrain when player is standing on a world island ═══
+    if (state._activeWorldIsland && state._worldIslePos && typeof drawIslandAt === 'function') {
+      let _wp = state._worldIslePos;
+      let _wisle = typeof getWorldIsland === 'function' ? getWorldIsland(state._activeWorldIsland) : null;
+      let _wiseSeed = _wisle ? (_wisle.key.length * 7 + _wisle.angle * 100) : 42;
+      drawIslandAt({
+        cx: _wp.x,
+        cy: _wp.y,
+        rx: _wp.rx,
+        ry: _wp.ry,
+        level: 3,
+        seed: _wiseSeed
+      });
     }
     {
       // ═══ LOD WORLD: render all nation islands based on distance ═══

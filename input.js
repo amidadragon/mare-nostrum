@@ -1473,15 +1473,30 @@ function keyPressed() {
         }
         return;
       }
-      // World island — visit from ship (don't disembark)
-      if (typeof getWorldIsland === 'function') {
+      // World island — dock and disembark onto the island
+      if (typeof getWorldIsland === 'function' && typeof getIslandWorldPos === 'function') {
         let _wisle = getWorldIsland(r.nearIsle);
         if (_wisle && !_wisle.faction) {
-          if (typeof addNotification === 'function') addNotification('Visited ' + _wisle.name, '#aaddff');
+          let _wpos = getIslandWorldPos(_wisle);
+          let _wrx = _wisle.isleRX || 300, _wry = _wisle.isleRY || 200;
+          // Dock — stop rowing, place player on island
+          state.rowing.active = false;
+          state._activeWorldIsland = _wisle.key;
+          // Place player toward the dock side (approach angle)
+          let _dockAng = atan2(r.y - _wpos.y, r.x - _wpos.x);
+          state.player.x = _wpos.x + cos(_dockAng) * _wrx * 0.5;
+          state.player.y = _wpos.y + sin(_dockAng) * _wry * 0.5;
+          state.player.vx = 0; state.player.vy = 0;
+          cam.x = state.player.x; cam.y = state.player.y;
+          camSmooth.x = cam.x; camSmooth.y = cam.y;
+          camZoomTarget = 1.0;
+          // Store island center for re-embark boundary check
+          state._worldIslePos = { x: _wpos.x, y: _wpos.y, rx: _wrx, ry: _wry };
+          if (typeof addNotification === 'function') addNotification('Arrived at ' + _wisle.name, '#aaddff');
           if (_wisle.benefit && _wisle.benefit.desc) {
-            addNotification('Bonus available: ' + _wisle.benefit.desc, '#88ff88');
+            addNotification('Bonus: ' + _wisle.benefit.desc, '#88ff88');
           }
-          return; // stay on ship
+          return;
         }
       }
       // Otherwise disembark — snap player back to pier
@@ -1517,6 +1532,27 @@ function keyPressed() {
         state._activeNation = null;
         state._invasionTarget = null;
         camZoomTarget = 0.55; // zoom out for sailing
+        addFloatingText(width / 2, height * 0.35, 'Setting sail!', C.solarBright);
+        return;
+      }
+    }
+    // Board boat from world island — E at island edge to re-embark
+    if (state._activeWorldIsland && state._worldIslePos) {
+      let _wp = state._worldIslePos;
+      let _edx = (state.player.x - _wp.x) / _wp.rx;
+      let _edy = (state.player.y - _wp.y) / _wp.ry;
+      let _edist = _edx * _edx + _edy * _edy;
+      if (_edist > 0.5) { // near edge of island
+        state.rowing.active = true;
+        state.rowing.x = state.player.x;
+        state.rowing.y = state.player.y;
+        state.rowing.angle = atan2(state.player.y - _wp.y, state.player.x - _wp.x);
+        state.rowing.speed = 0;
+        state.rowing.oarPhase = 0;
+        state.rowing.wakeTrail = [];
+        state._activeWorldIsland = null;
+        state._worldIslePos = null;
+        camZoomTarget = 0.55;
         addFloatingText(width / 2, height * 0.35, 'Setting sail!', C.solarBright);
         return;
       }
