@@ -10,12 +10,18 @@ function _initAmbientShips() {
   // Island targets for trade routes
   let _targets = [
     { x: cx, y: cy },
-    { x: state.conquest.isleX, y: state.conquest.isleY },
-    { x: state.vulcan.isleX, y: state.vulcan.isleY },
-    { x: state.hyperborea.isleX, y: state.hyperborea.isleY },
-    { x: state.plenty.isleX, y: state.plenty.isleY },
-    { x: state.necropolis.isleX, y: state.necropolis.isleY },
   ];
+  // Add conquest island if it exists
+  if (state.conquest && state.conquest.isleX) _targets.push({ x: state.conquest.isleX, y: state.conquest.isleY });
+  // Add world islands as ambient ship targets
+  if (typeof WORLD_ISLANDS !== 'undefined') {
+    for (let wi of WORLD_ISLANDS) {
+      if (!wi.faction) {
+        let wpos = typeof getIslandWorldPos === 'function' ? getIslandWorldPos(wi) : null;
+        if (wpos) _targets.push({ x: wpos.x, y: wpos.y });
+      }
+    }
+  }
   let nKeys = Object.keys(state.nations || {});
   for (let k of nKeys) {
     let n = state.nations[k];
@@ -66,9 +72,14 @@ function drawAmbientShips() {
       let cx = WORLD.islandCX, cy = WORLD.islandCY;
       let _newTargets = [{ x: cx, y: cy }];
       let nk = Object.keys(state.nations || {});
-      for (let k of nk) { let n = state.nations[k]; if (n && !n.defeated) _newTargets.push({ x: n.isleX, y: n.isleY, nation: k }); }
-      _newTargets.push({ x: state.conquest.isleX, y: state.conquest.isleY });
-      _newTargets.push({ x: state.plenty.isleX, y: state.plenty.isleY });
+      for (let k of nk) { let n = state.nations[k]; if (n && !n.defeated && n.isleX) _newTargets.push({ x: n.isleX, y: n.isleY, nation: k }); }
+      if (state.conquest && state.conquest.isleX) _newTargets.push({ x: state.conquest.isleX, y: state.conquest.isleY });
+      // Add world islands as re-route targets
+      if (typeof WORLD_ISLANDS !== 'undefined') {
+        let _wPick = WORLD_ISLANDS[floor(random(WORLD_ISLANDS.length))];
+        let _wPos = typeof getIslandWorldPos === 'function' ? getIslandWorldPos(_wPick) : null;
+        if (_wPos) _newTargets.push({ x: _wPos.x, y: _wPos.y });
+      }
       let pick = _newTargets[floor(random(_newTargets.length))];
       ship.toX = pick.x; ship.toY = pick.y;
       ship.midX = (ship.fromX + ship.toX) / 2 + random(-300, 300);
@@ -258,7 +269,8 @@ function updateRowing(dt) {
   // World islands proximity + collision (all modes)
   if (typeof WORLD_ISLANDS !== 'undefined') {
     for (let isle of WORLD_ISLANDS) {
-      if (isle.faction) continue; // capitals handled as nations
+      // Skip capitals only if state.nations actually handles them
+      if (isle.faction && state.nations && state.nations[isle.faction] && !state.nations[isle.faction].defeated) continue;
       let pos = getIslandWorldPos(isle);
       let _wdx = (r.x - pos.x) / (isle.isleRX || 300);
       let _wdy = (r.y - pos.y) / (isle.isleRY || 200);
