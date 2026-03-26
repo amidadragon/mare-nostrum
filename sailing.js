@@ -10,18 +10,12 @@ function _initAmbientShips() {
   // Island targets for trade routes
   let _targets = [
     { x: cx, y: cy },
+    { x: state.conquest.isleX, y: state.conquest.isleY },
+    { x: state.vulcan.isleX, y: state.vulcan.isleY },
+    { x: state.hyperborea.isleX, y: state.hyperborea.isleY },
+    { x: state.plenty.isleX, y: state.plenty.isleY },
+    { x: state.necropolis.isleX, y: state.necropolis.isleY },
   ];
-  // Add conquest island if it exists
-  if (state.conquest && state.conquest.isleX) _targets.push({ x: state.conquest.isleX, y: state.conquest.isleY });
-  // Add world islands as ambient ship targets
-  if (typeof WORLD_ISLANDS !== 'undefined') {
-    for (let wi of WORLD_ISLANDS) {
-      if (!wi.faction) {
-        let wpos = typeof getIslandWorldPos === 'function' ? getIslandWorldPos(wi) : null;
-        if (wpos) _targets.push({ x: wpos.x, y: wpos.y });
-      }
-    }
-  }
   let nKeys = Object.keys(state.nations || {});
   for (let k of nKeys) {
     let n = state.nations[k];

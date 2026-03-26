@@ -2794,10 +2794,11 @@ function drawInner() {
           }
         }
       }
-      // Render neutral world islands during sailing
+      // Render ALL world islands during sailing (capitals + neutrals)
       if (typeof WORLD_ISLANDS !== 'undefined' && state.rowing && state.rowing.active) {
         for (let isle of WORLD_ISLANDS) {
-          if (isle.faction) continue; // capitals rendered as nation islands
+          // Skip capitals ONLY if state.nations actually renders them
+          if (isle.faction && state.nations && state.nations[isle.faction] && !state.nations[isle.faction].defeated) continue;
           let pos = getIslandWorldPos(isle);
           let dx = pos.x - state.player.x;
           let dy = pos.y - state.player.y;
@@ -3067,6 +3068,136 @@ function drawInner() {
                 fill(255, 255, 255);
                 ellipse(-ry*0.2, -ry*0.15, 3, 3);
                 ellipse(ry*0.15, -ry*0.12, 3, 3);
+                break;
+              // ═══ FACTION CAPITAL ISLANDS ═══
+              case 'rome_capital':
+                // Roman forum: colosseum arches, red SPQR banner, marble columns
+                fill(200, 195, 180); // marble base
+                rect(-rx*0.3, -ry*0.15, rx*0.6, ry*0.35);
+                // Colosseum arches
+                fill(180, 175, 160);
+                for (let i = 0; i < 5; i++) {
+                  arc((i-2)*rx*0.12, ry*0.05, rx*0.1, ry*0.2, PI, 0);
+                }
+                // SPQR banner
+                fill(180, 30, 30); rect(-2, -ry*0.4, 4, 14);
+                fill(255, 200, 0); textSize(5); textAlign(CENTER); text('SPQR', 0, -ry*0.27); textAlign(LEFT, TOP);
+                break;
+              case 'carthage_capital':
+                // Phoenician harbor: purple sails, crescent moon, merchant docks
+                fill(180, 160, 130); // sandstone
+                rect(-rx*0.25, -ry*0.15, rx*0.5, ry*0.3);
+                // Purple sails
+                fill(120, 30, 120);
+                triangle(-rx*0.2, ry*0.1, -rx*0.15, -ry*0.15, -rx*0.1, ry*0.1);
+                triangle(rx*0.1, ry*0.1, rx*0.15, -ry*0.15, rx*0.2, ry*0.1);
+                // Crescent moon symbol
+                fill(255, 200, 0);
+                arc(0, -ry*0.3, 10, 10, -PI*0.75, PI*0.75);
+                fill(180, 160, 130);
+                arc(2, -ry*0.3, 8, 8, -PI*0.75, PI*0.75);
+                break;
+              case 'egypt_capital':
+                // Egyptian: pyramid, obelisk, golden sands, papyrus
+                fill(210, 190, 140); // desert sand base
+                // Great pyramid
+                fill(200, 175, 120);
+                triangle(-rx*0.2, ry*0.1, 0, -ry*0.3, rx*0.2, ry*0.1);
+                fill(180, 155, 100);
+                triangle(0, -ry*0.3, rx*0.2, ry*0.1, rx*0.05, ry*0.1);
+                // Obelisk
+                fill(160, 140, 100); rect(rx*0.25 - 2, -ry*0.25, 4, ry*0.3);
+                fill(255, 200, 0); triangle(rx*0.25 - 3, -ry*0.25, rx*0.25, -ry*0.32, rx*0.25 + 3, -ry*0.25);
+                // Nile blue streak
+                stroke(60, 120, 180); strokeWeight(2);
+                line(-rx*0.35, ry*0.15, rx*0.35, ry*0.12);
+                noStroke();
+                break;
+              case 'greece_capital':
+                // Greek: Parthenon columns, olive wreath, white marble
+                fill(230, 225, 215); // white marble
+                rect(-rx*0.3, -ry*0.15, rx*0.6, ry*0.3);
+                // Parthenon columns
+                fill(210, 205, 195);
+                for (let i = 0; i < 6; i++) {
+                  rect((i-2.5)*rx*0.1 - 1.5, -ry*0.15, 3, ry*0.25);
+                }
+                // Pediment
+                fill(220, 215, 205);
+                triangle(-rx*0.3, -ry*0.15, 0, -ry*0.3, rx*0.3, -ry*0.15);
+                // Olive wreath
+                fill(100, 150, 60);
+                arc(0, -ry*0.35, 12, 10, PI, 0);
+                break;
+              case 'persia_capital':
+                // Persian: Persepolis gate, bull capitals, gold/blue tiles
+                fill(180, 155, 120); // sandstone
+                rect(-rx*0.3, -ry*0.15, rx*0.6, ry*0.35);
+                // Gate pillars
+                fill(160, 135, 100);
+                rect(-rx*0.25, -ry*0.3, 6, ry*0.4);
+                rect(rx*0.2, -ry*0.3, 6, ry*0.4);
+                // Bull capital icons
+                fill(140, 100, 60);
+                ellipse(-rx*0.22, -ry*0.32, 8, 6);
+                ellipse(rx*0.23, -ry*0.32, 8, 6);
+                // Blue-gold decorative band
+                fill(30, 80, 160); rect(-rx*0.15, -ry*0.17, rx*0.3, 4);
+                fill(255, 200, 50); rect(-rx*0.15, -ry*0.13, rx*0.3, 3);
+                break;
+              case 'gaul_capital':
+                // Celtic: stone circle, wooden longhouse, mistletoe
+                fill(100, 130, 80); // deep forest green
+                // Stone circle
+                fill(150, 150, 140);
+                for (let i = 0; i < 6; i++) {
+                  let a = i * PI / 3;
+                  rect(cos(a)*ry*0.25 - 2, sin(a)*ry*0.25 - 4, 4, 8, 1);
+                }
+                // Central altar
+                fill(120, 120, 110);
+                rect(-4, -3, 8, 6, 1);
+                // Mistletoe
+                fill(180, 200, 80);
+                ellipse(0, -ry*0.3, 8, 6);
+                fill(255, 255, 200);
+                ellipse(-1, -ry*0.28, 2, 2);
+                ellipse(2, -ry*0.31, 2, 2);
+                break;
+              case 'phoenicia_capital':
+                // Phoenician: cedar tree, purple dye vats, merchant fleet
+                fill(180, 160, 120); // warm sand
+                // Great Cedar of Lebanon
+                fill(80, 50, 30); rect(-1, -ry*0.15, 3, ry*0.3);
+                fill(30, 80, 40);
+                for (let i = 0; i < 4; i++) {
+                  let w = (4-i)*rx*0.08;
+                  triangle(-w, -ry*0.15 - i*ry*0.07, 0, -ry*0.2 - i*ry*0.07, w, -ry*0.15 - i*ry*0.07);
+                }
+                // Purple dye vats
+                fill(100, 20, 100);
+                ellipse(-rx*0.2, ry*0.1, 8, 5);
+                ellipse(-rx*0.1, ry*0.12, 8, 5);
+                break;
+              case 'seapeople_capital':
+                // Sea People: skull totem, raider ships, dark sails, bonfire
+                fill(80, 90, 100); // dark rocky shore
+                // Skull totem
+                fill(200, 200, 190);
+                ellipse(0, -ry*0.25, 10, 12);
+                fill(40, 40, 50);
+                ellipse(-2, -ry*0.27, 3, 3);
+                ellipse(3, -ry*0.27, 3, 3);
+                // Raider ship
+                fill(60, 40, 30);
+                rect(-rx*0.25, ry*0.1, rx*0.2, 4, 2);
+                fill(50, 50, 50);
+                triangle(-rx*0.2, ry*0.1, -rx*0.15, -ry*0.05, -rx*0.1, ry*0.1);
+                // Bonfire
+                fill(255, 120, 30, 180);
+                ellipse(rx*0.15, -ry*0.05, 8, 10);
+                fill(255, 80, 20, 120);
+                ellipse(rx*0.15, -ry*0.08, 6, 12);
                 break;
             }
             pop();
