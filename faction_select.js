@@ -225,6 +225,11 @@ function selectFaction(faction) {
   }
   trackMilestone('faction_chosen_' + faction);
   if (snd && snd.playNarration) snd.playNarration(faction + '_intro');
+  // Auto-acquire faction starter pet
+  if (typeof getFactionPetKey === 'function' && typeof acquirePet === 'function') {
+    let petKey = getFactionPetKey(faction);
+    if (petKey) acquirePet(petKey);
+  }
   // Initialize all rival nations (everyone except player's faction)
   initNations();
   // All nations at their NATION_DEFAULTS positions (4000-6000px from home)

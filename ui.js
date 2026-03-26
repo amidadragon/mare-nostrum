@@ -4176,7 +4176,7 @@ function drawVictoryScreen() {
   };
   let col = colors[vs.type] || [200, 200, 200];
 
-  // Victory particles
+  // Victory particles — fireworks and confetti
   if (vs.timer % 3 === 0 && vs.timer < 300) {
     particles.push({
       x: random(width * 0.2, width * 0.8), y: height + 4,
@@ -4186,6 +4186,46 @@ function drawVictoryScreen() {
       r: col[0], g: col[1], b: col[2],
       world: false,
     });
+  }
+  // Confetti sparkles
+  if (vs.timer % 2 === 0 && vs.timer < 400) {
+    let sparkCols = [[255,220,80],[200,180,240],[255,150,100],[120,220,180],[255,200,60]];
+    let sc = sparkCols[floor(random(sparkCols.length))];
+    particles.push({
+      x: random(width * 0.05, width * 0.95), y: -4,
+      vx: random(-0.8, 0.8), vy: random(0.8, 2.5),
+      life: random(80, 160), maxLife: 160,
+      type: 'burst', size: random(2, 4),
+      r: sc[0], g: sc[1], b: sc[2],
+      world: false,
+    });
+  }
+
+  // Victory parade — marching soldiers across bottom
+  if (vs.timer > 30 && vs.timer < 360) {
+    let paradeY = height * 0.88;
+    let fm = typeof getFactionMilitary === 'function' ? getFactionMilitary() : null;
+    let tunic = fm ? fm.tunic : [160, 35, 25];
+    noStroke();
+    for (let s = 0; s < 8; s++) {
+      let sx = ((vs.timer * 1.5 + s * 50) % (width + 100)) - 50;
+      let march = sin(vs.timer * 0.15 + s * 0.8) * 2;
+      // Body
+      fill(tunic[0], tunic[1], tunic[2], fadeIn * 200);
+      rect(sx - 3, paradeY - 8 + march, 6, 10);
+      // Head
+      fill(210, 170, 120, fadeIn * 200);
+      rect(sx - 2, paradeY - 12 + march, 4, 4);
+      // Helmet
+      fill(190, 160, 60, fadeIn * 180);
+      rect(sx - 2, paradeY - 13 + march, 4, 2);
+      // Shield
+      fill(col[0], col[1], col[2], fadeIn * 150);
+      rect(sx + 3, paradeY - 6 + march, 3, 6);
+      // Spear
+      fill(140, 120, 80, fadeIn * 160);
+      rect(sx - 4, paradeY - 18 + march, 1, 14);
+    }
   }
 
   push();
@@ -4219,6 +4259,27 @@ function drawVictoryScreen() {
   let score = (vs.day || 1) * 10 + (state.islandLevel || 1) * 50 + ((state.research && state.research.completed) || []).length * 25;
   textSize(14); fill(col[0], col[1], col[2], alpha);
   text('FINAL SCORE: ' + score, width / 2, height * 0.72);
+
+  // Triumphal monument
+  if (vs.timer > 60) {
+    let mAlpha = min(255, (vs.timer - 60) * 3);
+    let mx = width / 2, my = height * 0.78;
+    noStroke();
+    // Base
+    fill(180, 175, 160, mAlpha * 0.6);
+    rect(mx - 40, my, 80, 8);
+    // Columns
+    fill(200, 195, 180, mAlpha * 0.5);
+    rect(mx - 35, my - 30, 8, 30); rect(mx + 27, my - 30, 8, 30);
+    // Arch
+    fill(210, 205, 190, mAlpha * 0.5);
+    rect(mx - 35, my - 34, 70, 4);
+    // Victory type symbol
+    fill(col[0], col[1], col[2], mAlpha * 0.7);
+    textSize(16); textAlign(CENTER, CENTER);
+    let symbols = { domination: '\u2694', diplomatic: '\u2764', economic: '\u25C9', research: '\u2605' };
+    text(symbols[vs.type] || '\u2605', mx, my - 16);
+  }
 
   // Options
   if (vs.timer > 120) {

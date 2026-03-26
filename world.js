@@ -3303,6 +3303,8 @@ function initOceanWildlife() {
     whaleSpouts: [],
     seabirds: [],
     dolphins: [],
+    fishSchools: [],
+    seaTurtles: [],
   };
   // Seed 3-5 seabirds
   for (let i = 0; i < 4; i++) {
@@ -3428,6 +3430,83 @@ function drawOceanWildlife() {
       fill(230, 240, 248, splashA * 0.5 * dayMix);
       rect(dx - 5, floor(d.y) + 1, 10, 1);
     }
+  }
+
+  // ── Fish schools — shimmering silvery clusters moving in formation ──
+  if (frameCount % 300 === 0 && _oceanWildlife.fishSchools.length < 3 && bright > 0.25) {
+    let schoolSize = 5 + Math.floor(Math.random() * 8);
+    let schoolX = Math.random() * 0.8 + 0.1;
+    let schoolY = oceanTop + 25 + Math.random() * (height * 0.4);
+    let dir = Math.random() > 0.5 ? 1 : -1;
+    let fish = [];
+    for (let f = 0; f < schoolSize; f++) {
+      fish.push({
+        ox: (Math.random() - 0.5) * 20, oy: (Math.random() - 0.5) * 10,
+        phase: Math.random() * Math.PI * 2,
+      });
+    }
+    _oceanWildlife.fishSchools.push({
+      x: schoolX, y: schoolY, dir: dir,
+      speed: 0.0006 + Math.random() * 0.0004,
+      fish: fish, life: 240 + Math.floor(Math.random() * 120),
+    });
+  }
+  for (let i = _oceanWildlife.fishSchools.length - 1; i >= 0; i--) {
+    let sc = _oceanWildlife.fishSchools[i];
+    sc.x += sc.dir * sc.speed;
+    sc.life--;
+    if (sc.life <= 0 || sc.x < -0.1 || sc.x > 1.1) { _oceanWildlife.fishSchools.splice(i, 1); continue; }
+    let fadeIn = min(1, sc.life > 200 ? (240 - sc.life) / 40 : sc.life / 40);
+    let baseX = floor(sc.x * width);
+    let baseY = floor(sc.y);
+    for (let f of sc.fish) {
+      let fx = baseX + f.ox + sin(frameCount * 0.03 + f.phase) * 3;
+      let fy = baseY + f.oy + sin(frameCount * 0.02 + f.phase * 1.3) * 2;
+      // Silvery shimmer
+      let shimmer = 150 + sin(frameCount * 0.08 + f.phase) * 60;
+      fill(shimmer, shimmer + 10, shimmer + 30, 50 * dayMix * fadeIn);
+      rect(floor(fx), floor(fy), 2, 1);
+      // Tiny tail
+      fill(shimmer * 0.7, shimmer * 0.75, shimmer * 0.8 + 15, 35 * dayMix * fadeIn);
+      rect(floor(fx) - sc.dir * 2, floor(fy), 1, 1);
+    }
+  }
+
+  // ── Sea turtles — slow, serene surface swimmers ──
+  if (frameCount % 900 === 0 && _oceanWildlife.seaTurtles.length < 1 && bright > 0.35) {
+    _oceanWildlife.seaTurtles.push({
+      x: Math.random() > 0.5 ? -0.05 : 1.05,
+      y: oceanTop + 30 + Math.random() * 50,
+      dir: Math.random() > 0.5 ? 1 : -1,
+      speed: 0.0003 + Math.random() * 0.0002,
+      flipperPhase: Math.random() * Math.PI * 2,
+      life: 400 + Math.floor(Math.random() * 200),
+    });
+  }
+  for (let i = _oceanWildlife.seaTurtles.length - 1; i >= 0; i--) {
+    let t = _oceanWildlife.seaTurtles[i];
+    t.x += t.dir * t.speed;
+    t.flipperPhase += 0.03;
+    t.life--;
+    if (t.life <= 0 || t.x < -0.1 || t.x > 1.1) { _oceanWildlife.seaTurtles.splice(i, 1); continue; }
+    let tx = floor(t.x * width), ty = floor(t.y);
+    let tAlpha = 100 * dayMix * min(1, t.life > 360 ? (400 - t.life) / 40 : t.life / 40);
+    // Shell — olive green oval
+    fill(65, 85, 45, tAlpha); ellipse(tx, ty, 10, 7);
+    // Shell pattern
+    fill(55, 75, 35, tAlpha * 0.6); ellipse(tx, ty, 6, 4);
+    // Head
+    fill(70, 90, 50, tAlpha);
+    ellipse(tx + t.dir * 6, ty - 1, 4, 3);
+    // Flippers — paddle animation
+    let fAng = sin(t.flipperPhase) * 0.6;
+    fill(60, 80, 40, tAlpha * 0.8);
+    // Front flippers
+    rect(tx + t.dir * 2 + floor(cos(fAng) * 3), ty - 4, 3, 2);
+    rect(tx + t.dir * 2 + floor(cos(fAng) * 3), ty + 3, 3, 2);
+    // Back flippers (smaller)
+    rect(tx - t.dir * 4, ty - 3 + floor(sin(fAng) * 1), 2, 1);
+    rect(tx - t.dir * 4, ty + 3 - floor(sin(fAng) * 1), 2, 1);
   }
 }
 

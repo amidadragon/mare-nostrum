@@ -1565,46 +1565,94 @@ function drawNationDiplomacyUI() {
   let rv = state.nations[key];
   let name = getNationName(key);
 
-  // Panel background
-  let pw = 280, ph = 220;
-  let px = width / 2 - pw / 2, py = height / 2 - ph / 2 - 30;
+  // Faction colors
+  let _fm = (typeof FACTION_MILITARY !== 'undefined' && FACTION_MILITARY[key]) ? FACTION_MILITARY[key] : null;
+  let fCol = _fm ? _fm.conquestFlag : [160, 140, 90];
+
+  // Panel background — dark with faction-colored border
+  let pw = 300, ph = 260;
+  let px = width / 2 - pw / 2, py = height / 2 - ph / 2 - 20;
   noStroke();
-  fill(20, 15, 10, 220); rect(px, py, pw, ph, 5);
-  stroke(160, 140, 90, 180); strokeWeight(1); noFill();
-  rect(px, py, pw, ph, 5); noStroke();
+  fill(15, 12, 8, 230); rect(px, py, pw, ph, 6);
+  // Inner glow border
+  stroke(fCol[0], fCol[1], fCol[2], 120); strokeWeight(2); noFill();
+  rect(px + 1, py + 1, pw - 2, ph - 2, 5);
+  stroke(fCol[0], fCol[1], fCol[2], 40); strokeWeight(1);
+  rect(px + 4, py + 4, pw - 8, ph - 8, 4);
+  noStroke();
 
-  // Title
-  fill(240, 220, 170); textAlign(CENTER, TOP); textSize(14);
-  text(name + ' — Diplomacy', px + pw / 2, py + 8);
+  // Header bar with faction tint
+  fill(fCol[0], fCol[1], fCol[2], 30);
+  rect(px + 5, py + 5, pw - 10, 28, 3);
 
-  // Stats
+  // Title — faction colored
+  fill(min(255, fCol[0] + 80), min(255, fCol[1] + 80), min(255, fCol[2] + 80));
+  textAlign(CENTER, TOP); textSize(13);
+  text(name + ' — Diplomacy', px + pw / 2, py + 10);
+
+  // Divider line
+  stroke(fCol[0], fCol[1], fCol[2], 60); strokeWeight(1);
+  line(px + 15, py + 36, px + pw - 15, py + 36); noStroke();
+
+  // Stats section
   textSize(9); textAlign(LEFT, TOP);
-  let sx = px + 15, sy = py + 32;
+  let sx = px + 18, sy = py + 42;
   let rep = rv.reputation || 0;
-  let repCol = rep > 10 ? [100, 200, 100] : rep < -10 ? [220, 80, 60] : [200, 190, 140];
-  fill(repCol[0], repCol[1], repCol[2]);
-  text('Reputation: ' + rep, sx, sy);
-  fill(200, 190, 140);
-  text('Military: ' + (rv.military || 0) + '   Gold: ' + (rv.gold || 0) + '   Pop: ' + (rv.population || 0), sx, sy + 14);
-  text('Status: ' + (rv.allied ? 'ALLIED' : rv.vassal ? 'VASSAL' : rv.defeated ? 'DEFEATED' : 'Independent'), sx, sy + 28);
+
+  // Reputation bar
+  fill(180, 170, 140); text('Reputation', sx, sy);
+  let barX = sx + 65, barW = pw - 100, barH = 8;
+  fill(40, 35, 25); rect(barX, sy + 1, barW, barH, 3);
+  let repNorm = constrain((rep + 100) / 200, 0, 1);
+  let repBarCol = rep > 10 ? [80, 180, 80] : rep < -10 ? [200, 60, 50] : [180, 170, 100];
+  fill(repBarCol[0], repBarCol[1], repBarCol[2], 200);
+  rect(barX + 1, sy + 2, max(2, (barW - 2) * repNorm), barH - 2, 2);
+  // Rep number
+  fill(repBarCol[0], repBarCol[1], repBarCol[2]);
+  textAlign(RIGHT, TOP); text(rep, px + pw - 18, sy); textAlign(LEFT, TOP);
+
+  sy += 16;
+  // Status badge
+  let statusText = rv.allied ? 'ALLIED' : rv.vassal ? 'VASSAL' : rv.defeated ? 'DEFEATED' : 'Independent';
+  let statusCol = rv.allied ? [80, 200, 120] : rv.vassal ? [200, 180, 80] : rv.defeated ? [120, 120, 120] : [180, 170, 140];
+  fill(statusCol[0], statusCol[1], statusCol[2], 40); rect(sx, sy, textWidth(statusText) + 12, 14, 3);
+  fill(statusCol[0], statusCol[1], statusCol[2]); text(statusText, sx + 6, sy + 2);
+
+  // Stats row
+  sy += 20;
+  fill(160, 150, 120);
+  text('Military: ' + (rv.military || 0), sx, sy);
+  text('Gold: ' + (rv.gold || 0), sx + 90, sy);
+  text('Pop: ' + (rv.population || 0), sx + 170, sy);
+
+  // Divider
+  sy += 16;
+  stroke(80, 70, 50, 80); line(sx, sy, px + pw - 18, sy); noStroke();
 
   // Actions
-  sy += 50;
+  sy += 8;
   fill(180, 170, 140); textSize(10);
   let actions = [
-    { key: '1', label: 'Trade (25g → +5 rep)', enabled: state.gold >= 25 },
-    { key: '2', label: 'Gift (50g → +15 rep)', enabled: state.gold >= 50 },
-    { key: '3', label: 'Propose Alliance (rep > 30)', enabled: rep > 30 && !rv.allied },
-    { key: '4', label: 'Demand Tribute (rep > 20)', enabled: rep > 20 },
-    { key: '5', label: 'Declare War', enabled: !rv.allied },
-    { key: 'E', label: 'Invade (need army)', enabled: state.legia && state.legia.army && state.legia.army.length > 0 && !rv.defeated },
+    { key: '1', label: 'Trade (25g \u2192 goods + rep)', enabled: state.gold >= 25 },
+    { key: '2', label: 'Gift (25g \u2192 +rep)', enabled: state.gold >= 25 },
+    { key: '3', label: 'Propose Alliance', enabled: rep > 30 && !rv.allied },
+    { key: '4', label: 'Demand Tribute', enabled: rep > 20 },
+    { key: '5', label: 'Declare War', enabled: !rv.allied && !rv.defeated },
+    { key: 'E', label: 'Invade!', enabled: state.legia && state.legia.army && state.legia.army.length > 0 && !rv.defeated },
   ];
   for (let a of actions) {
-    fill(a.enabled ? 220 : 100, a.enabled ? 210 : 90, a.enabled ? 170 : 70);
+    // Action row hover hint
+    let aCol = a.enabled ? [220, 210, 170] : [80, 75, 60];
+    if (a.key === '5' && a.enabled) aCol = [220, 80, 60]; // war = red
+    if (a.key === 'E' && a.enabled) aCol = [220, 100, 50]; // invade = orange
+    if (a.key === '3' && a.enabled) aCol = [100, 220, 140]; // ally = green
+    fill(aCol[0], aCol[1], aCol[2]);
     text('[' + a.key + '] ' + a.label, sx, sy);
-    sy += 16;
+    sy += 18;
   }
-  fill(140, 130, 110); text('[ESC] Close', sx, sy + 4);
+  sy += 4;
+  fill(120, 110, 90); textSize(8);
+  text('[ESC] Close', sx, sy);
   textAlign(LEFT, TOP);
 }
 

@@ -115,34 +115,64 @@ function drawAmbientShips() {
     translate(floor(sx), floor(sy));
     scale(dir * sc, sc);
     let hAlpha = 160 * distFade * bright;
-    // Hull — wooden planks
-    fill(90, 62, 28, hAlpha);
+    // Faction-aware hull colors
+    let _afs = (ship.nationKey && typeof FACTION_SHIPS !== 'undefined' && FACTION_SHIPS[ship.nationKey]) ? FACTION_SHIPS[ship.nationKey] : null;
+    let hullR = _afs ? _afs.hullColor[0] : 90, hullG = _afs ? _afs.hullColor[1] : 62, hullB = _afs ? _afs.hullColor[2] : 28;
+    let deckR = _afs ? _afs.deckColor[0] : 75, deckG = _afs ? _afs.deckColor[1] : 50, deckB = _afs ? _afs.deckColor[2] : 22;
+    // Hull — faction-colored planks
+    fill(hullR, hullG, hullB, hAlpha);
     beginShape();
     vertex(-12, -1); vertex(-10, 3); vertex(10, 3); vertex(12, -1);
     vertex(9, -3); vertex(-9, -3);
     endShape(CLOSE);
-    // Hull stripe
-    fill(75, 50, 22, hAlpha * 0.7);
+    // Hull stripe — deck color
+    fill(deckR, deckG, deckB, hAlpha * 0.7);
     rect(-8, -1, 16, 1);
+    // Faction hull shields (small dots along hull for nation ships)
+    if (_afs && ship.nationKey && FACTION_MILITARY[ship.nationKey]) {
+      let _shc = FACTION_MILITARY[ship.nationKey].conquestFlag;
+      fill(_shc[0], _shc[1], _shc[2], hAlpha * 0.8);
+      noStroke();
+      for (let si = -6; si <= 6; si += 4) ellipse(si, -2, 2, 2);
+    }
+    // Ram or bow feature for faction war ships
+    if (_afs && ship.type === 2) {
+      if (_afs.hasRam) {
+        let ramC = _afs.ramColor;
+        fill(ramC[0], ramC[1], ramC[2], hAlpha);
+        triangle(12, -1, 15, -2, 15, 1);
+      } else if (_afs.hasDragon) {
+        fill(35, 35, 40, hAlpha);
+        triangle(12, -3, 16, -5, 13, 0);
+      }
+    }
     // Mast
-    fill(70, 48, 20, hAlpha);
+    fill(hullR * 0.8, hullG * 0.8, hullB * 0.8, hAlpha);
     rect(-1, -16, 2, 14);
-    // Sail — colored by ship type
+    // Sail — colored by ship type / faction
     let puff = sin(frameCount * 0.025 + ship.t * 20) * 1.5;
     let sailR, sailG, sailB;
     if (ship.nationKey && FACTION_MILITARY[ship.nationKey]) {
       let _nf = FACTION_MILITARY[ship.nationKey].conquestFlag;
-      if (ship.type === 2) { sailR = _nf[0]; sailG = _nf[1] * 0.6; sailB = _nf[2] * 0.6; } // darkened faction color for hostile
-      else { sailR = _nf[0]; sailG = _nf[1]; sailB = _nf[2]; } // faction color
-    } else if (ship.type === 0) { sailR = 240; sailG = 210; sailB = 140; } // gold trade
-    else if (ship.type === 2) { sailR = 200; sailG = 80; sailB = 70; } // red enemy
-    else { sailR = 235; sailG = 228; sailB = 210; } // white neutral
+      if (ship.type === 2) { sailR = _nf[0]; sailG = _nf[1] * 0.6; sailB = _nf[2] * 0.6; }
+      else { sailR = _nf[0]; sailG = _nf[1]; sailB = _nf[2]; }
+    } else if (ship.type === 0) { sailR = 240; sailG = 210; sailB = 140; }
+    else if (ship.type === 2) { sailR = 200; sailG = 80; sailB = 70; }
+    else { sailR = 235; sailG = 228; sailB = 210; }
     fill(sailR, sailG, sailB, hAlpha * 0.9);
     beginShape();
     vertex(0, -15); vertex(7 + puff, -9); vertex(0, -2);
     endShape(CLOSE);
-    // Small flag at top of mast
-    if (ship.type === 0) fill(220, 190, 60, hAlpha);
+    // Sail emblem stripe for faction ships
+    if (_afs) {
+      fill(sailR * 0.7, sailG * 0.7, sailB * 0.7, hAlpha * 0.5);
+      rect(2, -12, 3, 1);
+    }
+    // Small flag at top — faction-colored or type-based
+    if (_afs && FACTION_MILITARY[ship.nationKey]) {
+      let _ff = FACTION_MILITARY[ship.nationKey].conquestFlag;
+      fill(_ff[0], _ff[1], _ff[2], hAlpha);
+    } else if (ship.type === 0) fill(220, 190, 60, hAlpha);
     else if (ship.type === 2) fill(200, 50, 40, hAlpha);
     else fill(200, 200, 200, hAlpha * 0.7);
     rect(1, -17, 4, 2);
@@ -331,12 +361,48 @@ function drawRowingBoat() {
   });
   // Bow spray — pixel splashes
   if (r.speed > 1) {
-    for (let i = 0; i < 5; i++) {
+    let _sprayCount = min(8, floor(r.speed * 2));
+    for (let i = 0; i < _sprayCount; i++) {
       let sp = floor(sin(frameCount * 0.2 + i * 1.5) * 5);
-      fill(200, 225, 240, 35 + r.speed * 8);
+      let _spAlpha = 35 + r.speed * 8;
+      fill(200, 225, 240, _spAlpha);
       rect(floor(sx + cos(r.angle) * 60 + sp) - 3, floor(sy + sin(r.angle) * 60 + bob - i * 2) - 1, 6, 3);
     }
+    // Side spray arcs at high speed
+    if (r.speed > 2.5) {
+      let _sideAng = r.angle + HALF_PI;
+      let _sprayStr = min(1, (r.speed - 2.5) / 2);
+      for (let si = 0; si < 3; si++) {
+        let _sOff = sin(frameCount * 0.15 + si * 2) * 8;
+        let _sAlpha = 25 * _sprayStr;
+        fill(210, 230, 245, _sAlpha);
+        rect(floor(sx + cos(_sideAng) * (20 + _sOff) + cos(r.angle) * 30), floor(sy + sin(_sideAng) * (20 + _sOff) + sin(r.angle) * 30 + bob), 3, 2);
+        rect(floor(sx - cos(_sideAng) * (20 + _sOff) + cos(r.angle) * 30), floor(sy - sin(_sideAng) * (20 + _sOff) + sin(r.angle) * 30 + bob), 3, 2);
+      }
+    }
   }
+  // Foam line along wake at moderate speed
+  if (r.speed > 0.8 && r.wakeTrail.length > 2) {
+    let _foamCount = min(6, floor(r.speed * 1.5));
+    for (let fi = 0; fi < _foamCount; fi++) {
+      let _fIdx = min(fi, r.wakeTrail.length - 1);
+      let _fw = r.wakeTrail[_fIdx];
+      if (!_fw) continue;
+      let _fAlpha = (_fw.life / 40) * 30;
+      let _fOff = sin(frameCount * 0.05 + fi * 0.8) * 6;
+      fill(220, 235, 248, _fAlpha);
+      rect(floor(w2sX(_fw.x) + _fOff), floor(w2sY(_fw.y) + bob), 4, 2);
+      rect(floor(w2sX(_fw.x) - _fOff), floor(w2sY(_fw.y) + bob), 4, 2);
+    }
+  }
+
+  // Faction-aware ship data
+  let _fs = FACTION_SHIPS[state.faction] || FACTION_SHIPS.rome;
+  let _fm = getFactionMilitary();
+  let _fc = _fm.conquestFlag || [160, 35, 25]; // shield/stripe color
+  let _fEmblems = { rome:'SPQR', carthage:'BAAL', egypt:'ANKH', greece:'NIKA',
+    seapeople:'KRAK', persia:'SHAH', phoenicia:'TYRS', gaul:'FERT' };
+  let _emblem = _fEmblems[state.faction] || 'SPQR';
 
   // Determine view: side view for horizontal, top-down for vertical
   let verticalness = abs(sin(r.angle));
@@ -358,30 +424,43 @@ function drawRowingBoat() {
     rotate(r.angle);
 
     // Hull from above — pixel rects (tapered bow/stern)
-    fill(75, 45, 20);
+    fill(_fs.hullColor[0], _fs.hullColor[1], _fs.hullColor[2]);
     rect(-42, -13, 80, 26);       // main body
     rect(38, -10, 14, 20);        // bow taper
     rect(52, -4, 8, 8);           // bow tip
     rect(-45, -4, 3, 8);          // stern taper
 
     // Deck planking
-    fill(95, 65, 30);
+    fill(_fs.deckColor[0], _fs.deckColor[1], _fs.deckColor[2]);
     rect(-35, -9, 73, 18);
-    fill(80, 52, 22, 50);
+    fill(_fs.hullColor[0]-15, _fs.hullColor[1]-13, _fs.hullColor[2]-8, 50);
     for (let i = 0; i < 8; i++) rect(-30 + i * 10, -8, 1, 16);
 
-    // Bronze ram at bow — pixel wedge
-    fill(160, 120, 40);
-    rect(56, -3, 8, 6);
-    rect(64, -2, 4, 4);
-    rect(68, -1, 2, 2);
-    fill(180, 140, 50, 150);
-    rect(58, -1, 6, 2);
+    // Bow feature — ram or dragon prow
+    if (_fs.hasRam) {
+      fill(_fs.ramColor[0], _fs.ramColor[1], _fs.ramColor[2]);
+      rect(56, -3, 8, 6);
+      rect(64, -2, 4, 4);
+      rect(68, -1, 2, 2);
+      fill(_fs.ramColor[0]+20, _fs.ramColor[1]+20, _fs.ramColor[2]+10, 150);
+      rect(58, -1, 6, 2);
+    } else if (_fs.hasDragon) {
+      // Dragon figurehead (Sea Peoples)
+      fill(60, 60, 70);
+      rect(56, -6, 4, 12); rect(60, -8, 3, 6); rect(63, -10, 2, 4);
+      fill(200, 80, 30); rect(62, -9, 2, 2); // dragon eye
+      fill(80, 80, 90); rect(56, -3, 6, 6); // neck
+    } else {
+      // Simple curved prow (Egypt, Persia, Gaul)
+      fill(_fs.hullColor[0]+10, _fs.hullColor[1]+10, _fs.hullColor[2]+5);
+      rect(56, -5, 4, 10); rect(60, -6, 3, 4); rect(60, 2, 3, 4);
+    }
 
     // Oar rows from above — pixel lines
     fill(100, 70, 35);
-    for (let i = 0; i < 8; i++) {
-      let ox = -25 + i * 9;
+    for (let i = 0; i < _fs.oarCount; i++) {
+      let oarSpacing = floor(50 / _fs.oarCount);
+      let ox = -25 + i * oarSpacing;
       let oarSwing = floor(sin(r.oarPhase + i * 0.4) * 4);
       rect(ox, -27, 1, 14);       // top oar
       rect(ox + oarSwing, -27, 1, 2); // oar tip top
@@ -389,22 +468,22 @@ function drawRowingBoat() {
       rect(ox + oarSwing, 25, 1, 2);  // oar tip bottom
     }
 
-    // Shields along gunwales — pixel rects
+    // Shields along gunwales — pixel rects (faction colors)
     for (let i = 0; i < 6; i++) {
       let shx = -18 + i * 11;
-      fill(160, 35, 25); rect(shx - 2, -13, 4, 4);
+      fill(_fc[0], _fc[1], _fc[2]); rect(shx - 2, -13, 4, 4);
       fill(190, 160, 60); rect(shx - 1, -12, 2, 2);
-      fill(160, 35, 25); rect(shx - 2, 9, 4, 4);
+      fill(_fc[0], _fc[1], _fc[2]); rect(shx - 2, 9, 4, 4);
       fill(190, 160, 60); rect(shx - 1, 10, 2, 2);
     }
 
-    // Cabin/tower at bow — pixel rects
-    fill(100, 68, 32);
+    // Cabin/tower at bow — pixel rects (faction deck tints)
+    fill(_fs.deckColor[0], _fs.deckColor[1], _fs.deckColor[2]);
     rect(24, -11, 20, 22);
-    fill(120, 85, 42);
+    fill(_fs.deckColor[0]+20, _fs.deckColor[1]+17, _fs.deckColor[2]+2);
     rect(26, -9, 16, 18);
     // Planking lines on cabin roof
-    fill(90, 60, 28, 80);
+    fill(_fs.deckColor[0]-10, _fs.deckColor[1]-8, _fs.deckColor[2]-4, 80);
     rect(27, -6, 14, 1); rect(27, 0, 14, 1); rect(27, 6, 14, 1);
     // Railing posts
     fill(80, 55, 25);
@@ -429,16 +508,16 @@ function drawRowingBoat() {
     fill(180, 160, 120, 150);
     rect(-22, -17, 34, 1); rect(-22, 16, 34, 1);
     rect(-22, -17, 1, 34); rect(11, -17, 1, 34);
-    // Red stripe
-    fill(175, 40, 30, 210);
+    // Faction stripe
+    fill(_fc[0], _fc[1], _fc[2], 210);
     rect(-7 + floor(sailBillow * 0.5), -17, 8, 34);
-    // SPQR text
+    // Faction emblem text
     push();
     translate(-3 + floor(sailBillow * 0.5), 0);
     rotate(HALF_PI);
-    fill(165, 35, 25, 200);
+    fill(_fc[0]-10, _fc[1]-5, _fc[2]-5, 200);
     textSize(5); textAlign(CENTER, CENTER);
-    text('SPQR', 0, 0);
+    text(_emblem, 0, 0);
     pop();
     // Yard arm
     fill(100, 70, 35);
@@ -502,23 +581,38 @@ function drawRowingBoat() {
     scale(flipX, 1);
 
     // Hull — pixel rects (tapered bow, blunt stern)
-    fill(75, 45, 20);
+    fill(_fs.hullColor[0], _fs.hullColor[1], _fs.hullColor[2]);
     rect(-42, -4, 77, 14);        // main body
     rect(35, -4, 17, 8);          // bow taper
     rect(52, -2, 6, 4);           // bow tip
     rect(-45, -2, 3, 12);         // stern
     // Hull planking lines
-    fill(90, 55, 25, 70);
+    fill(_fs.hullColor[0]+15, _fs.hullColor[1]+10, _fs.hullColor[2]+5, 70);
     rect(-40, 2, 90, 1);
     rect(-38, 6, 83, 1);
 
-    // Bronze ram — pixel wedge
-    fill(160, 120, 40);
-    rect(55, -3, 10, 6);
-    rect(65, -2, 4, 4);
-    rect(69, -1, 3, 2);
-    fill(180, 140, 50, 150);
-    rect(57, -1, 8, 2);
+    // Bow feature — ram or dragon prow
+    if (_fs.hasRam) {
+      fill(_fs.ramColor[0], _fs.ramColor[1], _fs.ramColor[2]);
+      rect(55, -3, 10, 6);
+      rect(65, -2, 4, 4);
+      rect(69, -1, 3, 2);
+      fill(_fs.ramColor[0]+20, _fs.ramColor[1]+20, _fs.ramColor[2]+10, 150);
+      rect(57, -1, 8, 2);
+    } else if (_fs.hasDragon) {
+      // Dragon prow (Sea Peoples) — side view rising neck + head
+      fill(60, 60, 70);
+      rect(52, -8, 3, 12); rect(55, -14, 3, 8); rect(58, -18, 3, 6);
+      fill(80, 80, 90); rect(58, -20, 4, 4); // dragon head
+      fill(200, 80, 30); rect(60, -19, 2, 2); // eye
+      fill(50, 50, 55); rect(62, -18, 3, 2); // snout
+    } else {
+      // Elegant curved prow (Egypt, Persia, Gaul)
+      fill(_fs.hullColor[0]+10, _fs.hullColor[1]+10, _fs.hullColor[2]+5);
+      rect(52, -6, 3, 8); rect(55, -10, 3, 6); rect(58, -12, 2, 4);
+      fill(_fs.hullColor[0]+30, _fs.hullColor[1]+25, _fs.hullColor[2]+10);
+      rect(57, -14, 3, 3); // decorative prow finial
+    }
 
     // Stern ornament — pixel post (stacked rects curving up)
     fill(120, 80, 30);
@@ -535,8 +629,8 @@ function drawRowingBoat() {
 
     // Oar banks — pixel lines (vertical rects)
     fill(100, 70, 35);
-    for (let i = 0; i < 8; i++) {
-      let ox = -30 + i * 10;
+    for (let i = 0; i < _fs.oarCount; i++) {
+      let ox = -30 + i * floor(60 / _fs.oarCount);
       let oarOff = floor(sin(r.oarPhase + i * 0.4) * 4);
       // Top oars
       rect(ox, -4 - 14 + oarOff, 1, 14);
@@ -545,17 +639,17 @@ function drawRowingBoat() {
     }
 
     // Deck
-    fill(100, 68, 32);
+    fill(_fs.deckColor[0], _fs.deckColor[1], _fs.deckColor[2]);
     rect(-40, -6, 88, 5);
-    fill(85, 55, 25);
+    fill(_fs.deckColor[0]-15, _fs.deckColor[1]-13, _fs.deckColor[2]-7);
     rect(-40, -8, 88, 2);
 
-    // Shields along sides — pixel rects
+    // Shields along sides — pixel rects (faction colors)
     for (let i = 0; i < 6; i++) {
       let shx = -25 + i * 12;
-      fill(160, 35, 25); rect(shx - 3, -7, 5, 5);
+      fill(_fc[0], _fc[1], _fc[2]); rect(shx - 3, -7, 5, 5);
       fill(190, 160, 60); rect(shx - 1, -6, 2, 2);
-      fill(160, 35, 25); rect(shx - 3, 7, 5, 5);
+      fill(_fc[0], _fc[1], _fc[2]); rect(shx - 3, 7, 5, 5);
       fill(190, 160, 60); rect(shx - 1, 8, 2, 2);
     }
 
@@ -568,12 +662,12 @@ function drawRowingBoat() {
     let sailBillow = floor(sin(frameCount * 0.03) * 2);
     fill(220, 205, 175, 230);
     rect(-22, -38, 36, 28);
-    // Red stripe on sail
-    fill(160, 40, 30, 180);
+    // Faction stripe on sail
+    fill(_fc[0], _fc[1], _fc[2], 180);
     rect(-21 + sailBillow, -28, 34, 8);
-    fill(160, 35, 25, 140);
+    fill(_fc[0], _fc[1], _fc[2], 140);
     textSize(5); textAlign(CENTER, CENTER);
-    text('SPQR', sailBillow - 4, -24);
+    text(_emblem, sailBillow - 4, -24);
     // Rigging
     stroke(100, 80, 50, 80); strokeWeight(1);
     line(-7, -42, -40, -6);
@@ -581,15 +675,22 @@ function drawRowingBoat() {
     noStroke();
     // Flag — pixel rect, faction color
     let flagWave = floor(sin(frameCount * 0.04) * 2);
-    let _sf2 = getFactionMilitary();
-    fill(_sf2.conquestFlag[0], _sf2.conquestFlag[1], _sf2.conquestFlag[2]);
+    fill(_fc[0], _fc[1], _fc[2]);
     rect(-7, -50, 10 + flagWave, 4);
     rect(-7, -48, 6 + flagWave, 2);
 
-    // Bow tower — pixel rects (already rect-based, remove rounded corners)
-    fill(110, 78, 38);
+    // Faction-specific deck emblem (Rome: eagle standard, Egypt: lotus, etc.)
+    if (_fs.hasEagle) {
+      // Roman eagle standard on deck
+      fill(190, 160, 60); rect(10, -20, 2, 14); // pole
+      fill(200, 170, 50); rect(7, -22, 8, 3); // eagle wings
+      fill(220, 190, 60); rect(10, -23, 2, 2); // eagle head
+    }
+
+    // Bow tower — pixel rects (faction deck tints)
+    fill(_fs.deckColor[0]+10, _fs.deckColor[1]+10, _fs.deckColor[2]);
     rect(30, -20, 18, 16);
-    fill(125, 90, 45);
+    fill(_fs.deckColor[0]+25, _fs.deckColor[1]+22, _fs.deckColor[2]+5);
     rect(31, -19, 16, 14);
     fill(50, 30, 10);
     rect(34, -16, 2, 5);
@@ -601,17 +702,17 @@ function drawRowingBoat() {
     fill(100, 70, 34);
     rect(29, -20, 20, 2);
 
-    // Captain in tower — pixel
-    fill(160, 35, 25);
-    rect(37, -14, 6, 8);         // body
+    // Captain in tower — pixel (faction colors)
+    fill(_fc[0], _fc[1], _fc[2]);
+    rect(37, -14, 6, 8);         // body (faction tunic)
     fill(180, 150, 70);
     rect(37, -17, 6, 4);         // armor
     fill(210, 170, 120);
     rect(37, -22, 6, 6);         // head
     fill(190, 160, 60);
     rect(37, -24, 6, 3);         // helmet
-    fill(200, 50, 40);
-    rect(39, -26, 2, 3);         // plume
+    fill(_fc[0]+40, _fc[1]+15, _fc[2]+15);
+    rect(39, -26, 2, 3);         // plume (faction tint)
 
     // Rowers on deck — pixel
     for (let i = 0; i < 4; i++) {

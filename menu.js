@@ -533,7 +533,7 @@ function drawMenuScreen() {
     let btnH = itemSize * 1.6;
     let btnX = w / 2 - btnW / 2;
     let btnY = iy - btnH * 0.45;
-    let hitPad = 4;
+    let hitPad = 16;
     let hovered = mouseX > btnX - hitPad && mouseX < btnX + btnW + hitPad &&
                   mouseY > btnY - hitPad && mouseY < btnY + btnH + hitPad;
     if (hovered) { menuHover = i; menuKeyIdx = -1; isCursorPointer = true; }

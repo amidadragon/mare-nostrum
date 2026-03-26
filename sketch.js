@@ -2658,6 +2658,7 @@ function drawInner() {
     let _onOtherIsland = _onNationIsland || _onWorldIsland;
     if (_onWorldIsland || (!_isSailing && !_onOtherIsland) || (_isSailing && _homeDist < 800)) {
       drawIsland(); // Full island render (home island or visited world island)
+      if (!_onWorldIsland && typeof drawHomeLighthouse === 'function') drawHomeLighthouse();
     } else if (_isSailing && _homeDist < 2000) {
       // Medium LOD for home island while sailing away (not when visiting other islands)
       drawIsland();
@@ -2679,7 +2680,7 @@ function drawInner() {
       // Tier 1 (>2000px): silhouette ellipse + faction label
       // Tier 2 (800-2000px): terrain + building blocks
       // Tier 3 (<800px or visiting): full drawWorldObjectsSorted via state swap
-      if (state.nations) {
+      if (state.nations && (state.rowing && state.rowing.active || state._activeNation || state._activeWorldIsland)) {
         let _camX = camSmooth.x || state.player.x;
         let _camY = camSmooth.y || state.player.y;
         let _nationKeys = Object.keys(state.nations);
@@ -3480,12 +3481,53 @@ function drawInner() {
       }
     }
 
-    // Sailing speed indicator
+    // Sailing speed + wind indicator
     if (state.rowing && state.rowing.active) {
       let spd = state.rowing.speed || 0;
-      fill(200, 200, 180, 150);
-      textSize(9); textAlign(RIGHT);
+      let _windAng = (state.naval && state.naval.wind) ? state.naval.wind.angle : (frameCount * 0.001);
+      let _windStr = (state.naval && state.naval.wind) ? (state.naval.wind.strength || 0.5) : 0.5;
+      let _headwind = cos(state.rowing.angle - _windAng);
+      let _windFavor = 0.5 + _headwind * 0.5; // 0=headwind, 1=tailwind
+
+      // Mini wind rose (bottom-right corner)
+      let _wrx = width - 50, _wry = height - 50;
+      push();
+      // Background circle
+      fill(15, 12, 8, 160); noStroke();
+      ellipse(_wrx, _wry, 44, 44);
+      stroke(120, 100, 70, 100); strokeWeight(0.5); noFill();
+      ellipse(_wrx, _wry, 44, 44);
+      // Cardinal ticks
+      stroke(160, 140, 100, 120); strokeWeight(1);
+      for (let ci = 0; ci < 4; ci++) {
+        let ca = ci * HALF_PI - HALF_PI;
+        line(_wrx + cos(ca) * 18, _wry + sin(ca) * 18, _wrx + cos(ca) * 20, _wry + sin(ca) * 20);
+      }
+      noStroke();
+      // N label
+      fill(220, 200, 140, 180); textSize(7); textAlign(CENTER, CENTER);
+      text('N', _wrx, _wry - 15);
+      // Wind arrow
+      let _wArrLen = 8 + _windStr * 6;
+      fill(_windFavor > 0.6 ? color(80, 200, 120, 200) : _windFavor < 0.4 ? color(200, 80, 60, 200) : color(200, 180, 100, 200));
+      translate(_wrx, _wry);
+      rotate(_windAng);
+      triangle(_wArrLen, 0, -_wArrLen * 0.5, -4, -_wArrLen * 0.5, 4);
+      // Wind streaks
+      stroke(_windFavor > 0.6 ? color(80, 200, 120, 80) : _windFavor < 0.4 ? color(200, 80, 60, 80) : color(200, 180, 100, 80));
+      strokeWeight(1);
+      line(-_wArrLen * 0.3, -3, -_wArrLen * 0.6, -3);
+      line(-_wArrLen * 0.3, 3, -_wArrLen * 0.6, 3);
+      noStroke();
+      pop();
+
+      // Speed text + wind label
+      fill(200, 200, 180, 150); textSize(8); textAlign(RIGHT);
       text('Speed: ' + spd.toFixed(1), width - 20, height - 20);
+      let _windLabel = _windFavor > 0.7 ? 'Tailwind' : _windFavor < 0.3 ? 'Headwind' : 'Crosswind';
+      let _windCol = _windFavor > 0.7 ? [80, 200, 120] : _windFavor < 0.3 ? [200, 80, 60] : [200, 180, 100];
+      fill(_windCol[0], _windCol[1], _windCol[2], 150);
+      text(_windLabel, width - 20, height - 10);
     }
 
     // Compass arrows when sailing
@@ -3592,6 +3634,7 @@ function drawInner() {
         // Old expedition islands HUD removed
       }
       if (typeof drawTechTreeUI === 'function') drawTechTreeUI();
+      if (typeof drawTavernPanel === 'function') drawTavernPanel();
       if (typeof drawVictoryScreen === 'function') drawVictoryScreen();
       if (typeof drawVictoryProgressHUD === 'function') drawVictoryProgressHUD();
       drawExpeditionSummaryOverlay();

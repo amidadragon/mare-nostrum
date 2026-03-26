@@ -153,6 +153,30 @@ class AmbientManager {
     // Bubble timer
     this._bubbleTimer = 0;
 
+    // --- CROWD MURMUR (city bustle for populated islands) ---
+    this._crowdGain = ctx.createGain();
+    this._crowdGain.gain.value = 0;
+    this._crowdGain.connect(this._uwFilter);
+    // Brown noise through bandpass for voice-like murmur
+    this._crowdNoise = this._makeLoopNoise('brown', 4);
+    this._crowdFilter = ctx.createBiquadFilter();
+    this._crowdFilter.type = 'bandpass';
+    this._crowdFilter.frequency.value = 800;
+    this._crowdFilter.Q.value = 1.2;
+    this._crowdNoise.connect(this._crowdFilter);
+    this._crowdFilter.connect(this._crowdGain);
+    // Second layer: higher pitched murmur
+    this._crowdHigh = this._makeLoopNoise('white', 3);
+    this._crowdHighFilter = ctx.createBiquadFilter();
+    this._crowdHighFilter.type = 'bandpass';
+    this._crowdHighFilter.frequency.value = 1800;
+    this._crowdHighFilter.Q.value = 2;
+    this._crowdHighGain = ctx.createGain();
+    this._crowdHighGain.gain.value = 0.15;
+    this._crowdHigh.connect(this._crowdHighFilter);
+    this._crowdHighFilter.connect(this._crowdHighGain);
+    this._crowdHighGain.connect(this._crowdGain);
+
     // --- ISLAND SPECIFIC (old islands removed) ---
 
     // Shore lap phase
@@ -346,6 +370,29 @@ class AmbientManager {
         });
       }
     }
+
+    // --- CROWD MURMUR (scales with city level) ---
+    let crowdTarget = 0;
+    if (island === 'home' && !diving && typeof state !== 'undefined' && state.islandLevel) {
+      let lvl = state.islandLevel;
+      if (lvl >= 5) {
+        // Fade in from level 5, full at level 20
+        crowdTarget = Math.min(0.08, (lvl - 4) * 0.005) * masterVol;
+        // Louder during day, quieter at night
+        if (bright < 0.3) crowdTarget *= 0.2;
+        else if (bright < 0.5) crowdTarget *= 0.5;
+        // Slow undulation for organic feel
+        let crowdLFO = 0.7 + Math.sin(this._t * 0.05 * Math.PI * 2) * 0.3;
+        crowdTarget *= crowdLFO;
+      }
+    } else if (island === 'nation' && !diving) {
+      // Nation capitals always have some crowd bustle
+      crowdTarget = 0.04 * masterVol;
+      if (bright < 0.3) crowdTarget *= 0.3;
+    }
+    this._ramp(this._crowdGain.gain, crowdTarget, 1.5);
+    // Slowly shift crowd filter for variety
+    this._crowdFilter.frequency.value = 700 + Math.sin(this._t * 0.03 * Math.PI * 2) * 200;
 
     // --- BIRDS ---
     let birdMute = (island === 'necropolis' || diving || hour < 6 || hour > 18);
@@ -1398,6 +1445,12 @@ class SoundManager {
     let aeolian = [293.7, 329.6, 349.2, 392.0, 440.0, 466.2, 523.3, 587.3, 659.3, 698.5, 784.0, 880.0];
     // D Mixolydian: D E F# G A B C — for sailing (major feel)
     let mixolydian = [293.7, 329.6, 370.0, 392.0, 440.0, 493.9, 523.3, 587.3, 659.3, 740.0, 784.0, 880.0];
+    // D Hijaz (Phrygian Dominant): D Eb F# G A Bb C — Middle Eastern/Carthaginian
+    let hijaz = [293.7, 311.1, 370.0, 392.0, 440.0, 466.2, 523.3, 587.3, 622.3, 740.0, 784.0, 880.0];
+    // D Double Harmonic: D Eb F# G A Bb C# — Egyptian
+    let doubleHarmonic = [293.7, 311.1, 370.0, 392.0, 440.0, 466.2, 554.4, 587.3, 622.3, 740.0, 784.0, 880.0];
+    // D Pentatonic: D E G A B (padded to 12 for index compat) — Celtic/Gaul
+    let pentatonic = [293.7, 329.6, 392.0, 440.0, 493.9, 587.3, 659.3, 784.0, 880.0, 987.8, 1174.7, 1318.5];
 
     let scale, phrases;
 
@@ -1637,8 +1690,15 @@ class SoundManager {
          [7,25,0.65,0],[4,30,0.58,1],[0,40,0.72,0],[-1,45,0,0]],
       ];
     } else {
-      // Peaceful: Mediterranean lyre — composed melodic phrases with tension/release arcs
-      scale = dorian;
+      // Peaceful: faction-specific scale for cultural flavor
+      let faction = (typeof state !== 'undefined' && state.faction) ? state.faction : 'rome';
+      if (faction === 'carthage' || faction === 'phoenicia') scale = hijaz;
+      else if (faction === 'egypt') scale = doubleHarmonic;
+      else if (faction === 'persia') scale = phrygian;
+      else if (faction === 'greece') scale = mixolydian;
+      else if (faction === 'seapeople') scale = aeolian;
+      else if (faction === 'gaul') scale = pentatonic;
+      else scale = dorian; // Rome default
       phrases = [
         // Phrase 1: Ascending scale run (D E F G A) then resolve down (G F E D)
         [[0,40,0.65,0],[2,40,0.42,1],[-1,10,0,0],[1,30,0.55,0],[-1,8,0,0],

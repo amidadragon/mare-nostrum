@@ -39,28 +39,50 @@ function drawSkyBirds() {
 }
 
 const _stormCloudData = [
-  { x: 0.0, y: 0.04, r: 140 }, { x: 0.12, y: 0.08, r: 130 },
-  { x: 0.25, y: 0.03, r: 150 }, { x: 0.35, y: 0.10, r: 120 },
-  { x: 0.45, y: 0.05, r: 160 }, { x: 0.55, y: 0.12, r: 135 },
-  { x: 0.65, y: 0.04, r: 145 }, { x: 0.75, y: 0.09, r: 130 },
-  { x: 0.85, y: 0.06, r: 155 }, { x: 0.95, y: 0.11, r: 125 },
-  { x: 0.20, y: 0.18, r: 140 }, { x: 0.50, y: 0.20, r: 150 },
+  { x: 0.0, y: 0.06, r: 140, drift: 0.0012 }, { x: 0.12, y: 0.10, r: 130, drift: 0.0008 },
+  { x: 0.25, y: 0.05, r: 150, drift: 0.0015 }, { x: 0.35, y: 0.12, r: 120, drift: 0.0010 },
+  { x: 0.45, y: 0.07, r: 160, drift: 0.0013 }, { x: 0.55, y: 0.14, r: 135, drift: 0.0009 },
+  { x: 0.65, y: 0.06, r: 145, drift: 0.0014 }, { x: 0.75, y: 0.11, r: 130, drift: 0.0011 },
+  { x: 0.85, y: 0.08, r: 155, drift: 0.0007 }, { x: 0.95, y: 0.13, r: 125, drift: 0.0016 },
+  { x: 0.20, y: 0.20, r: 140, drift: 0.0010 }, { x: 0.50, y: 0.22, r: 150, drift: 0.0012 },
+  // Larger foreground clouds that push cloud base down
+  { x: 0.10, y: 0.28, r: 200, drift: 0.0006 }, { x: 0.40, y: 0.30, r: 180, drift: 0.0008 },
+  { x: 0.70, y: 0.26, r: 210, drift: 0.0005 }, { x: 0.90, y: 0.28, r: 170, drift: 0.0009 },
 ];
 function drawStormClouds() {
   let intensity = stormActive ? 1 : map(stormTimer, 0, 600, 0, 0.5);
+  if (intensity < 0.01) return;
   noStroke();
+  let t = frameCount;
   _stormCloudData.forEach((c, i) => {
-    let cx = floor(c.x * width + sin(frameCount * 0.003 + i * 0.8) * 25);
-    let cy = floor(c.y * height);
+    let drift = c.drift || 0.001;
+    let cx = floor(((c.x + t * drift) % 1.3 - 0.15) * width + sin(t * 0.003 + i * 0.8) * 20);
+    let cy = floor(c.y * height + sin(t * 0.002 + i * 1.2) * 4);
     let r = c.r;
-    fill(25, 32, 50, 160 * intensity);
+    let isBig = r >= 170; // foreground clouds
+    let baseAlpha = isBig ? 0.85 : 0.7;
+    // Dark base shadow (bottom of cloud)
+    fill(12, 16, 28, floor(130 * intensity * baseAlpha));
+    ellipse(cx, cy + r * 0.12, r * 2.0, r * 0.5);
+    // Main cloud body
+    fill(30, 38, 58, floor(150 * intensity * baseAlpha));
     ellipse(cx, cy, r * 2.2, r * 0.7);
-    fill(20, 28, 45, 140 * intensity);
-    ellipse(cx - r * 0.4, cy - r * 0.12, r * 1.4, r * 0.45);
-    ellipse(cx + r * 0.35, cy + r * 0.08, r * 1.3, r * 0.4);
-    fill(18, 24, 40, 110 * intensity);
-    ellipse(cx, cy + r * 0.18, r * 1.8, r * 0.35);
+    // Billowing sub-clouds (left + right lumps)
+    fill(35, 42, 62, floor(130 * intensity * baseAlpha));
+    ellipse(cx - r * 0.45, cy - r * 0.08, r * 1.3, r * 0.5);
+    ellipse(cx + r * 0.4, cy + r * 0.04, r * 1.2, r * 0.45);
+    // Highlight on top (lighter gray — volumetric feel)
+    fill(55, 62, 82, floor(80 * intensity * baseAlpha));
+    ellipse(cx - r * 0.1, cy - r * 0.15, r * 1.4, r * 0.3);
+    // Dark underbelly wisp
+    fill(15, 20, 35, floor(100 * intensity * baseAlpha));
+    ellipse(cx + r * 0.15, cy + r * 0.2, r * 1.6, r * 0.25);
   });
+  // Global storm darkening overlay
+  if (intensity > 0.3) {
+    fill(10, 12, 20, floor(40 * (intensity - 0.3)));
+    rect(0, 0, width, height * 0.35);
+  }
 }
 
 // ─── OCEAN ────────────────────────────────────────────────────────────────

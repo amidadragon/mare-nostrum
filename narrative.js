@@ -1023,7 +1023,8 @@ function drawQuestTracker() {
   }
   let chapter = MAIN_QUEST_CHAPTERS[ch];
   if (!chapter) return;
-  let rx = width - 240, ry = 12, rw = 228, rh = 18 + chapter.objectives.length * 13;
+  let rw = min(280, floor(width * 0.22));
+  let rx = width - rw - 12, ry = 12, rh = 18 + chapter.objectives.length * 14;
   drawHUDPanel(rx, ry, rw, rh);
   fill(220, 190, 80); textAlign(LEFT, TOP); textSize(11);
   text(chapter.title, rx + 8, ry + 5);
@@ -1037,9 +1038,12 @@ function drawQuestTracker() {
     if (obj.counter && !done) pt = ' (' + (state.mainQuest.counters[obj.counter] || 0) + '/' + obj.target + ')';
     fill(done ? color(120, 200, 80) : color(180, 170, 140)); textSize(10);
     let objStr = (done ? '[x] ' : '[ ] ') + obj.desc + pt;
-    let maxW = rw - 20;
-    while (objStr.length > 10 && textWidth(objStr) > maxW) objStr = objStr.slice(0, -1);
-    text(objStr, rx + 10, oy); oy += 13;
+    let maxW = rw - 16;
+    if (textWidth(objStr) > maxW) {
+      while (objStr.length > 10 && textWidth(objStr + '...') > maxW) objStr = objStr.slice(0, -1);
+      objStr += '...';
+    }
+    text(objStr, rx + 10, oy); oy += 14;
   }
   // NPC side quests
   let nqY = ry + rh + 6;
@@ -1063,8 +1067,11 @@ function drawQuestTracker() {
       if (obj.counter && !done) pt = ' (' + (state.npcQuests.counters[obj.counter] || 0) + '/' + obj.target + ')';
       fill(done ? color(120, 200, 80) : color(160, 150, 120)); textSize(9);
       let npcStr = (done ? '[x] ' : '[ ] ') + obj.desc + pt;
-      let npcMaxW = rw - 20;
-      while (npcStr.length > 10 && textWidth(npcStr) > npcMaxW) npcStr = npcStr.slice(0, -1);
+      let npcMaxW = rw - 16;
+      if (textWidth(npcStr) > npcMaxW) {
+        while (npcStr.length > 10 && textWidth(npcStr + '...') > npcMaxW) npcStr = npcStr.slice(0, -1);
+        npcStr += '...';
+      }
       text(npcStr, rx + 10, objY); objY += 12;
     }
     nqY += nqH + 4;

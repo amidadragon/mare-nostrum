@@ -90,6 +90,10 @@ function mousePressed() {
     saveCanvas('mare-nostrum-' + nf(month(), 2) + nf(day(), 2) + '-' + nf(hour(), 2) + nf(minute(), 2), 'png');
     return;
   }
+  // Tavern panel click
+  if (state._tavernOpen && typeof handleTavernClick === 'function') {
+    if (handleTavernClick()) return;
+  }
   // Tech tree click
   if (state.techTreeOpen && typeof handleTechTreeClick === 'function') {
     if (handleTechTreeClick(mouseX, mouseY)) return;
@@ -1175,6 +1179,17 @@ function keyPressed() {
   if (state.rowing && state.rowing.active) {
     if (key === ' ' && typeof playerFireCannons === 'function') { playerFireCannons(); return; }
   }
+  // Tavern panel close
+  if (state._tavernOpen) {
+    if (keyCode === 27 || key === 'e' || key === 'E') { closeTavernPanel(); return; }
+    // Number keys for quick activity selection
+    let tvnEntries = typeof TAVERN_ACTIVITIES !== 'undefined' ? Object.keys(TAVERN_ACTIVITIES).filter(k => TAVERN_ACTIVITIES[k].minLevel <= (state._tavern ? state._tavern.level : 0)) : [];
+    if (key >= '1' && key <= '5' && parseInt(key) - 1 < tvnEntries.length) {
+      if (typeof doTavernActivity === 'function') doTavernActivity(tvnEntries[parseInt(key) - 1]);
+      return;
+    }
+    return;
+  }
   // Upgrade shop close
   if (state.upgradeShopOpen) {
     if (keyCode === 27 || key === 'e' || key === 'E') { state.upgradeShopOpen = false; return; }
@@ -1249,6 +1264,14 @@ function keyPressed() {
       return;
     }
     // Diving moved to G key (below) — E is interact only
+
+    // Tavern interaction — E near tavern
+    if (state._tavernOpen) { closeTavernPanel(); return; }
+    if (typeof openTavernPanel === 'function' && state.buildings) {
+      let nearTavern = state.buildings.find(b => b.type === 'tavern' &&
+        dist(state.player.x, state.player.y, b.x, b.y) < 60);
+      if (nearTavern) { openTavernPanel(); return; }
+    }
 
     // Random event E-key interactions
     if (interactWanderingMerchant()) return;
@@ -1473,15 +1496,30 @@ function keyPressed() {
         }
         return;
       }
-      // World island — visit from ship (don't disembark)
-      if (typeof getWorldIsland === 'function') {
+      // World island — dock and disembark onto the island
+      if (typeof getWorldIsland === 'function' && typeof getIslandWorldPos === 'function') {
         let _wisle = getWorldIsland(r.nearIsle);
         if (_wisle && !_wisle.faction) {
-          if (typeof addNotification === 'function') addNotification('Visited ' + _wisle.name, '#aaddff');
+          let _wpos = getIslandWorldPos(_wisle);
+          let _wrx = _wisle.isleRX || 300, _wry = _wisle.isleRY || 200;
+          // Dock — stop rowing, place player on island
+          state.rowing.active = false;
+          state._activeWorldIsland = _wisle.key;
+          // Place player toward the dock side (approach angle)
+          let _dockAng = atan2(r.y - _wpos.y, r.x - _wpos.x);
+          state.player.x = _wpos.x + cos(_dockAng) * _wrx * 0.5;
+          state.player.y = _wpos.y + sin(_dockAng) * _wry * 0.5;
+          state.player.vx = 0; state.player.vy = 0;
+          cam.x = state.player.x; cam.y = state.player.y;
+          camSmooth.x = cam.x; camSmooth.y = cam.y;
+          camZoomTarget = 1.0;
+          // Store island center for re-embark boundary check
+          state._worldIslePos = { x: _wpos.x, y: _wpos.y, rx: _wrx, ry: _wry };
+          if (typeof addNotification === 'function') addNotification('Arrived at ' + _wisle.name, '#aaddff');
           if (_wisle.benefit && _wisle.benefit.desc) {
-            addNotification('Bonus available: ' + _wisle.benefit.desc, '#88ff88');
+            addNotification('Bonus: ' + _wisle.benefit.desc, '#88ff88');
           }
-          return; // stay on ship
+          return;
         }
       }
       // Otherwise disembark — snap player back to pier
@@ -1517,6 +1555,27 @@ function keyPressed() {
         state._activeNation = null;
         state._invasionTarget = null;
         camZoomTarget = 0.55; // zoom out for sailing
+        addFloatingText(width / 2, height * 0.35, 'Setting sail!', C.solarBright);
+        return;
+      }
+    }
+    // Board boat from world island — E at island edge to re-embark
+    if (state._activeWorldIsland && state._worldIslePos) {
+      let _wp = state._worldIslePos;
+      let _edx = (state.player.x - _wp.x) / _wp.rx;
+      let _edy = (state.player.y - _wp.y) / _wp.ry;
+      let _edist = _edx * _edx + _edy * _edy;
+      if (_edist > 0.5) { // near edge of island
+        state.rowing.active = true;
+        state.rowing.x = state.player.x;
+        state.rowing.y = state.player.y;
+        state.rowing.angle = atan2(state.player.y - _wp.y, state.player.x - _wp.x);
+        state.rowing.speed = 0;
+        state.rowing.oarPhase = 0;
+        state.rowing.wakeTrail = [];
+        state._activeWorldIsland = null;
+        state._worldIslePos = null;
+        camZoomTarget = 0.55;
         addFloatingText(width / 2, height * 0.35, 'Setting sail!', C.solarBright);
         return;
       }
