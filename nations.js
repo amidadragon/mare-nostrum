@@ -1450,6 +1450,76 @@ function drawNationRaiders() {
 function openNationDiplomacy(key) { state.nationDiplomacyOpen = key; }
 function closeNationDiplomacy() { state.nationDiplomacyOpen = null; }
 
+// ═══ ARRIVAL BANNER — dramatic faction splash on docking ═══
+let _arrivalBanner = { active: false, nation: null, timer: 0, maxTimer: 120 };
+
+function triggerArrivalBanner(nationKey) {
+  _arrivalBanner.active = true;
+  _arrivalBanner.nation = nationKey;
+  _arrivalBanner.timer = _arrivalBanner.maxTimer;
+}
+
+function drawArrivalBanner() {
+  if (!_arrivalBanner.active || _arrivalBanner.timer <= 0) return;
+  _arrivalBanner.timer--;
+  if (_arrivalBanner.timer <= 0) { _arrivalBanner.active = false; return; }
+
+  let key = _arrivalBanner.nation;
+  let name = typeof getNationName === 'function' ? getNationName(key) : key;
+  let t = _arrivalBanner.timer / _arrivalBanner.maxTimer;
+  let _fm = (typeof FACTION_MILITARY !== 'undefined' && FACTION_MILITARY[key]) ? FACTION_MILITARY[key] : null;
+  let fCol = _fm ? _fm.conquestFlag : [160, 140, 90];
+
+  // Fade: slide in from top (first 20%), hold (60%), fade out (last 20%)
+  let slideY = 0, alpha = 1;
+  if (t > 0.8) { // entrance
+    let entT = (t - 0.8) / 0.2;
+    slideY = -40 * entT;
+    alpha = 1 - entT;
+  } else if (t < 0.2) { // exit
+    alpha = t / 0.2;
+  }
+
+  let bw = min(400, width - 40), bh = 50;
+  let bx = width / 2 - bw / 2, by = 60 + slideY;
+
+  push();
+  noStroke();
+  // Banner background with faction tint
+  fill(15, 12, 8, 200 * alpha); rect(bx, by, bw, bh, 4);
+  // Faction color stripe at top and bottom
+  fill(fCol[0], fCol[1], fCol[2], 180 * alpha);
+  rect(bx, by, bw, 3, 2); rect(bx, by + bh - 3, bw, 3, 2);
+  // Side accents
+  rect(bx, by + 3, 3, bh - 6);
+  rect(bx + bw - 3, by + 3, 3, bh - 6);
+
+  // Faction emblem symbols
+  let _emblems = { rome: 'SPQR', carthage: '\u2600', egypt: '\u2625', greece: '\u03A9',
+    seapeople: '\u2693', persia: '\u2736', phoenicia: '\u2622', gaul: '\u2618' };
+  let emblem = _emblems[key] || '\u2605';
+
+  fill(fCol[0], fCol[1], fCol[2], 220 * alpha);
+  textSize(18); textAlign(LEFT, CENTER);
+  text(emblem, bx + 14, by + bh / 2);
+
+  // Nation name — large
+  fill(min(255, fCol[0] + 80), min(255, fCol[1] + 80), min(255, fCol[2] + 80), 240 * alpha);
+  textSize(16); textAlign(CENTER, CENTER);
+  text(name, bx + bw / 2, by + bh / 2 - 6);
+
+  // Subtitle
+  let rv = state.nations[key];
+  let subtitle = rv ? (rv.allied ? 'Allied Territory' : rv.vassal ? 'Vassal State' : rv.defeated ? 'Conquered Land' : 'Foreign Territory') : 'Unknown Land';
+  let subCol = rv && rv.allied ? [80, 200, 120] : rv && rv.defeated ? [120, 120, 120] : [180, 170, 140];
+  fill(subCol[0], subCol[1], subCol[2], 160 * alpha);
+  textSize(9);
+  text(subtitle, bx + bw / 2, by + bh / 2 + 12);
+
+  textAlign(LEFT, TOP);
+  pop();
+}
+
 function nationTrade(key) {
   let rv = state.nations[key];
   if (!rv) return;

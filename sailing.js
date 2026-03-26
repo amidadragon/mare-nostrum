@@ -335,6 +335,10 @@ function updateRowing(dt) {
   }
   r.wakeTrail.forEach(w => w.life--);
   r.wakeTrail = r.wakeTrail.filter(w => w.life > 0);
+
+  // Sea events — random encounters while sailing
+  if (typeof updateSeaEvents === 'function') updateSeaEvents();
+  if (typeof checkSeaEvent === 'function') checkSeaEvent();
 }
 
 

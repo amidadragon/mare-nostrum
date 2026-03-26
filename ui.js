@@ -4772,3 +4772,94 @@ function drawControlsOverlay() {
   fill(120, 100, 70); textSize(8); textAlign(CENTER);
   text('Press H to close', px + pw/2, py + ph - 16);
 }
+
+// ═══ BUILDING PROXIMITY TOOLTIPS ═══
+// Shows building name and info when player walks near a building
+const BUILDING_TOOLTIPS = {
+  house: { name: 'House', desc: '+1 Population', icon: '\u2302' },
+  farm: { name: 'Farm', desc: 'Produces food', icon: '\u2698' },
+  granary: { name: 'Granary', desc: 'Stores food, reduces rot', icon: '\u2617' },
+  workshop: { name: 'Workshop', desc: '+Resources, +Build speed', icon: '\u2692' },
+  market: { name: 'Market', desc: '+Gold from trade', icon: '\u2696' },
+  temple: { name: 'Temple', desc: 'Advisor, blessings, XP', icon: '\u2625' },
+  castrum: { name: 'Castrum', desc: 'Recruit soldiers, forge gear', icon: '\u2694' },
+  tavern: { name: 'Tavern', desc: 'Activities, morale, gossip [E]', icon: '\u2615' },
+  lighthouse: { name: 'Lighthouse', desc: 'Reveals map, sailing bonus', icon: '\u2600' },
+  dock: { name: 'Dock', desc: 'Board ship, trade routes', icon: '\u2693' },
+  mine: { name: 'Mine', desc: '+Stone production', icon: '\u26CF' },
+  lumber: { name: 'Lumber Mill', desc: '+Wood production', icon: '\u2042' },
+  wall: { name: 'Wall', desc: 'Defense', icon: '\u25A0' },
+  tower: { name: 'Watch Tower', desc: '+Defense, vision', icon: '\u25B2' },
+  gate: { name: 'Gate', desc: 'Fortified entrance', icon: '\u2550' },
+  well: { name: 'Well', desc: '+Crop yield', icon: '\u25CB' },
+  campfire: { name: 'Campfire', desc: 'Starting camp', icon: '\u2668' },
+  academy: { name: 'Academy', desc: 'Research, tech tree', icon: '\u2706' },
+  arena: { name: 'Arena', desc: 'Train troops, events', icon: '\u2654' },
+  fountain: { name: 'Fountain', desc: 'Morale, beauty', icon: '\u2756' },
+  monument: { name: 'Monument', desc: 'Glory, XP bonus', icon: '\u2605' },
+  barracks: { name: 'Barracks', desc: 'Recruit soldiers', icon: '\u2694' },
+};
+
+let _buildingTooltip = { building: null, fadeIn: 0 };
+
+function drawBuildingTooltip() {
+  if (!state || !state.buildings || !state.player) return;
+  if (state.rowing && state.rowing.active) return;
+  if (state.buildMode) return;
+
+  // Find nearest building within tooltip range
+  let nearest = null, nearDist = 60;
+  for (let b of state.buildings) {
+    if (b.ruined) continue;
+    let d = dist(state.player.x, state.player.y, b.x, b.y);
+    if (d < nearDist) { nearest = b; nearDist = d; }
+  }
+
+  if (nearest && nearest !== _buildingTooltip.building) {
+    _buildingTooltip.building = nearest;
+    _buildingTooltip.fadeIn = 0;
+  } else if (!nearest) {
+    _buildingTooltip.building = null;
+    _buildingTooltip.fadeIn = 0;
+    return;
+  }
+
+  _buildingTooltip.fadeIn = min(1, _buildingTooltip.fadeIn + 0.06);
+  let b = _buildingTooltip.building;
+  let info = BUILDING_TOOLTIPS[b.type] || { name: b.type, desc: '', icon: '' };
+  let alpha = _buildingTooltip.fadeIn;
+
+  let bsx = w2sX(b.x), bsy = w2sY(b.y);
+  let tw = max(90, textWidth(info.name + '  ' + info.desc) * 0.7 + 30);
+  let th = 28;
+  let tx = bsx - tw / 2, ty = bsy - b.h / 2 - th - 12;
+
+  // Clamp to screen
+  tx = max(4, min(width - tw - 4, tx));
+  ty = max(4, ty);
+
+  push();
+  noStroke();
+  // Background
+  fill(12, 10, 6, 200 * alpha); rect(tx, ty, tw, th, 4);
+  stroke(140, 120, 80, 100 * alpha); strokeWeight(0.5); noFill();
+  rect(tx, ty, tw, th, 4); noStroke();
+
+  // Icon + name + desc
+  fill(220, 200, 140, 240 * alpha); textSize(10); textAlign(LEFT, CENTER);
+  text(info.icon + ' ' + info.name, tx + 6, ty + th / 2 - 1);
+
+  if (info.desc) {
+    fill(160, 150, 120, 180 * alpha); textSize(8);
+    text(info.desc, tx + 6 + textWidth(info.icon + ' ' + info.name) + 8, ty + th / 2);
+  }
+
+  // Interaction hint for interactive buildings
+  if (b.type === 'tavern' || b.type === 'temple' || b.type === 'castrum' || b.type === 'dock' || b.type === 'academy') {
+    fill(100, 180, 220, 160 * alpha); textSize(7); textAlign(RIGHT, CENTER);
+    text('[E]', tx + tw - 6, ty + th / 2);
+  }
+
+  textAlign(LEFT, TOP);
+  pop();
+}

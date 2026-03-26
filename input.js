@@ -617,6 +617,11 @@ function keyPressed() {
   if (typeof isInvasionBattleActive === 'function' && isInvasionBattleActive()) {
     if (key !== 'r' && key !== 'R') return;
   }
+  // Sea event popup consumes all keys
+  if (typeof isSeaEventActive === 'function' && isSeaEventActive()) {
+    if (typeof handleSeaEventKey === 'function') handleSeaEventKey(key, keyCode);
+    return;
+  }
   // Victory screen — any key returns to menu
   if (state._victoryShown && state._victory) {
     state._victoryShown = false;
@@ -1490,6 +1495,7 @@ function keyPressed() {
         camSmooth.x = cam.x; camSmooth.y = cam.y; // instant camera snap
         camZoomTarget = 1.0;
         addNotification('Arrived at ' + (typeof getNationName === 'function' ? getNationName(r.nearIsle) : r.nearIsle), '#aaddff');
+        if (typeof triggerArrivalBanner === 'function') triggerArrivalBanner(r.nearIsle);
         // Set invasion target if player has army
         if (state.legia && state.legia.army && state.legia.army.length > 0 && !_nv.defeated && !_nv.vassal) {
           state._invasionTarget = r.nearIsle;

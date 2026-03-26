@@ -3528,6 +3528,16 @@ function drawInner() {
       let _windCol = _windFavor > 0.7 ? [80, 200, 120] : _windFavor < 0.3 ? [200, 80, 60] : [200, 180, 100];
       fill(_windCol[0], _windCol[1], _windCol[2], 150);
       text(_windLabel, width - 20, height - 10);
+
+      // Distance from home + coordinates
+      let _homeDx = state.rowing.x - WORLD.islandCX, _homeDy = state.rowing.y - WORLD.islandCY;
+      let _homeDist2 = floor(sqrt(_homeDx * _homeDx + _homeDy * _homeDy));
+      fill(160, 160, 150, 120); textSize(7);
+      text(_homeDist2 + 'm from home', width - 20, height - 30);
+
+      // Track distance sailed (cumulative stat)
+      if (!state._sailDistTotal) state._sailDistTotal = 0;
+      state._sailDistTotal += spd * 0.016; // rough dt
     }
 
     // Compass arrows when sailing
@@ -3591,6 +3601,7 @@ function drawInner() {
       if (typeof drawCompassHUD === 'function') drawCompassHUD();
       if (typeof drawQuestTracker === 'function') drawQuestTracker();
       if (typeof drawContextActionBar === 'function') drawContextActionBar();
+      if (typeof drawBuildingTooltip === 'function') drawBuildingTooltip();
       drawHotbar();
       drawFestivalBanner();
       drawFestivalAnnouncement();
@@ -3635,6 +3646,8 @@ function drawInner() {
       }
       if (typeof drawTechTreeUI === 'function') drawTechTreeUI();
       if (typeof drawTavernPanel === 'function') drawTavernPanel();
+      if (typeof drawSeaEventUI === 'function') drawSeaEventUI();
+      if (typeof drawArrivalBanner === 'function') drawArrivalBanner();
       if (typeof drawVictoryScreen === 'function') drawVictoryScreen();
       if (typeof drawVictoryProgressHUD === 'function') drawVictoryProgressHUD();
       drawExpeditionSummaryOverlay();
