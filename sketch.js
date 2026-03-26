@@ -1899,6 +1899,26 @@ function draw() {
   }
   _fpsSmooth = lerp(_fpsSmooth, 1 / _delta, 0.05);
 
+  // ─── WORLD ISLAND VISIT: swap island coords so all home-island logic works on the visited island ───
+  let _savedHomeIsland = null;
+  if (state._activeWorldIsland && state._worldIslePos) {
+    _savedHomeIsland = {
+      cx: WORLD.islandCX, cy: WORLD.islandCY,
+      rx: state.islandRX, ry: state.islandRY,
+      seed: typeof _coastlineSeed !== 'undefined' ? _coastlineSeed : 42
+    };
+    let _wp = state._worldIslePos;
+    WORLD.islandCX = _wp.x;
+    WORLD.islandCY = _wp.y;
+    state.islandRX = _wp.rx;
+    state.islandRY = _wp.ry;
+    let _wisle = typeof getWorldIsland === 'function' ? getWorldIsland(state._activeWorldIsland) : null;
+    if (typeof _coastlineSeed !== 'undefined') {
+      _coastlineSeed = _wisle ? (_wisle.key.length * 7 + _wisle.angle * 100) : 42;
+    }
+    if (typeof _coastlineVerts !== 'undefined') _coastlineVerts = null;
+  }
+
   // ─── FPS WATCHDOG + FRAME BUDGET ───
   if (_fpsSmooth < 30) { _lowFpsFrames++; } else { _lowFpsFrames = 0; }
   // Measure previous frame duration (start was set at top of previous draw())
@@ -1991,6 +2011,15 @@ function draw() {
   }
   // Debug console — ALWAYS draw on top of everything, every screen
   if (typeof Debug !== 'undefined') Debug.draw();
+  // ─── WORLD ISLAND VISIT: restore home island coords ───
+  if (_savedHomeIsland) {
+    WORLD.islandCX = _savedHomeIsland.cx;
+    WORLD.islandCY = _savedHomeIsland.cy;
+    state.islandRX = _savedHomeIsland.rx;
+    state.islandRY = _savedHomeIsland.ry;
+    if (typeof _coastlineSeed !== 'undefined') _coastlineSeed = _savedHomeIsland.seed;
+    if (typeof _coastlineVerts !== 'undefined') _coastlineVerts = null;
+  }
 }
 // ─── DITHER HELPERS ───
 let _b4 = [0,8,2,10, 12,4,14,6, 3,11,1,9, 15,7,13,5]; // 4x4 Bayer matrix (constant)
@@ -2274,7 +2303,7 @@ function drawInner() {
   // Safety: if player is lost in deep ocean (not near any island, not rowing), teleport home
   // Skip during wreck beach (player is at -4800,0 which is far from all islands)
   let _onWreck = (state.progression.gameStarted && !state.progression.homeIslandReached) || (state.wreck && state.wreck._visiting);
-  if (state.player && !state.rowing.active && !_onWreck && typeof isNearAnyIsland === 'function' &&
+  if (state.player && !state.rowing.active && !_onWreck && !state._activeWorldIsland && typeof isNearAnyIsland === 'function' &&
       !isNearAnyIsland(state.player.x, state.player.y, 500) && !state.insideTemple && !state.insideCastrum) {
     state.player.x = WORLD.islandCX;
     state.player.y = WORLD.islandCY;
@@ -2622,10 +2651,13 @@ function drawInner() {
     push();
     translate(shakeX, shakeY + floatOffset);
     // Home island: render when on it (not visiting another island), LOD when sailing away
+    // When on a world island, WORLD coords are swapped so drawIsland() renders the visited island
     let _isSailing = state.rowing && state.rowing.active;
-    let _onOtherIsland = !!state._activeNation || !!state._activeExploration || !!state._activeWorldIsland;
-    if ((!_isSailing && !_onOtherIsland) || (_isSailing && _homeDist < 800)) {
-      drawIsland(); // Full home island render (on island or close while sailing)
+    let _onNationIsland = !!state._activeNation || !!state._activeExploration;
+    let _onWorldIsland = !!state._activeWorldIsland;
+    let _onOtherIsland = _onNationIsland || _onWorldIsland;
+    if (_onWorldIsland || (!_isSailing && !_onOtherIsland) || (_isSailing && _homeDist < 800)) {
+      drawIsland(); // Full island render (home island or visited world island)
     } else if (_isSailing && _homeDist < 2000) {
       // Medium LOD for home island while sailing away (not when visiting other islands)
       drawIsland();
@@ -2641,20 +2673,7 @@ function drawInner() {
       fill(220, 200, 160, _hAlpha); textSize(7); textAlign(CENTER, BOTTOM);
       text('HOME', _hsx, _hsy - _hry - 4); textAlign(LEFT, TOP);
     }
-    // ═══ WORLD ISLAND: render terrain when player is standing on a world island ═══
-    if (state._activeWorldIsland && state._worldIslePos && typeof drawIslandAt === 'function') {
-      let _wp = state._worldIslePos;
-      let _wisle = typeof getWorldIsland === 'function' ? getWorldIsland(state._activeWorldIsland) : null;
-      let _wiseSeed = _wisle ? (_wisle.key.length * 7 + _wisle.angle * 100) : 42;
-      drawIslandAt({
-        cx: _wp.x,
-        cy: _wp.y,
-        rx: _wp.rx,
-        ry: _wp.ry,
-        level: 3,
-        seed: _wiseSeed
-      });
-    }
+    // World island terrain now rendered by drawIsland() above via WORLD coord swap
     {
       // ═══ LOD WORLD: render all nation islands based on distance ═══
       // Tier 1 (>2000px): silhouette ellipse + faction label
