@@ -2238,9 +2238,9 @@ class SoundManager {
       inventory: 'inventory', page_turn: 'page_turn', writing: 'writing',
       // Economy
       coin: 'coin', coin_clink: 'coin', purchase: 'gold_pile', gold_pile: 'gold_pile',
-      // Footsteps
-      step_sand: 'step_sand', step_stone: 'step_stone',
-      step_grass: 'footstep_grass', step_water: 'footstep_water', step_wood: 'footstep_wood',
+      // Footsteps — deliberately omitted from sampleMap so they use the
+      // lightweight procedural _playStepNoise() path in the switch below.
+      // The .ogg samples caused crackling via _playSample() rapid-fire.
       // Combat
       hit: 'hit', armor_hit: 'armor_hit', punch: 'punch',
       dodge: 'dodge', whirlwind: 'whirlwind',
