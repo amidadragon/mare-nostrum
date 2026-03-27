@@ -841,6 +841,23 @@ class SoundManager {
       music_defeat: 'sounds/music_defeat_ai.mp3',
       music_lobby: 'sounds/music_lobby_ai.mp3',
       music_raid: 'sounds/generated/music_raid.wav',
+      // ═══════════════════════════════════════════════════════════════
+      // FACTION-SPECIFIC MUSIC VARIANTS (optional per-faction themes)
+      // ═══════════════════════════════════════════════════════════════
+      // When a player chooses a faction, the game will attempt to play faction-specific
+      // music variants instead of the base track. For example:
+      //   - music_peaceful_rome → Roman martial theme
+      //   - music_peaceful_carthage → Mediterranean trading port feel
+      //   - music_peaceful_egypt → Mysterious minor scales, harps
+      //   - music_peaceful_greece → Lyrical melodies, lyre-like arpeggios
+      //   - music_peaceful_persia → Rich ornamental scales, oud-like tones
+      //   - music_peaceful_phoenicia → Seafaring chanty rhythm, waves
+      //   - music_peaceful_gaul → Celtic pipes, driving drums
+      //   - music_peaceful_seapeople → Dark droning, ominous deep tones
+      //
+      // Same convention applies to all base tracks (music_night_*, music_sailing_*, etc)
+      // If a faction variant doesn't exist, the base track plays instead.
+      // This is defined in updateMusic() which routes to faction variants if available.
       // Narration voice clips
       narr_wreck_wake: 'sounds/narration/narration_wreck_wake.mp3',
       // narr_wreck_fire: 'sounds/narration/narration_wreck_fire.mp3', // TODO: generate
@@ -1245,6 +1262,14 @@ class SoundManager {
       if (typeof state.buildings !== 'undefined' && state.player) {
         let nearTemple = state.buildings.some(b => b.type === 'temple' && dist(b.x, b.y, state.player.x, state.player.y) < 200);
         if (nearTemple) target = 'music_temple';
+      }
+    }
+
+    // Apply faction-specific music variant if player has chosen a faction
+    if (typeof state !== 'undefined' && state.faction && target !== 'music_menu' && target !== 'music_lobby') {
+      let factionTrack = target + '_' + state.faction;
+      if (this._samples[factionTrack]) {
+        target = factionTrack;
       }
     }
 
