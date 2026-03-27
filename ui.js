@@ -2350,6 +2350,10 @@ function drawHUD() {
   textSize(hudTextSize);
   let rankTitle = state.islandLevel >= 25 ? 'IMPERATOR' : state.islandLevel >= 20 ? 'CONSUL' : state.islandLevel >= 15 ? 'SENATOR' : state.islandLevel >= 10 ? 'GOVERNOR' : 'CITIZEN';
   text(rankTitle + ' — LV.' + state.islandLevel, hudX, cookedY + barBlockH + qOff);
+  // Faction emblem
+  if (typeof drawFactionEmblem === 'function' && state.faction) {
+    drawFactionEmblem(state.faction, hudX - 12, cookedY + barBlockH + qOff - 2, 24);
+  }
   // Global reputation title
   if (typeof getReputationTitle === 'function') {
     let repTitle = getReputationTitle();

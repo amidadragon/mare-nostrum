@@ -176,6 +176,10 @@ function _drawFactionCard(x, y, w, h, fac, hovered, a) {
   var _fkName = '';
   for (var _fk in _fkMap) { if (FACTIONS[_fk] === fac) { _fkName = _fk; break; } }
   if (_fkName) { textAlign(CENTER, TOP); textSize(9); fill(120, 110, 90, 180 * a); text('[' + _fkMap[_fkName] + ']', cx, gy + 8); }
+  // Faction emblem
+  if (typeof drawFactionEmblem === 'function' && _fkName) {
+    drawFactionEmblem(_fkName, cx - 12, gy - 5, 28);
+  }
   textAlign(CENTER, TOP); textSize(14);
   fill(bc[0] + 60, bc[1] + 60, bc[2] + 60, 240 * a);
   text(fac.name, cx, gy + 20);

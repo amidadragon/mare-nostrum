@@ -229,6 +229,14 @@ function saveGame() {
     _lighthouses: state._lighthouses || {},
     _tavern: state._tavern || null,
     _revealedIslands: state._revealedIslands || [],
+    // Sea Peoples ship state
+    onShipDeck: state.onShipDeck || false,
+    belowDeck: state.belowDeck || false,
+    shipUpgrades: state.shipUpgrades || [],
+    shipWorldX: state.shipWorldX || 0,
+    shipWorldY: state.shipWorldY || 0,
+    _belowDeckReturnX: state._belowDeckReturnX || 0,
+    _belowDeckReturnY: state._belowDeckReturnY || 0,
   };
   try {
     // Backup current save before overwriting
@@ -483,7 +491,10 @@ function loadGame() {
     state.foodShortage = d.foodShortage || 0;
     state.hudMinimized = d.hudMinimized || false;
     state.seaPeopleRaidCooldown = d.seaPeopleRaidCooldown || 0;
-    if (d.templeCourt) { state.templeCourt.lastSpawn = d.templeCourt.lastSpawn || 0; }
+    if (d.templeCourt) {
+      if (!state.templeCourt) state.templeCourt = { visitors: [], lastSpawn: 0 };
+      state.templeCourt.lastSpawn = d.templeCourt.lastSpawn || 0;
+    }
     state.heartRewards = Array.isArray(d.heartRewards) ? d.heartRewards : [];
     if (d.weather && typeof d.weather === 'object') state.weather = { type: d.weather.type || 'clear', timer: d.weather.timer || 0, intensity: d.weather.intensity || 0 };
     state.daysSinceRain = d.daysSinceRain || 0;
@@ -1044,6 +1055,20 @@ function loadGame() {
       }));
     } else {
       initCitizens();
+    }
+    // Sea Peoples ship state
+    state.onShipDeck = d.onShipDeck || false;
+    state.belowDeck = d.belowDeck || false;
+    state.shipUpgrades = d.shipUpgrades || [];
+    state.shipWorldX = d.shipWorldX || 0;
+    state.shipWorldY = d.shipWorldY || 0;
+    state._belowDeckReturnX = d._belowDeckReturnX || 0;
+    state._belowDeckReturnY = d._belowDeckReturnY || 0;
+    // If faction is 'seapeople' and ship state exists, restore ship position
+    if (state.faction === 'seapeople' && state.onShipDeck) {
+      if (typeof initShipHome === 'function') initShipHome();
+      SHIP_DECK.cx = state.shipWorldX;
+      SHIP_DECK.cy = state.shipWorldY;
     }
     addFloatingText(width / 2, height * 0.4, 'GAME LOADED', C.crystalGlow);
   } catch(e) {

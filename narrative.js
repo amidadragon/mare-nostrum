@@ -1061,10 +1061,10 @@ function drawQuestTracker() {
     for (let obj of quest.objectives) {
       let done = false;
       if (obj.check) done = obj.check();
-      else if (obj.counter) done = (state.npcQuests.counters[obj.counter] || 0) >= obj.target;
+      else if (obj.counter && state.npcQuests && state.npcQuests.counters) done = (state.npcQuests.counters[obj.counter] || 0) >= obj.target;
       else if (obj.interact) done = !!state.narrativeFlags[obj.interact];
       let pt = '';
-      if (obj.counter && !done) pt = ' (' + (state.npcQuests.counters[obj.counter] || 0) + '/' + obj.target + ')';
+      if (obj.counter && !done && state.npcQuests && state.npcQuests.counters) pt = ' (' + (state.npcQuests.counters[obj.counter] || 0) + '/' + obj.target + ')';
       fill(done ? color(120, 200, 80) : color(160, 150, 120)); textSize(9);
       let npcStr = (done ? '[x] ' : '[ ] ') + obj.desc + pt;
       let npcMaxW = rw - 16;
