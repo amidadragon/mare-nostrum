@@ -417,6 +417,227 @@ function drawMenuScreen() {
   }
 
   // ═══════════════════════════════════════════════════════════════════════
+  // ─── ANIMATED BRAZIERS — flickering fire with warm glow cast ───
+  // ═══════════════════════════════════════════════════════════════════════
+  let _braziers = [
+    { x: 0.12, y: 0.42, size: 1.0 },   // left building rooftop
+    { x: 0.22, y: 0.44, size: 0.7 },   // left building lower
+    { x: 0.86, y: 0.38, size: 0.9 },   // right side
+    { x: 0.92, y: 0.42, size: 0.6 },   // far right
+  ];
+  for (let bi = 0; bi < _braziers.length; bi++) {
+    let bz = _braziers[bi];
+    let fx = bz.x * w, fy = bz.y * h;
+    let flick = 0.6 + sin(t0 * 8 + bi * 3.7) * 0.2 + sin(t0 * 13 + bi * 5.1) * 0.15 + random() * 0.05;
+    let fSize = 12 * bz.size * flick;
+    // Warm glow cast on surroundings
+    fill(255, 140, 40, floor(12 * flick * aF));
+    ellipse(fx, fy, fSize * 8, fSize * 5);
+    fill(255, 100, 20, floor(8 * flick * aF));
+    ellipse(fx, fy - 2, fSize * 5, fSize * 3);
+    // Fire core — multiple dancing tongues
+    for (let fi = 0; fi < 4; fi++) {
+      let tongueX = fx + sin(t0 * 10 + fi * 2.5 + bi) * 3 * bz.size;
+      let tongueY = fy - fi * 2 * bz.size - sin(t0 * 7 + fi * 1.8) * 2;
+      let tH = (4 - fi) * 2 * bz.size * flick;
+      // Outer flame (orange)
+      fill(255, 120 + fi * 30, 20, floor((180 - fi * 40) * aF * flick));
+      ellipse(tongueX, tongueY, 3 * bz.size, tH);
+      // Inner flame (yellow)
+      if (fi < 2) {
+        fill(255, 220, 80, floor((120 - fi * 30) * aF * flick));
+        ellipse(tongueX, tongueY + 1, 2 * bz.size, tH * 0.6);
+      }
+    }
+    // Sparks rising from brazier
+    for (let sp = 0; sp < 2; sp++) {
+      let sparkT = (t0 * 2 + bi * 1.3 + sp * 3.7) % 3.0;
+      if (sparkT < 1.5) {
+        let spX = fx + sin(t0 * 5 + sp * 4 + bi) * 6;
+        let spY = fy - sparkT * 20 * bz.size;
+        let spA = (1 - sparkT / 1.5) * 200;
+        fill(255, 200, 60, floor(spA * aF));
+        rect(floor(spX), floor(spY), 1, 1);
+      }
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // ─── TRIREME SAILING — majestic warship crossing the harbor ───
+  // ═══════════════════════════════════════════════════════════════════════
+  if (!drawMenuScreen._trireme) {
+    drawMenuScreen._trireme = { x: 1.15, y: 0.52, speed: 0.006, oarPhase: 0 };
+  }
+  let tri = drawMenuScreen._trireme;
+  tri.x -= tri.speed * 0.016;
+  tri.oarPhase += 0.03;
+  if (tri.x < -0.15) { tri.x = 1.15; tri.y = 0.50 + random() * 0.06; }
+  let tx = tri.x * w, ty = tri.y * h;
+  let tBob = sin(t0 * 0.7 + 2.5) * 3;
+  let tRock = sin(t0 * 0.5) * 0.015;
+  push();
+  translate(tx, ty + tBob);
+  rotate(tRock);
+  // Hull
+  fill(60, 45, 30, floor(180 * aF));
+  beginShape();
+  vertex(-28, 0); vertex(-32, -4); vertex(30, -4); vertex(35, 0);
+  vertex(30, 3); vertex(-28, 3);
+  endShape(CLOSE);
+  // Ram/prow
+  fill(100, 80, 50, floor(200 * aF));
+  triangle(35, -2, 42, -1, 35, 1);
+  // Mast
+  stroke(70, 55, 40, floor(180 * aF));
+  strokeWeight(1.5);
+  line(5, -4, 5, -28);
+  noStroke();
+  // Sail — billowing
+  let sailBillow = sin(t0 * 1.2) * 3;
+  fill(200, 180, 150, floor(160 * aF));
+  beginShape();
+  vertex(-8, -25); vertex(18, -25);
+  vertex(18 + sailBillow, -14);
+  vertex(-8 + sailBillow * 0.5, -14);
+  endShape(CLOSE);
+  // Sail stripe (red)
+  fill(160, 50, 40, floor(120 * aF));
+  rect(-4 + sailBillow * 0.3, -22, 14, 3);
+  // Oars — 4 per side, animated
+  stroke(80, 65, 45, floor(100 * aF));
+  strokeWeight(0.8);
+  for (let oi = 0; oi < 4; oi++) {
+    let oarX = -15 + oi * 10;
+    let oarAngle = sin(tri.oarPhase + oi * 0.8) * 0.4;
+    // Port side (top)
+    line(oarX, -4, oarX + cos(oarAngle) * 8, -4 - sin(oarAngle) * 12);
+    // Starboard side (bottom)
+    line(oarX, 3, oarX + cos(oarAngle) * 8, 3 + sin(oarAngle) * 12);
+  }
+  noStroke();
+  // Wake behind ship
+  for (let wi = 0; wi < 6; wi++) {
+    let wakeX = -30 - wi * 8;
+    let wakeA = (1 - wi / 6) * 25;
+    fill(200, 230, 255, floor(wakeA * aF));
+    ellipse(wakeX, 1, 6 + wi * 2, 2);
+  }
+  pop();
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // ─── FISH JUMPING — occasional splash in the harbor ───
+  // ═══════════════════════════════════════════════════════════════════════
+  if (!drawMenuScreen._fish) {
+    drawMenuScreen._fish = [];
+    for (let fi = 0; fi < 3; fi++) {
+      drawMenuScreen._fish.push({
+        x: 0.35 + random() * 0.40,
+        y: 0.55 + random() * 0.20,
+        timer: random() * 8,
+        cycle: 5 + random() * 6,  // seconds between jumps
+      });
+    }
+  }
+  for (let fish of drawMenuScreen._fish) {
+    let jumpT = (t0 + fish.timer) % fish.cycle;
+    if (jumpT < 0.6) {
+      let jumpPhase = jumpT / 0.6;
+      let jumpArc = sin(jumpPhase * PI);
+      let fjx = fish.x * w, fjy = fish.y * h;
+      // Fish body arcing out of water
+      let fishY = fjy - jumpArc * 18;
+      let fishAngle = (jumpPhase < 0.5 ? -1 : 1) * 0.5;
+      push();
+      translate(fjx, fishY);
+      rotate(fishAngle);
+      fill(140, 160, 180, floor(180 * aF * jumpArc));
+      ellipse(0, 0, 6, 3);  // body
+      triangle(3, 0, 6, -2, 6, 2);  // tail
+      pop();
+      // Splash rings
+      if (jumpPhase > 0.1) {
+        let ringSize = jumpPhase * 20;
+        fill(220, 240, 255, floor((1 - jumpPhase) * 60 * aF));
+        ellipse(fjx, fjy, ringSize, ringSize * 0.3);
+      }
+      // Water droplets
+      for (let di = 0; di < 3; di++) {
+        let dropT = jumpPhase - 0.1 * di;
+        if (dropT > 0 && dropT < 0.8) {
+          let dropX = fjx + (di - 1) * 5;
+          let dropY = fjy - sin(dropT * PI) * 12 * (1 - di * 0.2);
+          fill(180, 210, 240, floor((1 - dropT) * 100 * aF));
+          rect(floor(dropX), floor(dropY), 1, 2);
+        }
+      }
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // ─── SWAYING VEGETATION — palm/cypress trees with wind ───
+  // ═══════════════════════════════════════════════════════════════════════
+  let vegPositions = [
+    { x: 0.04, y: 0.50, h: 35, type: 'palm' },
+    { x: 0.08, y: 0.48, h: 28, type: 'cypress' },
+    { x: 0.94, y: 0.46, h: 32, type: 'palm' },
+    { x: 0.97, y: 0.44, h: 25, type: 'cypress' },
+  ];
+  for (let vi = 0; vi < vegPositions.length; vi++) {
+    let veg = vegPositions[vi];
+    let vx = veg.x * w, vy = veg.y * h;
+    let windSway = sin(t0 * 1.0 + vi * 2.3) * 4;
+    let gust = sin(t0 * 2.5 + vi * 1.7) * 2;
+    if (veg.type === 'palm') {
+      // Trunk — curved with wind
+      stroke(80, 65, 45, floor(80 * aF));
+      strokeWeight(2);
+      let tipX = vx + windSway + gust;
+      let tipY = vy - veg.h;
+      // Curved trunk (bezier approximation with 3 line segments)
+      let midX = vx + windSway * 0.4;
+      let midY = vy - veg.h * 0.5;
+      line(vx, vy, midX, midY);
+      line(midX, midY, tipX, tipY);
+      noStroke();
+      // Fronds — 5 drooping leaves
+      for (let fi = 0; fi < 5; fi++) {
+        let frondAng = -PI * 0.7 + fi * PI * 0.35;
+        let frondLen = 12 + fi % 2 * 4;
+        let frondSway = sin(t0 * 1.5 + fi * 1.2 + vi) * 3;
+        let fEndX = tipX + cos(frondAng) * frondLen + frondSway;
+        let fEndY = tipY + sin(frondAng) * frondLen * 0.6 + abs(frondSway) * 0.5;
+        stroke(50, 90, 35, floor(80 * aF));
+        strokeWeight(1);
+        line(tipX, tipY, fEndX, fEndY);
+      }
+      noStroke();
+    } else {
+      // Cypress — tall thin triangle swaying
+      let topX = vx + windSway * 0.7 + gust * 0.5;
+      fill(40, 65, 30, floor(70 * aF));
+      triangle(vx - 4, vy, vx + 4, vy, topX, vy - veg.h);
+      fill(50, 80, 35, floor(50 * aF));
+      triangle(vx - 3, vy - 5, vx + 3, vy - 5, topX, vy - veg.h + 3);
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // ─── ANIMATED WATER SURFACE — rolling wave bands across harbor ───
+  // ═══════════════════════════════════════════════════════════════════════
+  for (let wy = floor(h * 0.50); wy < floor(h * 0.90); wy += 8) {
+    let depth = (wy - h * 0.50) / (h * 0.40);
+    // Primary wave
+    let waveX = sin(t0 * 0.8 + wy * 0.02) * 30 * (1 - depth * 0.5);
+    let waveA = (sin(t0 * 1.0 + wy * 0.04) + 1) * 0.5;
+    // Bright crest
+    fill(160, 200, 240, floor(8 * waveA * aF * (1 - depth * 0.7)));
+    rect(waveX + w * 0.1, wy, w * 0.7, 1);
+    // Dark trough below
+    fill(10, 30, 60, floor(6 * waveA * aF * (1 - depth * 0.7)));
+    rect(waveX + w * 0.1, wy + 3, w * 0.7, 1);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
   // ─── TITLE — large, centered, with golden glow ───
   // ═══════════════════════════════════════════════════════════════════════
   let titleAlpha = constrain(menuFadeIn / 180, 0, 1);

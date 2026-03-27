@@ -843,8 +843,8 @@ class SoundManager {
       music_raid: 'sounds/generated/music_raid.wav',
       // Narration voice clips
       narr_wreck_wake: 'sounds/narration/narration_wreck_wake.mp3',
-      narr_wreck_fire: 'sounds/narration/narration_wreck_fire.mp3',
-      narr_wreck_sail: 'sounds/narration/narration_wreck_sail.mp3',
+      // narr_wreck_fire: 'sounds/narration/narration_wreck_fire.mp3', // TODO: generate
+      // narr_wreck_sail: 'sounds/narration/narration_wreck_sail.mp3', // TODO: generate
       narr_first_sail: 'sounds/narration/narration_first_sail.mp3',
       narr_first_raid: 'sounds/narration/narration_first_raid.mp3',
       narr_level_3: 'sounds/narration/narration_level_3.mp3',
@@ -859,10 +859,10 @@ class SoundManager {
       narr_persia_intro: 'sounds/narration/narration_persia_intro.mp3',
       narr_phoenicia_intro: 'sounds/narration/narration_phoenicia_intro.mp3',
       narr_gaul_intro: 'sounds/narration/narration_gaul_intro.mp3',
-      narr_first_harvest: 'sounds/narration/narration_first_harvest.mp3',
+      // narr_first_harvest: 'sounds/narration/narration_first_harvest.mp3', // TODO: generate
       narr_first_build: 'sounds/narration/narration_first_build.mp3',
-      narr_first_fish: 'sounds/narration/narration_first_fish.mp3',
-      narr_first_combat: 'sounds/narration/narration_first_combat.mp3',
+      // narr_first_fish: 'sounds/narration/narration_first_fish.mp3',     // TODO: generate
+      // narr_first_combat: 'sounds/narration/narration_first_combat.mp3', // TODO: generate
       narr_first_steps: 'sounds/narration/narration_first_steps.mp3',
       narr_victory: 'sounds/narration/narration_victory.mp3',
       narr_defeat: 'sounds/narration/narration_defeat.mp3',
@@ -940,6 +940,9 @@ class SoundManager {
       else if (state._activeExploration === 'necropolis') island = 'necropolis';
       else if (state._activeNation) island = 'nation';
       if (state.insideTemple) island = 'temple';
+      if (state.insideCastrum) island = 'temple';  // castrum uses temple ambience
+      if (state.belowDeck) island = 'temple';       // below deck = interior ambience
+      if (state.onShipDeck) island = 'sailing';     // ship deck = ocean ambience
     }
     this._islandAmbient = island;
 
@@ -1227,9 +1230,12 @@ class SoundManager {
       target = 'music_lobby';
     } else if (typeof state !== 'undefined') {
       if (state.conquest && state.conquest.active) target = 'music_combat';
+      else if (typeof _invasionBattle !== 'undefined' && _invasionBattle) target = 'music_combat';
       else if (state.seaPeopleRaidActive) target = 'music_raid';
       else if (state.festival) target = 'music_festival';
       else if (state.rowing && state.rowing.active) target = 'music_sailing';
+      else if (state.onShipDeck) target = 'music_sailing'; // Ship deck = sea music
+      else if (state.belowDeck) target = 'music_night';    // Below deck = moody
       else if (state._activeExploration === 'vulcan') target = 'music_vulcan';
       else if (state._activeExploration === 'hyperborea') target = 'music_hyperborea';
       else if (state._activeExploration === 'necropolis') target = 'music_necropolis';
