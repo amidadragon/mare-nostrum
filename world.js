@@ -110,7 +110,7 @@ const ISLAND_PALETTES = {
   egypt:    { water: [20,60,120], shallows: [50,120,140], cliff: [180,160,100], sand: [230,210,160], grass: [140,150,80], accent: [200,170,50] },
   greece:   { water: [40,90,150], shallows: [80,150,170], cliff: [200,200,200], sand: [220,210,190], grass: [90,140,70], accent: [50,80,160] },
   vulcan:   { water: [20,30,60], shallows: [40,60,80], cliff: [60,40,30], sand: [80,60,50], grass: [50,60,40], accent: [200,80,30] },
-  seapeople:{ water: [25,50,90], shallows: [45,80,110], cliff: [100,95,90], sand: [150,145,140], grass: [55,70,60], accent: [80,90,100] },
+  seapeople:{ water: [18,35,65], shallows: [35,60,85], cliff: [65,55,48], sand: [110,95,80], grass: [40,50,38], accent: [140,45,30] },
   persia:   { water: [25,65,125], shallows: [55,125,145], cliff: [170,145,95], sand: [215,195,140], grass: [100,135,65], accent: [170,130,50] },
   phoenicia:{ water: [30,75,135], shallows: [65,135,155], cliff: [155,120,95], sand: [200,180,155], grass: [85,125,60], accent: [140,40,100] },
   gaul:     { water: [35,85,145], shallows: [65,145,165], cliff: [130,120,90], sand: [190,180,145], grass: [60,110,45], accent: [80,100,60] },
@@ -560,7 +560,7 @@ function drawSky() {
   }
 
   if ((bright > 0.1 || (h >= 5 && h < 7)) && !stormActive && !(typeof _frameBudget !== 'undefined' && _frameBudget.throttled)) {
-    // Clouds disabled -- they render as dark blobs
+    drawDriftClouds(bright);
   }
 
   if (bright > 0.25) { // only draw sun when actually visible (was 0.05 = ghost at night)
@@ -714,71 +714,155 @@ function drawStarField(alpha) {
 function drawStars(alpha) { drawStarField(alpha); }
 
 function drawDriftClouds(bright) {
-  return; // DISABLED -- dark blobs, not clouds
+  if (stormActive) return; // storm has its own clouds
+  let h = state.time / 60;
+  let isNight = (h >= 19.5 || h < 4.5);
+  // Very low alpha at night — subtle silhouettes against stars
+  if (isNight && bright < 0.08) return;
+
   if (typeof drawDriftClouds._prevCamY === 'undefined') drawDriftClouds._prevCamY = camSmooth.y;
   let camDY = camSmooth.y - drawDriftClouds._prevCamY;
   drawDriftClouds._prevCamY = camSmooth.y;
 
-  let h = state.time / 60;
+  // Initialize cloud data with varied shapes
   if (!cloudPositions) {
     cloudPositions = [];
-    for (let i = 0; i < 8; i++) {
+    // 6 clouds with unique blob patterns for natural shapes
+    let _cloudSeeds = [
+      { x: 0.05, y: 0.06, w: 120, h: 28, sp: 0.12, dp: 0.7, blobs: [{ox:-0.35,oy:-0.1,sw:0.45,sh:0.7},{ox:0.05,oy:-0.25,sw:0.5,sh:0.65},{ox:0.3,oy:-0.05,sw:0.4,sh:0.6},{ox:-0.1,oy:0.05,sw:0.7,sh:0.45}] },
+      { x: 0.28, y: 0.10, w: 95, h: 24, sp: 0.08, dp: 0.85, blobs: [{ox:-0.25,oy:-0.15,sw:0.4,sh:0.6},{ox:0.15,oy:-0.2,sw:0.45,sh:0.55},{ox:-0.05,oy:0.0,sw:0.6,sh:0.4}] },
+      { x: 0.52, y: 0.04, w: 140, h: 32, sp: 0.15, dp: 0.6, blobs: [{ox:-0.4,oy:-0.08,sw:0.4,sh:0.65},{ox:-0.1,oy:-0.28,sw:0.45,sh:0.6},{ox:0.2,oy:-0.15,sw:0.5,sh:0.55},{ox:0.38,oy:0.0,sw:0.35,sh:0.5},{ox:0.0,oy:0.05,sw:0.75,sh:0.35}] },
+      { x: 0.78, y: 0.12, w: 80, h: 22, sp: 0.10, dp: 0.9, blobs: [{ox:-0.2,oy:-0.1,sw:0.5,sh:0.6},{ox:0.15,oy:-0.15,sw:0.4,sh:0.5},{ox:0.0,oy:0.05,sw:0.55,sh:0.35}] },
+      { x: 1.1, y: 0.08, w: 110, h: 26, sp: 0.14, dp: 0.65, blobs: [{ox:-0.3,oy:-0.12,sw:0.42,sh:0.6},{ox:0.1,oy:-0.22,sw:0.48,sh:0.55},{ox:0.35,oy:-0.05,sw:0.38,sh:0.5},{ox:0.0,oy:0.03,sw:0.65,sh:0.38}] },
+      { x: 1.4, y: 0.14, w: 70, h: 20, sp: 0.06, dp: 0.95, blobs: [{ox:-0.15,oy:-0.1,sw:0.45,sh:0.55},{ox:0.2,oy:-0.08,sw:0.4,sh:0.5},{ox:0.0,oy:0.05,sw:0.5,sh:0.3}] },
+    ];
+    _cloudSeeds.forEach(s => {
       cloudPositions.push({
-        x: random(width * 1.5),
-        y: random(height * 0.03, height * 0.22),
-        w: random(55, 150),
-        h: random(16, 38),
-        speed: random(0.06, 0.22),
-        depth: random(0.5, 1),
+        x: s.x * width, y: s.y * height,
+        w: s.w, h: s.h, speed: s.sp, depth: s.dp,
+        blobs: s.blobs, phase: random(0, TWO_PI),
       });
-    }
+    });
   }
+
   noStroke();
 
-  let cloudR = 235, cloudG = 240, cloudB = 245;
-  let highlightR = 255, highlightG = 255, highlightB = 255;
-  let shadowR = 210, shadowG = 218, shadowB = 228;
+  // Time-of-day cloud colors — warm at dawn/dusk, cool at night
+  let cloudR, cloudG, cloudB;
+  let hiR, hiG, hiB; // highlight (top/sun-facing)
+  let shR, shG, shB; // shadow (bottom)
+  let baseAlpha;
 
   if (h >= 5 && h < 7) {
+    // Dawn — warm pink/orange tones
     let dt = map(h, 5, 7, 0, 1);
-    cloudR = lerp(180, 235, dt); cloudG = lerp(140, 240, dt); cloudB = lerp(160, 245, dt);
-    highlightR = 255; highlightG = lerp(180, 255, dt); highlightB = lerp(160, 255, dt);
-    shadowR = lerp(200, 210, dt); shadowG = lerp(120, 218, dt); shadowB = lerp(140, 228, dt);
-  } else if (h >= 16.5 && h < 19) {
-    let dt = map(h, 16.5, 19, 0, 1);
-    cloudR = lerp(245, 160, dt); cloudG = lerp(220, 120, dt); cloudB = lerp(200, 140, dt);
-    highlightR = lerp(255, 220, dt); highlightG = lerp(240, 150, dt); highlightB = lerp(200, 130, dt);
-    shadowR = lerp(220, 100, dt); shadowG = lerp(180, 70, dt); shadowB = lerp(170, 110, dt);
-  } else if (h >= 19 || h < 5) {
-    // Night clouds — lighter, more transparent (was too dark, looked like blobs)
-    cloudR = 60; cloudG = 65; cloudB = 90;
-    highlightR = 80; highlightG = 85; highlightB = 110;
-    shadowR = 45; shadowG = 50; shadowB = 70;
+    cloudR = lerp(200, 240, dt); cloudG = lerp(160, 235, dt); cloudB = lerp(175, 242, dt);
+    hiR = 255; hiG = lerp(190, 248, dt); hiB = lerp(170, 245, dt);
+    shR = lerp(180, 215, dt); shG = lerp(120, 210, dt); shB = lerp(140, 220, dt);
+    baseAlpha = lerp(20, 45, dt);
+  } else if (h >= 7 && h < 16) {
+    // Day — bright white with blue shadows
+    cloudR = 240; cloudG = 242; cloudB = 248;
+    hiR = 255; hiG = 255; hiB = 255;
+    shR = 200; shG = 210; shB = 225;
+    baseAlpha = 42;
+  } else if (h >= 16 && h < 19) {
+    // Sunset — golden orange to deep purple
+    let dt = map(h, 16, 19, 0, 1);
+    cloudR = lerp(245, 180, dt); cloudG = lerp(230, 110, dt); cloudB = lerp(210, 130, dt);
+    hiR = lerp(255, 240, dt); hiG = lerp(245, 160, dt); hiB = lerp(210, 120, dt);
+    shR = lerp(210, 100, dt); shG = lerp(190, 60, dt); shB = lerp(195, 100, dt);
+    baseAlpha = lerp(42, 30, dt);
+  } else if (h >= 19 && h < 20.5) {
+    // Twilight
+    let dt = map(h, 19, 20.5, 0, 1);
+    cloudR = lerp(140, 55, dt); cloudG = lerp(90, 58, dt); cloudB = lerp(120, 80, dt);
+    hiR = lerp(180, 70, dt); hiG = lerp(120, 72, dt); hiB = lerp(150, 95, dt);
+    shR = lerp(80, 40, dt); shG = lerp(50, 42, dt); shB = lerp(80, 60, dt);
+    baseAlpha = lerp(28, 16, dt);
+  } else {
+    // Night — very subtle blue silhouettes
+    cloudR = 50; cloudG = 52; cloudB = 72;
+    hiR = 60; hiG = 64; hiB = 85;
+    shR = 35; shG = 38; shB = 55;
+    baseAlpha = 14;
   }
 
-  cloudPositions.forEach(cl => {
+  cloudPositions.forEach((cl, ci) => {
+    // Drift movement
     cl.x += cl.speed * cl.depth;
-    if (cl.x > width + cl.w) cl.x = -cl.w;
-    cl.y -= camDY * 0.04;
+    if (cl.x > width + cl.w * 1.5) cl.x = -cl.w * 1.5;
+    cl.y -= camDY * 0.03;
     cl.y = constrain(cl.y, height * 0.02, height * 0.22);
-    // Night clouds: much lower alpha to avoid dark blob appearance
-    let nightDim = (h >= 19 || h < 5) ? 0.4 : 1;
-    let alpha = map(bright, 0.1, 0.5, 15, 55) * cl.depth * nightDim;
-    let cx = floor(cl.x), cy = floor(cl.y);
-    let cw = floor(cl.w), ch = floor(cl.h);
 
-    fill(cloudR, cloudG, cloudB, alpha);
-    rect(cx - cw * 0.3, cy - ch * 0.15, cw * 0.6, ch * 0.4);
-    fill(highlightR, highlightG, highlightB, alpha * 0.75);
-    rect(cx - cw * 0.2, cy - ch * 0.35, cw * 0.3, ch * 0.25);
-    rect(cx + cw * 0.05, cy - ch * 0.3, cw * 0.22, ch * 0.2);
-    fill(cloudR, cloudG, cloudB, alpha * 0.7);
-    rect(cx - cw * 0.45, cy - ch * 0.05, cw * 0.2, ch * 0.25);
-    rect(cx + cw * 0.28, cy - ch * 0.05, cw * 0.18, ch * 0.22);
-    fill(shadowR, shadowG, shadowB, alpha * 0.5);
-    rect(cx - cw * 0.25, cy + ch * 0.2, cw * 0.5, ch * 0.12);
-    fill(highlightR, highlightG, highlightB, alpha * 0.35);
-    rect(cx - cw * 0.15, cy - ch * 0.38, cw * 0.2, ch * 0.1);
+    let cx = floor(cl.x), cy = floor(cl.y);
+    let cw = cl.w, ch = cl.h;
+    let a = baseAlpha * cl.depth;
+
+    // Gentle vertical bob
+    let bob = sin(frameCount * 0.006 + cl.phase) * 1.5;
+    cy += floor(bob);
+
+    // Draw each blob that makes up this cloud — layered for volume
+    // Shadow layer first (offset down)
+    cl.blobs.forEach(b => {
+      let bx = cx + b.ox * cw;
+      let by = cy + b.oy * ch + ch * 0.15; // shadow offset down
+      let bw = b.sw * cw;
+      let bh = b.sh * ch;
+      fill(shR, shG, shB, a * 0.45);
+      // Pixel-art cloud: overlapping rects for soft shape
+      rect(floor(bx - bw * 0.4), floor(by - bh * 0.15), floor(bw * 0.8), floor(bh * 0.35));
+      rect(floor(bx - bw * 0.3), floor(by - bh * 0.25), floor(bw * 0.6), floor(bh * 0.5));
+    });
+
+    // Main body layer
+    cl.blobs.forEach(b => {
+      let bx = cx + b.ox * cw;
+      let by = cy + b.oy * ch;
+      let bw = b.sw * cw;
+      let bh = b.sh * ch;
+      fill(cloudR, cloudG, cloudB, a * 0.8);
+      // Core rectangle
+      rect(floor(bx - bw * 0.4), floor(by - bh * 0.2), floor(bw * 0.8), floor(bh * 0.4));
+      // Extended top and bottom
+      rect(floor(bx - bw * 0.3), floor(by - bh * 0.35), floor(bw * 0.6), floor(bh * 0.7));
+      // Wider middle
+      rect(floor(bx - bw * 0.45), floor(by - bh * 0.1), floor(bw * 0.9), floor(bh * 0.2));
+    });
+
+    // Highlight layer (top of each blob — sun-lit)
+    cl.blobs.forEach(b => {
+      let bx = cx + b.ox * cw;
+      let by = cy + b.oy * ch - ch * 0.08; // highlight offset up
+      let bw = b.sw * cw * 0.7;
+      let bh = b.sh * ch * 0.35;
+      fill(hiR, hiG, hiB, a * 0.55);
+      rect(floor(bx - bw * 0.35), floor(by - bh * 0.3), floor(bw * 0.7), floor(bh * 0.6));
+      rect(floor(bx - bw * 0.25), floor(by - bh * 0.4), floor(bw * 0.5), floor(bh * 0.8));
+    });
+  });
+}
+
+// ─── CLOUD SHADOWS ON GROUND ────────────────────────────────────────────
+function drawCloudShadowsOnGround() {
+  if (stormActive) return;
+  if (!cloudPositions || cloudPositions.length === 0) return;
+  let bright = getSkyBrightness();
+  if (bright < 0.25) return; // no shadows at night
+  let shadowA = min(25, (bright - 0.25) * 40);
+  noStroke();
+  fill(0, 0, 0, shadowA);
+  // Project each cloud onto the island surface area
+  cloudPositions.forEach(cl => {
+    let normX = cl.x / width; // 0-1 screen position
+    // Shadow position on island — roughly offset from cloud
+    let shX = w2sX(WORLD.islandCX) + (normX - 0.5) * state.islandRX * 1.5;
+    let shY = w2sY(WORLD.islandCY) - state.islandRY * 0.15 + cl.depth * state.islandRY * 0.4;
+    let shW = cl.w * 1.2;
+    let shH = cl.h * 0.5;
+    // Soft oval shadow
+    ellipse(floor(shX), floor(shY), floor(shW), floor(shH));
   });
 }
 
@@ -962,7 +1046,7 @@ const FACTION_TERRAIN = {
   carthage:  { grass: [110,140,80], beach: [220,200,160], seed: 137, trees: 'palm' },
   egypt:     { grass: [140,150,90], beach: [230,210,170], seed: 213, trees: 'palm' },
   greece:    { grass: [85,135,75],  beach: [210,200,180], seed: 89,  trees: 'olive' },
-  seapeople: { grass: [70,100,65],  beach: [170,165,150], seed: 167, trees: 'pine' },
+  seapeople: { grass: [45,55,40],   beach: [95,85,72],    seed: 167, trees: 'driftwood', waterTint: [10,15,25] },
   persia:    { grass: [130,140,85], beach: [225,205,165], seed: 251, trees: 'cypress' },
   phoenicia: { grass: [95,125,70],  beach: [205,190,155], seed: 193, trees: 'cedar' },
   gaul:      { grass: [65,110,55],  beach: [180,170,140], seed: 311, trees: 'oak' },

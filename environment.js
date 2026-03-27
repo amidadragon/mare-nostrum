@@ -186,49 +186,92 @@ function drawOcean() {
     rect(_vx, hLineY - 4, _vw, 4);
   }
 
-  // ── DEEP OCEAN WAVES — rolling rows with sin-based horizontal movement ──
-  let _waveRowStep = _fpsSmooth < 40 ? 44 : 26;
+  // ── DEEP OCEAN WAVES — multi-frequency rolling swells ──
+  let _waveRowStep = _fpsSmooth < 40 ? 40 : 22;
+  let windStr = (typeof state.weather !== 'undefined' && state.weather.wind) ? state.weather.wind : 0.5;
   for (let wy = oceanTop + 4; wy < _vb; wy += _waveRowStep) {
     let depthNorm = (wy - oceanTop) / oceanH;
-    let depthFade = 1 - depthNorm * 0.6;
-    let waveAlpha = (28 + 24 * dayMix) * depthFade;
-    // Each row has its own speed and frequency for variety
-    let rowSpeed = 0.4 + depthNorm * 0.3;
-    let rowFreq = 0.025 + depthNorm * 0.015;
-    let offsetX = floor(sin(t * rowSpeed + wy * rowFreq) * (14 + depthNorm * 6));
+    let depthFade = 1 - depthNorm * 0.55;
+    let waveAlpha = (30 + 26 * dayMix) * depthFade;
 
-    // Primary wave crest — lighter highlight
-    fill(120 + 70 * dayMix, 175 + 50 * dayMix, 210 + 30 * dayMix, waveAlpha);
-    let spacing = 60 + floor(depthNorm * 20);
+    // Multi-frequency swell — large slow + medium + small fast
+    let swell1 = sin(t * 0.3 + wy * 0.018 + depthNorm * 2.5) * (18 + depthNorm * 8); // big slow swell
+    let swell2 = sin(t * 0.55 + wy * 0.032 + 1.7) * (8 + depthNorm * 4); // medium
+    let swell3 = sin(t * 0.9 + wy * 0.05 + 3.1) * 4; // small chop
+    let offsetX = floor(swell1 + swell2 + swell3);
+
+    // Wave crest height affects visual thickness
+    let crestPhase = sin(t * 0.35 + wy * 0.025);
+    let crestH = 2 + floor(max(0, crestPhase) * 2); // 2-4px tall at crests
+
+    // Primary wave crest — highlight
+    let crR = 115 + 75 * dayMix, crG = 170 + 55 * dayMix, crB = 208 + 32 * dayMix;
+    fill(crR, crG, crB, waveAlpha);
+    let spacing = 55 + floor(depthNorm * 22);
     for (let wx = ((offsetX % spacing) + spacing) % spacing; wx < _vr; wx += spacing) {
-      let segW = 24 + floor(sin(wy * 0.07 + wx * 0.04 + t * 0.8) * 10);
-      rect(wx, wy, segW, 3);
+      let segW = 22 + floor(sin(wy * 0.065 + wx * 0.035 + t * 0.7) * 12);
+      rect(wx, wy, segW, crestH);
     }
 
-    // Foam caps on wave peaks (deep ocean — sparse white dashes)
-    if (depthNorm < 0.5 && dayMix > 0.2) {
-      let foamCapAlpha = waveAlpha * 0.6 * (1 - depthNorm * 2);
-      fill(230, 242, 250, foamCapAlpha);
-      for (let wx = ((offsetX + 30) % spacing + spacing) % spacing; wx < _vr; wx += spacing) {
-        let capPhase = sin(t * 1.5 + wx * 0.06 + wy * 0.04);
-        if (capPhase > 0.3) {
-          let cw = 4 + floor(capPhase * 6);
+    // Wave trough — darker band just below crest
+    let trAlpha = waveAlpha * 0.4;
+    fill(10 + 22 * dayMix, 28 + 52 * dayMix, 55 + 68 * dayMix, trAlpha);
+    for (let wx = ((offsetX + spacing * 0.4) % spacing + spacing) % spacing; wx < _vr; wx += spacing) {
+      let tw = 16 + floor(sin(wy * 0.05 + wx * 0.04 + t * 0.5) * 6);
+      rect(wx, wy + crestH + 2, tw, 2);
+    }
+
+    // Foam caps — white dashes on rising wave faces
+    if (depthNorm < 0.55 && dayMix > 0.15) {
+      let foamCapAlpha = waveAlpha * 0.65 * (1 - depthNorm * 1.8);
+      fill(232, 244, 252, foamCapAlpha);
+      for (let wx = ((offsetX + 20) % spacing + spacing) % spacing; wx < _vr; wx += spacing) {
+        let capPhase = sin(t * 1.3 + wx * 0.055 + wy * 0.035);
+        if (capPhase > 0.25) {
+          let cw = 5 + floor(capPhase * 8);
           rect(wx, wy - 1, cw, 1);
+          // Spray dots above foam
+          if (capPhase > 0.6 && windStr > 0.4) {
+            fill(240, 250, 255, foamCapAlpha * 0.5);
+            rect(wx + cw + 2, wy - 2, 2, 1);
+            if (capPhase > 0.75) rect(wx + cw + 5, wy - 1, 1, 1);
+          }
+          fill(232, 244, 252, foamCapAlpha); // restore
         }
       }
     }
 
-    // Secondary wave (counter-phase) — every other frame for perf
+    // Secondary counter-swell — cross-wave pattern for realism
     if (frameCount % 2 === 0) {
-      let off2 = floor(sin(t * 0.35 + wy * 0.05 + 2) * 8);
-      fill(90 + 50 * dayMix, 150 + 40 * dayMix, 195 + 25 * dayMix, waveAlpha * 0.5);
-      for (let wx = ((off2 % 90) + 90) % 90; wx < _vr; wx += 90) {
-        rect(wx, wy + 5, 18 + floor(sin(wy * 0.05 + wx * 0.03) * 6), 2);
+      let off2 = floor(sin(t * 0.4 + wy * 0.042 + 2.2) * 10);
+      fill(95 + 52 * dayMix, 155 + 42 * dayMix, 198 + 28 * dayMix, waveAlpha * 0.45);
+      let sp2 = 85 + floor(depthNorm * 15);
+      for (let wx = ((off2 % sp2) + sp2) % sp2; wx < _vr; wx += sp2) {
+        let sw2 = 16 + floor(sin(wy * 0.045 + wx * 0.028 + t * 0.6) * 7);
+        rect(wx, wy + 4, sw2, 2);
       }
-      // Dark trough between waves
-      fill(10 + 20 * dayMix, 25 + 50 * dayMix, 50 + 70 * dayMix, waveAlpha * 0.5);
-      for (let wx = ((offsetX + 14) % 90 + 90) % 90; wx < _vr; wx += 90) {
-        rect(wx, wy + 8, 14, 2);
+    }
+  }
+
+  // ── ROLLING SWELL BANDS — large visible ocean undulations ──
+  if (dayMix > 0.1 && _fpsSmooth > 30) {
+    let swellBandCount = 5;
+    for (let si = 0; si < swellBandCount; si++) {
+      let bandY = oceanTop + oceanH * (0.08 + si * 0.16);
+      let swellX = sin(t * 0.2 + si * 1.8) * 30;
+      let swellW = 80 + sin(t * 0.15 + si * 2.5) * 30;
+      let swellA = 8 * dayMix * (1 - abs(si - 2) / 3);
+      // Lighter band (crest of large swell)
+      fill(130 + 80 * dayMix, 185 + 45 * dayMix, 220 + 20 * dayMix, swellA);
+      for (let wx = 0; wx < _vr; wx += swellW + 40) {
+        let bx = wx + swellX + sin(wx * 0.01 + t * 0.3) * 15;
+        rect(floor(bx), floor(bandY), floor(swellW), 3);
+      }
+      // Darker band (trough)
+      fill(15 + 18 * dayMix, 35 + 45 * dayMix, 60 + 60 * dayMix, swellA * 0.7);
+      for (let wx = swellW * 0.5; wx < _vr; wx += swellW + 40) {
+        let bx = wx + swellX + sin(wx * 0.012 + t * 0.35 + 1) * 12;
+        rect(floor(bx), floor(bandY + 6), floor(swellW * 0.6), 2);
       }
     }
   }

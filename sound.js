@@ -2274,36 +2274,86 @@ class SoundManager {
         this._playNoise({ type: 'white', filterType: 'highpass', freq: 6000, Q: 1, volume: 0.02, duration: 0.06, attack: 0.002, decay: 0.03 });
         break;
 
-      // ═══ Footsteps — filtered noise, sounds like real surfaces ═══
+      // ═══ Footsteps — natural per-terrain sounds with rich variation ═══
       case 'step_sand': {
-        // Sand crunch: brown noise through bandpass 200-800Hz
-        let p = 1 + (Math.random() - 0.5) * 0.4;
-        this._playNoise({ type: 'brown', filterType: 'bandpass', freq: 500 * p, Q: 0.8, volume: 0.06, duration: 0.07, attack: 0.003, decay: 0.035 });
-        // Subtle high grain texture
-        this._playNoise({ type: 'white', filterType: 'bandpass', freq: 3000 * p, Q: 1.5, volume: 0.02, duration: 0.04, attack: 0.002, decay: 0.02 });
+        // Sand: soft crunch with grain scatter — randomize heavily
+        let p = 1 + (Math.random() - 0.5) * 0.5;
+        let vol = 0.04 + Math.random() * 0.03; // volume variation
+        // Main sand crunch — brown noise through bandpass
+        this._playNoise({ type: 'brown', filterType: 'bandpass', freq: 400 * p + Math.random() * 200, Q: 0.6 + Math.random() * 0.4, volume: vol, duration: 0.06 + Math.random() * 0.03, attack: 0.003, decay: 0.03 + Math.random() * 0.02 });
+        // High grain scatter — fine particles shifting
+        this._playNoise({ type: 'white', filterType: 'bandpass', freq: 2500 * p + Math.random() * 1500, Q: 1.2, volume: vol * 0.35, duration: 0.03 + Math.random() * 0.02, attack: 0.002, decay: 0.015 });
+        // Occasional deeper thud (heel hitting compacted sand)
+        if (Math.random() < 0.4) {
+          this._playNoise({ type: 'brown', filterType: 'lowpass', freq: 250 * p, Q: 1.5, volume: vol * 0.4, duration: 0.04, attack: 0.002, decay: 0.02, delay: 0.008 });
+        }
         break;
       }
       case 'step_stone': {
-        // Stone tap: short noise burst with highpass + sine transient click
-        let p = 1 + (Math.random() - 0.5) * 0.4;
-        this._playNoise({ type: 'white', filterType: 'highpass', freq: 2000 * p, Q: 1, volume: 0.05, duration: 0.03, attack: 0.001, decay: 0.015 });
-        this._playTone({ freq: 320 * p, freqEnd: 200 * p, volume: 0.04, duration: 0.04, attack: 0.001, decay: 0.02 });
-        // Low resonant thud
-        this._playNoise({ type: 'brown', filterType: 'lowpass', freq: 300, Q: 2, volume: 0.03, duration: 0.03, attack: 0.001, decay: 0.015 });
+        // Stone/marble: sharp click-tap with resonant bounce
+        let p = 1 + (Math.random() - 0.5) * 0.5;
+        let vol = 0.04 + Math.random() * 0.025;
+        // Initial impact click — short transient
+        this._playTone({ freq: 280 * p + Math.random() * 80, freqEnd: 160 * p, volume: vol, duration: 0.035 + Math.random() * 0.015, attack: 0.001, decay: 0.015 });
+        // Stone resonance — highpass noise burst
+        this._playNoise({ type: 'white', filterType: 'highpass', freq: 1800 * p + Math.random() * 600, Q: 0.8 + Math.random() * 0.6, volume: vol * 0.7, duration: 0.025, attack: 0.001, decay: 0.012 });
+        // Low thud — the mass of stone
+        this._playNoise({ type: 'brown', filterType: 'lowpass', freq: 200 + Math.random() * 100, Q: 1.8, volume: vol * 0.5, duration: 0.03, attack: 0.001, decay: 0.015 });
+        // Occasional gritty scrape (foot twist)
+        if (Math.random() < 0.3) {
+          this._playNoise({ type: 'white', filterType: 'bandpass', freq: 4000 * p, Q: 2, volume: vol * 0.2, duration: 0.02, attack: 0.001, decay: 0.01, delay: 0.015 });
+        }
         break;
       }
       case 'step_grass': {
-        // Grass rustle: bandpass white noise, soft and breathy
-        let p = 1 + (Math.random() - 0.5) * 0.4;
-        this._playNoise({ type: 'white', filterType: 'bandpass', freq: 3500 * p, Q: 0.6, volume: 0.03, duration: 0.06, attack: 0.003, decay: 0.03 });
-        this._playNoise({ type: 'brown', filterType: 'bandpass', freq: 800 * p, Q: 1, volume: 0.02, duration: 0.05, attack: 0.002, decay: 0.025 });
+        // Grass: soft rustle with leaf crinkle — gentle and organic
+        let p = 1 + (Math.random() - 0.5) * 0.5;
+        let vol = 0.025 + Math.random() * 0.02; // quieter than other surfaces
+        // Soft earth compression
+        this._playNoise({ type: 'brown', filterType: 'bandpass', freq: 600 * p + Math.random() * 300, Q: 0.8, volume: vol, duration: 0.05 + Math.random() * 0.025, attack: 0.004, decay: 0.025 });
+        // Grass blade rustle — higher frequency whisper
+        this._playNoise({ type: 'white', filterType: 'bandpass', freq: 3000 * p + Math.random() * 2000, Q: 0.5 + Math.random() * 0.3, volume: vol * 0.5, duration: 0.04 + Math.random() * 0.02, attack: 0.003, decay: 0.02 });
+        // Leaf crinkle (random)
+        if (Math.random() < 0.35) {
+          this._playNoise({ type: 'white', filterType: 'bandpass', freq: 5000 + Math.random() * 2000, Q: 1.5, volume: vol * 0.25, duration: 0.015, attack: 0.001, decay: 0.008, delay: 0.01 });
+        }
+        // Subtle low earth thump
+        if (Math.random() < 0.5) {
+          this._playNoise({ type: 'brown', filterType: 'lowpass', freq: 180, Q: 1, volume: vol * 0.3, duration: 0.03, attack: 0.003, decay: 0.015 });
+        }
         break;
       }
       case 'step_water': {
-        // Water step: lowpass noise splash + sine plop
+        // Water: splashy plop with ripple — wet and expressive
         let p = 1 + (Math.random() - 0.5) * 0.4;
-        this._playNoise({ type: 'white', filterType: 'lowpass', freq: 2000, Q: 1, volume: 0.05, duration: 0.08, attack: 0.003, decay: 0.04 });
-        this._playTone({ freq: 200 * p, freqEnd: 120 * p, volume: 0.05, duration: 0.07, attack: 0.005, decay: 0.03 });
+        let vol = 0.04 + Math.random() * 0.03;
+        // Initial splash burst
+        this._playNoise({ type: 'white', filterType: 'lowpass', freq: 1800 + Math.random() * 600, Q: 0.8, volume: vol, duration: 0.06 + Math.random() * 0.03, attack: 0.003, decay: 0.03 });
+        // Water plop — descending tone
+        this._playTone({ freq: 180 * p + Math.random() * 60, freqEnd: 100 * p, volume: vol * 0.8, duration: 0.06, attack: 0.004, decay: 0.03 });
+        // Ripple tail — longer decay noise
+        this._playNoise({ type: 'white', filterType: 'bandpass', freq: 800 * p, Q: 1.2, volume: vol * 0.25, duration: 0.08, attack: 0.005, decay: 0.04, delay: 0.02 });
+        // Drip/droplet (random secondary splash)
+        if (Math.random() < 0.4) {
+          let dDelay = 0.04 + Math.random() * 0.03;
+          this._playTone({ freq: 350 * p + Math.random() * 100, freqEnd: 200 * p, volume: vol * 0.3, duration: 0.04, attack: 0.002, decay: 0.02, delay: dDelay });
+        }
+        break;
+      }
+      case 'step_wood': {
+        // Wood: hollow knock with creaky resonance — boardwalk/pier
+        let p = 1 + (Math.random() - 0.5) * 0.45;
+        let vol = 0.05 + Math.random() * 0.025;
+        // Hollow wood knock — bandpass mid-frequency
+        this._playTone({ freq: 200 * p + Math.random() * 50, freqEnd: 140 * p, volume: vol, duration: 0.04 + Math.random() * 0.02, attack: 0.001, decay: 0.02 });
+        // Wood resonance — warm filtered noise
+        this._playNoise({ type: 'brown', filterType: 'bandpass', freq: 700 * p + Math.random() * 300, Q: 1.5 + Math.random() * 0.5, volume: vol * 0.6, duration: 0.05, attack: 0.002, decay: 0.025 });
+        // Board creak (random)
+        if (Math.random() < 0.3) {
+          this._playTone({ freq: 600 * p + Math.random() * 200, freqEnd: 400 * p, volume: vol * 0.15, duration: 0.06, attack: 0.005, decay: 0.03, delay: 0.015 });
+        }
+        // Subtle hollow echo
+        this._playNoise({ type: 'brown', filterType: 'lowpass', freq: 350, Q: 2.5, volume: vol * 0.35, duration: 0.035, attack: 0.001, decay: 0.018 });
         break;
       }
       case 'dash':

@@ -1026,16 +1026,16 @@ function startSeaPeopleRaid(tier) {
   state.seaPeopleRaidActive = true;
 
   let raidSize, champCount, bossCount, title;
-  if (tier <= 1) { raidSize = floor(random(3, 6)); champCount = 0; bossCount = 0; title = 'Sea People Scout Party'; }
-  else if (tier === 2) { raidSize = floor(random(6, 11)); champCount = 1; bossCount = 0; title = 'Sea People War Band'; }
-  else if (tier === 3) { raidSize = floor(random(12, 19)); champCount = 2; bossCount = 0; title = 'Sea People Fleet'; }
-  else { raidSize = floor(random(20, 31)); champCount = 3; bossCount = 1; title = 'Sea People Armada'; }
+  if (tier <= 1) { raidSize = floor(random(3, 6)); champCount = 0; bossCount = 0; title = 'Sea People Reavers'; }
+  else if (tier === 2) { raidSize = floor(random(6, 11)); champCount = 1; bossCount = 0; title = 'Sea People Horde'; }
+  else if (tier === 3) { raidSize = floor(random(12, 19)); champCount = 2; bossCount = 0; title = 'Sea People Dread Fleet'; }
+  else { raidSize = floor(random(20, 31)); champCount = 3; bossCount = 1; title = 'Sea People Destroyer Armada'; }
 
   let baseHp = 25 + tier * 10;
   let baseDmg = 8 + tier * 3;
 
-  addNotification('Sea People longships spotted on the horizon!', '#ff4444');
-  addFloatingText(width / 2, height * 0.2, title.toUpperCase() + '!', '#ff4444');
+  addNotification('Black sails on the horizon — the Sea People come!', '#8c2d1e');
+  addFloatingText(width / 2, height * 0.2, title.toUpperCase() + '!', '#cc3322');
   if (snd) snd.playSFX('war_horn');
   if (snd && snd.playNarration) snd.playNarration('first_raid');
   if (typeof triggerPlayerAlert === 'function') triggerPlayerAlert();
@@ -1079,7 +1079,7 @@ function updateSeaPeopleRaid(dt) {
     state.seaPeopleShips = [];
     state._seaPeopleRaidParty = null;
     let killed = state._seaPeopleRaidKills || 0;
-    addFloatingText(width / 2, height * 0.2, 'SEA PEOPLE REPELLED!', '#88ff88');
+    addFloatingText(width / 2, height * 0.2, 'THE SCOURGE IS BROKEN!', '#88ff88');
     addNotification('Sea People raiders defeated! ' + killed + ' enemies slain.', '#88ff88');
     state._seaPeopleRaidKills = 0;
     _returnGarrisonDefenders();
@@ -1227,48 +1227,67 @@ function drawSeaPeopleShips() {
     push();
     translate(sx, sy);
     noStroke();
-    // Hull
-    fill(50, 35, 20);
+    // Dark hull — near-black charred wood
+    fill(28, 25, 30);
     beginShape();
-    vertex(-30, 0); vertex(-25, 8); vertex(25, 8); vertex(30, 0);
-    vertex(25, -3); vertex(-25, -3);
+    vertex(-32, 0); vertex(-27, 9); vertex(27, 9); vertex(32, 0);
+    vertex(27, -4); vertex(-27, -4);
     endShape(CLOSE);
-    // Prow
-    fill(40, 28, 15);
+    // Hull stripe — blood red
+    fill(140, 45, 30, 180);
+    rect(-24, 1, 48, 2);
+    // Prow — spiked ram
+    fill(22, 18, 25);
     beginShape();
-    vertex(28, -3); vertex(35, -12); vertex(32, -10); vertex(30, 0);
+    vertex(30, -4); vertex(38, -14); vertex(35, -10); vertex(32, 0);
     endShape(CLOSE);
+    // Ram tip — iron
+    fill(120, 40, 25);
+    rect(36, -14, 4, 3);
     // Stern
+    fill(22, 18, 25);
     beginShape();
-    vertex(-28, -3); vertex(-33, -10); vertex(-30, -8); vertex(-28, 0);
+    vertex(-30, -4); vertex(-36, -12); vertex(-33, -9); vertex(-30, 0);
     endShape(CLOSE);
-    // Mast
-    stroke(60, 45, 25); strokeWeight(2);
-    line(0, -3, 0, -28);
-    // Sail — dark grey with red trim
+    // Mast — dark
+    stroke(40, 35, 30); strokeWeight(2);
+    line(0, -4, 0, -30);
+    // Sail — black with blood-red serpent stripe
     noStroke();
-    fill(70, 65, 60, 200);
+    fill(35, 30, 35, 210);
     beginShape();
-    vertex(-12, -26); vertex(12, -26); vertex(10, -10); vertex(-10, -10);
+    vertex(-13, -28); vertex(13, -28); vertex(11, -10); vertex(-11, -10);
     endShape(CLOSE);
-    fill(120, 40, 30, 180);
-    rect(-11, -14, 22, 3);
-    // Dragon figurehead at prow
-    fill(60, 50, 40);
-    rect(33, -14, 3, 5);
-    fill(42, 138, 106);
-    rect(32, -18, 5, 4);
-    fill(200, 60, 40);
-    rect(35, -16, 2, 2); // eye
-    // Oars
-    stroke(70, 50, 30); strokeWeight(1);
-    let oarPhase = sin(frameCount * 0.06 + s.phase) * 4;
-    for (let o = 0; o < 3; o++) {
-      let ox = -12 + o * 12;
-      line(ox, 4, ox - 5, 12 + oarPhase);
-      line(ox, 4, ox + 5, 12 - oarPhase);
+    // Red serpent zigzag on sail
+    fill(140, 45, 30, 200);
+    rect(-10, -22, 20, 2);
+    rect(-8, -18, 16, 2);
+    rect(-10, -14, 20, 2);
+    // Dragon figurehead — darker, larger
+    fill(35, 30, 28);
+    rect(35, -18, 4, 8);
+    fill(140, 45, 30);
+    rect(34, -22, 6, 4); // serpent head
+    fill(200, 50, 30);
+    rect(38, -20, 2, 2); // glowing red eye
+    // Skull on prow
+    fill(180, 170, 150, 150);
+    rect(30, -6, 4, 4);
+    fill(35, 30, 28);
+    rect(31, -5, 1, 1); rect(33, -5, 1, 1); // eye sockets
+    // Oars — many, fast
+    stroke(50, 40, 35); strokeWeight(1);
+    let oarPhase = sin(frameCount * 0.07 + s.phase) * 5;
+    for (let o = 0; o < 4; o++) {
+      let ox = -15 + o * 10;
+      line(ox, 5, ox - 5, 14 + oarPhase);
+      line(ox, 5, ox + 5, 14 - oarPhase);
     }
     noStroke();
+    // Smoke/mist trailing effect
+    fill(30, 25, 35, 25 + sin(frameCount * 0.05 + s.phase) * 15);
+    ellipse(-38, -2, 20, 8);
+    ellipse(-48, 0, 14, 6);
     pop();
   }
 }
@@ -1277,15 +1296,25 @@ function drawSeaPeopleRaiders() {
   if (!state._seaPeopleRaidParty || state._seaPeopleRaidParty.length === 0) return;
   if (state._seaPeopleWarning > 0) {
     push();
-    fill(120, 40, 30, 180 + sin(frameCount * 0.15) * 60);
-    noStroke(); textAlign(CENTER); textSize(14);
-    text('SEA PEOPLE RAIDERS APPROACHING!', width / 2, height * 0.12);
-    textSize(9); fill(255, 200, 150, 160);
-    text('Defend your island!', width / 2, height * 0.15);
+    // Blood-red pulsing warning with screen edge vignette
+    let pulse = sin(frameCount * 0.12) * 0.5 + 0.5;
+    noStroke();
+    // Dark edge vignette
+    fill(35, 10, 10, 40 * pulse);
+    rect(0, 0, width, height * 0.05);
+    rect(0, height * 0.95, width, height * 0.05);
+    // Warning text
+    fill(140, 45, 30, 180 + pulse * 70);
+    textAlign(CENTER); textSize(14);
+    textFont('Cinzel, Georgia, serif');
+    text('THE SEA PEOPLE ARE COMING', width / 2, height * 0.12);
+    textFont('monospace');
+    textSize(9); fill(200, 150, 120, 140 + pulse * 40);
+    text('Black sails on the horizon...', width / 2, height * 0.15);
     pop();
     return;
   }
-  let bannerCol = FACTIONS.seapeople ? FACTIONS.seapeople.bannerColor : [26, 58, 92];
+  let bannerCol = FACTIONS.seapeople ? FACTIONS.seapeople.bannerColor : [35, 30, 45];
   for (let r of state._seaPeopleRaidParty) {
     let sx = w2sX(r.x), sy = w2sY(r.y);
     if (sx < -30 || sx > width + 30 || sy < -30 || sy > height + 30) continue;

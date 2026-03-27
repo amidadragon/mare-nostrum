@@ -897,7 +897,7 @@ function drawShopUI() {
   textAlign(LEFT, TOP);
 }
 
-// ─── EXPEDITION FORGE UI ────────────────────────────────────────────────
+// ─── ANCIENT TEMPLE UI ──────────────────────────────────────────────────
 function drawUpgradeShopUI() {
   if (!state.upgradeShopOpen) return;
   push();
@@ -910,10 +910,10 @@ function drawUpgradeShopUI() {
   // Title
   textFont('Cinzel, Georgia, serif');
   fill(210, 180, 80); textSize(15); textAlign(CENTER);
-  text('EXPEDITION FORGE', px + panW / 2, py + 18);
+  text('ANCIENT TEMPLE', px + panW / 2, py + 18);
   textFont('monospace');
   fill(180, 160, 120); textSize(11);
-  text('Upgrade your expeditions at the temple', px + panW / 2, py + 34);
+  text('Blessings of the gods for your voyage', px + panW / 2, py + 34);
 
   // Resource bar
   let ry = py + 44;

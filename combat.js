@@ -2390,10 +2390,10 @@ const FACTION_ABILITIES = {
     passiveDesc: '+15% move speed',
   },
   seapeople: {
-    q: { name: 'Harpoon Throw', maxCD: 240, desc: 'Pull nearest enemy toward you', color: '#66aacc' },
-    r: { name: 'Tidal Wave', maxCD: 720, desc: 'Knockback + slow all nearby enemies', color: '#3388bb' },
-    passive: 'Sea Raider',
-    passiveDesc: '+50% raid loot, +30% sail speed',
+    q: { name: 'Boarding Hook', maxCD: 200, desc: 'Drag nearest enemy to you, stun 1s', color: '#8c2d1e' },
+    r: { name: 'Dread Tide', maxCD: 660, desc: 'Fear + knockback all nearby, -30% their ATK 5s', color: '#551818' },
+    passive: 'Scourge',
+    passiveDesc: '+50% raid loot, +30% sail speed, +15% combat dmg',
   },
   persia: {
     q: { name: 'Immortal Guard', maxCD: 360, desc: 'Block next 3 attacks', color: '#ddbb44' },

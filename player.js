@@ -337,7 +337,31 @@ function updatePlayerAnim(dt) {
       a.walkTimer = 0; a.walkFrame = (a.walkFrame + 1) % 4;
       // Footstep sound on frames 1 and 3 (feet hitting ground)
       if ((a.walkFrame === 1 || a.walkFrame === 3) && snd && frameCount % 2 === 0) {
-        snd.playSFX((isInShallows(p.x, p.y) || (typeof isNearAnyIsland === 'function' && !isOnAnyIslandSurface(p.x, p.y) && isNearAnyIsland(p.x, p.y, 300))) ? 'water' : 'step_sand');
+        // Terrain-aware footsteps with natural variation
+        let _stepSfx = 'step_sand'; // default
+        if (isInShallows(p.x, p.y) || (typeof isNearAnyIsland === 'function' && !isOnAnyIslandSurface(p.x, p.y) && isNearAnyIsland(p.x, p.y, 300))) {
+          _stepSfx = 'step_water';
+        } else if (typeof isOnPier === 'function' && isOnPier(p.x, p.y)) {
+          _stepSfx = 'step_wood';
+        } else if (typeof isOnBridge === 'function' && isOnBridge(p.x, p.y)) {
+          _stepSfx = 'step_stone';
+        } else if (typeof isOnIsland === 'function' && isOnIsland(p.x, p.y)) {
+          // Beach vs grass — outer 25% is sandy, inner is grass
+          let _sdx = (p.x - WORLD.islandCX) / getSurfaceRX();
+          let _sdy = (p.y - WORLD.islandCY) / getSurfaceRY();
+          let _sdist = _sdx * _sdx + _sdy * _sdy;
+          if (_sdist > 0.72) {
+            _stepSfx = 'step_sand';
+          } else {
+            // Near buildings = stone, otherwise grass
+            let _nearBldg = state.buildings.some(b => {
+              let dx = p.x - b.x, dy = p.y - b.y;
+              return dx*dx + dy*dy < 1600; // within 40px
+            });
+            _stepSfx = _nearBldg ? 'step_stone' : 'step_grass';
+          }
+        }
+        snd.playSFX(_stepSfx);
       }
     }
   } else {

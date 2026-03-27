@@ -214,7 +214,7 @@ const FACTION_CASTRUM_STYLE = {
   persia:    { wallColor: [60,100,170],  roofColor: [170,130,50], accentColor: [106,42,138], gateStyle: 'arch',    towerStyle: 'dome',     bannerIcon: 'lion' },
   gaul:      { wallColor: [100,80,50],   roofColor: [80,90,50],   accentColor: [42,106,48],  gateStyle: 'wood',    towerStyle: 'log',      bannerIcon: 'boar' },
   phoenicia: { wallColor: [200,190,170], roofColor: [120,20,70],  accentColor: [138,16,80],  gateStyle: 'cedar',   towerStyle: 'square',   bannerIcon: 'ship' },
-  seapeople: { wallColor: [60,55,50],    roofColor: [50,45,40],   accentColor: [180,40,40],  gateStyle: 'dragon',  towerStyle: 'spike',    bannerIcon: 'serpent' }
+  seapeople: { wallColor: [45,40,38],    roofColor: [35,30,28],   accentColor: [140,45,30],  gateStyle: 'skull',   towerStyle: 'spike',    bannerIcon: 'serpent' }
 };
 
 function drawOneBuilding(b) {

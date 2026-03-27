@@ -254,33 +254,33 @@ const FACTIONS = {
   },
   seapeople: {
     name: 'SEA PEOPLE',
-    subtitle: 'Raiders of the Deep',
-    bonuses: ['+30% sailing speed', '+50% raid loot', 'No starting island', 'Starts on a ship'],
+    subtitle: 'Scourge of the Bronze Age',
+    bonuses: ['+30% sailing speed', '+50% raid loot', '+15% combat on water', 'Starts on a ship'],
     buildSpeedMult: 1.0,
     recruitBonus: 0,
-    tradeIncomeMult: 1.0,
+    tradeIncomeMult: 0.85,
     sailSpeedMult: 1.3,
-    combatDamageMult: 1.0,
-    fishYieldMult: 1.0,
-    npcFavorMult: 1.0,
+    combatDamageMult: 1.15,
+    fishYieldMult: 1.2,
+    npcFavorMult: 0.8,
     crystalIncomeMult: 1.0,
-    cropGrowthMult: 1.0,
-    buildCostMult: 1.0,
+    cropGrowthMult: 0.9,
+    buildCostMult: 1.1,
     raidLootMult: 1.5,
     noStartIsland: true,
-    bannerColor: [26, 58, 92],
-    accentColor: [42, 138, 106],
-    accentColorHex: '#2a8a6a',
-    bannerGlyph: 'trident',
+    bannerColor: [35, 30, 45],
+    accentColor: [140, 45, 30],
+    accentColorHex: '#8c2d1e',
+    bannerGlyph: 'serpent',
     style: {
-      wall: [138, 112, 80], roof: [90, 80, 65], trim: [110, 100, 80],
-      accent: [42, 138, 106], door: [70, 55, 35], window: [26, 58, 92],
-      column: [120, 105, 80], ground: [105, 90, 70],
-      roofType: 'flat', columnType: 'wooden', doorShape: 'rect',
-      wallTexture: 'plank', groundTint: [115, 100, 78],
+      wall: [55, 50, 45], roof: [40, 35, 30], trim: [80, 60, 50],
+      accent: [140, 45, 30], door: [45, 35, 28], window: [35, 30, 45],
+      column: [65, 55, 45], ground: [50, 45, 40],
+      roofType: 'flat', columnType: 'wooden', doorShape: 'arch',
+      wallTexture: 'plank', groundTint: [60, 52, 42],
     },
-    player: { tunic: [26, 58, 92], sash: [90, 70, 45], cape: [42, 138, 106], helm: [138, 112, 80] },
-    npcNames: { livia: 'Thalassa', marcus: 'Nereus', vesta: 'Scylla', felix: 'Triton' },
+    player: { tunic: [35, 30, 45], sash: [140, 45, 30], cape: [25, 22, 35], helm: [90, 80, 65] },
+    npcNames: { livia: 'Meresankh', marcus: 'Lukka', vesta: 'Shekelesh', felix: 'Denyen' },
   },
   persia: {
     name: 'PERSIA',
@@ -450,9 +450,9 @@ const FACTION_FLORA = {
     { col: [220, 220, 210], w: 2, h: 2 },
   ],
   seapeople: [
-    { col: [40, 100, 120], w: 3, h: 2 },
-    { col: [80, 130, 90], w: 4, h: 3 },
-    { col: [60, 90, 110], w: 2, h: 2 },
+    { col: [55, 50, 45], w: 3, h: 2 },
+    { col: [100, 80, 60], w: 4, h: 3 },
+    { col: [70, 55, 40], w: 2, h: 2 },
   ],
   persia: [
     { col: [180, 100, 200], w: 3, h: 3 },
@@ -501,11 +501,11 @@ const FACTION_MILITARY = {
     conquestFlag: [50, 100, 170],
   },
   seapeople: {
-    tunic: [26, 58, 92], cape: [42, 138, 106], armor: [138, 112, 80],
-    helm: [138, 112, 80], helmCrest: [42, 138, 106], shield: [26, 58, 92],
-    shieldBoss: [138, 112, 80], legs: [80, 65, 45], plume: [42, 138, 106],
-    shieldShape: 'round', helmStyle: 'nasal', weapon: 'axe',
-    conquestFlag: [26, 58, 92],
+    tunic: [35, 30, 45], cape: [25, 22, 35], armor: [70, 60, 50],
+    helm: [90, 80, 65], helmCrest: [140, 45, 30], shield: [40, 35, 30],
+    shieldBoss: [140, 45, 30], legs: [50, 40, 32], plume: [140, 45, 30],
+    shieldShape: 'round', helmStyle: 'horned', weapon: 'axe',
+    conquestFlag: [35, 30, 45],
   },
   persia: {
     tunic: [106, 42, 138], cape: [212, 160, 48], armor: [230, 220, 200],
@@ -543,7 +543,7 @@ const FACTION_TERMS = {
   carthage:  { leader:'Suffete', soldier:'Libyan Infantry', barracks:'War Camp', army:'Host', elite:'Sacred Band', officer:'Captain', rank2:'Suffete', rank3:'General' },
   egypt:     { leader:'Commander', soldier:'Medjay', barracks:'Garrison', army:'Royal Guard', elite:"Pharaoh's Elite", officer:'Scribe', rank2:'Commander', rank3:'Vizier' },
   greece:    { leader:'Strategos', soldier:'Hoplite', barracks:'Stratopedo', army:'Phalanx', elite:'Companion', officer:'Lochagos', rank2:'Strategos', rank3:'Polemarch' },
-  seapeople: { leader:'Warchief', soldier:'Raider', barracks:'Longhouse', army:'War Band', elite:'Storm Warrior', officer:'Thane', rank2:'Warchief', rank3:'High King' },
+  seapeople: { leader:'Sea Lord', soldier:'Raider', barracks:'War Camp', army:'Horde', elite:'Dread Corsair', officer:'Reaver', rank2:'Sea Lord', rank3:'Destroyer' },
   persia:    { leader:'Satrap', soldier:'Immortal', barracks:'Apadana', army:'Royal Army', elite:'Immortal Guard', officer:'Hazarapatis', rank2:'Satrap', rank3:'Spahbod' },
   phoenicia: { leader:'Admiral', soldier:'Marine', barracks:'Dockfort', army:'Fleet Guard', elite:'Tyrian Elite', officer:'Helmsman', rank2:'Admiral', rank3:'Archon' },
   gaul:      { leader:'Chieftain', soldier:'Warrior', barracks:'Hill Fort', army:'War Band', elite:'Champion', officer:'Ambact', rank2:'Chieftain', rank3:'Vercingetorix' },
@@ -578,9 +578,9 @@ const FACTION_WILDLIFE = {
     { type: 'owl', speed: 0.5, size: 6 },
   ],
   seapeople: [
-    { type: 'seagull', speed: 0.7, size: 6 },
-    { type: 'crab', speed: 0.15, size: 4 },
-    { type: 'pelican', speed: 0.4, size: 8 },
+    { type: 'raven', speed: 0.6, size: 6 },
+    { type: 'crab', speed: 0.15, size: 5 },
+    { type: 'vulture', speed: 0.35, size: 9 },
   ],
   persia: [
     { type: 'peacock', speed: 0.2, size: 9 },
@@ -634,12 +634,12 @@ const FACTION_UNITS = {
     { name: 'Achilles', cost: 50, currency: 'gold', hp: 95, atk: 24, def: 12, desc: 'Legendary hero' },
   ],
   seapeople: [
-    { name: 'Raider', cost: 5, currency: 'gold', hp: 20, atk: 8, def: 2, desc: 'Fast raider' },
-    { name: 'Sea Warrior', cost: 14, currency: 'gold', hp: 40, atk: 12, def: 6, desc: 'Seasoned fighter' },
-    { name: 'Berserker', cost: 20, currency: 'gold', hp: 50, atk: 20, def: 2, desc: 'Reckless fury' },
-    { name: 'Shieldmaiden', cost: 18, currency: 'gold', hp: 45, atk: 12, def: 10, desc: 'Balanced warrior' },
-    { name: 'Longship Captain', cost: 35, currency: 'gold', hp: 65, atk: 16, def: 12, desc: 'Naval commander' },
-    { name: 'Sea King', cost: 0, currency: 'gold', hp: 100, atk: 22, def: 14, desc: 'Born ruler of waves' },
+    { name: 'Sherden', cost: 5, currency: 'gold', hp: 22, atk: 9, def: 2, desc: 'Sword-wielding raider' },
+    { name: 'Peleset', cost: 14, currency: 'gold', hp: 42, atk: 12, def: 7, desc: 'Armored spearman' },
+    { name: 'Lukkan Marauder', cost: 20, currency: 'gold', hp: 48, atk: 18, def: 3, desc: 'Savage fury' },
+    { name: 'Tjeker Corsair', cost: 18, currency: 'gold', hp: 44, atk: 14, def: 8, desc: 'Ship-borne fighter' },
+    { name: 'Weshesh Champion', cost: 35, currency: 'gold', hp: 68, atk: 18, def: 12, desc: 'Elite destroyer' },
+    { name: 'Sea Lord', cost: 0, currency: 'gold', hp: 110, atk: 24, def: 14, desc: 'Dread of all coasts' },
   ],
   persia: [
     { name: 'Immortal', cost: 15, currency: 'gold', hp: 50, atk: 12, def: 8, desc: 'Never-ending guard' },
@@ -673,7 +673,7 @@ const GODS = {
   carthage:  { name: 'Tanit', domain: 'Moon', ultimate: 'Lunar Tide', blessingOptions: ['night_veil', 'trade_wind', 'silver_tongue'] },
   egypt:     { name: 'Ra', domain: 'Sun', ultimate: 'Solar Judgment', blessingOptions: ['solar_shield', 'harvest_blessing', 'crystal_growth'] },
   greece:    { name: 'Athena', domain: 'Wisdom', ultimate: 'Oracle Vision', blessingOptions: ['tactical_insight', 'scholar_focus', 'divine_aegis'] },
-  seapeople: { name: 'Poseidon', domain: 'Sea', ultimate: 'Tsunami', blessingOptions: ['calm_seas', 'fish_bounty', 'storm_call'] },
+  seapeople: { name: 'Dagon', domain: 'Abyss', ultimate: 'Maelstrom', blessingOptions: ['blood_tide', 'fish_bounty', 'storm_call'] },
   persia:    { name: 'Ahura Mazda', domain: 'Light', ultimate: 'Eternal Flame', blessingOptions: ['purity', 'royal_decree', 'fire_blessing'] },
   phoenicia: { name: 'Melqart', domain: 'Trade', ultimate: 'Golden Touch', blessingOptions: ['merchant_favor', 'fair_winds', 'harbor_blessing'] },
   gaul:      { name: 'Cernunnos', domain: 'Nature', ultimate: 'Wild Hunt', blessingOptions: ['forest_growth', 'beast_bond', 'earth_strength'] },
@@ -927,7 +927,7 @@ const NARRATION_TEXTS = {
   carthage_intro: 'Carthage rises again. Let gold flow like water through your markets.',
   egypt_intro: 'By the light of Ra, your dynasty begins anew upon these shores.',
   greece_intro: 'Wisdom and beauty shall be your foundation. Athens lives in you.',
-  seapeople_intro: 'The sea is your homeland. Take what you need. Fear nothing.',
+  seapeople_intro: 'We are the storm that toppled empires. The sea remembers what the land forgets.',
   persia_intro: 'The King of Kings builds not just walls, but an empire of splendor.',
   phoenicia_intro: 'Every shore is a market. Every wave, a road. Navigate wisely.',
   gaul_intro: 'The forest remembers. The druids whisper. Strength flows from the earth.',
@@ -1792,6 +1792,16 @@ function isWalkable(wx, wy) {
   if (state && state.insideCastrum) {
     return abs(wx - CASTRUM_ROOM.cx) <= CASTRUM_ROOM.hw && abs(wy - CASTRUM_ROOM.cy) <= CASTRUM_ROOM.hh;
   }
+  // Ship deck — elliptical boundary (Sea Peoples home)
+  if (state && state.onShipDeck && typeof SHIP_DECK !== 'undefined') {
+    var _sdx = (wx - SHIP_DECK.cx) / (SHIP_DECK.hw + 10);
+    var _sdy = (wy - SHIP_DECK.cy) / (SHIP_DECK.hh + 5);
+    return _sdx * _sdx + _sdy * _sdy <= 1.15;
+  }
+  // Below deck — rectangular boundary
+  if (state && state.belowDeck && typeof BELOW_DECK !== 'undefined') {
+    return abs(wx - BELOW_DECK.cx) <= BELOW_DECK.hw && abs(wy - BELOW_DECK.cy) <= BELOW_DECK.hh;
+  }
   // While diving, player can swim in wider water area around island
   if (state && state.diving && state.diving.active) {
     let dx = (wx - WORLD.islandCX) / (state.islandRX * 2.0);
@@ -2285,6 +2295,13 @@ function drawInner() {
     return;
   }
 
+  // === BELOW DECK INTERIOR (Sea Peoples ship) ===
+  if (state.belowDeck && typeof updateShipHome === 'function') {
+    updateShipHome(dt);
+    renderShipHome();
+    return;
+  }
+
   updateTime(dt);
   updateCurrentIsland();
   // Safety: ensure castrumLevel matches building state
@@ -2304,7 +2321,7 @@ function drawInner() {
   // Skip during wreck beach (player is at -4800,0 which is far from all islands)
   let _onWreck = (state.progression.gameStarted && !state.progression.homeIslandReached) || (state.wreck && state.wreck._visiting);
   if (state.player && !state.rowing.active && !_onWreck && !state._activeWorldIsland && typeof isNearAnyIsland === 'function' &&
-      !isNearAnyIsland(state.player.x, state.player.y, 500) && !state.insideTemple && !state.insideCastrum) {
+      !isNearAnyIsland(state.player.x, state.player.y, 500) && !state.insideTemple && !state.insideCastrum && !state.onShipDeck && !state.belowDeck) {
     state.player.x = WORLD.islandCX;
     state.player.y = WORLD.islandCY;
     cam.x = state.player.x; cam.y = state.player.y;
@@ -2656,7 +2673,11 @@ function drawInner() {
     let _onNationIsland = !!state._activeNation || !!state._activeExploration;
     let _onWorldIsland = !!state._activeWorldIsland;
     let _onOtherIsland = _onNationIsland || _onWorldIsland;
-    if (_onWorldIsland || (!_isSailing && !_onOtherIsland) || (_isSailing && _homeDist < 800)) {
+    // Sea Peoples ship deck — draw ship instead of island when on ship
+    if (state.onShipDeck && typeof drawShipDeck === 'function') {
+      drawShipDeck();
+      if (typeof clampPlayerToShipDeck === 'function') clampPlayerToShipDeck();
+    } else if (_onWorldIsland || (!_isSailing && !_onOtherIsland) || (_isSailing && _homeDist < 800)) {
       drawIsland(); // Full island render (home island or visited world island)
       if (!_onWorldIsland && typeof drawHomeLighthouse === 'function') drawHomeLighthouse();
     } else if (_isSailing && _homeDist < 2000) {
@@ -3344,14 +3365,14 @@ function drawInner() {
     // Dive prompt
     if (typeof drawDivePrompt === 'function') drawDivePrompt();
 
-    // Expedition Forge prompt near pyramid — gate behind villa
+    // Ancient Temple prompt near pyramid — gate behind villa
     if (!state.rowing.active && !state.upgradeShopOpen && _boatUnlocked &&
         dist(state.player.x, state.player.y, state.pyramid.x, state.pyramid.y) < 60) {
       let fpx = w2sX(state.pyramid.x);
       let fpy = w2sY(state.pyramid.y) - 40 + floatOffset;
       fill(255, 220, 150, 200 + sin(frameCount * 0.06) * 30);
       noStroke(); textAlign(CENTER); textSize(10);
-      text('[E] Expedition Forge', fpx, fpy);
+      text('[E] Ancient Temple', fpx, fpy);
       // Show last expedition result
       if (state.expeditionLog.length > 0) {
         let last = state.expeditionLog[0];

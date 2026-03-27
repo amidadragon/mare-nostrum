@@ -218,7 +218,7 @@ const FACTION_SHIPS = {
   carthage: { hullColor: [55,30,55], hullW: 65, hullH: 18, ramColor: [140,100,50], sailH: 42, mastH: 55, hasRam: true, hasEagle: false, hasDragon: false, deckColor: [90,55,80], oarCount: 10 },
   egypt: { hullColor: [90,65,30], hullW: 55, hullH: 14, ramColor: [200,170,40], sailH: 44, mastH: 52, hasRam: false, hasEagle: false, hasDragon: false, deckColor: [130,100,50], oarCount: 6 },
   greece: { hullColor: [60,40,25], hullW: 58, hullH: 15, ramColor: [140,130,50], sailH: 36, mastH: 48, hasRam: true, hasEagle: false, hasDragon: false, deckColor: [100,70,45], oarCount: 8 },
-  seapeople: { hullColor: [35,35,40], hullW: 70, hullH: 20, ramColor: [100,100,110], sailH: 40, mastH: 54, hasRam: false, hasEagle: false, hasDragon: true, deckColor: [60,60,65], oarCount: 12 },
+  seapeople: { hullColor: [28,25,30], hullW: 72, hullH: 22, ramColor: [120,40,25], sailH: 42, mastH: 56, hasRam: true, hasEagle: false, hasDragon: true, deckColor: [45,40,38], oarCount: 14 },
   persia: { hullColor: [70,35,50], hullW: 62, hullH: 17, ramColor: [170,130,60], sailH: 40, mastH: 52, hasRam: false, hasEagle: false, hasDragon: false, deckColor: [120,70,80], oarCount: 8 },
   phoenicia: { hullColor: [80,30,30], hullW: 64, hullH: 16, ramColor: [150,110,40], sailH: 38, mastH: 50, hasRam: true, hasEagle: false, hasDragon: false, deckColor: [115,60,50], oarCount: 10 },
   gaul: { hullColor: [50,55,30], hullW: 56, hullH: 18, ramColor: [100,90,40], sailH: 34, mastH: 46, hasRam: false, hasEagle: false, hasDragon: false, deckColor: [85,90,50], oarCount: 6 }
