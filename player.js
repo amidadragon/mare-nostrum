@@ -344,8 +344,10 @@ function updatePlayerAnim(dt) {
         a._stepCooldown = 14; // ~0.23s at 60fps — natural walking pace
         // Terrain-aware footsteps with natural variation
         let _stepSfx = 'step_sand'; // default
-        // Ship deck = wood footsteps
-        if (state.onShipDeck || state.belowDeck) {
+        // Ship deck = wind/sail swoosh; below deck = wood
+        if (state.onShipDeck) {
+          _stepSfx = 'step_sail';
+        } else if (state.belowDeck) {
           _stepSfx = 'step_wood';
         } else if (isInShallows(p.x, p.y) || (typeof isNearAnyIsland === 'function' && !isOnAnyIslandSurface(p.x, p.y) && isNearAnyIsland(p.x, p.y, 300))) {
           _stepSfx = 'step_water';

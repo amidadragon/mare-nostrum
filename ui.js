@@ -925,14 +925,14 @@ function drawUpgradeShopUI() {
   text(resText, px + 12, ry + 12);
 
   // Upgrades list
-  let keys = Object.keys(EXPEDITION_UPGRADES);
+  let keys = Object.keys(TEMPLE_UPGRADES);
   let sy = py + 70;
   for (let i = 0; i < keys.length; i++) {
     let key = keys[i];
-    let upg = EXPEDITION_UPGRADES[key];
-    let tier = state.expeditionUpgrades[key] || 0;
+    let upg = TEMPLE_UPGRADES[key];
+    let tier = state.templeUpgrades[key] || 0;
     let maxTier = upg.tiers.length;
-    let atMax = (key === 'expeditionTier') ? tier >= maxTier : tier >= maxTier;
+    let atMax = (key === 'warTier') ? tier >= maxTier : tier >= maxTier;
 
     let rowY = sy + i * 36;
     // Row bg
@@ -1000,8 +1000,8 @@ function drawBountyBoard() {
   pop();
 }
 
-// ─── EXPEDITION MODIFIERS ────────────────────────────────────────────────
-const EXPEDITION_MODIFIERS = {
+// ─── CONQUEST MODIFIERS ────────────────────────────────────────────────
+const CONQUEST_MODIFIERS = {
   normal:     { name: 'Standard',    desc: 'No modifiers',           color: '#bbbbbb', enemyMult: 1.0, lootMult: 1.0, spawnMult: 1.0, speedMult: 1.0 },
   blood_moon: { name: 'Blood Moon',  desc: '2x enemies, 2x loot',   color: '#ff4444', enemyMult: 1.5, lootMult: 2.0, spawnMult: 0.5, speedMult: 1.2 },
   foggy:      { name: 'Fog of Dread',desc: 'Thick fog, rare spawns', color: '#8899aa', enemyMult: 0.7, lootMult: 1.3, spawnMult: 1.5, speedMult: 0.8 },
@@ -1010,12 +1010,12 @@ const EXPEDITION_MODIFIERS = {
 };
 
 function getModifier() {
-  let key = state.expeditionModifier || 'normal';
-  return EXPEDITION_MODIFIERS[key] || EXPEDITION_MODIFIERS.normal;
+  let key = state.conquestModifier || 'normal';
+  return CONQUEST_MODIFIERS[key] || CONQUEST_MODIFIERS.normal;
 }
 
 function drawModifierSelectUI() {
-  if (!state.expeditionModifierSelect) return;
+  if (!state.conquestModifierSelect) return;
   push();
   // Dim backdrop
   fill(0, 0, 0, 160);
@@ -1033,18 +1033,18 @@ function drawModifierSelectUI() {
 
   // Title
   fill(220, 200, 150); textSize(13); textAlign(CENTER);
-  text('CHOOSE EXPEDITION TYPE', px + panW / 2, py + 20);
+  text('CHOOSE CONQUEST TYPE', px + panW / 2, py + 20);
   fill(160, 140, 100); textSize(10);
-  text('Select a modifier for this expedition', px + panW / 2, py + 34);
+  text('Select a modifier for this conquest', px + panW / 2, py + 34);
 
   // Modifier options
-  let mods = Object.keys(EXPEDITION_MODIFIERS);
+  let mods = Object.keys(CONQUEST_MODIFIERS);
   let sy = py + 48;
   for (let i = 0; i < mods.length; i++) {
     let key = mods[i];
-    let mod = EXPEDITION_MODIFIERS[key];
+    let mod = CONQUEST_MODIFIERS[key];
     let ry = sy + i * 34;
-    let selected = (state.expeditionModifier || 'normal') === key;
+    let selected = (state.conquestModifier || 'normal') === key;
 
     // Row bg
     fill(selected ? 55 : 40, selected ? 48 : 35, selected ? 35 : 25, 180);
@@ -1071,7 +1071,7 @@ function drawModifierSelectUI() {
   }
 
   // Supply cost preview
-  let en = state.conquest.expeditionNum;
+  let en = state.conquest.conquestNum || state.conquest.expeditionNum || 0;
   let costG = 15 + en * 5 + state.conquest.soldiers.length * 5;
   let costW = 10 + en * 3;
   let costM = min(3, 1 + floor(en / 3));
@@ -1085,7 +1085,7 @@ function drawModifierSelectUI() {
   pop();
 }
 
-// ─── LEGIA / EXPEDITION OVERLAY ─────────────────────────────────────────
+// ─── LEGIA / CONQUEST OVERLAY ───────────────────────────────────────────
 function drawLegiaUI() {
   let lg = state.legia;
   if (!lg || !lg.legiaUIOpen) return;
@@ -1250,7 +1250,7 @@ function drawLegiaUI() {
   // Expedition launch
   if (armyCount > 0) {
     fill(180, 160, 120); textSize(10);
-    text('[R] Launch expedition (go to port)', px + 14, sy); sy += 14;
+    text('[R] Launch conquest (go to port)', px + 14, sy); sy += 14;
   }
 
   // Close hint
@@ -1283,7 +1283,7 @@ function drawExpeditionSummaryOverlay() {
 
   fill(s.isDeath ? color(255, 100, 60, alpha) : color(220, 185, 60, alpha));
   textAlign(CENTER, TOP); textSize(18);
-  text(s.isDeath ? 'EXPEDITION ENDED' : 'EXPEDITION COMPLETE', width / 2, by + 14);
+  text(s.isDeath ? 'CONQUEST ENDED' : 'CONQUEST COMPLETE', width / 2, by + 14);
 
   stroke(160, 130, 60, alpha * 0.7); strokeWeight(1);
   line(bx + 20, by + 38, bx + bw - 20, by + 38);

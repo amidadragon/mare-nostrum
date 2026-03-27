@@ -2394,6 +2394,13 @@ class SoundManager {
         if (!this._canPlayStep()) break;
         this._playStepNoise('brown', 'bandpass', 600 + Math.random() * 200, 1.2, 0.045, 0.05);
         break;
+      case 'step_sail':
+        // Wind/sail swoosh — gentle breeze gust instead of footsteps on ship deck
+        if (!this._canPlayStep()) break;
+        this._playStepNoise('white', 'bandpass', 800 + Math.random() * 600, 0.4, 0.018, 0.12);
+        // Soft rope creak undertone
+        this._playStepNoise('brown', 'lowpass', 200 + Math.random() * 100, 1.5, 0.012, 0.08);
+        break;
       case 'dash':
         // Breeze whoosh: sweeping bandpass noise high to low
         this._playNoise({ type: 'white', filterType: 'bandpass', freq: 3000, freqEnd: 400, Q: 0.8, volume: 0.10, duration: 0.18, attack: 0.005, decay: 0.08 });

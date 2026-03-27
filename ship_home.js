@@ -881,6 +881,29 @@ function drawBelowDeck() {
     triangle(esx - 15, esy - 15, esx + 15, esy - 15, esx, esy + 10);
   }});
 
+  // ── Below Deck Pet (Sea People crab or serpent scuttling around) ──
+  if (!state.deckPetX) { state.deckPetX = R.cx + hw * 0.3; state.deckPetY = R.cy + hh * 0.2; }
+  var dpDist = dist(state.deckPetX, state.deckPetY, state.player.x, state.player.y + 8);
+  if (dpDist > 28) {
+    state.deckPetX += (state.player.x + 12 - state.deckPetX) * 0.035;
+    state.deckPetY += (state.player.y + 6 - state.deckPetY) * 0.035;
+  }
+  var dpMoving = dpDist > 28;
+  var dpBob = sin(ft * 0.06) * (dpMoving ? 0.3 : 1.0);
+  items.push({ y: state.deckPetY, draw: function() {
+    var dpsx = w2sX(state.deckPetX), dpsy = w2sY(state.deckPetY) + dpBob;
+    if (typeof _drawAnimatedPet === 'function') {
+      push(); noStroke();
+      _drawAnimatedPet('crab', dpsx, dpsy, 0.85, dpMoving);
+      pop();
+    }
+    if (dist(state.player.x, state.player.y, state.deckPetX, state.deckPetY) < 22) {
+      fill(255,220,120, 200 + sin(ft * 0.08) * 40); noStroke();
+      textSize(7); textAlign(CENTER,CENTER);
+      text('[E] Pet Crab', dpsx, dpsy + 12);
+    }
+  }});
+
   // Sort by Y and draw
   items.sort(function(a, b) { return a.y - b.y; });
   for (var i = 0; i < items.length; i++) items[i].draw();

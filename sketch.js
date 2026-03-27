@@ -4764,49 +4764,16 @@ function _templeRoomInteractE() {
 }
 
 function _drawTemplePet(hall, px, py) {
-  noStroke();
-  var pc = hall.petColor, pa = hall.petAccent;
-  fill(pc[0], pc[1], pc[2]);
-  if (hall.pet === 'wolf') {
-    ellipse(px, py, 10, 7);
-    fill(pa[0], pa[1], pa[2]);
-    ellipse(px - 5, py - 2, 5, 4);
-    triangle(px - 7, py - 5, px - 5, py - 8, px - 3, py - 5);
-  } else if (hall.pet === 'monkey') {
-    ellipse(px, py, 8, 8);
-    fill(pa[0], pa[1], pa[2]);
-    ellipse(px, py - 5, 7, 6);
-  } else if (hall.pet === 'cat') {
-    ellipse(px, py, 9, 7);
-    fill(pa[0], pa[1], pa[2]);
-    ellipse(px - 4, py - 2, 6, 5);
-    triangle(px - 6, py - 5, px - 4, py - 9, px - 2, py - 5);
-    triangle(px - 7, py - 5, px - 5, py - 9, px - 3, py - 5);
-  } else if (hall.pet === 'owl') {
-    ellipse(px, py, 8, 10);
-    fill(pa[0], pa[1], pa[2]);
-    ellipse(px, py - 4, 8, 6);
-    fill(60, 50, 30);
-    circle(px - 2, py - 4, 2.5); circle(px + 2, py - 4, 2.5);
-  } else if (hall.pet === 'crab') {
-    ellipse(px, py, 10, 6);
-    fill(pa[0], pa[1], pa[2]);
-    circle(px - 6, py - 2, 4); circle(px + 6, py - 2, 4);
-  } else if (hall.pet === 'falcon') {
-    ellipse(px, py, 8, 6);
-    fill(pa[0], pa[1], pa[2]);
-    ellipse(px - 3, py - 1, 5, 4);
-  } else if (hall.pet === 'parrot') {
-    fill(pc[0], pc[1], pc[2]);
-    ellipse(px, py, 7, 8);
-    fill(pa[0], pa[1], pa[2]);
-    ellipse(px, py - 4, 6, 5);
-    fill(255, 200, 60);
-    triangle(px - 4, py - 4, px - 6, py - 3, px - 4, py - 2);
-  } else if (hall.pet === 'boar') {
-    ellipse(px, py, 12, 8);
-    fill(pa[0], pa[1], pa[2]);
-    ellipse(px - 5, py, 5, 4);
+  // Use the new animated pet drawing system
+  var petDist2 = state.templePetX ? dist(state.player.x, state.player.y, state.templePetX, state.templePetY) : 0;
+  var isMoving = petDist2 > 25;
+  if (typeof _drawAnimatedPet === 'function') {
+    _drawAnimatedPet(hall.pet, px, py, 1.0, isMoving);
+  } else {
+    // Fallback: simple circle
+    noStroke();
+    fill(hall.petColor[0], hall.petColor[1], hall.petColor[2]);
+    ellipse(px, py, 10, 8);
   }
 }
 
@@ -4963,6 +4930,26 @@ function drawCastrumRoom() {
         fill(mil.cape[0], mil.cape[1], mil.cape[2], 160); rect(bsx - 5, bsy, 10, 20, 1);
         fill(mil.tunic[0], mil.tunic[1], mil.tunic[2], 100); rect(bsx - 3, bsy + 4, 6, 6);
       }}); })(bps[bi]); } }
+  // ── Castrum Pet (faction mascot roaming near training yard) ──
+  if (!state.castrumPetX) { state.castrumPetX = R.cx - hw * 0.3; state.castrumPetY = R.cy + hh * 0.4; }
+  var cpDist = dist(state.castrumPetX, state.castrumPetY, state.player.x, state.player.y + 10);
+  if (cpDist > 30) {
+    state.castrumPetX += (state.player.x - 15 - state.castrumPetX) * 0.04;
+    state.castrumPetY += (state.player.y + 8 - state.castrumPetY) * 0.04;
+  }
+  var cpMoving = cpDist > 30;
+  var cpBob = sin(ft * 0.07) * (cpMoving ? 0.5 : 1.2);
+  items.push({ y: state.castrumPetY, draw: function() {
+    var cpsx = w2sX(state.castrumPetX), cpsy = w2sY(state.castrumPetY) + cpBob;
+    if (typeof drawInteriorPet === 'function') {
+      drawInteriorPet(cpsx, cpsy, fk, 0.9, cpMoving);
+    }
+    if (dist(state.player.x, state.player.y, state.castrumPetX, state.castrumPetY) < 25) {
+      fill(255,220,120, 200 + sin(ft * 0.08) * 40); textSize(7); textAlign(CENTER,CENTER);
+      text('[E] Pet', cpsx, cpsy + 14);
+    }
+  }});
+
   // Door marker
   var doorX = R.cx, doorY = R.cy + hh - 5;
   items.push({ y: doorY + 999, draw: function() {

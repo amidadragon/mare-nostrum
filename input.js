@@ -160,17 +160,17 @@ function mousePressed() {
   if (typeof handleSkillTreeClick === 'function' && handleSkillTreeClick(mouseX, mouseY)) return;
   // Economy UI click handling
   if (typeof handleEconomyClick === 'function' && handleEconomyClick(mouseX, mouseY)) return;
-  // Expedition modifier select — click handling
-  if (state.expeditionModifierSelect) {
+  // Conquest modifier select — click handling
+  if (state.conquestModifierSelect) {
     let panW = 340, panH = 230;
     let px = width / 2 - panW / 2, py = height / 2 - panH / 2;
-    let mods = Object.keys(EXPEDITION_MODIFIERS);
+    let mods = Object.keys(CONQUEST_MODIFIERS);
     let sy = py + 48;
     for (let i = 0; i < mods.length; i++) {
       let ry = sy + i * 34;
       if (mouseX > px + 8 && mouseX < px + panW - 8 && mouseY > ry && mouseY < ry + 30) {
         // Click to select
-        if (state.expeditionModifier === mods[i]) {
+        if (state.conquestModifier === mods[i]) {
           // Double-click on already selected = confirm (embark)
           let expNum = state.conquest.expeditionNum;
           let supplyCost = {
@@ -184,11 +184,11 @@ function mousePressed() {
           state.gold = max(0, state.gold - supplyCost.gold);
           state.wood -= supplyCost.wood;
           state.meals -= supplyCost.meals;
-          state.expeditionModifierSelect = false;
-          addFloatingText(width / 2, height * 0.38, getModifier().name + ' Expedition', getModifier().color);
+          state.conquestModifierSelect = false;
+          addFloatingText(width / 2, height * 0.38, getModifier().name + ' Conquest', getModifier().color);
           // enterConquest() deprecated -- openworld seamless
         } else {
-          state.expeditionModifier = mods[i];
+          state.conquestModifier = mods[i];
         }
         return;
       }
@@ -200,16 +200,16 @@ function mousePressed() {
   if (state.upgradeShopOpen) {
     let panW = 320, panH = 300;
     let px = width / 2 - panW / 2, py = height / 2 - panH / 2;
-    let keys = Object.keys(EXPEDITION_UPGRADES);
+    let keys = Object.keys(TEMPLE_UPGRADES);
     let sy = py + 70;
     for (let i = 0; i < keys.length; i++) {
       let key = keys[i];
-      let tier = state.expeditionUpgrades[key] || 0;
-      let upg = EXPEDITION_UPGRADES[key];
+      let tier = state.templeUpgrades[key] || 0;
+      let upg = TEMPLE_UPGRADES[key];
       if (tier >= upg.tiers.length) continue;
       let btnX = px + panW - 85, btnY = sy + i * 36 + 4;
       if (mouseX > btnX && mouseX < btnX + 72 && mouseY > btnY && mouseY < btnY + 24) {
-        buyExpeditionUpgrade(key);
+        buyTempleUpgrade(key);
         return;
       }
     }
@@ -842,7 +842,7 @@ function keyPressed() {
     if (wardrobeOpen) { wardrobeOpen = false; return; }
     if (typeof _seaMapOpen !== 'undefined' && _seaMapOpen) { _seaMapOpen = false; return; }
     if (dialogState.active) { dialogState.active = false; return; }
-    if (state.expeditionModifierSelect) { state.expeditionModifierSelect = false; return; }
+    if (state.conquestModifierSelect) { state.conquestModifierSelect = false; return; }
     if (state.upgradeShopOpen) { state.upgradeShopOpen = false; return; }
     if (typeof _shipyardOpen !== 'undefined' && _shipyardOpen) { closeShipyard(); return; }
     if (state.nightMarket && state.nightMarket.shopOpen) { state.nightMarket.shopOpen = false; return; }
@@ -931,15 +931,15 @@ function keyPressed() {
     return; // block all other game keys on wreck
   }
 
-  // Expedition modifier selection
-  if (state.expeditionModifierSelect) {
-    let mods = Object.keys(EXPEDITION_MODIFIERS);
+  // Conquest modifier selection
+  if (state.conquestModifierSelect) {
+    let mods = Object.keys(CONQUEST_MODIFIERS);
     // Number keys 1-5 to select modifier
     for (let i = 0; i < mods.length; i++) {
-      if (key === String(i + 1)) { state.expeditionModifier = mods[i]; return; }
+      if (key === String(i + 1)) { state.conquestModifier = mods[i]; return; }
     }
     // ESC to cancel
-    if (keyCode === 27) { state.expeditionModifierSelect = false; return; }
+    if (keyCode === 27) { state.conquestModifierSelect = false; return; }
     // ENTER to confirm and embark
     if (keyCode === ENTER) {
       // Check supply cost
@@ -970,9 +970,9 @@ function keyPressed() {
       state.meals -= mealsUsed;
       foodNeeded -= mealsUsed;
       if (foodNeeded > 0) state.stew -= foodNeeded;
-      state.expeditionModifierSelect = false;
+      state.conquestModifierSelect = false;
       let modName = getModifier().name;
-      addFloatingText(width / 2, height * 0.38, modName + ' Expedition', getModifier().color);
+      addFloatingText(width / 2, height * 0.38, modName + ' Conquest', getModifier().color);
       // enterConquest() deprecated -- openworld seamless
       return;
     }
@@ -1023,7 +1023,7 @@ function keyPressed() {
           let tKey = floor(b.x) + ',' + floor(b.y);
           if (!cq.towerLevels) cq.towerLevels = {};
           let tLv = cq.towerLevels[tKey] || 0;
-          let tData = EXPEDITION_TOWER.levels[tLv];
+          let tData = CONQUEST_TOWER.levels[tLv];
           if (tData && tData.upgradeCost) {
             let cost = tData.upgradeCost;
             let canAfford = (cq.woodPile >= (cost.wood || 0)) && ((cq.stonePile || 0) >= (cost.stone || 0)) && (state.gold >= (cost.gold || 0));
@@ -1052,11 +1052,11 @@ function keyPressed() {
         if (b.type === 'barracks' && dist(state.player.x, state.player.y, b.x, b.y) < 45) {
           let lvIdx = cq.barracksLevel - 1;
           if (lvIdx < 0) lvIdx = 0;
-          if (lvIdx >= EXPEDITION_BARRACKS.levels.length - 1) {
+          if (lvIdx >= CONQUEST_BARRACKS.levels.length - 1) {
             addFloatingText(w2sX(b.x), w2sY(b.y) - 45, 'Barracks at max level!', '#aaaaaa');
             return;
           }
-          let lvData = EXPEDITION_BARRACKS.levels[lvIdx];
+          let lvData = CONQUEST_BARRACKS.levels[lvIdx];
           if (lvData && lvData.upgradeCost) {
             let cost = lvData.upgradeCost;
             let canAfford = (cq.woodPile >= (cost.wood || 0)) && ((cq.stonePile || 0) >= (cost.stone || 0)) && (state.gold >= (cost.gold || 0));
@@ -1465,8 +1465,8 @@ function keyPressed() {
           return;
         }
         // Open modifier selection UI
-        state.expeditionModifierSelect = true;
-        state.expeditionModifier = state.expeditionModifier || 'normal';
+        state.conquestModifierSelect = true;
+        state.conquestModifier = state.conquestModifier || 'normal';
         return;
       }
       if (r.nearIsle === 'wreck') {

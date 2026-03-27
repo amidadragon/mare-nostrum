@@ -646,13 +646,13 @@ function drawOneEnemy(e) {
 }
 
 // ─── EXPEDITION UPGRADES ─────────────────────────────────────────────────
-const EXPEDITION_UPGRADES = {
+const TEMPLE_UPGRADES = {
   workerSpeed:    { name: 'Swift Workers',    tiers: [{ gold: 50, wood: 20 },  { gold: 150, ironOre: 8 },  { gold: 300, ironOre: 15, rareHide: 5 }],  desc: 'Workers chop/build 25% faster' },
   workerCap:      { name: 'Worker Barracks',  tiers: [{ gold: 60, wood: 25 },  { gold: 180, ironOre: 12 }, { gold: 350, rareHide: 8, ancientRelic: 1 }], desc: '+1 max worker per tier' },
   dangerResist:   { name: 'Scout Network',    tiers: [{ gold: 40, wood: 15 },  { gold: 120, rareHide: 5 }, { gold: 250, ancientRelic: 2 }],             desc: 'Danger escalates slower' },
   lootBonus:      { name: 'Plunder Expertise',tiers: [{ gold: 60, wood: 20 },  { gold: 200, ironOre: 10 }, { gold: 400, titanBone: 2 }],                 desc: '+15% loot per tier' },
   soldierHP:      { name: 'Veteran Training', tiers: [{ gold: 50, ironOre: 5 },{ gold: 160, rareHide: 6 }, { gold: 320, ancientRelic: 3, titanBone: 1 }],desc: 'Soldiers start tougher' },
-  expeditionTier: { name: 'Cartographer',     tiers: [{ gold: 100, ancientRelic: 2 }, { gold: 250, titanBone: 3, ancientRelic: 3 }],                      desc: 'Harder but richer expeditions' },
+  warTier:        { name: 'War Strategist',    tiers: [{ gold: 100, ancientRelic: 2 }, { gold: 250, titanBone: 3, ancientRelic: 3 }],                      desc: 'Harder but richer conquests' },
 };
 
 
@@ -668,9 +668,9 @@ function canAffordUpgrade(cost) {
   return true;
 }
 
-function buyExpeditionUpgrade(key) {
-  let upg = EXPEDITION_UPGRADES[key];
-  let tier = state.expeditionUpgrades[key] || 0;
+function buyTempleUpgrade(key) {
+  let upg = TEMPLE_UPGRADES[key];
+  let tier = state.templeUpgrades[key] || 0;
   if (tier >= upg.tiers.length) return false;
   let cost = upg.tiers[tier];
   if (!canAffordUpgrade(cost)) return false;
@@ -684,7 +684,7 @@ function buyExpeditionUpgrade(key) {
     if (k === 'ancientRelic') state.ancientRelic -= v;
     if (k === 'titanBone') state.titanBone -= v;
   }
-  state.expeditionUpgrades[key] = tier + 1;
+  state.templeUpgrades[key] = tier + 1;
   addFloatingText(width / 2, height * 0.35, upg.name + ' upgraded!', '#88ccff');
   triggerScreenShake(2, 5);
   return true;
@@ -795,7 +795,7 @@ function drawFogOfWar() {
   if (!state._fogCols || !state.fogOfWar.length) return;
   let c = state.conquest;
   // Only draw fog if foggy modifier or always show partial
-  let fogAlpha = state.expeditionModifier === 'foggy' ? 220 : 140;
+  let fogAlpha = state.conquestModifier === 'foggy' ? 220 : 140;
   push();
   noStroke();
   for (let gy = 0; gy < state._fogRows; gy++) {
@@ -816,7 +816,7 @@ function drawFogOfWar() {
 }
 
 function drawModifierAtmosphere() {
-  let mod = state.expeditionModifier;
+  let mod = state.conquestModifier;
   if (!mod || mod === 'normal') return;
   let c = state.conquest;
   let ix = w2sX(c.isleX), iy = w2sY(c.isleY);
@@ -870,7 +870,7 @@ const CONQUEST_BUILDINGS = {
 
 // ─── V1.2 RTS EXPEDITION COMBAT ─────────────────────────────────────────
 
-const EXPEDITION_BARRACKS = {
+const CONQUEST_BARRACKS = {
   levels: [
     { maxSoldiers: 4,  genTime: 1800, genCount: 2, units: ['swordsman'], upgradeCost: { wood: 15, stone: 10 } },
     { maxSoldiers: 6,  genTime: 1500, genCount: 3, units: ['swordsman'], upgradeCost: { wood: 25, stone: 20 } },
@@ -891,7 +891,7 @@ const EXPEDITION_UNITS = {
   cavalry:   { hp: 40, damage: 7, speed: 2.2, range: 25, cost: 0, color: [180, 160, 100] }
 };
 
-const EXPEDITION_TOWER = {
+const CONQUEST_TOWER = {
   levels: [
     { damage: 5, speed: 60, range: 150, upgradeCost: { wood: 10, stone: 5 } },
     { damage: 8, speed: 50, range: 180, upgradeCost: { wood: 20, stone: 15 } },
@@ -1009,7 +1009,7 @@ function _exitConquest_legacy(isDeath) {
   if (typeof advanceMainQuestCounter === 'function') {
     advanceMainQuestCounter('mq_expeditions', 1);
   }
-  trackMilestone('first_expedition');
+  trackMilestone('first_conquest');
 
   let lg = state.legia;
   let soldiersAtStart = c._soldiersAtStart || 0;
@@ -1039,12 +1039,12 @@ function _exitConquest_legacy(isDeath) {
   }
 
   let lootMult = isDeath ? 0.5 : 1.0;
-  let lootBonusMult = 1 + state.expeditionUpgrades.lootBonus * 0.15;
+  let lootBonusMult = 1 + state.templeUpgrades.lootBonus * 0.15;
   if (!isDeath && soldiersAtStart > 0) lootBonusMult *= (1 + soldiersAtStart * 0.10);
   let modGoldMult = getModifier().goldMult || 1.0;
   let baseGold = floor((50 + c.dangerLevel * 20 + c.expeditionNum * 5) * lootMult * modGoldMult);
   let goldEarned = isDeath ? baseGold : floor(baseGold * (1 + soldiersAtStart * 0.15));
-  state.gold += goldEarned; if (typeof trackStat === 'function') trackStat('totalGoldEarned', goldEarned); if (typeof trackStat === 'function') trackStat('expeditionsCompleted', 1);
+  state.gold += goldEarned; if (typeof trackStat === 'function') trackStat('totalGoldEarned', goldEarned); if (typeof trackStat === 'function') trackStat('conquestsCompleted', 1);
 
   let lootSummary = {};
   for (let loot of c.lootBag) {
@@ -1472,9 +1472,9 @@ function updateConquest(dt) {
   // Expedition timer + danger escalation
   c.expeditionTimer += dt;
   let dangerMult = (getModifier().dangerMult || 1.0);
-  let dangerInterval = (600 + state.expeditionUpgrades.dangerResist * 200) / dangerMult;
+  let dangerInterval = (600 + state.templeUpgrades.dangerResist * 200) / dangerMult;
   c.dangerLevel = min(10, floor(c.expeditionTimer / dangerInterval));
-  let tierMult = state.expeditionUpgrades.expeditionTier;
+  let tierMult = state.templeUpgrades.warTier;
 
   // Enemy spawning based on danger level + modifier
   let mod = getModifier();
@@ -1667,7 +1667,7 @@ function spawnConquestEnemy(c, type) {
   let stats = statMap[type] || statMap.wolf;
   // Scale HP with danger + expedition tier
   let dangerScale = 1 + c.dangerLevel * 0.15;
-  let tierScale = 1 + state.expeditionUpgrades.expeditionTier * 0.2;
+  let tierScale = 1 + state.templeUpgrades.warTier * 0.2;
   let scaledHp = floor(stats.hp * dangerScale * tierScale);
   // Nightfall speed boost
   let speedMult = (c.expeditionTimer > c.expeditionTimeLimit) ? 1.5 : 1.0;
@@ -1682,7 +1682,7 @@ function spawnConquestEnemy(c, type) {
 
 function dropExpeditionLoot(x, y, sourceType) {
   let c = state.conquest;
-  let lootBonus = (1 + state.expeditionUpgrades.lootBonus * 0.15) * (getModifier().lootMult || 1.0);
+  let lootBonus = (1 + state.templeUpgrades.lootBonus * 0.15) * (getModifier().lootMult || 1.0);
   let drops = [];
 
   if (sourceType === 'treasure') {
@@ -1998,8 +1998,8 @@ function updateConquestSoldier(s, dt, p, c, idx, total) {
 
 function updateConquestBarracks(c, dt) {
   if (c.barracksLevel < 1) return;
-  let lvIdx = min(c.barracksLevel - 1, EXPEDITION_BARRACKS.levels.length - 1);
-  let lvData = EXPEDITION_BARRACKS.levels[lvIdx];
+  let lvIdx = min(c.barracksLevel - 1, CONQUEST_BARRACKS.levels.length - 1);
+  let lvData = CONQUEST_BARRACKS.levels[lvIdx];
   let aliveSoldiers = c.soldiers.filter(s => s.hp > 0).length;
   if (aliveSoldiers >= lvData.maxSoldiers) return;
   c.barracksGenTimer -= dt;
@@ -2037,7 +2037,7 @@ function updateConquestTowers(c, dt) {
     if (c.towerLevels[tKey] === undefined) c.towerLevels[tKey] = 0;
     if (c.towerTimers[tKey] === undefined) c.towerTimers[tKey] = 0;
     let tLv = c.towerLevels[tKey];
-    let tData = EXPEDITION_TOWER.levels[min(tLv, EXPEDITION_TOWER.levels.length - 1)];
+    let tData = CONQUEST_TOWER.levels[min(tLv, CONQUEST_TOWER.levels.length - 1)];
     c.towerTimers[tKey] -= dt;
     if (c.towerTimers[tKey] > 0) continue;
     // Find nearest enemy in range
@@ -2194,7 +2194,7 @@ function completeConquestBuilding(c, wx, wy, type) {
   if (type === 'barracks') {
     if (c.barracksLevel < 1) {
       c.barracksLevel = 1;
-      c.barracksGenTimer = EXPEDITION_BARRACKS.levels[0].genTime;
+      c.barracksGenTimer = CONQUEST_BARRACKS.levels[0].genTime;
       addFloatingText(w2sX(wx), w2sY(wy) - 40, 'Barracks active! Soldiers auto-generate.', '#88cc88');
     }
   }
@@ -2210,7 +2210,7 @@ function completeConquestBuilding(c, wx, wy, type) {
   }
 
   // Spawn worker
-  let wCap = 2 + state.expeditionUpgrades.workerCap;
+  let wCap = 2 + state.templeUpgrades.workerCap;
   if (bp.workerType && c.workers.length < wCap) {
     spawnConquestWorker(c, wx, wy, bp.workerType);
   }
@@ -2218,7 +2218,7 @@ function completeConquestBuilding(c, wx, wy, type) {
 
 function spawnConquestWorker(c, wx, wy, type) {
   let ang = random(TWO_PI);
-  let spd = 1.4 * (1 + state.expeditionUpgrades.workerSpeed * 0.25);
+  let spd = 1.4 * (1 + state.templeUpgrades.workerSpeed * 0.25);
   c.workers.push({
     x: wx + cos(ang) * 15, y: wy + sin(ang) * 15,
     vx: 0, vy: 0, task: 'idle', taskTarget: null, timer: 0,
@@ -2229,7 +2229,7 @@ function spawnConquestWorker(c, wx, wy, type) {
 
 function updateConquestWorkers(dt) {
   let c = state.conquest;
-  let spd = 1.4 * (1 + state.expeditionUpgrades.workerSpeed * 0.25);
+  let spd = 1.4 * (1 + state.templeUpgrades.workerSpeed * 0.25);
 
   // Purge corrupted workers
   c.workers = c.workers.filter(w => w && !isNaN(w.x) && !isNaN(w.y) && w.type);
@@ -3179,8 +3179,8 @@ function drawConquestEntities() {
     let barr = c.buildings.find(b => b.type === 'barracks');
     if (barr) {
       let bx = w2sX(barr.x), by = w2sY(barr.y);
-      let lvIdx = min(c.barracksLevel - 1, EXPEDITION_BARRACKS.levels.length - 1);
-      let lvData = EXPEDITION_BARRACKS.levels[lvIdx];
+      let lvIdx = min(c.barracksLevel - 1, CONQUEST_BARRACKS.levels.length - 1);
+      let lvData = CONQUEST_BARRACKS.levels[lvIdx];
       let prog = 1 - (c.barracksGenTimer / lvData.genTime);
       push(); noStroke();
       fill(30, 30, 30, 150);
@@ -3202,7 +3202,7 @@ function drawConquestEntities() {
     if (pd > 80) continue;
     let tKey = floor(b.x) + ',' + floor(b.y);
     let tLv = (c.towerLevels && c.towerLevels[tKey]) || 0;
-    let tData = EXPEDITION_TOWER.levels[min(tLv, EXPEDITION_TOWER.levels.length - 1)];
+    let tData = CONQUEST_TOWER.levels[min(tLv, CONQUEST_TOWER.levels.length - 1)];
     push();
     noFill();
     stroke(100, 180, 255, 40);
@@ -3228,8 +3228,8 @@ function drawConquestEntities() {
     if (pd > 45) continue;
     let lvIdx = c.barracksLevel - 1;
     if (lvIdx < 0) lvIdx = 0;
-    if (lvIdx < EXPEDITION_BARRACKS.levels.length - 1) {
-      let lvData = EXPEDITION_BARRACKS.levels[lvIdx];
+    if (lvIdx < CONQUEST_BARRACKS.levels.length - 1) {
+      let lvData = CONQUEST_BARRACKS.levels[lvIdx];
       if (lvData.upgradeCost) {
         let cost = lvData.upgradeCost;
         let bsx = w2sX(b.x), bsy = w2sY(b.y);
@@ -3312,8 +3312,8 @@ function drawConquestHUD() {
   // Expedition number + modifier
   let modInfo = getModifier();
   fill(200, 190, 160, 100); textSize(10);
-  let expLabel = 'Expedition #' + c.expeditionNum;
-  if (state.expeditionModifier && state.expeditionModifier !== 'normal') {
+  let expLabel = 'Conquest #' + c.expeditionNum;
+  if (state.conquestModifier && state.conquestModifier !== 'normal') {
     expLabel += '  [' + modInfo.name + ']';
   }
   fill(modInfo.color || '#bbbbbb');
@@ -3333,8 +3333,8 @@ function drawConquestHUD() {
   // Soldiers — show count/max
   let maxSol = 0;
   if (c.barracksLevel > 0) {
-    let lvIdx = min(c.barracksLevel - 1, EXPEDITION_BARRACKS.levels.length - 1);
-    maxSol = EXPEDITION_BARRACKS.levels[lvIdx].maxSoldiers;
+    let lvIdx = min(c.barracksLevel - 1, CONQUEST_BARRACKS.levels.length - 1);
+    maxSol = CONQUEST_BARRACKS.levels[lvIdx].maxSoldiers;
   }
   { let _fc3 = (typeof getFactionData === 'function' ) ? getFactionData() : null; let _sc = _fc3 ? _fc3.bannerColor : [180, 50, 40]; fill(_sc[0], _sc[1], _sc[2]); }; rect(lx, ly + 26, 8, 8, 1);
   fill(220, 200, 150);

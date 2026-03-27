@@ -710,7 +710,7 @@ function initState() {
       fishingSpots: [],      // { x, y, cooldown }
       wildlife: [],          // ambient birds/rabbits { x, y, type, vx, vy, timer }
       // V1.2 RTS barracks auto-gen
-      barracksLevel: 0,      // 0-9 (index into EXPEDITION_BARRACKS.levels)
+      barracksLevel: 0,      // 0-9 (index into CONQUEST_BARRACKS.levels)
       barracksGenTimer: 0,   // countdown to next soldier spawn batch
       stonePile: 0,          // local stone storage for upgrades
       // V1.2 unit types & leveling
@@ -731,13 +731,13 @@ function initState() {
 
     // Expedition resources (earned on Terra Nova, spent at home)
     ironOre: 0, rareHide: 0, ancientRelic: 0, titanBone: 0,
-    expeditionUpgrades: {
+    templeUpgrades: {
       workerSpeed: 0,   // 0-3
       workerCap: 0,     // 0-3
       dangerResist: 0,  // 0-3
       lootBonus: 0,     // 0-3
       soldierHP: 0,     // 0-3
-      expeditionTier: 0,// 0-2
+      warTier: 0,       // 0-2
     },
     expeditionLog: [],
     upgradeShopOpen: false,
@@ -764,8 +764,8 @@ function initState() {
     },
 
     // Expedition modifiers — choose before departing
-    expeditionModifier: null, // null, 'blood_moon', 'foggy', 'sacred', 'golden'
-    expeditionModifierSelect: false, // true when showing modifier pick UI
+    conquestModifier: null, // null, 'blood_moon', 'foggy', 'sacred', 'golden'
+    conquestModifierSelect: false, // true when showing modifier pick UI
 
     // Fog of War — revealed tiles on Terra Nova
     fogOfWar: [], // flat grid: 0=hidden, 1=revealed. Reset each expedition
