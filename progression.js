@@ -117,7 +117,7 @@ function checkAllVictoryConditions() {
     let nationKeys = Object.keys(state.nations);
     let hasVassal = nationKeys.some(k => state.nations[k] && state.nations[k].vassal);
     let allSubdued = nationKeys.length >= 1 && nationKeys.every(k => state.nations[k] && (state.nations[k].defeated || state.nations[k].vassal));
-    if (hasVassal && allSubdued) {
+    if (allSubdued) { // vassal no longer required — defeating all nations is sufficient
       state.victoryAchieved = 'domination';
       state.victoryScreen = { type: 'domination', day: state.day, timer: 0 };
       if (snd && snd.playNarration) snd.playNarration('victory');

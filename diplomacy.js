@@ -113,9 +113,9 @@ function checkVictoryConditions() {
     victories.push('military');
   }
 
-  // Economic Victory — 4 trade hubs + 100,000 gold
+  // Economic Victory — 4 trade hubs + 10,000 gold
   let hubs = getControlledTradeHubs();
-  if (hubs.length >= 4 && state.gold >= 100000) {
+  if (hubs.length >= 4 && state.gold >= 10000) {
     victories.push('economic');
   }
 

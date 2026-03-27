@@ -26,12 +26,12 @@ const BotAI = {
     let underAttack = state.invasion && state.invasion.active && state.invasion.target === nationKey;
     let actions = [];
 
-    let phase = level < 8 ? 'early' : level < 12 ? 'mid' : 'late';
-    let expandBonus = phase === 'early' ? 2.0 : 0.5;
+    let phase = level < 8 ? 'early' : level < 14 ? 'mid' : 'late';
+    let expandBonus = phase === 'early' ? 2.0 : (phase === 'mid' ? 1.2 : 0.5);
     let militaryBonus = phase === 'mid' ? 2.0 : (phase === 'late' ? 1.5 : 0.3);
 
     if (underAttack) actions.push({ type: 'defend', score: 10.0 });
-    if (crystals >= expandCost && level < 15) actions.push({ type: 'expand', score: 3.0 + expandBonus });
+    if (crystals >= expandCost && level < 22) actions.push({ type: 'expand', score: 3.0 + expandBonus });
 
     let armySize = is.legia ? (is.legia.army ? is.legia.army.length : 0) : 0;
     let maxArmy = Math.min(10, 3 + Math.floor(level / 3));

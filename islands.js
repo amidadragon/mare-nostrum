@@ -682,6 +682,97 @@ function drawWorldIslandContent(isle, sx, sy, sc) {
   let s = sc || 1; // distance scale
 
   switch(isle.key) {
+    // ═══ FACTION CAPITALS ═══
+    case 'rome_capital':
+      // Colosseum + Senate
+      fill(180, 160, 130); rect(-20*s, -8*s, 40*s, 16*s); // senate base
+      fill(200, 180, 150); triangle(-22*s, -8*s, 22*s, -8*s, 0, -20*s); // pediment
+      for (let i = -2; i <= 2; i++) { fill(190, 170, 140); rect(i*8*s-2*s, -8*s, 4*s, 16*s); } // columns
+      fill(160, 140, 110); ellipse(28*s, 0, 18*s, 14*s); stroke(140,120,90); noFill();
+      for (let a = 0; a < PI; a += 0.4) { let ax = 28*s+cos(a)*8*s, ay = -sin(a)*6*s; rect(ax-1.5*s, ay-3*s, 3*s, 6*s); }
+      noStroke(); fill(180,50,50,160); ellipse(0, -24*s, 6*s, 6*s); // SPQR banner dot
+      break;
+
+    case 'carthage_capital':
+      // Harbor fortress + Tanit symbol
+      fill(180, 150, 100); rect(-18*s, -6*s, 36*s, 14*s); // citadel
+      fill(160, 130, 80); rect(-22*s, -10*s, 8*s, 18*s); rect(14*s, -10*s, 8*s, 18*s); // towers
+      fill(140, 110, 60); triangle(-22*s, -10*s, -14*s, -10*s, -18*s, -16*s);
+      triangle(14*s, -10*s, 22*s, -10*s, 18*s, -16*s); // tower caps
+      fill(200, 170, 80); ellipse(0, -14*s, 8*s, 8*s); // Tanit disc
+      stroke(200, 170, 80); strokeWeight(1.5*s); line(-4*s, -10*s, 4*s, -10*s); // Tanit arms
+      line(0, -14*s, 0, -6*s); noStroke(); // Tanit body
+      fill(80, 140, 180, 120); ellipse(0, 14*s, 30*s, 8*s); // harbor water
+      break;
+
+    case 'egypt_capital':
+      // Pyramid + lighthouse
+      fill(200, 180, 120); triangle(-16*s, 8*s, 16*s, 8*s, 0, -16*s); // great pyramid
+      fill(180, 160, 100); triangle(12*s, 8*s, 28*s, 8*s, 20*s, -8*s); // smaller pyramid
+      fill(220, 200, 140); rect(30*s, -18*s, 6*s, 26*s); // lighthouse tower
+      fill(255, 230, 100, 180); ellipse(33*s, -20*s, 8*s, 8*s); // lighthouse flame
+      fill(80, 150, 200, 100); rect(-24*s, 8*s, 60*s, 4*s); // Nile strip
+      break;
+
+    case 'greece_capital':
+      // Parthenon + olive tree
+      fill(220, 215, 200); rect(-16*s, -4*s, 32*s, 12*s); // temple base
+      fill(235, 230, 215); triangle(-18*s, -4*s, 18*s, -4*s, 0, -14*s); // pediment
+      for (let i = -3; i <= 3; i++) { fill(225, 220, 205); rect(i*5*s-1.5*s, -4*s, 3*s, 12*s); }
+      fill(100, 140, 70); ellipse(-22*s, 2*s, 10*s, 12*s); // olive tree canopy
+      fill(90, 70, 40); rect(-22*s, 6*s, 2*s, 6*s); // trunk
+      fill(60, 100, 180, 100); ellipse(22*s, 6*s, 12*s, 6*s); // agora pool
+      break;
+
+    case 'persia_capital':
+      // Palace with Apadana columns + winged disc
+      fill(170, 140, 100); rect(-22*s, -4*s, 44*s, 14*s); // palace platform
+      fill(190, 160, 120); rect(-18*s, -14*s, 36*s, 10*s); // upper palace
+      for (let i = -3; i <= 3; i++) { fill(180, 150, 110); rect(i*6*s-2*s, -14*s, 4*s, 24*s); } // columns
+      fill(200, 170, 60); ellipse(0, -18*s, 10*s, 6*s); // Faravahar disc
+      stroke(200, 170, 60); strokeWeight(1*s);
+      line(-6*s, -16*s, -12*s, -14*s); line(6*s, -16*s, 12*s, -14*s); // wings
+      noStroke();
+      fill(100, 60, 140, 100); rect(-24*s, 10*s, 48*s, 3*s); // royal road
+      break;
+
+    case 'phoenicia_capital':
+      // Harbor city + cedar + purple dye vats
+      fill(160, 140, 110); rect(-14*s, -4*s, 28*s, 12*s); // city wall
+      fill(180, 160, 130); rect(-8*s, -10*s, 16*s, 6*s); // inner city
+      fill(60, 120, 60); triangle(18*s, 4*s, 22*s, 4*s, 20*s, -12*s); // cedar tree
+      fill(50, 100, 50); ellipse(20*s, -8*s, 10*s, 6*s); // cedar canopy
+      fill(120, 40, 140, 160); ellipse(-18*s, 4*s, 6*s, 4*s); ellipse(-12*s, 6*s, 5*s, 3*s); // purple dye vats
+      fill(80, 140, 180, 120); ellipse(0, 14*s, 24*s, 6*s); // harbor
+      break;
+
+    case 'gaul_capital':
+      // Hill fort + palisade + standing stones
+      fill(120, 100, 70); ellipse(0, 0, 32*s, 20*s); // hill mound
+      fill(100, 80, 50); rect(-16*s, -2*s, 32*s, 4*s); // palisade wall
+      fill(140, 120, 80); rect(-4*s, -10*s, 8*s, 12*s); // great hall
+      fill(130, 110, 70); triangle(-6*s, -10*s, 10*s, -10*s, 2*s, -18*s); // roof
+      fill(150, 150, 140); // standing stones
+      rect(-22*s, -6*s, 3*s, 10*s); rect(20*s, -4*s, 3*s, 8*s); rect(-14*s, -8*s, 2*s, 6*s);
+      fill(180, 80, 40, 140); ellipse(12*s, 4*s, 6*s, 6*s); // war boar pen glow
+      break;
+
+    case 'seapeople_capital':
+      // Giant ship/kraken lair
+      fill(60, 80, 100); ellipse(0, 0, 36*s, 16*s); // dark lagoon
+      fill(80, 100, 60); // ship hull fragments
+      beginShape(); vertex(-18*s, 4*s); vertex(-14*s, -2*s); vertex(14*s, -2*s); vertex(18*s, 4*s);
+      vertex(12*s, 6*s); vertex(-12*s, 6*s); endShape(CLOSE);
+      fill(100, 80, 60); rect(-2*s, -12*s, 4*s, 10*s); // mast
+      fill(120, 100, 80); triangle(-2*s, -12*s, -2*s, -4*s, -14*s, -6*s); // tattered sail
+      // Kraken tentacles
+      stroke(100, 60, 80); strokeWeight(2*s); noFill();
+      beginShape(); curveVertex(-20*s, 8*s); curveVertex(-16*s, 12*s); curveVertex(-10*s, 10*s); curveVertex(-8*s, 14*s); endShape();
+      beginShape(); curveVertex(20*s, 8*s); curveVertex(16*s, 12*s); curveVertex(10*s, 10*s); curveVertex(8*s, 14*s); endShape();
+      noStroke();
+      fill(200, 160, 40, 140); ellipse(0, -2*s, 4*s, 4*s); // glowing treasure
+      break;
+
     // ═══ TRADE HUBS ═══
     case 'golden_bazaar':
       // Golden market tents

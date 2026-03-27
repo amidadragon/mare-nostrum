@@ -3159,7 +3159,7 @@ function spawnBuildingComplete(wx, wy) {
 // ─── IMPERIAL BRIDGE — Connects home island to colonized Terra Nova ───────
 
 function canBuildBridge() {
-  return state.islandLevel >= 20 && state.conquest.colonized && !state.imperialBridge.built && !state.imperialBridge.building;
+  return state.islandLevel >= 20 && state.conquest && state.conquest.colonized && state.imperialBridge && !state.imperialBridge.built && !state.imperialBridge.building;
 }
 
 function getBridgeCost() {
@@ -3185,7 +3185,7 @@ function startBuildBridge() {
 
   // Generate bridge segments between home island west edge and Terra Nova east edge
   let homeX = WORLD.islandCX - state.islandRX * 0.9;
-  let terraX = state.conquest.isleX + state.conquest.isleRX * 0.9;
+  let terraX = (state.conquest ? state.conquest.isleX : 0) + (state.conquest ? state.conquest.isleRX : 400) * 0.9;
   let bridgeY = WORLD.islandCY;
   let totalDist = homeX - terraX;
   let numSegments = floor(abs(totalDist) / 40);

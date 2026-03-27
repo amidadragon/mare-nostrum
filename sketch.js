@@ -4037,6 +4037,10 @@ function updateTime(dt) {
     if (typeof collectVassalTribute === 'function') collectVassalTribute();
     // Check all victory conditions daily
     checkAllVictoryConditions();
+    // Imperator victory (level 25 + all NPC hearts + colonized)
+    if (typeof checkImperatorVictory === 'function') checkImperatorVictory();
+    // Bridge victory state variables across all systems
+    _bridgeVictoryState();
     // Strategy engine daily tick
     if (typeof StrategyEngine !== 'undefined' && StrategyEngine.session) StrategyEngine.updateStrategy();
     // Nations AI daily tick
@@ -7357,6 +7361,38 @@ function tryAwakenLares() {
   return true;
 }
 
+
+// ======================================================================
+// === VICTORY STATE BRIDGE — unifies competing victory systems ========
+// ======================================================================
+// progression.js uses state.victoryAchieved / state.victoryScreen
+// diplomacy.js uses state._victoryAchieved / state._victoryTitle
+// strategy.js uses state._victory / state._victoryShown
+// sketch.js uses state.won / state.victoryCeremony
+// This bridge syncs them so a win in ANY system is recognized by ALL.
+
+function _bridgeVictoryState() {
+  // diplomacy.js → progression.js
+  if (state._victoryAchieved && !state.victoryAchieved) {
+    state.victoryAchieved = state._victoryAchieved;
+    state.victoryScreen = { type: state._victoryAchieved, day: state.day || 1, timer: 0 };
+  }
+  // strategy.js → progression.js
+  if (state._victory && !state.victoryAchieved) {
+    state.victoryAchieved = state._victory;
+    state.victoryScreen = { type: state._victory, day: state.day || 1, timer: 0 };
+  }
+  // Imperator → progression.js
+  if (state.won && !state.victoryAchieved) {
+    state.victoryAchieved = 'imperator';
+    state.victoryScreen = { type: 'imperator', day: state.day || 1, timer: 0 };
+  }
+  // progression.js → diplomacy.js (reverse sync)
+  if (state.victoryAchieved && !state._victoryAchieved) {
+    state._victoryAchieved = state.victoryAchieved;
+    state._victoryTitle = state.victoryAchieved.toUpperCase();
+  }
+}
 
 // ======================================================================
 // === IMPERATOR VICTORY CEREMONY ======================================
