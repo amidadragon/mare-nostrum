@@ -5977,16 +5977,20 @@ function updateVisualInvasion(dt) {
         if (typeof addNotification === 'function') addNotification('DEFEATED! Retreating...', '#ff4444');
       }
 
+      // Distribute survivors properly between army[] and units[]
+      let armyCount = (lg.army ? lg.army.length : 0);
+      let unitsCount = (lg.units ? lg.units.reduce((s, u) => s + (u.count || 1), 0) : 0);
+      let totalDeployed = armyCount + unitsCount;
+      let survivalRatio = totalDeployed > 0 ? survivingAttackers / totalDeployed : 1;
+
       if (lg.army) {
-        let remaining = Math.min(lg.army.length, survivingAttackers);
-        lg.army = lg.army.slice(0, remaining);
+        let armySurvivors = Math.min(lg.army.length, Math.round(armyCount * survivalRatio));
+        lg.army = lg.army.slice(0, armySurvivors);
       }
       if (lg.units && lg.units.length > 0) {
-        let totalBefore = lg.units.reduce((sum, u) => sum + (u.count || 1), 0);
-        let losses = totalBefore - survivingAttackers;
         for (let u of lg.units) {
-          let unitLoss = Math.floor((u.count || 1) * (losses / Math.max(1, totalBefore)));
-          u.count = Math.max(0, (u.count || 1) - unitLoss);
+          let before = u.count || 1;
+          u.count = Math.max(0, Math.round(before * survivalRatio));
         }
         lg.units = lg.units.filter(u => u.count > 0);
       }

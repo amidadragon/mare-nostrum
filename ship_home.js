@@ -155,6 +155,7 @@ function exitBelowDeck() {
 function handleShipDeckInteraction() {
   if (!isOnShipDeck()) return false;
   var p = state.player;
+  if (!p) return false;
   // Check each station
   for (var key in SHIP_STATIONS) {
     var st = SHIP_STATIONS[key];
@@ -204,6 +205,7 @@ function handleShipDeckInteraction() {
 function handleBelowDeckInteraction() {
   if (!isBelowDeck()) return false;
   var p = state.player;
+  if (!p) return false;
   for (var key in BELOW_DECK_STATIONS) {
     var st = BELOW_DECK_STATIONS[key];
     var sx = BELOW_DECK.cx + st.ox, sy = BELOW_DECK.cy + st.oy;
@@ -241,6 +243,30 @@ function handleBelowDeckInteraction() {
     }
   }
   return false;
+}
+
+// ─── SHIP FORGE (upgrade menu) ──────────────────────────────────────────
+function openShipForge() {
+  // Show next available upgrade
+  var ups = state.shipUpgrades || [];
+  var nextIdx = ups.length;
+  if (nextIdx >= SHIP_UPGRADES.length) {
+    if (typeof addFloatingText === 'function')
+      addFloatingText(width / 2, height * 0.3, 'Ship fully upgraded!', '#ffcc44');
+    return;
+  }
+  var upg = SHIP_UPGRADES[nextIdx];
+  if (state.gold >= upg.cost) {
+    state.gold -= upg.cost;
+    ups.push(upg.key);
+    state.shipUpgrades = ups;
+    if (typeof addFloatingText === 'function')
+      addFloatingText(width / 2, height * 0.3, upg.name + ' installed!', '#ffcc44');
+    if (typeof snd !== 'undefined' && snd) snd.playSFX('upgrade');
+  } else {
+    if (typeof addFloatingText === 'function')
+      addFloatingText(width / 2, height * 0.3, upg.name + ': need ' + upg.cost + ' gold', '#ff6644');
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -503,7 +529,7 @@ function drawShipDeck() {
 
   // ── NPC STATION PROMPTS ──
   var p = state.player;
-  for (var key in SHIP_STATIONS) {
+  if (p) for (var key in SHIP_STATIONS) {
     var st = SHIP_STATIONS[key];
     var sx = cx + st.ox, sy = cy + st.oy;
     if (st.label && dist(p.x, p.y, sx, sy) < 35) {
