@@ -331,12 +331,17 @@ function updatePlayerAnim(dt) {
   let a = p.anim;
 
   // Walk frame advance (4-frame cycle, ~8 frames per step)
+  // Footstep cooldown prevents rapid-fire audio stacking
+  if (!a._stepCooldown) a._stepCooldown = 0;
+  if (a._stepCooldown > 0) a._stepCooldown -= dt;
+
   if (p.moving) {
     a.walkTimer += dt;
     if (a.walkTimer >= 8) {
       a.walkTimer = 0; a.walkFrame = (a.walkFrame + 1) % 4;
-      // Footstep sound on frames 1 and 3 (feet hitting ground)
-      if ((a.walkFrame === 1 || a.walkFrame === 3) && snd && frameCount % 2 === 0) {
+      // Footstep sound on frame 1 only (one foot per cycle), with cooldown
+      if (a.walkFrame === 1 && snd && a._stepCooldown <= 0) {
+        a._stepCooldown = 14; // ~0.23s at 60fps — natural walking pace
         // Terrain-aware footsteps with natural variation
         let _stepSfx = 'step_sand'; // default
         // Ship deck = wood footsteps
@@ -357,7 +362,7 @@ function updatePlayerAnim(dt) {
             _stepSfx = 'step_sand';
           } else {
             // Near buildings = stone, otherwise grass
-            let _nearBldg = state.buildings.some(b => {
+            let _nearBldg = state.buildings && state.buildings.some(b => {
               let dx = p.x - b.x, dy = p.y - b.y;
               return dx*dx + dy*dy < 1600; // within 40px
             });

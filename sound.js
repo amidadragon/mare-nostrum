@@ -908,9 +908,16 @@ class SoundManager {
     if (!s) return false;
     let vol = this.vol.master * this.vol.sfx * (volMult || 1.0);
     if (vol < 0.001) return true; // muted, but still "handled"
-    s.setVolume(vol);
-    if (s.isPlaying()) s.stop();
-    s.play();
+    // Avoid clicking: if already playing, ramp volume down briefly before restart
+    if (s.isPlaying()) {
+      try { s.setVolume(0, 0.01); } catch(e) {} // 10ms fade-out
+      setTimeout(() => {
+        try { s.stop(); s.setVolume(vol); s.play(); } catch(e) {}
+      }, 12);
+    } else {
+      s.setVolume(vol);
+      s.play();
+    }
     return true;
   }
 
