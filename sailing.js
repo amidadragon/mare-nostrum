@@ -206,6 +206,8 @@ function updateRowing(dt) {
 
   // ═══ SPEED ═══
   let rowSpeed = 3.5 * getFactionData().sailSpeedMult;
+  // Sea Peoples ship upgrades: extra oars = +15% speed
+  if (state.shipUpgrades && state.shipUpgrades.indexOf('extra_oars') >= 0) rowSpeed *= 1.15;
   if (typeof hasTech === 'function' && hasTech('celestial_navigation')) rowSpeed *= 1.15;
   rowSpeed *= getWeatherEffects().sailMult;
   if (state.naval) {

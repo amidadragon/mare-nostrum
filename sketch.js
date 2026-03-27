@@ -2301,6 +2301,12 @@ function drawInner() {
     renderShipHome();
     return;
   }
+  // Sea Peoples passive systems (fishing, trade income) run on deck + while sailing
+  if ((state.onShipDeck || (state.rowing && state.rowing.active)) &&
+      typeof isSeaPeoplesFaction === 'function' && isSeaPeoplesFaction() &&
+      typeof updateShipHome === 'function') {
+    updateShipHome(dt);
+  }
 
   updateTime(dt);
   updateCurrentIsland();
@@ -2322,11 +2328,17 @@ function drawInner() {
   let _onWreck = (state.progression.gameStarted && !state.progression.homeIslandReached) || (state.wreck && state.wreck._visiting);
   if (state.player && !state.rowing.active && !_onWreck && !state._activeWorldIsland && typeof isNearAnyIsland === 'function' &&
       !isNearAnyIsland(state.player.x, state.player.y, 500) && !state.insideTemple && !state.insideCastrum && !state.onShipDeck && !state.belowDeck) {
-    state.player.x = WORLD.islandCX;
-    state.player.y = WORLD.islandCY;
-    cam.x = state.player.x; cam.y = state.player.y;
-    camSmooth.x = cam.x; camSmooth.y = cam.y;
-    addNotification('Washed ashore on your island...', '#88ddff');
+    // Sea Peoples: teleport back to ship deck
+    if (typeof isSeaPeoplesFaction === 'function' && isSeaPeoplesFaction() && typeof returnToShipDeck === 'function') {
+      returnToShipDeck();
+      addNotification('Pulled back to your ship...', '#cc4422');
+    } else {
+      state.player.x = WORLD.islandCX;
+      state.player.y = WORLD.islandCY;
+      cam.x = state.player.x; cam.y = state.player.y;
+      camSmooth.x = cam.x; camSmooth.y = cam.y;
+      addNotification('Washed ashore on your island...', '#88ddff');
+    }
   }
   updateTutorialHint(dt);
   if (snd && frameCount % 10 === 0) { snd.updateAmbient(); }
@@ -2673,17 +2685,18 @@ function drawInner() {
     let _onNationIsland = !!state._activeNation || !!state._activeExploration;
     let _onWorldIsland = !!state._activeWorldIsland;
     let _onOtherIsland = _onNationIsland || _onWorldIsland;
-    // Sea Peoples ship deck — draw ship instead of island when on ship
+    // Sea Peoples: ship deck OR sailing — never render home island
+    let _isSeaPeople = typeof isSeaPeoplesFaction === 'function' && isSeaPeoplesFaction();
     if (state.onShipDeck && typeof drawShipDeck === 'function') {
       drawShipDeck();
       if (typeof clampPlayerToShipDeck === 'function') clampPlayerToShipDeck();
-    } else if (_onWorldIsland || (!_isSailing && !_onOtherIsland) || (_isSailing && _homeDist < 800)) {
+    } else if (_onWorldIsland || (!_isSeaPeople && ((!_isSailing && !_onOtherIsland) || (_isSailing && _homeDist < 800)))) {
       drawIsland(); // Full island render (home island or visited world island)
       if (!_onWorldIsland && typeof drawHomeLighthouse === 'function') drawHomeLighthouse();
-    } else if (_isSailing && _homeDist < 2000) {
+    } else if (!_isSeaPeople && _isSailing && _homeDist < 2000) {
       // Medium LOD for home island while sailing away (not when visiting other islands)
       drawIsland();
-    } else if (_isSailing && _homeDist < 4000) {
+    } else if (!_isSeaPeople && _isSailing && _homeDist < 4000) {
       // Far LOD — simplified silhouette of home island
       let _hsx = w2sX(WORLD.islandCX), _hsy = w2sY(WORLD.islandCY);
       let _hrx = Math.max(10, Math.floor(state.islandRX * 0.12));

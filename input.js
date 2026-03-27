@@ -1528,6 +1528,13 @@ function keyPressed() {
           return;
         }
       }
+      // Sea Peoples: return to ship deck instead of snapping to port
+      if (typeof isSeaPeoplesFaction === 'function' && isSeaPeoplesFaction()) {
+        if (typeof returnToShipDeck === 'function') {
+          returnToShipDeck();
+          return;
+        }
+      }
       // Otherwise disembark — snap player back to pier
       let port = getPortPosition();
       state.rowing.active = false;

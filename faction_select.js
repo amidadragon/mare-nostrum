@@ -265,22 +265,36 @@ function selectFaction(faction) {
   initBotWorker();
   // Initialize personal rival
   initPersonalRival(faction);
-  // ALL factions: skip wreck, spawn directly on home island
+  // ALL factions: skip wreck, mark intro done
   state.progression.triremeRepaired = true;
   state.progression.homeIslandReached = true;
   state.progression.villaCleared = true;
   state.introPhase = 'done';
   state.wreckPhase = 'done';
   state.isInitialized = true;
-  state.player.x = WORLD.islandCX;
-  state.player.y = WORLD.islandCY;
-  cam.x = state.player.x; cam.y = state.player.y;
-  camSmooth.x = cam.x; camSmooth.y = cam.y;
-  // Build the starting island
-  if (!state.buildings || state.buildings.length === 0) {
-    if (typeof buildIsland === 'function') buildIsland();
+
+  // Sea Peoples: no starting island — ship is their home
+  var factionData = typeof FACTIONS !== 'undefined' ? FACTIONS[faction] : null;
+  if (factionData && factionData.noStartIsland) {
+    // initShipHome() already called above — it sets player position & camera
+    // Give Sea Peoples starter resources to compensate for no buildings
+    state.gold = (state.gold || 0) + 80;
+    state.wood = (state.wood || 0) + 30;
+    state.harvest = (state.harvest || 0) + 20;
+    state.crystals = (state.crystals || 0) + 5;
+    addFloatingText(width / 2, height * 0.45, 'The sea is your home — take the helm to sail!', '#cc4422');
+  } else {
+    // Normal factions: spawn on home island
+    state.player.x = WORLD.islandCX;
+    state.player.y = WORLD.islandCY;
+    cam.x = state.player.x; cam.y = state.player.y;
+    camSmooth.x = cam.x; camSmooth.y = cam.y;
+    // Build the starting island
+    if (!state.buildings || state.buildings.length === 0) {
+      if (typeof buildIsland === 'function') buildIsland();
+    }
+    addFloatingText(width / 2, height * 0.45, 'Welcome to your island!', '#ffcc44');
   }
-  addFloatingText(width / 2, height * 0.45, 'Welcome to your island!', '#ffcc44');
 }
 
 function drawForumBanner() {

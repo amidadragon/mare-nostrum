@@ -96,14 +96,30 @@ function initShipHome() {
   state.shipUpgrades = state.shipUpgrades || [];
   state._belowDeckReturnX = 0;
   state._belowDeckReturnY = 0;
+
+  // Sea Peoples start in open water — pick a random ocean position
+  // away from the home island (centered ~600,400) but within world bounds
+  if (!state.shipWorldX && !state.shipWorldY) {
+    // Start southeast of the world center, in open Mediterranean
+    var angle = Math.random() * Math.PI * 2;
+    var dist = 1500 + Math.random() * 1500;  // 1500-3000 pixels from center
+    state.shipWorldX = 600 + Math.cos(angle) * dist;
+    state.shipWorldY = 400 + Math.sin(angle) * dist;
+  }
+  SHIP_DECK.cx = state.shipWorldX;
+  SHIP_DECK.cy = state.shipWorldY;
+
   // Place player on stern (near helm)
   state.player.x = SHIP_DECK.cx - 80;
   state.player.y = SHIP_DECK.cy;
-  // Init ship world position (can drift with current)
-  state.shipWorldX = state.shipWorldX || 0;
-  state.shipWorldY = state.shipWorldY || 0;
-  SHIP_DECK.cx = state.shipWorldX;
-  SHIP_DECK.cy = state.shipWorldY;
+
+  // Set camera to ship position
+  if (typeof cam !== 'undefined') {
+    cam.x = state.player.x; cam.y = state.player.y;
+  }
+  if (typeof camSmooth !== 'undefined') {
+    camSmooth.x = state.player.x; camSmooth.y = state.player.y;
+  }
 }
 
 // ─── ENTER / EXIT BELOW DECK ────────────────────────────────────────────
@@ -256,16 +272,45 @@ function openShipForge() {
     return;
   }
   var upg = SHIP_UPGRADES[nextIdx];
-  if (state.gold >= upg.cost) {
-    state.gold -= upg.cost;
-    ups.push(upg.key);
+  var cost = upg.cost || {};
+  // Check all required resources
+  var canAfford = true;
+  var missing = [];
+  if (cost.gold  && (state.gold || 0) < cost.gold)       { canAfford = false; missing.push(cost.gold + ' gold'); }
+  if (cost.wood  && (state.wood || 0) < cost.wood)       { canAfford = false; missing.push(cost.wood + ' wood'); }
+  if (cost.iron  && (state.iron || 0) < cost.iron)       { canAfford = false; missing.push(cost.iron + ' iron'); }
+  if (cost.crystal && (state.crystals || 0) < cost.crystal) { canAfford = false; missing.push(cost.crystal + ' crystals'); }
+
+  if (canAfford) {
+    if (cost.gold)    state.gold -= cost.gold;
+    if (cost.wood)    state.wood -= cost.wood;
+    if (cost.iron)    state.iron -= cost.iron;
+    if (cost.crystal) state.crystals -= cost.crystal;
+    ups.push(upg.id);
     state.shipUpgrades = ups;
     if (typeof addFloatingText === 'function')
-      addFloatingText(width / 2, height * 0.3, upg.name + ' installed!', '#ffcc44');
-    if (typeof snd !== 'undefined' && snd) snd.playSFX('upgrade');
+      addFloatingText(width / 2, height * 0.3, upg.name + ' installed! ' + upg.desc, '#ffcc44');
+    if (snd) snd.playSFX('upgrade');
   } else {
     if (typeof addFloatingText === 'function')
-      addFloatingText(width / 2, height * 0.3, upg.name + ': need ' + upg.cost + ' gold', '#ff6644');
+      addFloatingText(width / 2, height * 0.3, upg.name + ': need ' + missing.join(', '), '#ff6644');
+  }
+}
+
+// Ship fishing (called from deck shrine interaction or a timed interval)
+var _fishTimer = 0;
+function updateShipFishing(dt) {
+  if (!isSeaPeoplesFaction()) return;
+  if (!state.onShipDeck) return;  // only fish while on deck
+  _fishTimer += dt;
+  // Every ~15 seconds on deck: passive food from the sea
+  if (_fishTimer > 900) {
+    _fishTimer = 0;
+    var fishYield = 3 + Math.floor(Math.random() * 3);
+    if ((state.shipUpgrades || []).indexOf('cargo_hold') >= 0) fishYield += 2;
+    state.harvest = (state.harvest || 0) + fishYield;
+    if (typeof addFloatingText === 'function')
+      addFloatingText(width / 2, height * 0.65, '+' + fishYield + ' fish caught', '#88bbcc');
   }
 }
 
@@ -805,6 +850,11 @@ function updateShipHome(dt) {
     camZoom = lerp(camZoom, camZoomTarget, 0.1);
   }
   // Ship deck: normal world update handles camera following player
+
+  // Passive income while sailing (Sea Peoples trade routes)
+  if (typeof updateShipPassiveIncome === 'function') updateShipPassiveIncome(dt);
+  // Passive fishing while on deck
+  if (typeof updateShipFishing === 'function') updateShipFishing(dt);
 }
 
 function renderShipHome() {
@@ -842,35 +892,73 @@ function renderShipHome() {
 // ═══════════════════════════════════════════════════════════════════════════
 function enterSailingFromHelm() {
   if (!state || !isOnShipDeck()) return;
-  // Save deck state and transition to sailing mode
+  // Transition from ship deck to world-map sailing via state.rowing
   state.onShipDeck = false;
-  // Set ship position to current world position
-  if (state.ship) {
-    state.ship.x = SHIP_DECK.cx;
-    state.ship.y = SHIP_DECK.cy;
-    state.ship.state = 'sailing';
-    state.ship.heading = state.ship.heading || 0;
-  }
-  // The normal sailing system takes over from here
-  addFloatingText(width / 2, height * 0.35, 'Taking the helm...', '#ffd080');
+  state.belowDeck = false;
+
+  // Activate the standard rowing/sailing system at ship's current world position
+  var r = state.rowing;
+  r.active = true;
+  r.x = SHIP_DECK.cx || state.shipWorldX || 0;
+  r.y = SHIP_DECK.cy || state.shipWorldY || 0;
+  r.angle = 0;
+  r.speed = 1.5;          // gentle start
+  r.oarPhase = 0;
+  r.wakeTrail = [];
+  r.nearIsle = null;
+  state.player.x = r.x;
+  state.player.y = r.y;
+
+  // Zoom out for world-map sailing
+  if (typeof camZoomTarget !== 'undefined') camZoomTarget = 0.55;
+  if (typeof _startCamTransition === 'function') _startCamTransition();
+
+  addFloatingText(width / 2, height * 0.35, 'Taking the helm — WASD to sail, E to dock or anchor', '#ffd080');
   if (snd) snd.playSFX('anchor_up');
 }
 
-// Return to ship deck from sailing
+// Return to ship deck from sailing (called when Sea Peoples stop rowing)
 function returnToShipDeck() {
   if (!isSeaPeoplesFaction()) return;
+  // Update ship world position from where the player stopped sailing
+  var r = state.rowing;
+  var sx = r.x || state.player.x || 0;
+  var sy = r.y || state.player.y || 0;
+  SHIP_DECK.cx = sx;
+  SHIP_DECK.cy = sy;
+  state.shipWorldX = sx;
+  state.shipWorldY = sy;
+
+  // Re-enable ship deck mode
   state.onShipDeck = true;
-  // Update ship world position from sailing endpoint
-  if (state.ship) {
-    SHIP_DECK.cx = state.ship.x || 0;
-    SHIP_DECK.cy = state.ship.y || 0;
-    state.shipWorldX = SHIP_DECK.cx;
-    state.shipWorldY = SHIP_DECK.cy;
-  }
-  state.player.x = SHIP_DECK.cx - 80;
+  r.active = false;
+  state.player.x = SHIP_DECK.cx - 80;  // stern near helm
   state.player.y = SHIP_DECK.cy;
+  state.player.vx = 0;
+  state.player.vy = 0;
+
+  // Zoom back in to deck view
+  if (typeof camZoomTarget !== 'undefined') camZoomTarget = 1.0;
+  if (typeof _startCamTransition === 'function') _startCamTransition();
+
   addFloatingText(width / 2, height * 0.35, 'Anchored', '#aaccff');
   if (snd) snd.playSFX('anchor_down');
+}
+
+// Passive sailing income for Sea Peoples (called every frame from updateShipHome)
+var _shipPassiveTimer = 0;
+function updateShipPassiveIncome(dt) {
+  if (!isSeaPeoplesFaction()) return;
+  if (!state.rowing || !state.rowing.active) return;
+  _shipPassiveTimer += dt;
+  // Every ~10 seconds of sailing: earn gold from trade/raiding
+  if (_shipPassiveTimer > 600) {
+    _shipPassiveTimer = 0;
+    var bonus = 2 + Math.floor((state.shipUpgrades || []).length * 1.5);
+    state.gold = (state.gold || 0) + bonus;
+    if (typeof addFloatingText === 'function')
+      addFloatingText(width / 2, height * 0.6, '+' + bonus + ' gold (sea trade)', '#ffd700');
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
