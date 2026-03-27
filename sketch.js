@@ -1301,9 +1301,12 @@ function startConquestGame(playerFaction) {
   }
   // Faction specified — finish setup
   if (typeof selectFaction === 'function') selectFaction(playerFaction);
-  if (typeof buildIsland === 'function') buildIsland();
-  // Place castrum building on island
-  state.buildings.push({ x: 780, y: 340, type: 'castrum', w: 130, h: 100, rot: 0, buildProgress: 1 });
+  // Sea Peoples have no island — skip building island and castrum
+  if (playerFaction !== 'seapeople') {
+    if (typeof buildIsland === 'function') buildIsland();
+    // Place castrum building on island
+    state.buildings.push({ x: 780, y: 340, type: 'castrum', w: 130, h: 100, rot: 0, buildProgress: 1 });
+  }
   gameScreen = 'game';
   if (typeof addNotification === 'function') {
     addNotification('Starting: 100 gold, 3 legionaries, castrum ready', '#88ff88');
@@ -3255,18 +3258,22 @@ function drawInner() {
           pop();
         }
       }
-      if (!_frameBudget.throttled || frameCount % 2 === 0) drawShoreWaves();
-      drawAmbientHouses();
-      if (!state._activeNation) drawWorldObjectsSorted(); // Skip home island objects when visiting nation
-      if (!_frameBudget.throttled) drawCitySmoke();
-      drawLaundryLines();
-      drawStreetWear();
-      drawGranaryArea();
-      drawAmphoraStacks();
-      drawTempleIncense();
-      drawForumBanner();
-      if (!_frameBudget.throttled) drawWindowGlow();
-      drawRuinOverlays();
+      // Sea Peoples live on their ship — skip all home-island rendering
+      let _skipHomeIsland = (typeof isSeaPeoplesFaction === 'function' && isSeaPeoplesFaction());
+      if (!_skipHomeIsland) {
+        if (!_frameBudget.throttled || frameCount % 2 === 0) drawShoreWaves();
+        drawAmbientHouses();
+        if (!state._activeNation) drawWorldObjectsSorted(); // Skip home island objects when visiting nation
+        if (!_frameBudget.throttled) drawCitySmoke();
+        drawLaundryLines();
+        drawStreetWear();
+        drawGranaryArea();
+        drawAmphoraStacks();
+        drawTempleIncense();
+        drawForumBanner();
+        if (!_frameBudget.throttled) drawWindowGlow();
+        drawRuinOverlays();
+      }
       drawCompanionTrail();
       drawPlayerTrail();
       drawNightLighting();
@@ -7101,7 +7108,7 @@ function showTutorialHintOnce(key, text, wx, wy) {
 
 // ─── TUTORIAL GOAL SYSTEM — 6-step onboarding ──────────────────────────
 const TUTORIAL_STEPS = [
-  { id: 'move',    text: 'Use WASD to move around your island',                check: function() { return state.player.moving; } },
+  { id: 'move',    get text() { return (typeof isSeaPeoplesFaction === 'function' && isSeaPeoplesFaction()) ? 'Use WASD to move around your ship' : 'Use WASD to move around your island'; }, check: function() { return state.player.moving; } },
   { id: 'chop',    text: 'Walk to a tree and press E to chop wood',            check: function() { return state.dailyActivities.chopped > 0 || state.playerStats.treesChopped > 0; } },
   { id: 'crystal', text: 'Walk to the glowing crystals and press E to mine',   check: function() { return state.dailyActivities.crystal > 0 || state.playerStats.crystalsCollected > 0; } },
   { id: 'farm',    text: 'Walk to the farm plots and press E to plant seeds',  check: function() { return state.plots && state.plots.some(function(p) { return p.planted; }); } },

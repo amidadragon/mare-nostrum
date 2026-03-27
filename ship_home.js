@@ -121,6 +121,31 @@ function initShipHome() {
     camSmooth.x = state.player.x; camSmooth.y = state.player.y;
   }
 
+  // Sea Peoples live on their ship — clear all home-island visual objects
+  // so farm plots, trees, houses, and island terrain never render
+  state.plots = [];
+  state.trees = state.trees || [];
+  state.trees.length = 0;
+  state.citizens = [];
+  state.chickens = [];
+  state.cats = [];
+  state.factionFlora = [];
+  state.factionWildlife = [];
+  if (state.ambient) { state.ambient.houses = []; state.ambient.clutter = []; }
+  state.crystalNodes = state.crystalNodes || [];
+  state.crystalNodes.length = 0;
+  state.resources = [];
+  state.crystalRainDrops = [];
+  // Move buildings array off-screen (keep data for save/load but don't render)
+  state.buildings = [];
+
+  // Position companion (Sea Lord) on the ship deck
+  if (state.companion) {
+    state.companion.x = SHIP_DECK.cx + 30;
+    state.companion.y = SHIP_DECK.cy;
+    state.companion.task = 'idle';
+  }
+
   // Relocate NPCs to below-deck positions (Sea Peoples have no island)
   relocateNPCsToBelowDeck();
 }

@@ -11,10 +11,28 @@ function updateCompanion(dt) {
   if (state.blessing.type === 'speed') c.speed *= 2;
   c.pulsePhase += 0.04;
 
-  // When player is rowing, companion stays on island and idles
+  // When player is rowing, companion rides on the ship
   if (state.rowing.active) {
-    c.vx *= 0.9; c.vy *= 0.9;
+    let r = state.rowing;
+    // Position companion on the ship — slightly behind center
+    c.x = r.x - cos(r.angle) * 12;
+    c.y = r.y - sin(r.angle) * 12;
+    c.vx = 0; c.vy = 0;
     if (c.task === 'deliver') { c.task = 'idle'; }
+    c.speed = origSpeed;
+    return;
+  }
+
+  // Sea Peoples on ship deck — companion follows player on deck
+  if (state.onShipDeck && typeof isSeaPeoplesFaction === 'function' && isSeaPeoplesFaction()) {
+    let dx = p.x + 30 - c.x;
+    let dy = p.y - 5 - c.y;
+    let d = sqrt(dx * dx + dy * dy);
+    if (d > 20) {
+      c.x += (dx / d) * c.speed * 0.5 * dt;
+      c.y += (dy / d) * c.speed * 0.5 * dt;
+    }
+    c.vx = 0; c.vy = 0;
     c.speed = origSpeed;
     return;
   }
@@ -29,22 +47,25 @@ function updateCompanion(dt) {
         c.vy = (dy / idleDist) * c.speed * 0.5;
       }
       // Priority: harvest ripe > plant empty > collect resources
-      let ripe = state.plots.find(pl => pl.ripe);
-      if (ripe && c.energy > 20) {
-        c.task = 'gather';
-        c.taskTarget = ripe;
-      } else if (state.seeds > 0 && c.energy > 15) {
-        let empty = state.plots.find(pl => !pl.planted);
-        if (empty) {
-          c.task = 'plant';
-          c.taskTarget = empty;
+      // Sea Peoples have no farm plots — skip farming tasks
+      if (!state.onShipDeck || !(typeof isSeaPeoplesFaction === 'function' && isSeaPeoplesFaction())) {
+        let ripe = state.plots.find(pl => pl.ripe);
+        if (ripe && c.energy > 20) {
+          c.task = 'gather';
+          c.taskTarget = ripe;
+        } else if (state.seeds > 0 && c.energy > 15) {
+          let empty = state.plots.find(pl => !pl.planted);
+          if (empty) {
+            c.task = 'plant';
+            c.taskTarget = empty;
+          }
         }
-      }
-      if (c.task === 'idle') {
-        let res = state.resources.find(r => r.active);
-        if (res && c.energy > 30) {
-          c.task = 'collect';
-          c.taskTarget = res;
+        if (c.task === 'idle') {
+          let res = state.resources.find(r => r.active);
+          if (res && c.energy > 30) {
+            c.task = 'collect';
+            c.taskTarget = res;
+          }
         }
       }
       break;

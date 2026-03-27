@@ -923,6 +923,8 @@ function initState() {
 }
 
 function buildIsland() {
+  // Sea Peoples live on their ship — no home island to build
+  if (state && state.faction === 'seapeople') return;
   let cx = WORLD.islandCX, cy = WORLD.islandCY;
   let srx = getSurfaceRX(), sry = getSurfaceRY();
   updatePortPositions();

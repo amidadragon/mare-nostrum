@@ -2391,8 +2391,11 @@ function drawHUD() {
   fill(seasonCol);
   textSize(hudTextSize);
   text(getSeasonName(), hudX, cookedY + barBlockH + hudLineH + _skillOff + _lvlBlockOff + qOff);
-  // Seasonal crop hint
-  let _scHint = typeof getSeasonalCrop === 'function' ? getSeasonalCrop() : null;
+  // Sea Peoples live on their ship — no farming HUD
+  let _isSP = (typeof isSeaPeoplesFaction === 'function' && isSeaPeoplesFaction());
+
+  // Seasonal crop hint (skip for Sea Peoples)
+  let _scHint = (!_isSP && typeof getSeasonalCrop === 'function') ? getSeasonalCrop() : null;
   if (_scHint) {
     fill(160, 150, 110, 160); textSize(hudSmallText);
     text('Best crop: ' + _scHint.name, hudX, cookedY + barBlockH + hudLineH * 2 + _skillOff + _lvlBlockOff + qOff);
@@ -2407,24 +2410,26 @@ function drawHUD() {
     hudY += hudLineH;
   }
 
-  // Grape/olive seeds — only show when player has some
-  if (state.grapeSeeds > 0 || state.oliveSeeds > 0) {
-    fill(140, 60, 160);
-    textSize(hudTextSize);
-    let seedStr = '';
-    if (state.grapeSeeds > 0) seedStr += 'GRAPE ' + state.grapeSeeds + '  ';
-    if (state.oliveSeeds > 0) seedStr += 'OLIVE ' + state.oliveSeeds;
-    text(seedStr.trim(), hudX, hudY);
+  if (!_isSP) {
+    // Grape/olive seeds — only show when player has some
+    if (state.grapeSeeds > 0 || state.oliveSeeds > 0) {
+      fill(140, 60, 160);
+      textSize(hudTextSize);
+      let seedStr = '';
+      if (state.grapeSeeds > 0) seedStr += 'GRAPE ' + state.grapeSeeds + '  ';
+      if (state.oliveSeeds > 0) seedStr += 'OLIVE ' + state.oliveSeeds;
+      text(seedStr.trim(), hudX, hudY);
+      hudY += hudLineH;
+    }
+
+    // Crop select
+    fill(color(C.textDim)); textSize(hudTextSize);
+    let sc = getSeasonalCrop();
+    let hasNewSeeds = (state.flaxSeeds > 0 || state.pomegranateSeeds > 0 || state.lotusSeeds > 0);
+    let cropHint = sc ? (hasNewSeeds ? '  (1-7)' : '  (1/2/3/4)') : (hasNewSeeds ? '  (1-3,5-7)' : '  (1/2/3)');
+    text('CROP: ' + (state.cropSelect || 'grain').toUpperCase() + cropHint, hudX, hudY);
     hudY += hudLineH;
   }
-
-  // Crop select
-  fill(color(C.textDim)); textSize(hudTextSize);
-  let sc = getSeasonalCrop();
-  let hasNewSeeds = (state.flaxSeeds > 0 || state.pomegranateSeeds > 0 || state.lotusSeeds > 0);
-  let cropHint = sc ? (hasNewSeeds ? '  (1-7)' : '  (1/2/3/4)') : (hasNewSeeds ? '  (1-3,5-7)' : '  (1/2/3)');
-  text('CROP: ' + (state.cropSelect || 'grain').toUpperCase() + cropHint, hudX, hudY);
-  hudY += hudLineH;
 
   // Blessing indicator
   if (state.blessing && state.blessing.type) {

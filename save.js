@@ -1064,11 +1064,11 @@ function loadGame() {
     state.shipWorldY = d.shipWorldY || 0;
     state._belowDeckReturnX = d._belowDeckReturnX || 0;
     state._belowDeckReturnY = d._belowDeckReturnY || 0;
-    // If faction is 'seapeople' and ship state exists, restore ship position
-    if (state.faction === 'seapeople' && state.onShipDeck) {
+    // Sea Peoples: always clear home-island artifacts and restore ship state
+    if (state.faction === 'seapeople') {
       if (typeof initShipHome === 'function') initShipHome();
-      SHIP_DECK.cx = state.shipWorldX;
-      SHIP_DECK.cy = state.shipWorldY;
+      SHIP_DECK.cx = state.shipWorldX || SHIP_DECK.cx;
+      SHIP_DECK.cy = state.shipWorldY || SHIP_DECK.cy;
     }
     addFloatingText(width / 2, height * 0.4, 'GAME LOADED', C.crystalGlow);
   } catch(e) {

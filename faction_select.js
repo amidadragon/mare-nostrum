@@ -287,6 +287,9 @@ function selectFaction(faction) {
     state.harvest = (state.harvest || 0) + 20;
     state.crystals = (state.crystals || 0) + 5;
     addFloatingText(width / 2, height * 0.45, 'The sea is your home — take the helm to sail!', '#cc4422');
+    // Force-clear any island artifacts that buildIsland() created before faction was set
+    // (initState → buildIsland runs before selectFaction, so plots/trees exist)
+    if (typeof initShipHome === 'function') initShipHome();
   } else {
     // Normal factions: spawn on home island
     state.player.x = WORLD.islandCX;
