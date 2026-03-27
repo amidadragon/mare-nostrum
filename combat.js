@@ -5727,6 +5727,68 @@ function recruitUnit(unitKey, count) {
 // ═══ VISUAL INVASION BATTLE ═══
 let _invasionBattle = null;
 
+// Apply formation positions to units in invasion battles
+function _applyFormationToUnitsInvasion(units, formationKey, side, isleX, isleY, isleRX, isleRY) {
+  if (!units || units.length === 0) return;
+
+  // Island position reference point
+  let centerX = isleX;
+  let centerY = isleY;
+  let spreadX = isleRX * 0.4;
+  let spreadY = isleRY * 0.3;
+
+  // Left side = attackers, right side = defenders
+  let baseX = side === 'attacker' ? centerX - spreadX : centerX + spreadX;
+  let dirX = side === 'attacker' ? 1 : -1;
+
+  for (let i = 0; i < units.length; i++) {
+    let u = units[i];
+    switch (formationKey) {
+      case 'shield': // tight rows
+        {
+          let row = floor(i / 6);
+          let col = i % 6;
+          u.x = baseX + dirX * row * 25;
+          u.y = centerY - spreadY * 0.7 + col * 20;
+        }
+        break;
+      case 'wedge': // V-shape (pointed at enemy)
+        {
+          let row = floor(i / 2);
+          let odd = i % 2;
+          let spread = row * 20;
+          u.x = baseX + dirX * row * 30;
+          u.y = centerY + (odd ? spread : -spread);
+        }
+        break;
+      case 'skirmish': // spread far apart
+        {
+          let row = floor(i / 3);
+          let col = i % 3;
+          u.x = baseX + dirX * row * 50 + random(-10, 10);
+          u.y = centerY - spreadY + col * 50 + random(-10, 10);
+        }
+        break;
+      case 'testudo': // tight block
+        {
+          let row = floor(i / 4);
+          let col = i % 4;
+          u.x = baseX + dirX * row * 20;
+          u.y = centerY - spreadY * 0.5 + col * 20;
+        }
+        break;
+      default: // 'line' — spread evenly in loose formation
+        {
+          let row = floor(i / 5);
+          let col = i % 5;
+          u.x = baseX + dirX * row * 35;
+          u.y = centerY - spreadY * 0.5 + col * 30;
+        }
+        break;
+    }
+  }
+}
+
 function startVisualInvasion(islandKey) {
   if (_invasionBattle) return false; // already in battle
 
@@ -5824,14 +5886,20 @@ function startVisualInvasion(islandKey) {
       attackTimer: 0,
       dead: false,
       deathTimer: 0,
-      color: defColor
+      color: defColor,
+      faction: islandKey // Track which faction this defender belongs to for faction-colored rendering
     });
   }
+
+  // Apply initial formation to attacking and defending units
+  let playerFormation = 'line';
+  let playerSide = 'left';
 
   _invasionBattle = {
     islandKey: islandKey,
     phase: 'deploy',
     timer: 0,
+    formation: playerFormation,
     attackers: playerUnits,
     defenders: defUnits,
     resultTimer: 0,
@@ -5842,6 +5910,10 @@ function startVisualInvasion(islandKey) {
     isleRX: _bIsleRX,
     isleRY: _bIsleRY
   };
+
+  // Apply formation positions to units
+  _applyFormationToUnitsInvasion(_invasionBattle.attackers, playerFormation, 'attacker', _bIsleX, _bIsleY, _bIsleRX, _bIsleRY);
+  _applyFormationToUnitsInvasion(_invasionBattle.defenders, 'line', 'defender', _bIsleX, _bIsleY, _bIsleRX, _bIsleRY);
 
   // Set active nation so island terrain renders
   if (rv) {
@@ -6025,86 +6097,152 @@ function updateVisualInvasion(dt) {
   }
 }
 
+// Enhanced faction-specific soldier rendering for invasion battles
+function _drawInvasionSoldier(u, sx, sy, alpha, playerFaction, isAttacker) {
+  push();
+  translate(sx, sy);
+  noStroke();
+
+  if (u.dead) {
+    // Fallen soldier — horizontal corpse with death animation
+    let sinkY = min(3, u.deathTimer * 0.05);
+    translate(0, sinkY);
+    rotate(0.3 * (isAttacker ? 1 : -1));
+    fill(100, 80, 60, alpha);
+    rect(-5, 0, 10, 3, 1);
+    // Blood pool
+    fill(150, 30, 30, alpha * 0.5);
+    ellipse(0, 4, 8 + min(6, u.deathTimer * 0.1), 3);
+  } else {
+    // Get faction military colors
+    let fm = isAttacker ? (typeof getFactionMilitary === 'function' ? getFactionMilitary() : null) : null;
+
+    // If defender has specific faction colors, use them
+    let defFaction = null;
+    if (!isAttacker && typeof FACTION_MILITARY !== 'undefined' && u.faction) {
+      defFaction = FACTION_MILITARY[u.faction];
+    }
+
+    // Walking animation
+    let walkPhase = sin(frameCount * 0.15 + u.x * 0.1);
+    let legOff = 2;
+
+    // Shadow
+    fill(0, 0, 0, 20);
+    ellipse(0, 5, 10, 4);
+
+    // Fighting bob — slight upward movement when attacking
+    let fightBob = (u.attackTimer && u.attackTimer > 15) ? -1.5 : 0;
+    translate(0, fightBob);
+
+    // ─── LEGS (darker color) ───
+    let legColor = defFaction ? defFaction.legs : (fm ? fm.legs : [90, 70, 50]);
+    fill(legColor[0], legColor[1], legColor[2], alpha);
+    rect(-2, 2 + walkPhase, 1.5, 5, 0);
+    rect(0.5, 2 - walkPhase, 1.5, 5, 0);
+
+    // ─── BODY / TUNIC ───
+    let tunicColor = defFaction ? defFaction.tunic : (fm ? fm.tunic : [160, 50, 40]);
+    fill(tunicColor[0], tunicColor[1], tunicColor[2], alpha);
+    rect(-3, -7, 6, 10, 1);
+
+    // ─── ARMOR PLATE ───
+    let armorColor = defFaction ? defFaction.armor : (fm ? fm.armor : [175, 172, 180]);
+    fill(armorColor[0], armorColor[1], armorColor[2], alpha);
+    rect(-3, -5, 6, 4, 0);
+
+    // ─── HEAD ───
+    fill(210, 180, 140, alpha);
+    ellipse(0, -10, 5, 5);
+
+    // ─── HELMET ───
+    let helmColor = defFaction ? defFaction.helm : (fm ? fm.helm : [175, 150, 60]);
+    fill(helmColor[0], helmColor[1], helmColor[2], alpha);
+    rect(-2.5, -12.5, 5, 4, 0);
+
+    // ─── HELMET CREST (faction-specific accent) ───
+    let crestCol = defFaction ? defFaction.helmCrest : (fm ? fm.helmCrest : [200, 35, 25]);
+    fill(crestCol[0], crestCol[1], crestCol[2], alpha);
+    rect(-0.5, -14, 1, 2, 0);
+
+    // ─── SHIELD (left arm) ───
+    let shieldColor = defFaction ? defFaction.shield : (fm ? fm.shield : [140, 50, 35]);
+    fill(shieldColor[0], shieldColor[1], shieldColor[2], alpha);
+    if (isAttacker) rect(-5, -6, 2.5, 8, 1);
+    else rect(2.5, -6, 2.5, 8, 1);
+
+    // Shield boss (center detail)
+    let bossColor = defFaction ? defFaction.shieldBoss : (fm ? fm.shieldBoss : [200, 170, 55]);
+    fill(bossColor[0], bossColor[1], bossColor[2], alpha);
+    if (isAttacker) ellipse(-3.75, 0, 1.5, 1.5);
+    else ellipse(3.75, 0, 1.5, 1.5);
+
+    // ─── WEAPON ARM + SWORD ───
+    let skinColor = [220, 190, 160];
+    fill(skinColor[0], skinColor[1], skinColor[2], alpha);
+    let armOff = (u.attackTimer && u.attackTimer > 15) ? -4 : 0;
+    if (isAttacker) rect(3, -5 + armOff, 1.5, 6, 0);
+    else rect(-4.5, -5 + armOff, 1.5, 6, 0);
+
+    // Weapon (sword/spear animation)
+    let weaponColor = [200, 200, 210];
+    fill(weaponColor[0], weaponColor[1], weaponColor[2], alpha);
+    if (isAttacker) {
+      let swingOff = armOff > 0 ? -3 : 0;
+      rect(4.5, -8 + swingOff, 1.5, 6, 0);
+    } else {
+      let swingOff = armOff > 0 ? -3 : 0;
+      rect(-6, -8 + swingOff, 1.5, 6, 0);
+    }
+
+    // ─── HP BAR ───
+    if (u.hp < u.maxHp) {
+      fill(30, 25, 20, alpha * 0.9);
+      rect(-5, -15, 10, 2, 1);
+      let hpRatio = max(0, u.hp / u.maxHp);
+      let hpColor = hpRatio > 0.5 ? [80, 200, 80] : (hpRatio > 0.25 ? [220, 160, 40] : [220, 60, 40]);
+      fill(hpColor[0], hpColor[1], hpColor[2], alpha);
+      rect(-5, -15, 10 * hpRatio, 2, 1);
+    }
+  }
+
+  pop();
+}
+
 function drawVisualInvasion() {
   if (!_invasionBattle) return;
   let b = _invasionBattle;
 
   // NO dark overlay — island terrain is visible
 
-  // Draw all units at world positions
+  // Draw all units at world positions with proper sorting for depth
   let allUnits = [...b.attackers, ...b.defenders];
   allUnits.sort((a, b2) => a.y - b2.y); // Y-sort for depth
 
-  noStroke();
+  let playerFaction = state.faction || 'rome';
+
   for (let u of allUnits) {
     if (u.dead && u.deathTimer > 60) continue;
 
     let sx = w2sX(u.x);
     let sy = w2sY(u.y);
-    let alpha = u.dead ? Math.max(0, 255 - u.deathTimer * 4) : 255;
+    let alpha = u.dead ? max(0, 255 - u.deathTimer * 4) : 255;
 
-    push();
-    translate(sx, sy);
+    // Check if unit is on screen before drawing
+    if (sx < -60 || sx > width + 60 || sy < -60 || sy > height + 60) continue;
 
-    if (u.dead) {
-      fill(80, 60, 40, alpha);
-      rect(-4, -1, 8, 3);
-    } else {
-      let bodyColor;
-      if (u.side === 'attacker') {
-        let fm = typeof getFactionMilitary === 'function' ? getFactionMilitary() : null;
-        bodyColor = fm ? fm.conquestFlag : [185, 38, 28];
-      } else {
-        bodyColor = u.color || [150, 80, 80];
-      }
-
-      // Legs
-      let walkPhase = sin(frameCount * 0.15 + u.x * 0.1);
-      fill(60, 50, 40, alpha);
-      rect(-2, 4, 2, 4 + walkPhase);
-      rect(1, 4, 2, 4 - walkPhase);
-
-      // Body
-      fill(bodyColor[0], bodyColor[1], bodyColor[2], alpha);
-      rect(-4, -3, 8, 8);
-
-      // Head
-      fill(200, 170, 130, alpha);
-      ellipse(0, -5, 6, 6);
-
-      // Weapon
-      let atkAnim = u.attackTimer > 15 ? sin((u.attackTimer - 15) * 0.5) * 6 : 0;
-      fill(180, 180, 190, alpha);
-      if (u.side === 'attacker') rect(4, -2 - atkAnim, 2, 6);
-      else rect(-6, -2 - atkAnim, 2, 6);
-
-      // Shield
-      fill(Math.max(0, bodyColor[0] - 30), Math.max(0, bodyColor[1] - 20), Math.max(0, bodyColor[2] - 10), alpha);
-      if (u.side === 'attacker') rect(-5, -2, 3, 6, 1);
-      else rect(3, -2, 3, 6, 1);
-
-      // HP bar
-      if (u.hp < u.maxHp) {
-        fill(40, 30, 20, alpha * 0.8);
-        rect(-5, -10, 10, 2);
-        let hpPct = Math.max(0, u.hp / u.maxHp);
-        if (hpPct > 0.5) fill(80, 200, 80, alpha);
-        else fill(220, 60, 40, alpha);
-        rect(-5, -10, 10 * hpPct, 2);
-      }
-    }
-
-    pop();
+    let isAttacker = u.side === 'attacker';
+    _drawInvasionSoldier(u, sx, sy, alpha, playerFaction, isAttacker);
   }
 
-  // Minimal HUD at top — just counts and status
+  // Minimal HUD at top — counts, status, formation info
   let atkAlive = b.attackers.filter(u => !u.dead).length;
   let defAlive = b.defenders.filter(u => !u.dead).length;
 
   // Semi-transparent bar at top
   fill(0, 0, 0, 140);
   noStroke();
-  rect(width * 0.2, 5, width * 0.6, 22, 5);
+  rect(width * 0.2, 5, width * 0.6, 28, 5);
 
   let fm = typeof getFactionMilitary === 'function' ? getFactionMilitary() : null;
   let atkCol = fm ? fm.conquestFlag : [185, 38, 28];
@@ -6118,22 +6256,32 @@ function drawVisualInvasion() {
   text('Garrison: ' + defAlive + '/' + b.defenders.length, width * 0.78, 21);
 
   textAlign(CENTER);
-  if (b.phase === 'deploy') { fill(220, 200, 140); text('DEPLOYING...', width/2, 21); }
+  textSize(10);
+  if (b.phase === 'deploy') {
+    fill(220, 200, 140);
+    text('DEPLOYING... [' + (b.formation || 'line').toUpperCase() + ' FORMATION]', width/2, 21);
+  }
   if (b.phase === 'fighting') {
-    fill(255, 200, 100); text('BATTLE!', width/2, 21);
-    fill(180, 160, 120, 150); textSize(9);
+    fill(255, 200, 100);
+    text('BATTLE! [' + (b.formation || 'line').toUpperCase() + ' FORMATION]', width/2, 21);
+    fill(180, 160, 120, 150);
+    textSize(9);
     text('[R] Retreat', width/2, 38);
   }
   if (b.phase === 'result') {
     if (b.winner === 'attacker') {
-      fill(80, 220, 80); textSize(16);
+      fill(80, 220, 80);
+      textSize(16);
       text('VICTORY!', width/2, height * 0.85);
-      textSize(10); fill(200, 200, 180);
+      textSize(10);
+      fill(200, 200, 180);
       text(atkAlive + ' soldiers survived', width/2, height * 0.89);
     } else {
-      fill(220, 60, 60); textSize(16);
+      fill(220, 60, 60);
+      textSize(16);
       text('DEFEATED', width/2, height * 0.85);
-      textSize(10); fill(200, 200, 180);
+      textSize(10);
+      fill(200, 200, 180);
       text('Retreating...', width/2, height * 0.89);
     }
   }
