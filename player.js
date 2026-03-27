@@ -339,7 +339,10 @@ function updatePlayerAnim(dt) {
       if ((a.walkFrame === 1 || a.walkFrame === 3) && snd && frameCount % 2 === 0) {
         // Terrain-aware footsteps with natural variation
         let _stepSfx = 'step_sand'; // default
-        if (isInShallows(p.x, p.y) || (typeof isNearAnyIsland === 'function' && !isOnAnyIslandSurface(p.x, p.y) && isNearAnyIsland(p.x, p.y, 300))) {
+        // Ship deck = wood footsteps
+        if (state.onShipDeck || state.belowDeck) {
+          _stepSfx = 'step_wood';
+        } else if (isInShallows(p.x, p.y) || (typeof isNearAnyIsland === 'function' && !isOnAnyIslandSurface(p.x, p.y) && isNearAnyIsland(p.x, p.y, 300))) {
           _stepSfx = 'step_water';
         } else if (typeof isOnPier === 'function' && isOnPier(p.x, p.y)) {
           _stepSfx = 'step_wood';

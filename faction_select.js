@@ -207,7 +207,9 @@ function selectFaction(faction) {
   } else if (faction === 'greece') {
     addFloatingText(width / 2, height * 0.35, 'Olive wreath: +20% NPC favor gain', '#5090c0');
   } else if (faction === 'seapeople') {
-    addFloatingText(width / 2, height * 0.35, 'Ship start: +30% sail speed, +50% raid loot', '#2a8a6a');
+    addFloatingText(width / 2, height * 0.35, 'Ship start: +30% sail speed, +50% raid loot', '#8c2d1e');
+    // Initialize ship-as-home system
+    if (typeof initShipHome === 'function') initShipHome();
   } else if (faction === 'persia') {
     addFloatingText(width / 2, height * 0.35, 'Royal scepter: +25% colony income', '#d4a030');
   } else if (faction === 'phoenicia') {

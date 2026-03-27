@@ -486,6 +486,13 @@ function initState() {
     _castrumReturnX: 0, _castrumReturnY: 0,
     castrumSparAnim: 0,
 
+    // Ship home (Sea Peoples)
+    onShipDeck: false,
+    belowDeck: false,
+    shipUpgrades: [],
+    shipWorldX: 0, shipWorldY: 0,
+    _belowDeckReturnX: 0, _belowDeckReturnY: 0,
+
     // Build mode
     buildMode: false,
     demolishMode: false,

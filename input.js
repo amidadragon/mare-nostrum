@@ -1798,6 +1798,13 @@ function keyPressed() {
         return;
       }
     }
+    // Ship deck interactions (Sea Peoples) — check before temple/pyramid
+    if (state.onShipDeck && typeof handleShipDeckInteraction === 'function') {
+      if (handleShipDeckInteraction()) return;
+    }
+    if (state.belowDeck && typeof handleBelowDeckInteraction === 'function') {
+      if (handleBelowDeckInteraction()) return;
+    }
     // Temple interior entry — near door (front of pyramid)
     if (!state.insideTemple && !_doorTransition && dist(state.player.x, state.player.y, state.pyramid.x, state.pyramid.y + 5) < 40) {
       if (snd) snd.playSFX('door_creak');
