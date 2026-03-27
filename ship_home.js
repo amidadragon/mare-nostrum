@@ -120,6 +120,45 @@ function initShipHome() {
   if (typeof camSmooth !== 'undefined') {
     camSmooth.x = state.player.x; camSmooth.y = state.player.y;
   }
+
+  // Relocate NPCs to below-deck positions (Sea Peoples have no island)
+  relocateNPCsToBelowDeck();
+}
+
+// Move the 4 main NPCs (Livia, Marcus, Vesta, Felix) into the below-deck room
+// so Sea Peoples can interact with them in their ship interior
+function relocateNPCsToBelowDeck() {
+  if (!state) return;
+  var R = BELOW_DECK;
+  // Livia — near the captain's quarters (right side)
+  if (state.npc) {
+    state.npc.x = R.cx + 100;
+    state.npc.y = R.cy + 30;
+  }
+  // Marcus — near the hold / storage (left side, front)
+  if (state.marcus) {
+    state.marcus.x = R.cx - 100;
+    state.marcus.y = R.cy + 40;
+    state.marcus.present = true; // always present on the ship
+  }
+  // Vesta — near the shrine (upper right)
+  if (state.vesta) {
+    state.vesta.x = R.cx + 40;
+    state.vesta.y = R.cy - 50;
+  }
+  // Felix — near the forge (upper left)
+  if (state.felix) {
+    state.felix.x = R.cx - 40;
+    state.felix.y = R.cy - 40;
+  }
+  // Mark all NPCs as found for Sea Peoples (crew is already aboard)
+  if (state.progression) {
+    state.progression.npcsFound = state.progression.npcsFound || {};
+    state.progression.npcsFound.marcus = true;
+    state.progression.npcsFound.vesta = true;
+    state.progression.npcsFound.felix = true;
+    state.progression.homeIslandReached = true;
+  }
 }
 
 // ─── ENTER / EXIT BELOW DECK ────────────────────────────────────────────
@@ -828,6 +867,29 @@ function drawBelowDeck() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// NPC RENDERING IN BELOW DECK (Sea Peoples crew)
+// ═══════════════════════════════════════════════════════════════════════════
+function drawBelowDeckNPCs() {
+  if (!state || !state.belowDeck) return;
+  // Draw main NPC (Livia equivalent — ship's navigator/seer)
+  if (state.npc && typeof drawNPC === 'function') {
+    drawNPC();
+  }
+  // Draw Marcus (ship's quartermaster)
+  if (state.marcus && state.marcus.present !== false && typeof drawNewNPC === 'function') {
+    drawNewNPC(state.marcus, 'marcus');
+  }
+  // Draw Vesta (ship's priestess)
+  if (state.vesta && typeof drawNewNPC === 'function') {
+    drawNewNPC(state.vesta, 'vesta');
+  }
+  // Draw Felix (ship's scholar/scribe)
+  if (state.felix && typeof drawNewNPC === 'function') {
+    drawNewNPC(state.felix, 'felix');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // UPDATE LOOP — called from sketch.js draw() when onShipDeck or belowDeck
 // ═══════════════════════════════════════════════════════════════════════════
 function updateShipHome(dt) {
@@ -868,6 +930,8 @@ function renderShipHome() {
     push();
     translate(shakeX, shakeY + floatOffset);
     drawBelowDeck();
+    // Draw NPCs in below deck (Sea Peoples crew)
+    drawBelowDeckNPCs();
     drawPlayer();
     drawParticles();
     drawFloatingText();
