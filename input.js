@@ -1248,7 +1248,7 @@ function keyPressed() {
     if (typeof startDive === 'function' && !state.rowing.active && !state.buildMode &&
         !state.conquest.active && !state._activeExploration) {
       let _port = typeof getPortPosition === 'function' ? getPortPosition() : { x: 0, y: 0 };
-      let _nearBoat = dist(state.player.x, state.player.y, _port.x + 80, _port.y + 20) < 70;
+      let _nearBoat = dist(state.player.x, state.player.y, _port.x - 90, _port.y + 18) < 80;
       if (!_nearBoat && isInShallows(state.player.x, state.player.y)) {
         startDive(); return;
       }
@@ -1535,10 +1535,10 @@ function keyPressed() {
           return;
         }
       }
-      // Otherwise disembark — snap player back to pier
+      // Otherwise disembark — snap player back to pier (pier extends left of port)
       let port = getPortPosition();
       state.rowing.active = false;
-      state.player.x = port.x + 40;
+      state.player.x = port.x - 40;
       state.player.y = port.y;
       state.player.vx = 0;
       state.player.vy = 0;
@@ -1596,11 +1596,11 @@ function keyPressed() {
     // Check if near rowboat at pier (pier extends left from port) — gate behind villa
     let _canBoard = !state.progression.gameStarted || state.progression.villaCleared;
     let port = getPortPosition();
-    let boatWorldX = port.x + 80;
-    let boatWorldY = port.y + 20;
-    if (_canBoard && dist(state.player.x, state.player.y, boatWorldX, boatWorldY) < 60) {
+    let boatWorldX = port.x - 90;
+    let boatWorldY = port.y + 18;
+    if (_canBoard && dist(state.player.x, state.player.y, boatWorldX, boatWorldY) < 70) {
       state.rowing.active = true;
-      // Start boat outside the island
+      // Start boat at pier end (left side, in water)
       state.rowing.x = boatWorldX;
       state.rowing.y = boatWorldY;
       state.rowing.angle = 0;

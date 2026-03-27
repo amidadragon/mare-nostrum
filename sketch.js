@@ -1631,12 +1631,12 @@ function isOnBridge(wx, wy) {
 
 // Check if point is on the harbor pier (left side of island)
 function isOnPier(wx, wy) {
-  // Player dock (left side)
+  // Player dock (left side) — pier extends LEFT into water (drawPort uses scale(-1,1))
   let port = getPortPosition();
-  let pierLeft = port.x - 30;
-  let pierRight = port.x + 150;
-  let pierTop = port.y - 15;
-  let pierBot = port.y + 30;
+  let pierLeft = port.x - 160;
+  let pierRight = port.x + 40;
+  let pierTop = port.y - 20;
+  let pierBot = port.y + 35;
   if (wx >= pierLeft && wx <= pierRight && wy >= pierTop && wy <= pierBot) return true;
   // Merchant dock (right side)
   if (typeof getMerchantPortPosition === 'function') {
@@ -3332,8 +3332,8 @@ function drawInner() {
     let _boatUnlocked = !state.progression.gameStarted || state.progression.villaCleared;
     if (!state.rowing.active && _boatUnlocked) {
       let port = getPortPosition();
-      let boatWX = port.x + 80;
-      let boatWY = port.y + 20;
+      let boatWX = port.x - 90;
+      let boatWY = port.y + 18;
       if (dist(state.player.x, state.player.y, boatWX, boatWY) < 60) {
         let promptX = w2sX(boatWX);
         let promptY = w2sY(boatWY) - 25 + floatOffset;
