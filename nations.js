@@ -1681,8 +1681,12 @@ function drawNationDiplomacyUI() {
   let _fm = (typeof FACTION_MILITARY !== 'undefined' && FACTION_MILITARY[key]) ? FACTION_MILITARY[key] : null;
   let fCol = _fm ? _fm.conquestFlag : [160, 140, 90];
 
+  // Check if we have swarm events to show — expand panel if so
+  let _swarmEvts = (typeof getSwarmFactionEvents === 'function') ? getSwarmFactionEvents(key) : [];
+  let _hasSwarm = _swarmEvts.length > 0;
+
   // Panel background — dark with faction-colored border
-  let pw = 300, ph = 260;
+  let pw = 300, ph = _hasSwarm ? 350 : 260;
   let px = width / 2 - pw / 2, py = height / 2 - ph / 2 - 20;
   noStroke();
   fill(15, 12, 8, 230); rect(px, py, pw, ph, 6);
@@ -1762,6 +1766,32 @@ function drawNationDiplomacyUI() {
     text('[' + a.key + '] ' + a.label, sx, sy);
     sy += 18;
   }
+  // ─── Swarm Intelligence Chronicle ───
+  if (_hasSwarm) {
+    sy += 6;
+    stroke(fCol[0], fCol[1], fCol[2], 40); line(sx, sy, px + pw - 18, sy); noStroke();
+    sy += 6;
+    fill(fCol[0], fCol[1], fCol[2], 180); textSize(8);
+    text('\u2691 INTELLIGENCE REPORTS', sx, sy);
+    sy += 14;
+
+    // Show last 5 events
+    let showEvts = _swarmEvts.slice(-5);
+    for (let evt of showEvts) {
+      let evtCol = evt.type === 'war' ? [200, 80, 60] :
+                   evt.type === 'trade' ? [80, 180, 200] :
+                   evt.type === 'peace' ? [80, 200, 120] :
+                   evt.type === 'military' ? [200, 160, 60] :
+                   evt.type === 'betrayal' ? [180, 80, 200] :
+                   [140, 135, 110];
+      fill(evtCol[0], evtCol[1], evtCol[2], 160);
+      textSize(7);
+      // Bullet + text
+      text('\u2022 ' + evt.text, sx + 4, sy);
+      sy += 12;
+    }
+  }
+
   sy += 4;
   fill(120, 110, 90); textSize(8);
   text('[ESC] Close', sx, sy);

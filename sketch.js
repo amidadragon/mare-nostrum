@@ -1912,19 +1912,29 @@ function draw() {
   }
   _fpsSmooth = lerp(_fpsSmooth, 1 / _delta, 0.05);
 
-  // ─── WORLD ISLAND VISIT: swap island coords so all home-island logic works on the visited island ───
-  let _savedHomeIsland = null;
+  // ─── WORLD ISLAND VISIT: swap island coords via WorldState (Phase 2) ───
+  let _visitSwapped = false;
+  let _savedCoastSeed = null;
   if (state._activeWorldIsland && state._worldIslePos) {
-    _savedHomeIsland = {
-      cx: WORLD.islandCX, cy: WORLD.islandCY,
-      rx: state.islandRX, ry: state.islandRY,
-      seed: typeof _coastlineSeed !== 'undefined' ? _coastlineSeed : 42
-    };
-    let _wp = state._worldIslePos;
-    WORLD.islandCX = _wp.x;
-    WORLD.islandCY = _wp.y;
-    state.islandRX = _wp.rx;
-    state.islandRY = _wp.ry;
+    // Use WorldState.safeSwap if available; falls back to manual swap
+    if (typeof WorldState !== 'undefined' && WorldState.initialized && WorldState.islands[state._activeWorldIsland]) {
+      _visitSwapped = WorldState.safeSwap(state._activeWorldIsland);
+    } else {
+      // Legacy fallback — manual coord swap
+      _savedCoastSeed = {
+        cx: WORLD.islandCX, cy: WORLD.islandCY,
+        rx: state.islandRX, ry: state.islandRY,
+      };
+      let _wp = state._worldIslePos;
+      WORLD.islandCX = _wp.x;
+      WORLD.islandCY = _wp.y;
+      state.islandRX = _wp.rx;
+      state.islandRY = _wp.ry;
+    }
+    // Coastline seed is outside state — handle separately
+    let _prevSeed = typeof _coastlineSeed !== 'undefined' ? _coastlineSeed : 42;
+    if (!_savedCoastSeed) _savedCoastSeed = { seed: _prevSeed };
+    else _savedCoastSeed.seed = _prevSeed;
     let _wisle = typeof getWorldIsland === 'function' ? getWorldIsland(state._activeWorldIsland) : null;
     if (typeof _coastlineSeed !== 'undefined') {
       _coastlineSeed = _wisle ? (_wisle.key.length * 7 + _wisle.angle * 100) : 42;
@@ -2031,13 +2041,18 @@ function draw() {
   }
   // Debug console — ALWAYS draw on top of everything, every screen
   if (typeof Debug !== 'undefined') Debug.draw();
-  // ─── WORLD ISLAND VISIT: restore home island coords ───
-  if (_savedHomeIsland) {
-    WORLD.islandCX = _savedHomeIsland.cx;
-    WORLD.islandCY = _savedHomeIsland.cy;
-    state.islandRX = _savedHomeIsland.rx;
-    state.islandRY = _savedHomeIsland.ry;
-    if (typeof _coastlineSeed !== 'undefined') _coastlineSeed = _savedHomeIsland.seed;
+  // ─── WORLD ISLAND VISIT: restore home island (Phase 2) ───
+  if (_visitSwapped) {
+    if (typeof WorldState !== 'undefined') WorldState.safeSwapBack();
+  } else if (_savedCoastSeed && _savedCoastSeed.cx !== undefined) {
+    // Legacy fallback restore
+    WORLD.islandCX = _savedCoastSeed.cx;
+    WORLD.islandCY = _savedCoastSeed.cy;
+    state.islandRX = _savedCoastSeed.rx;
+    state.islandRY = _savedCoastSeed.ry;
+  }
+  if (_savedCoastSeed) {
+    if (typeof _coastlineSeed !== 'undefined') _coastlineSeed = _savedCoastSeed.seed;
     if (typeof _coastlineVerts !== 'undefined') _coastlineVerts = null;
   }
 }

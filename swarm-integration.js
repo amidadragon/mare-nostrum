@@ -124,7 +124,7 @@ function processSwarmTurn() {
         addChronicleEntry(msg, entry.faction);
         // High-priority events become notifications
         if (entry.priority > 0.7) {
-          addNotification(msg, entry.faction);
+          addSwarmScreenNotification(msg, entry.faction);
         }
       }
     }
@@ -597,7 +597,7 @@ function drawChroniclePanel(px, py, pw, ph) {
 // NOTIFICATIONS — Floating event banners
 // ═══════════════════════════════════════════════════════════════════════════
 
-function addNotification(msg, factionId) {
+function addSwarmScreenNotification(msg, factionId) {
   swarmState.notifications.push({
     msg,
     factionId,
@@ -906,9 +906,58 @@ function processSwarmBackgroundTurn() {
   }
 }
 
+// ─── Swarm Event Log (for diplomacy panel display) ──────────────────────
+// Keyed by game faction. Each entry: { text, turn, type, time }
+let _swarmFactionEvents = {};
+const _SWARM_MAX_FACTION_EVENTS = 12;
+
+function _logSwarmFactionEvent(gameKey, text, type) {
+  if (!_swarmFactionEvents[gameKey]) _swarmFactionEvents[gameKey] = [];
+  _swarmFactionEvents[gameKey].push({
+    text: text,
+    type: type || 'info',
+    turn: _swarmBgState.turnTimer || 0,
+    time: Date.now()
+  });
+  if (_swarmFactionEvents[gameKey].length > _SWARM_MAX_FACTION_EVENTS) {
+    _swarmFactionEvents[gameKey].shift();
+  }
+}
+
+/**
+ * Get recent swarm events for a specific game faction (used by diplomacy panel).
+ */
+function getSwarmFactionEvents(gameKey) {
+  return _swarmFactionEvents[gameKey] || [];
+}
+
+// Pretty faction names for notifications
+function _factionDisplayName(gameKey) {
+  let names = {
+    rome: 'Rome', carthage: 'Carthage', egypt: 'Egypt', greece: 'Greece',
+    persia: 'Persia', phoenicia: 'Phoenicia', gaul: 'Gaul', seapeople: 'Sea Peoples'
+  };
+  return names[gameKey] || gameKey;
+}
+
+// Notification colors per action type
+function _swarmNotifColor(action) {
+  switch (action) {
+    case 'recruit_army': return '#cc9944';
+    case 'lobby_war': return '#cc3333';
+    case 'lobby_peace': return '#44aa66';
+    case 'propose_trade': return '#44aacc';
+    case 'plan_campaign': return '#cc6633';
+    case 'plot_betrayal': return '#aa44cc';
+    case 'call_for_omens': return '#cccc44';
+    default: return '#d4a040';
+  }
+}
+
 /**
  * Translate a swarm agent action into a game effect.
  * This bridges between the abstract swarm decisions and the concrete game systems.
+ * Phase 2: also fires visible notifications for significant events.
  */
 function applySwarmActionToGame(entry) {
   if (!state || !state.nations) return;
@@ -923,6 +972,7 @@ function applySwarmActionToGame(entry) {
   }
   if (!gameKey || !state.nations[gameKey]) return;
   let nation = state.nations[gameKey];
+  let fName = _factionDisplayName(gameKey);
 
   switch (entry.action) {
     case 'recruit_army':
@@ -930,6 +980,12 @@ function applySwarmActionToGame(entry) {
       if (nation.gold >= 10) {
         nation.military = (nation.military || 0) + 1;
         nation.gold -= 10;
+        if (entry.priority > 0.6) {
+          _logSwarmFactionEvent(gameKey, fName + ' recruits soldiers', 'military');
+          if (typeof addNotification === 'function') {
+            addNotification(fName + ' recruits troops!', _swarmNotifColor('recruit_army'));
+          }
+        }
       }
       break;
 
@@ -944,6 +1000,12 @@ function applySwarmActionToGame(entry) {
       }
       if (targetGameKey && nation.relations && nation.relations[targetGameKey] !== undefined) {
         nation.relations[targetGameKey] = Math.max(-100, (nation.relations[targetGameKey] || 0) - 5);
+        let tName = _factionDisplayName(targetGameKey);
+        _logSwarmFactionEvent(gameKey, fName + ' agitates against ' + tName, 'war');
+        _logSwarmFactionEvent(targetGameKey, fName + ' stirs hostility', 'war');
+        if (entry.priority > 0.5 && typeof addNotification === 'function') {
+          addNotification(fName + ' agitates against ' + tName + '!', _swarmNotifColor('lobby_war'));
+        }
       }
       break;
     }
@@ -955,6 +1017,10 @@ function applySwarmActionToGame(entry) {
           if (nation.relations[k] < 50) {
             nation.relations[k] = Math.min(100, nation.relations[k] + 2);
           }
+        }
+        _logSwarmFactionEvent(gameKey, fName + ' seeks peace', 'peace');
+        if (entry.priority > 0.6 && typeof addNotification === 'function') {
+          addNotification(fName + ' seeks peace with neighbors.', _swarmNotifColor('lobby_peace'));
         }
       }
       break;
@@ -973,6 +1039,12 @@ function applySwarmActionToGame(entry) {
       }
       if (targetGameKey && state.nations[targetGameKey]) {
         state.nations[targetGameKey].gold = (state.nations[targetGameKey].gold || 0) + 3;
+        let tName = _factionDisplayName(targetGameKey);
+        _logSwarmFactionEvent(gameKey, fName + ' trades with ' + tName, 'trade');
+        _logSwarmFactionEvent(targetGameKey, tName + ' receives trade from ' + fName, 'trade');
+        if (entry.priority > 0.5 && typeof addNotification === 'function') {
+          addNotification(fName + ' trades with ' + tName + '.', _swarmNotifColor('propose_trade'));
+        }
       }
       break;
     }
@@ -980,17 +1052,29 @@ function applySwarmActionToGame(entry) {
     case 'plan_campaign': {
       // Increase military readiness (preparation for invasion)
       nation._campaignReady = (nation._campaignReady || 0) + 1;
+      _logSwarmFactionEvent(gameKey, fName + ' prepares for war', 'military');
+      // Only notify when campaign fully ready (3+ preparations)
+      if (nation._campaignReady >= 3 && typeof addNotification === 'function') {
+        addNotification(fName + ' is ready for war!', _swarmNotifColor('plan_campaign'));
+        nation._campaignReady = 0; // reset after notification
+      }
       break;
     }
 
     case 'gather_intel': {
       // No direct game effect — intel is tracked in the graph
+      _logSwarmFactionEvent(gameKey, fName + ' gathers intelligence', 'intel');
       break;
     }
 
     case 'plot_betrayal': {
       // Can trigger alliance breaks later
       nation._betrayalPlots = (nation._betrayalPlots || 0) + 1;
+      _logSwarmFactionEvent(gameKey, fName + ' plots betrayal...', 'betrayal');
+      if (nation._betrayalPlots >= 3 && typeof addNotification === 'function') {
+        addNotification('Rumors of treachery within ' + fName + '!', _swarmNotifColor('plot_betrayal'));
+        nation._betrayalPlots = 0;
+      }
       break;
     }
 
@@ -998,6 +1082,10 @@ function applySwarmActionToGame(entry) {
       // Small morale boost
       if (nation.islandState && nation.islandState.legia) {
         nation.islandState.legia.morale = Math.min(100, (nation.islandState.legia.morale || 80) + 5);
+      }
+      _logSwarmFactionEvent(gameKey, fName + ' consults the oracles', 'omens');
+      if (entry.priority > 0.7 && typeof addNotification === 'function') {
+        addNotification(fName + ' receives a divine omen!', _swarmNotifColor('call_for_omens'));
       }
       break;
     }
