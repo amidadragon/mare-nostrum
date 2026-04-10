@@ -665,6 +665,86 @@ function updateNationDaily(key) {
     }
   }
 
+  // --- AI TERRITORIAL EXPANSION (claim neutral world islands) ---
+  // Factions can claim unowned world islands based on military strength
+  if (!state._worldIslandOwners) state._worldIslandOwners = {};
+  let daysSinceTerritorialExpand = (state.day || 1) - (rv._lastTerritoryClaimDay || 0);
+  let territoryDelay = rv.personality === 'aggressive' ? 5 : rv.personality === 'trader' ? 10 : 7;
+  let canClaimTerritory = rv.military >= 3 && rv.level >= 3 && daysSinceTerritorialExpand >= territoryDelay && !rv.defeated && !rv.vassal;
+
+  if (canClaimTerritory && random() < 0.15 * (rv.aggression || 0.3)) {
+    // Find unowned non-capital world islands
+    let worldIslands = typeof WORLD_ISLANDS !== 'undefined' ? WORLD_ISLANDS : [];
+    let claimable = [];
+    for (let wi = 0; wi < worldIslands.length; wi++) {
+      let isle = worldIslands[wi];
+      if (isle.type === 'capital') continue; // can't claim capitals
+      let owner = state._worldIslandOwners[isle.key];
+      if (!owner) {
+        claimable.push(isle); // unowned
+      }
+    }
+    if (claimable.length > 0) {
+      // Pick based on faction personality
+      let preferred = null;
+      if (rv.personality === 'trader' || rv._victoryFocus === 'economic') {
+        preferred = claimable.find(i => i.type === 'economic') || claimable.find(i => i.type === 'resource');
+      } else if (rv.personality === 'aggressive' || rv._victoryFocus === 'military') {
+        preferred = claimable.find(i => i.type === 'military');
+      } else if (rv.personality === 'diplomat') {
+        preferred = claimable.find(i => i.type === 'diplomatic');
+      }
+      let claimed = preferred || claimable[floor(random(claimable.length))];
+      state._worldIslandOwners[claimed.key] = key;
+      rv._lastTerritoryClaimDay = state.day || 1;
+      if (!rv._territories) rv._territories = [];
+      rv._territories.push(claimed.key);
+      // Bonus from territory
+      rv.gold += 10 + floor(rv.level * 2);
+      addNotification(name + ' claims ' + claimed.name + '!', '#ffcc44');
+      state.worldEvents.push({ type: 'territory', text: name + ' claims ' + claimed.name + '!', day: state.day, factionA: key, factionB: null });
+      if (state.worldEvents.length > 30) state.worldEvents.shift();
+      // Log to swarm events if available
+      if (typeof _logSwarmFactionEvent === 'function') {
+        _logSwarmFactionEvent(key, name + ' claims ' + claimed.name, 'military');
+      }
+    }
+  }
+
+  // AI can contest enemy-held territories during war
+  if (rv.wars && rv.wars.length > 0 && rv.military >= 5) {
+    for (let warKey of rv.wars) {
+      let enemy = state.nations[warKey];
+      if (!enemy || !enemy._territories || enemy._territories.length === 0) continue;
+      if (random() < 0.05 * rv.aggression) {
+        // Steal a territory from the enemy
+        let stolen = enemy._territories[floor(random(enemy._territories.length))];
+        let idx = enemy._territories.indexOf(stolen);
+        if (idx !== -1) {
+          enemy._territories.splice(idx, 1);
+          state._worldIslandOwners[stolen] = key;
+          if (!rv._territories) rv._territories = [];
+          rv._territories.push(stolen);
+          let isleData = typeof getWorldIsland === 'function' ? getWorldIsland(stolen) : null;
+          let isleName = isleData ? isleData.name : stolen;
+          addNotification(name + ' seizes ' + isleName + ' from ' + getNationName(warKey) + '!', '#ff8844');
+          state.worldEvents.push({ type: 'territory_seized', text: name + ' seizes ' + isleName + ' from ' + getNationName(warKey) + '!', day: state.day, factionA: key, factionB: warKey });
+          if (state.worldEvents.length > 30) state.worldEvents.shift();
+          if (typeof _logSwarmFactionEvent === 'function') {
+            _logSwarmFactionEvent(key, name + ' seizes ' + isleName + ' from ' + getNationName(warKey), 'war');
+          }
+          // Check if this was player's island
+          if (state._controlledIslands && state._controlledIslands.includes(stolen)) {
+            let pIdx = state._controlledIslands.indexOf(stolen);
+            state._controlledIslands.splice(pIdx, 1);
+            addNotification('You lost ' + isleName + ' to ' + name + '!', '#ff4444');
+          }
+          break; // one seizure per day max
+        }
+      }
+    }
+  }
+
   // --- DIPLOMACY & RELATIONS ---
   rv.stance = getNationStance(rv);
   if (rv.tradeActive) { rv.aggression = max(0.1, rv.aggression - 0.02); }

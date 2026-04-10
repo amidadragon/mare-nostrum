@@ -4570,10 +4570,26 @@ function drawWorldMap() {
       let pos = getIslandWorldPos(isle);
       let ix = mapPX(pos.x), iy = mapPY(pos.y);
       let controlled = typeof isIslandControlled === 'function' && isIslandControlled(isle.key);
+      let aiOwner = state._worldIslandOwners ? state._worldIslandOwners[isle.key] : null;
       let tc = isle.type === 'military' ? [200,80,80] : isle.type === 'economic' ? [200,180,60] : isle.type === 'diplomatic' ? [80,160,200] : [120,180,100];
+      let isOwned = controlled || aiOwner;
       noStroke();
-      fill(tc[0], tc[1], tc[2], controlled ? 220 : 100);
-      ellipse(ix, iy, controlled ? 8 : 5, controlled ? 8 : 5);
+      if (aiOwner && !controlled) {
+        // Show faction color for AI-owned islands
+        let _fc = (typeof FACTIONS !== 'undefined' && FACTIONS[aiOwner] && FACTIONS[aiOwner].bannerColor) ? FACTIONS[aiOwner].bannerColor : tc;
+        if (Array.isArray(_fc)) { fill(_fc[0], _fc[1], _fc[2], 180); }
+        else { fill(tc[0], tc[1], tc[2], 180); }
+        ellipse(ix, iy, 7, 7);
+        fill(255, 255, 220, 140); textSize(6); textAlign(CENTER, TOP);
+        text(isle.name, ix, iy + 5);
+        // Faction label
+        let ownerName = typeof getNationName === 'function' ? getNationName(aiOwner) : aiOwner;
+        fill(200, 180, 140, 120); textSize(5); textAlign(CENTER, TOP);
+        text(ownerName, ix, iy + 12);
+      } else {
+        fill(tc[0], tc[1], tc[2], controlled ? 220 : 100);
+        ellipse(ix, iy, controlled ? 8 : 5, controlled ? 8 : 5);
+      }
       if (controlled) {
         fill(255, 255, 220, 180);
         textSize(7); textAlign(CENTER);

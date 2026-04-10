@@ -126,6 +126,7 @@ function saveGame() {
     // Diplomacy system
     _alliances: state._alliances || [],
     _controlledIslands: state._controlledIslands || [],
+    _worldIslandOwners: state._worldIslandOwners || {},
     _victoriesEarned: state._victoriesEarned || [],
     _victoryAchieved: state._victoryAchieved || null,
     _lastStandActive: state._lastStandActive || false,
@@ -729,6 +730,7 @@ function loadGame() {
     // Diplomacy system
     state._alliances = d._alliances || [];
     state._controlledIslands = d._controlledIslands || [];
+    state._worldIslandOwners = d._worldIslandOwners || {};
     state._victoriesEarned = d._victoriesEarned || [];
     state._victoryAchieved = d._victoryAchieved || null;
     state._lastStandActive = d._lastStandActive || false;
