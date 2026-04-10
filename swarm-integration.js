@@ -955,9 +955,31 @@ function _swarmNotifColor(action) {
 }
 
 /**
+ * Phase 3D: Check if a swarm event is relevant to the player.
+ * Only show notifications for events involving the player's faction,
+ * their allies, their enemies, or nearby factions.
+ */
+function _isSwarmEventRelevantToPlayer(gameKey, targetGameKey) {
+  if (!state || !state.faction) return true; // show all if no faction set
+  let pf = state.faction;
+  // Directly involves player
+  if (gameKey === pf || targetGameKey === pf) return true;
+  // Involves an ally
+  let nation = state.nations[gameKey];
+  let target = targetGameKey ? state.nations[targetGameKey] : null;
+  if (nation && nation.allied) return true;
+  if (target && target.allied) return true;
+  // Involves a faction at war with player
+  if (nation && nation.wars && nation.wars.includes(pf)) return true;
+  if (target && target.wars && target.wars.includes(pf)) return true;
+  // Not directly relevant — suppress notification (still logged to chronicle)
+  return false;
+}
+
+/**
  * Translate a swarm agent action into a game effect.
  * This bridges between the abstract swarm decisions and the concrete game systems.
- * Phase 2: also fires visible notifications for significant events.
+ * Phase 2+3: fires visible notifications for significant events, triggers wars/betrayals.
  */
 function applySwarmActionToGame(entry) {
   if (!state || !state.nations) return;
@@ -982,7 +1004,7 @@ function applySwarmActionToGame(entry) {
         nation.gold -= 10;
         if (entry.priority > 0.6) {
           _logSwarmFactionEvent(gameKey, fName + ' recruits soldiers', 'military');
-          if (typeof addNotification === 'function') {
+          if (typeof addNotification === 'function' && _isSwarmEventRelevantToPlayer(gameKey)) {
             addNotification(fName + ' recruits troops!', _swarmNotifColor('recruit_army'));
           }
         }
@@ -1003,7 +1025,7 @@ function applySwarmActionToGame(entry) {
         let tName = _factionDisplayName(targetGameKey);
         _logSwarmFactionEvent(gameKey, fName + ' agitates against ' + tName, 'war');
         _logSwarmFactionEvent(targetGameKey, fName + ' stirs hostility', 'war');
-        if (entry.priority > 0.5 && typeof addNotification === 'function') {
+        if (entry.priority > 0.5 && typeof addNotification === 'function' && _isSwarmEventRelevantToPlayer(gameKey, targetGameKey)) {
           addNotification(fName + ' agitates against ' + tName + '!', _swarmNotifColor('lobby_war'));
         }
       }
@@ -1019,7 +1041,7 @@ function applySwarmActionToGame(entry) {
           }
         }
         _logSwarmFactionEvent(gameKey, fName + ' seeks peace', 'peace');
-        if (entry.priority > 0.6 && typeof addNotification === 'function') {
+        if (entry.priority > 0.6 && typeof addNotification === 'function' && _isSwarmEventRelevantToPlayer(gameKey)) {
           addNotification(fName + ' seeks peace with neighbors.', _swarmNotifColor('lobby_peace'));
         }
       }
@@ -1042,7 +1064,7 @@ function applySwarmActionToGame(entry) {
         let tName = _factionDisplayName(targetGameKey);
         _logSwarmFactionEvent(gameKey, fName + ' trades with ' + tName, 'trade');
         _logSwarmFactionEvent(targetGameKey, tName + ' receives trade from ' + fName, 'trade');
-        if (entry.priority > 0.5 && typeof addNotification === 'function') {
+        if (entry.priority > 0.5 && typeof addNotification === 'function' && _isSwarmEventRelevantToPlayer(gameKey, targetGameKey)) {
           addNotification(fName + ' trades with ' + tName + '.', _swarmNotifColor('propose_trade'));
         }
       }
@@ -1053,26 +1075,122 @@ function applySwarmActionToGame(entry) {
       // Increase military readiness (preparation for invasion)
       nation._campaignReady = (nation._campaignReady || 0) + 1;
       _logSwarmFactionEvent(gameKey, fName + ' prepares for war', 'military');
-      // Only notify when campaign fully ready (3+ preparations)
-      if (nation._campaignReady >= 3 && typeof addNotification === 'function') {
-        addNotification(fName + ' is ready for war!', _swarmNotifColor('plan_campaign'));
-        nation._campaignReady = 0; // reset after notification
+
+      // Phase 3: Campaign ready → actually trigger wars/raids
+      if (nation._campaignReady >= 3) {
+        // Find the faction's worst enemy (lowest relations)
+        let worstEnemy = null, worstRel = 0;
+        if (nation.relations) {
+          for (let rk in nation.relations) {
+            if (nation.relations[rk] < worstRel && state.nations[rk] && !state.nations[rk].defeated) {
+              worstRel = nation.relations[rk];
+              worstEnemy = rk;
+            }
+          }
+        }
+
+        if (worstEnemy && worstRel < -20 && nation.military >= 3) {
+          // Declare war on worst enemy if not already at war
+          if (!nation.wars) nation.wars = [];
+          if (!nation.wars.includes(worstEnemy)) {
+            nation.wars.push(worstEnemy);
+            let enemy = state.nations[worstEnemy];
+            if (enemy) {
+              if (!enemy.wars) enemy.wars = [];
+              if (!enemy.wars.includes(gameKey)) enemy.wars.push(gameKey);
+              enemy.relations[gameKey] = Math.max(-100, (enemy.relations[gameKey] || 0) - 40);
+            }
+            nation.relations[worstEnemy] = -80;
+            let eName = _factionDisplayName(worstEnemy);
+            _logSwarmFactionEvent(gameKey, fName + ' declares war on ' + eName + '!', 'war');
+            _logSwarmFactionEvent(worstEnemy, fName + ' attacks ' + eName + '!', 'war');
+            if (typeof addNotification === 'function') {
+              addNotification(fName + ' declares WAR on ' + eName + '!', '#ff4444');
+            }
+            // Log to world events
+            if (state.worldEvents) {
+              state.worldEvents.push({ type: 'war', text: fName + ' declares war on ' + eName + '!', day: state.day, factionA: gameKey, factionB: worstEnemy });
+              if (state.worldEvents.length > 30) state.worldEvents.shift();
+            }
+          }
+          // If enemy is the player, trigger a raid
+          if (worstEnemy === state.faction && nation.military >= 2 && nation.raidParty && nation.raidParty.length === 0) {
+            if (typeof startNationRaid === 'function') {
+              startNationRaid(gameKey);
+              _logSwarmFactionEvent(gameKey, fName + ' launches raid on player!', 'war');
+            }
+          }
+        } else if (typeof addNotification === 'function') {
+          addNotification(fName + ' is ready for war!', _swarmNotifColor('plan_campaign'));
+        }
+        nation._campaignReady = 0;
       }
       break;
     }
 
     case 'gather_intel': {
-      // No direct game effect — intel is tracked in the graph
+      // Slight relations boost with target (spying = awareness)
       _logSwarmFactionEvent(gameKey, fName + ' gathers intelligence', 'intel');
       break;
     }
 
     case 'plot_betrayal': {
-      // Can trigger alliance breaks later
+      // Phase 3: Betrayal plots actually break alliances
       nation._betrayalPlots = (nation._betrayalPlots || 0) + 1;
       _logSwarmFactionEvent(gameKey, fName + ' plots betrayal...', 'betrayal');
-      if (nation._betrayalPlots >= 3 && typeof addNotification === 'function') {
-        addNotification('Rumors of treachery within ' + fName + '!', _swarmNotifColor('plot_betrayal'));
+
+      if (nation._betrayalPlots >= 3) {
+        // Find an allied faction to betray
+        let betrayTarget = null;
+        if (nation.relations) {
+          for (let rk in nation.relations) {
+            let other = state.nations[rk];
+            if (other && other.allied && !other.defeated) {
+              betrayTarget = rk;
+              break;
+            }
+          }
+        }
+        // Also check if this faction itself is allied (with player or others)
+        if (!betrayTarget && nation.allied) {
+          betrayTarget = state.faction; // betray the player
+        }
+
+        if (betrayTarget) {
+          let bName = _factionDisplayName(betrayTarget);
+          // Break alliance
+          if (betrayTarget === state.faction) {
+            // Betraying the player
+            nation.allied = false;
+            nation.tradeActive = false;
+            nation.reputation = Math.max(-100, (nation.reputation || 0) - 40);
+            nation.aggression = Math.min(1.0, (nation.aggression || 0.5) + 0.3);
+            if (typeof addNotification === 'function') {
+              addNotification(fName + ' BETRAYS your alliance!', '#cc22cc');
+            }
+          } else {
+            // AI-vs-AI betrayal
+            let other = state.nations[betrayTarget];
+            if (other) {
+              other.allied = false;
+              nation.relations[betrayTarget] = -50;
+              if (other.relations) other.relations[gameKey] = -50;
+            }
+          }
+          _logSwarmFactionEvent(gameKey, fName + ' betrays ' + bName + '!', 'betrayal');
+          _logSwarmFactionEvent(betrayTarget, fName + ' breaks alliance!', 'betrayal');
+          if (typeof addNotification === 'function') {
+            addNotification(fName + ' betrays ' + bName + '!', '#cc22cc');
+          }
+          if (state.worldEvents) {
+            state.worldEvents.push({ type: 'betrayal', text: fName + ' betrays ' + bName + '!', day: state.day, factionA: gameKey, factionB: betrayTarget });
+            if (state.worldEvents.length > 30) state.worldEvents.shift();
+          }
+        } else {
+          if (typeof addNotification === 'function') {
+            addNotification('Rumors of treachery within ' + fName + '!', _swarmNotifColor('plot_betrayal'));
+          }
+        }
         nation._betrayalPlots = 0;
       }
       break;
@@ -1084,7 +1202,7 @@ function applySwarmActionToGame(entry) {
         nation.islandState.legia.morale = Math.min(100, (nation.islandState.legia.morale || 80) + 5);
       }
       _logSwarmFactionEvent(gameKey, fName + ' consults the oracles', 'omens');
-      if (entry.priority > 0.7 && typeof addNotification === 'function') {
+      if (entry.priority > 0.7 && typeof addNotification === 'function' && _isSwarmEventRelevantToPlayer(gameKey)) {
         addNotification(fName + ' receives a divine omen!', _swarmNotifColor('call_for_omens'));
       }
       break;

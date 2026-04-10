@@ -4,6 +4,11 @@
 
 // ─── INPUT ────────────────────────────────────────────────────────────────
 function mouseWheel(event) {
+  // Swarm mode zoom
+  if (gameScreen === 'swarm') {
+    if (typeof swarmMouseWheel === 'function') swarmMouseWheel(event.delta);
+    return false;
+  }
   // Scroll keybind list in settings
   if (gameScreen === 'settings') {
     let maxScroll = max(0, Object.keys(DEFAULT_KEYBINDS).length * 18 - 10 * 18);
@@ -31,6 +36,7 @@ function mousePressed() {
     return;
   }
   if (gameScreen === 'lobby') { if (typeof lobbyHandleClick === 'function') lobbyHandleClick(); return; }
+  if (gameScreen === 'swarm') { if (typeof swarmMousePressed === 'function') swarmMousePressed(); return; }
   if (gameScreen !== 'game') { handleMenuClick(); return; }
   if (state.introPhase !== 'done') { skipIntro(); return; }
   if (factionSelectActive) {
@@ -587,6 +593,8 @@ function mousePressed() {
 }
 
 function mouseDragged() {
+  // Swarm mode drag
+  if (gameScreen === 'swarm') { if (typeof swarmMouseDragged === 'function') swarmMouseDragged(); return; }
   // Drag volume sliders in settings
   if (gameScreen === 'settings' && snd) {
     let py = floor(height * 0.18);
@@ -604,6 +612,10 @@ function mouseDragged() {
   }
 }
 
+function mouseReleased() {
+  if (gameScreen === 'swarm') { if (typeof swarmMouseReleased === 'function') swarmMouseReleased(); }
+}
+
 function touchStarted() {
   if (snd) snd.resume();
   // Delegate to mousePressed for touch handling
@@ -613,6 +625,8 @@ function touchStarted() {
 
 function keyPressed() {
   if (snd) snd.resume();
+  // Swarm mode keys
+  if (gameScreen === 'swarm') { if (typeof swarmKeyPressed === 'function') swarmKeyPressed(key, keyCode); return; }
   // Block input during visual invasion battle (allow R for retreat)
   if (typeof isInvasionBattleActive === 'function' && isInvasionBattleActive()) {
     if (key !== 'r' && key !== 'R') return;
