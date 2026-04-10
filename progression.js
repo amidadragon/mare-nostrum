@@ -927,7 +927,7 @@ function buildIsland() {
   if (state && state.faction === 'seapeople') return;
   let cx = WORLD.islandCX, cy = WORLD.islandCY;
   let srx = getSurfaceRX(), sry = getSurfaceRY();
-  updatePortPositions();
+  if (typeof updatePortPositions === 'function') updatePortPositions();
 
   // ─── ZONE LAYOUT ───
   // Left: farm garden | Center: pyramid + NPC | Right: forest grove

@@ -846,7 +846,7 @@ function loadGame() {
     state.solar = d.solar || 80; state.maxSolar = d.maxSolar || 100;
     state.islandLevel = d.islandLevel || 1; state.islandRX = d.islandRX || WORLD.islandRX; state.islandRY = d.islandRY || WORLD.islandRY;
     state.islandName = d.islandName || null;
-    updatePortPositions(); // recompute from restored island size (must be after islandRX/RY load)
+    if (typeof updatePortPositions === 'function') updatePortPositions(); // recompute from restored island size (must be after islandRX/RY load)
     if (d.pyramidLevel) state.pyramid.level = d.pyramidLevel;
     state.player.x = d.playerX || WORLD.islandCX; state.player.y = d.playerY || WORLD.islandCY;
     if (d.playerFacing) state.player.facing = d.playerFacing;

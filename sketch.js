@@ -1990,6 +1990,13 @@ function draw() {
     return;
   }
 
+  // ─── SWARM MODE SCREEN ───
+  if (gameScreen === 'swarm') {
+    if (typeof drawSwarmMode === 'function') drawSwarmMode();
+    if (typeof Debug !== 'undefined') Debug.draw();
+    return;
+  }
+
   // ─── GAME SCREEN ───
   if (!state.isInitialized) return;
   // ─── REAL-TIME AUTOSAVE (every 5 min, skip combat) ───
@@ -2138,15 +2145,20 @@ function updateConquestIslands(dt) {
   let nation = state.nations[k];
   let is = nation.islandState;
 
-  swapToIsland(is, nation.isleX, nation.isleY);
+  // V2: Use WorldState.withIsland() for stack-safe bot updates
+  let _doBotUpdate = function() {
+    if (typeof BotAI !== 'undefined') BotAI.update(k, dt);
+    updateIslandSystems(dt * botKeys.length, false);
+  };
 
-  // Bot AI generates synthetic input for this island's leader
-  if (typeof BotAI !== 'undefined') BotAI.update(k, dt);
-
-  // Run the same island systems as the player
-  updateIslandSystems(dt * botKeys.length, false);
-
-  swapBack();
+  if (typeof WorldState !== 'undefined' && WorldState.initialized) {
+    WorldState.withIsland(k, _doBotUpdate);
+  } else {
+    // Fallback to legacy swap
+    swapToIsland(is, nation.isleX, nation.isleY);
+    _doBotUpdate();
+    swapBack();
+  }
 }
 
 function drawInner() {
@@ -2541,6 +2553,8 @@ function drawInner() {
     updateRivalRaid(dt);
     // Update bot islands — full island simulation with staggered updates
     updateConquestIslands(dt);
+    // V2: Tick swarm agents in the background (runs every ~5 sec)
+    if (typeof updateSwarmBackground === 'function') updateSwarmBackground(dt);
     if (typeof updateDiplomacy === 'function') updateDiplomacy(dt);
     if (typeof updatePet === 'function') updatePet(dt);
     if (typeof updateTavern === 'function') updateTavern(dt);
@@ -2750,27 +2764,44 @@ function drawInner() {
             if (_isVisiting && !(typeof isInvasionBattleActive === 'function' && isInvasionBattleActive())) {
               // Draw biome content AFTER terrain — skip during invasion battle (battle units replace NPCs)
               drawActiveNationContent();
-            } else if (_own.islandState && _own.islandState.buildings && typeof swapToIsland === 'function') {
+            } else if (_own.islandState && _own.islandState.buildings) {
               // Only render bot island via state swap when NOT visiting — drawActiveNationContent handles visited islands
-              swapToIsland(_own.islandState, botCX, botCY);
-              state.faction = _owKey;
-              if (!state.pyramid) state.pyramid = { x: botCX, y: botCY - 40, level: state.islandLevel || 1 };
-              if (!state.resources) state.resources = [];
-              if (!state.factionFlora) state.factionFlora = [];
-              if (!state.factionWildlife) state.factionWildlife = [];
-              if (!state.chickens) state.chickens = [];
-              if (!state.cats) state.cats = [];
-              if (!state.ruins) state.ruins = [];
-              if (!state.crystalRainDrops) state.crystalRainDrops = [];
-              if (!state.plots) state.plots = [];
-              if (!state.crystalShrine) state.crystalShrine = { x: botCX + 50, y: botCY - 30 };
-              if (!state.progression) state.progression = { gameStarted: true, villaCleared: true, companionsAwakened: { lares: true, woodcutter: true, harvester: true, centurion: true }, tutorialsSeen: {} };
-              if (!state.legia) state.legia = { army: [], soldiers: [], castrumX: botCX + 100, castrumY: botCY + 50, castrumLevel: 0 };
-              if (!state.companion) state.companion = { x: botCX + 40, y: botCY + 20, vx: 0, vy: 0, speed: 2, task: 'idle', taskTarget: null, carryItem: null, energy: 100, pulsePhase: 0, trailPoints: [] };
-              if (!state.player) state.player = { x: botCX, y: botCY, vx: 0, vy: 0, speed: 3.2, size: 16, facing: 'down', moving: false, targetX: null, targetY: null, hp: 100, maxHp: 100, anim: { emotion: 'determined', emotionTimer: 0, blinkTimer: 240, blinkFrame: 0, bounceY: 0, bounceTimer: 0, walkFrame: 0, walkTimer: 0, helmetOff: false }, level: 1, xp: 0, weapon: 0, armor: 0, skills: {}, skillCooldowns: {} };
-              _groundSortFrame = -999;
-              drawWorldObjectsSorted();
-              swapBack();
+              // V2: Use WorldState.withIsland() for stack-safe swap (prevents the "weird instance" bug)
+              let _renderBotIsland = function() {
+                if (typeof WorldState !== 'undefined' && WorldState.initialized) {
+                  WorldState.withIsland(_owKey, function() {
+                    state.faction = _owKey;
+                    if (!state.pyramid) state.pyramid = { x: botCX, y: botCY - 40, level: state.islandLevel || 1 };
+                    if (!state.resources) state.resources = [];
+                    if (!state.factionFlora) state.factionFlora = [];
+                    if (!state.factionWildlife) state.factionWildlife = [];
+                    if (!state.chickens) state.chickens = [];
+                    if (!state.cats) state.cats = [];
+                    if (!state.ruins) state.ruins = [];
+                    if (!state.crystalRainDrops) state.crystalRainDrops = [];
+                    if (!state.plots) state.plots = [];
+                    if (!state.crystalShrine) state.crystalShrine = { x: botCX + 50, y: botCY - 30 };
+                    if (!state.progression) state.progression = { gameStarted: true, villaCleared: true, companionsAwakened: { lares: true, woodcutter: true, harvester: true, centurion: true }, tutorialsSeen: {} };
+                    if (!state.legia) state.legia = { army: [], soldiers: [], castrumX: botCX + 100, castrumY: botCY + 50, castrumLevel: 0 };
+                    if (!state.companion) state.companion = { x: botCX + 40, y: botCY + 20, vx: 0, vy: 0, speed: 2, task: 'idle', taskTarget: null, carryItem: null, energy: 100, pulsePhase: 0, trailPoints: [] };
+                    if (!state.player) state.player = { x: botCX, y: botCY, vx: 0, vy: 0, speed: 3.2, size: 16, facing: 'down', moving: false, targetX: null, targetY: null, hp: 100, maxHp: 100, anim: { emotion: 'determined', emotionTimer: 0, blinkTimer: 240, blinkFrame: 0, bounceY: 0, bounceTimer: 0, walkFrame: 0, walkTimer: 0, helmetOff: false }, level: 1, xp: 0, weapon: 0, armor: 0, skills: {}, skillCooldowns: {} };
+                    _groundSortFrame = -999;
+                    drawWorldObjectsSorted();
+                  });
+                } else if (typeof swapToIsland === 'function') {
+                  // Fallback to legacy swap
+                  swapToIsland(_own.islandState, botCX, botCY);
+                  state.faction = _owKey;
+                  if (!state.pyramid) state.pyramid = { x: botCX, y: botCY - 40, level: state.islandLevel || 1 };
+                  if (!state.resources) state.resources = [];
+                  if (!state.factionFlora) state.factionFlora = [];
+                  if (!state.factionWildlife) state.factionWildlife = [];
+                  _groundSortFrame = -999;
+                  drawWorldObjectsSorted();
+                  swapBack();
+                }
+              };
+              _renderBotIsland();
             }
             // Bot AI draw
             if (typeof BotAI !== 'undefined') {

@@ -665,7 +665,7 @@ function drawAmbientWildlife() {
   }
 }
 function getMerchantPortPosition() {
-  if (!state.portRight) updatePortPositions();
+  if (!state.portRight && typeof updatePortPositions === 'function') updatePortPositions();
   return state.portRight;
 }
 

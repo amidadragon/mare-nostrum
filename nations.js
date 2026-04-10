@@ -418,10 +418,18 @@ function updateNationDaily(key) {
   if (!rv.islandState && typeof createIslandState === 'function') {
     rv.islandState = createIslandState(key);
   }
-  if (rv.islandState && typeof swapToIsland === 'function') {
+  if (rv.islandState) {
     let isCX = rv.isleX || WORLD.islandCX + 1200;
     let isCY = rv.isleY || WORLD.islandCY;
-    swapToIsland(rv.islandState, isCX, isCY);
+    // V2: Use WorldState for stack-safe nation economy tick
+    let _swapMethod = 'none';
+    if (typeof WorldState !== 'undefined' && WorldState.initialized) {
+      WorldState.safeSwap(key);
+      _swapMethod = 'worldstate';
+    } else if (typeof swapToIsland === 'function') {
+      swapToIsland(rv.islandState, isCX, isCY);
+      _swapMethod = 'legacy';
+    }
     let level = state.islandLevel || 1;
 
     // Catch-up bonus
@@ -573,7 +581,12 @@ function updateNationDaily(key) {
       else rv._victoryFocus = 'expansion';
     }
 
-    swapBack();
+    // V2: Use matching swap-back method
+    if (_swapMethod === 'worldstate') {
+      WorldState.safeSwapBack();
+    } else if (_swapMethod === 'legacy') {
+      swapBack();
+    }
   }
 
   // --- MILITARY AI ---

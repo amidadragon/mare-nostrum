@@ -48,6 +48,15 @@
       unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
     }
   </style>
+  <script>
+    // Nuke stale service workers to ensure fresh file loads
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(regs) {
+        regs.forEach(function(r) { r.unregister(); });
+      });
+    }
+  </script>
+  <script src="v2-safety.js?v=1781000000"></script>
   <script src="libs/p5.min.js"></script>
   <script src="libs/p5.sound.min.js"></script>
   <script src="libs/easystar.min.js"></script>
@@ -122,56 +131,63 @@
     <div class="sub">NAVIGATING THE ANCIENT WATERS...</div>
   </div>
 
-  <script src="sprites.js?v=1774500000"></script>
-  <script src="engine.js?v=1774500000"></script>
-  <script src="sound.js?v=1774500000"></script>
-  <script src="narrative.js?v=1774500000"></script>
-  <script src="cinematics.js?v=1774500000"></script>
-  <script src="fishing.js?v=1774500000"></script>
-  <script src="farming.js?v=1774500000"></script>
-  <script src="npc.js?v=1774500000"></script>
-  <script src="events.js?v=1774500000"></script>
-  <script src="world.js?v=1774500000"></script>
-  <script src="player.js?v=1774500000"></script>
-  <script src="ui.js?v=1774603200"></script>
-  <script src="faction_emblems.js?v=1774500000"></script>
-  <script src="multiplayer.js?v=1774500000"></script>
-  <script src="lobby.js?v=1774500000"></script>
-  <script src="merchant.js?v=1774603200"></script>
-  <script src="save.js?v=1774603200"></script>
-  <script src="sailing.js?v=1774500000"></script>
-  <script src="building.js?v=1774500000"></script>
-  <script src="nations.js?v=1774500000"></script>
-  <script src="bot.js?v=1774500000"></script>
-  <script src="conquest.js?v=1774500000"></script>
-  <script src="input.js?v=1774500000"></script>
-  <script src="companions.js?v=1774603200"></script>
-  <script src="effects.js?v=1774500000"></script>
-  <script src="military.js?v=1774500000"></script>
-  <script src="systems.js?v=1774500000"></script>
-  <script src="lifecycle.js?v=1774500000"></script>
-  <script src="social.js?v=1774500000"></script>
-  <script src="expansion.js?v=1774500000"></script>
-  <script src="environment.js?v=1774500000"></script>
-  <script src="strategy.js?v=1774500000"></script>
-  <script src="progression.js?v=1774603200"></script>
-  <script src="faction_select.js?v=1774603200"></script>
-  <script src="ship_home.js?v=1774603200"></script>
-  <script src="sketch.js?v=1774603200"></script>
-  <script src="wreck.js?v=1774500000"></script>
-  <script src="menu.js?v=1774500000"></script>
-  <script src="islands.js?v=1774500000"></script>
-  <script src="diving.js?v=1774500000"></script>
-  <script src="combat.js?v=1774500000"></script>
-  <script src="naval.js?v=1774500000"></script>
-  <script src="economy.js?v=1774500000"></script>
-  <script src="pets.js?v=1774500000"></script>
-  <script src="lighthouse.js?v=1774500000"></script>
-  <script src="tavern.js?v=1774500000"></script>
-  <script src="sea_events.js?v=1774500000"></script>
-  <script src="diplomacy.js?v=1774500000"></script>
-  <script src="debug.js?v=1774500000"></script>
-  <script src="mobile.js?v=1774500000"></script>
+  <!-- Swarm Intelligence Engine -->
+  <script src="mediterranean.js?v=1781000000"></script>
+  <script src="graph.js?v=1781000000"></script>
+  <script src="agent.js?v=1781000000"></script>
+  <script src="swarm-integration.js?v=1781000000"></script>
+
+  <script src="sprites.js?v=1781000000"></script>
+  <script src="engine.js?v=1781000000"></script>
+  <script src="sound.js?v=1781000000"></script>
+  <script src="narrative.js?v=1781000000"></script>
+  <script src="cinematics.js?v=1781000000"></script>
+  <script src="fishing.js?v=1781000000"></script>
+  <script src="farming.js?v=1781000000"></script>
+  <script src="npc.js?v=1781000000"></script>
+  <script src="events.js?v=1781000000"></script>
+  <script src="world.js?v=1781000000"></script>
+  <script src="player.js?v=1781000000"></script>
+  <script src="ui.js?v=1781000000"></script>
+  <script src="faction_emblems.js?v=1781000000"></script>
+  <script src="multiplayer.js?v=1781000000"></script>
+  <script src="lobby.js?v=1781000000"></script>
+  <script src="merchant.js?v=1781000000"></script>
+  <script src="save.js?v=1781000000"></script>
+  <script src="sailing.js?v=1781000000"></script>
+  <script src="building.js?v=1781000000"></script>
+  <script src="nations.js?v=1781000000"></script>
+  <script src="bot.js?v=1781000000"></script>
+  <script src="conquest.js?v=1781000000"></script>
+  <script src="input.js?v=1781000000"></script>
+  <script src="companions.js?v=1781000000"></script>
+  <script src="effects.js?v=1781000000"></script>
+  <script src="military.js?v=1781000000"></script>
+  <script src="systems.js?v=1781000000"></script>
+  <script src="lifecycle.js?v=1781000000"></script>
+  <script src="social.js?v=1781000000"></script>
+  <script src="expansion.js?v=1781000000"></script>
+  <script src="world-state.js?v=1781000000"></script>
+  <script src="environment.js?v=1781000000"></script>
+  <script src="strategy.js?v=1781000000"></script>
+  <script src="progression.js?v=1781000000"></script>
+  <script src="faction_select.js?v=1781000000"></script>
+  <script src="ship_home.js?v=1781000000"></script>
+  <script src="sketch.js?v=1781000000"></script>
+  <script src="wreck.js?v=1781000000"></script>
+  <script src="menu.js?v=1781000000"></script>
+  <script src="islands.js?v=1781000000"></script>
+  <script src="diving.js?v=1781000000"></script>
+  <script src="combat.js?v=1781000000"></script>
+  <script src="naval.js?v=1781000000"></script>
+  <script src="economy.js?v=1781000000"></script>
+  <script src="pets.js?v=1781000000"></script>
+  <script src="lighthouse.js?v=1781000000"></script>
+  <script src="tavern.js?v=1781000000"></script>
+  <script src="sea_events.js?v=1781000000"></script>
+  <script src="diplomacy.js?v=1781000000"></script>
+  <script src="debug.js?v=1781000000"></script>
+  <script src="mobile.js?v=1781000000"></script>
   <script>
     // Hide loading screen after p5 starts
     document.addEventListener('click', () => { document.querySelector('canvas')?.focus(); });

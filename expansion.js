@@ -295,7 +295,7 @@ function expandIsland() {
   state.islandRY += ryGrowth;
   state._expandFrames = 120;
   state.pyramid.level = state.islandLevel;
-  updatePortPositions(); // ports follow island edge
+  if (typeof updatePortPositions === 'function') updatePortPositions(); // ports follow island edge
   // Expansion ceremony effects
   if (snd) snd.playSFX('expand_rumble');
   // Expanding ring particle from island center
@@ -778,8 +778,8 @@ function applyBotMutation(m) {
       }
       break;
     case 'expand':
-      if (typeof swapToIsland === 'function') {
-        swapToIsland(is, nation.isleX, nation.isleY);
+      // V2: Use WorldState for stack-safe expand action
+      let _doExpand = function() {
         let cost = 5 + (state.islandLevel || 1) * 8;
         if ((state.crystals || 0) >= cost) {
           state.crystals -= cost;
@@ -793,6 +793,12 @@ function applyBotMutation(m) {
             state.trees.push({ x: nation.isleX + Math.cos(a) * state.islandRX * r * 0.7, y: nation.isleY + Math.sin(a) * state.islandRY * r * 0.3, type: 'oak', hp: 3 });
           }
         }
+      };
+      if (typeof WorldState !== 'undefined' && WorldState.initialized) {
+        WorldState.withIsland(m.nation, _doExpand);
+      } else if (typeof swapToIsland === 'function') {
+        swapToIsland(is, nation.isleX, nation.isleY);
+        _doExpand();
         swapBack();
       }
       break;
