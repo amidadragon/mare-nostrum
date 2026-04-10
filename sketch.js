@@ -3993,6 +3993,24 @@ function updateTime(dt) {
     // Colony income (daily)
     updateColonyIncome();
     if (typeof onDayTransitionEconomy === 'function') onDayTransitionEconomy();
+    // Player territory income (from captured world islands)
+    if (state._controlledIslands && state._controlledIslands.length > 0 && typeof WORLD_ISLANDS !== 'undefined') {
+      let tGold = 0;
+      for (let tKey of state._controlledIslands) {
+        let isle = WORLD_ISLANDS.find(i => i.key === tKey);
+        if (!isle || !isle.benefit) continue;
+        if (isle.type === 'economic') tGold += 4;
+        else if (isle.type === 'resource') tGold += 3;
+        else if (isle.type === 'military') tGold += 2;
+        else if (isle.type === 'diplomatic') tGold += 2;
+        if (isle.benefit.goldMod) tGold += floor(3 * isle.benefit.goldMod);
+        if (isle.benefit.tradeMod) tGold += floor(2 * (isle.benefit.tradeMod - 1) * 10);
+      }
+      if (tGold > 0) {
+        state.gold += tGold;
+        if (state.day % 3 === 0) addNotification('Territory income: +' + tGold + 'g from ' + state._controlledIslands.length + ' island(s)', '#ddcc44');
+      }
+    }
     // Track gold earned for scoring
     if (state.score && state.gold > _goldBeforeDay) {
       state.score.goldEarned += (state.gold - _goldBeforeDay);

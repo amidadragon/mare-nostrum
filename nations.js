@@ -343,7 +343,8 @@ function updateNationsDaily() {
   let keys = Object.keys(state.nations);
   for (let k of keys) updateNationDaily(k);
   if (random() < 0.12 && keys.length >= 2) generateWorldEvent(keys);
-  checkVictoryConditions();
+  let _vic = checkVictoryConditions();
+  if (_vic && typeof triggerVictory === 'function') triggerVictory(_vic);
 }
 
 function updateNationDaily(key) {
@@ -364,6 +365,30 @@ function updateNationDaily(key) {
   let income = floor((baseIncome + tradeBonus + buildingIncome) * pers.goldMult * botDiff.goldMult);
   income = floor(income * (facData.tradeIncomeMult || 1.0));
   rv.gold += income;
+
+  // --- TERRITORY BONUS INCOME (from owned world islands) ---
+  if (rv._territories && rv._territories.length > 0 && typeof WORLD_ISLANDS !== 'undefined') {
+    let territoryGold = 0;
+    let territoryMilitary = 0;
+    for (let tKey of rv._territories) {
+      let isle = WORLD_ISLANDS.find(i => i.key === tKey);
+      if (!isle || !isle.benefit) continue;
+      // Gold bonuses by island type
+      if (isle.type === 'economic') territoryGold += 3 + floor(rv.level * 0.5);
+      else if (isle.type === 'resource') territoryGold += 2 + floor(rv.level * 0.3);
+      else if (isle.type === 'military') { territoryGold += 1; territoryMilitary += (random() < 0.08 ? 1 : 0); }
+      else if (isle.type === 'diplomatic') territoryGold += 1;
+      // Specific benefit modifiers
+      if (isle.benefit.goldMod) territoryGold += floor(3 * isle.benefit.goldMod);
+      if (isle.benefit.tradeMod) territoryGold += floor(2 * (isle.benefit.tradeMod - 1) * 10);
+    }
+    rv.gold += territoryGold;
+    rv.military += territoryMilitary;
+    // Population growth from territories every 5 days
+    if ((state.day || 1) % 5 === 0 && rv._territories.length >= 2) {
+      rv.population += 1;
+    }
+  }
 
   // Vassal tribute income
   let otherKeys = Object.keys(state.nations).filter(k2 => k2 !== key);

@@ -2570,15 +2570,31 @@ function drawHUD() {
     pop();
   }
 
-  // ─── QUEST TRACKER (right side) ───
-  {let qtW=max(156,floor(170*uiScale)),qtH=max(32,floor(36*uiScale));
-  if(state.quest){let qtX=width-qtW-14,qtY=floor(122*uiScale);noStroke();fill(25,20,14,180);rect(qtX,qtY,qtW,qtH,4);
-    stroke(180,145,70,100);strokeWeight(0.5);noFill();rect(qtX,qtY,qtW,qtH,4);noStroke();
-    fill(212,160,64);textSize(hudTextSize);textAlign(LEFT,TOP);text('QUEST',qtX+6,qtY+3);
-    fill(200,190,160);textSize(hudTextSize);text(state.quest.desc.length>22?state.quest.desc.substring(0,22)+'..':state.quest.desc,qtX+6,qtY+3+hudTextSize+2);
-    let _qF=state.quest.progress/state.quest.target;fill(40,35,25);rect(qtX+6,qtY+qtH-8,qtW-56,4,2);
-    fill(212,160,64);rect(qtX+6,qtY+qtH-8,(qtW-56)*_qF,4,2);fill(160,140,100);textSize(hudSmallText);textAlign(RIGHT,TOP);
-    text(state.quest.progress+'/'+state.quest.target,qtX+qtW-6,qtY+qtH-10);textAlign(LEFT,TOP);}}
+  // ─── QUEST TRACKER (right side, expanded for readability) ───
+  {let qtW = max(180, floor(200 * uiScale)), qtH = max(44, floor(48 * uiScale));
+  if (state.quest) {
+    let qtX = width - qtW - 14, qtY = floor(122 * uiScale);
+    noStroke(); fill(25, 20, 14, 200); rect(qtX, qtY, qtW, qtH, 5);
+    stroke(180, 145, 70, 120); strokeWeight(0.5); noFill(); rect(qtX, qtY, qtW, qtH, 5); noStroke();
+    // Title
+    fill(212, 160, 64); textSize(hudTextSize); textAlign(LEFT, TOP);
+    text('QUEST', qtX + 8, qtY + 4);
+    // Description — clip at 28 chars for wider box
+    let _qDesc = state.quest.desc || '';
+    let _qMaxChars = floor((qtW - 16) / (hudTextSize * 0.55));
+    if (_qDesc.length > _qMaxChars) _qDesc = _qDesc.substring(0, _qMaxChars - 2) + '..';
+    fill(200, 190, 160); textSize(hudTextSize);
+    text(_qDesc, qtX + 8, qtY + 5 + hudTextSize + 2);
+    // Progress bar
+    let _qF = constrain(state.quest.progress / max(1, state.quest.target), 0, 1);
+    let barW = qtW - 60, barY = qtY + qtH - 10;
+    fill(40, 35, 25); rect(qtX + 8, barY, barW, 5, 2);
+    fill(212, 160, 64); rect(qtX + 8, barY, barW * _qF, 5, 2);
+    // Counter
+    fill(160, 140, 100); textSize(hudSmallText); textAlign(RIGHT, TOP);
+    text(state.quest.progress + '/' + state.quest.target, qtX + qtW - 8, barY - 2);
+    textAlign(LEFT, TOP);
+  }}
 
   // Controls (bottom right) — context-aware, minimal
   let ctrlW = max(200, floor(220 * uiScale));

@@ -135,6 +135,28 @@ function checkVictoryConditions() {
     return 'domination';
   }
 
+  // AI faction territorial domination check
+  if (!state._victoryAchieved && state._worldIslandOwners) {
+    let terCounts = {};
+    for (let iKey in state._worldIslandOwners) {
+      let owner = state._worldIslandOwners[iKey];
+      terCounts[owner] = (terCounts[owner] || 0) + 1;
+    }
+    for (let fk in terCounts) {
+      if (fk === state.faction) continue; // player checked above
+      if (terCounts[fk] >= 10 && state.nations && state.nations[fk] && !state.nations[fk].defeated) {
+        state._aiTerritoryWarning = state._aiTerritoryWarning || {};
+        if (!state._aiTerritoryWarning[fk]) {
+          state._aiTerritoryWarning[fk] = true;
+          let aiName = typeof getNationName === 'function' ? getNationName(fk) : fk;
+          if (typeof addNotification === 'function') {
+            addNotification('WARNING: ' + aiName + ' controls ' + terCounts[fk] + ' territories — nearing domination!', '#ff4444');
+          }
+        }
+      }
+    }
+  }
+
   return victories.length > 0 ? victories[0] : null;
 }
 
