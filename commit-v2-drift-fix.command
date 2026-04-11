@@ -3,20 +3,23 @@ cd "$(dirname "$0")"
 # Remove any stale git lock files
 find .git -name "*.lock" -delete 2>/dev/null
 echo "=== Committing: Fix player northwest drift bug ==="
-git add sketch.js faction_select.js index.html commit-v2-drift-fix.command
-git commit -m "Fix: player no longer drifts northwest after faction select
+git add bot.js sketch.js faction_select.js index.html commit-v2-drift-fix.command
+git commit -m "Fix: player no longer drifts northwest when playing non-Rome factions
 
-Root cause: selectFaction() repositioned player but didn't clear
-click-to-move target (targetX/targetY), causing residual auto-walk.
-Also fixed startConquestGame/start1v1Game setting introPhase=null
-instead of 'done', which caused the first click during faction
-select to be eaten by skipIntro() instead of reaching the handler.
+Root cause: Rome's bot AI (bot.js) used state.player for movement, but
+when the human plays as Carthage/Egypt/etc, Rome becomes an AI nation
+whose island has _usesGlobalState=true. The WorldState.withIsland() swap
+was skipped, so BotAI.executeTask() drove the HUMAN player's targetX/Y
+instead of the bot's leader — causing immediate northwest drift.
 
-Changes:
-  - faction_select.js: clear targetX/targetY/vx/vy after player reposition
-  - sketch.js: startConquestGame & start1v1Game now set introPhase='done'
-  - sketch.js: clear movement state in both game mode init functions
-  - index.html: cache bust to 1786000000
+Fix: bot.js executeTask() now reads the bot's own islandState.player
+instead of state.player, with a safety check that prevents any bot
+from ever writing to the human player object.
+
+Also fixed:
+  - sketch.js: startConquestGame/start1v1 set introPhase='done' (was null)
+  - sketch.js: clear targetX/targetY/velocity on game mode init
+  - faction_select.js: clear movement state after player reposition
 
 Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
 

@@ -752,13 +752,7 @@ function drawMenuScreen() {
     let iw = textWidth(items[i]);
     let btnW = max(iw + 60, 160);
     let btnH = itemSize * 1.6;
-
-    // Slide-in offset (items slide in from right, eased)
-    let slideEase = 1 - pow(1 - slideProgress, 3);
-    let slideX = (1 - slideEase) * 60;
-
-    // Hitbox uses ACTUAL visual position (accounting for slide offset)
-    let btnX = w / 2 - btnW / 2 + slideX;
+    let btnX = w / 2 - btnW / 2;
     let btnY = iy - btnH * 0.45;
     let hitPad = 16;
     let hovered = mouseX > btnX - hitPad && mouseX < btnX + btnW + hitPad &&
@@ -766,6 +760,9 @@ function drawMenuScreen() {
     if (hovered) { menuHover = i; menuKeyIdx = -1; isCursorPointer = true; }
     let selected = hovered || menuKeyIdx === i;
 
+    // Slide-in offset (items slide in from right, eased)
+    let slideEase = 1 - pow(1 - slideProgress, 3);
+    let slideX = (1 - slideEase) * 60;
     let bScale = selected ? 1.04 : 1.0;
     let bw = btnW * bScale, bh = btnH * bScale;
     let bx = w / 2 - bw / 2 + slideX, by = iy - bh * 0.45;
