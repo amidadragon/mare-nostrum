@@ -294,6 +294,9 @@ function selectFaction(faction) {
     // Normal factions: spawn on home island
     state.player.x = WORLD.islandCX;
     state.player.y = WORLD.islandCY;
+    // Clear any residual click-to-move target so player doesn't drift
+    state.player.targetX = null; state.player.targetY = null;
+    state.player.vx = 0; state.player.vy = 0; state.player.moving = false;
     cam.x = state.player.x; cam.y = state.player.y;
     camSmooth.x = cam.x; camSmooth.y = cam.y;
     // Build the starting island

@@ -1225,13 +1225,15 @@ function start1v1Game(playerFaction) {
   state.progression.gameStarted = true;
   state.progression.villaCleared = true;
   state.progression.tutorialDone = true;
-  state.introPhase = null;
+  state.introPhase = 'done'; // 1v1 skips intro — must be 'done' so clicks work properly
   // Both player and bot start at level 5 — visible civilization from start
   state.islandLevel = 5;
   state.islandRX = 500 + 35 * 5; // 675
   state.islandRY = 320 + 24 * 5; // 440
   state.player.x = WORLD.islandCX;
   state.player.y = WORLD.islandCY;
+  state.player.targetX = null; state.player.targetY = null;
+  state.player.vx = 0; state.player.vy = 0; state.player.moving = false;
   cam.x = state.player.x; cam.y = state.player.y;
   camSmooth.x = cam.x; camSmooth.y = cam.y;
   // Starting resources — level 5 start
@@ -1266,13 +1268,15 @@ function startConquestGame(playerFaction) {
   state.progression.farmCleared = true;
   state.progression.companionsAwakened = { lares: true, woodcutter: true, harvester: true, centurion: true };
   state.progression.npcsFound = { marcus: true, vesta: true, felix: true };
-  state.introPhase = null;
+  state.introPhase = 'done'; // conquest skips intro — must be 'done' so clicks reach faction select handler
   // Everyone starts at level 1 — build from scratch
   state.islandLevel = 1;
   state.islandRX = 500;
   state.islandRY = 320;
   state.player.x = WORLD.islandCX;
   state.player.y = WORLD.islandCY;
+  state.player.targetX = null; state.player.targetY = null;
+  state.player.vx = 0; state.player.vy = 0; state.player.moving = false;
   cam.x = state.player.x; cam.y = state.player.y;
   camSmooth.x = cam.x; camSmooth.y = cam.y;
   // Equal starting resources
