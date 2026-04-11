@@ -2917,7 +2917,10 @@ function drawInner() {
           }
 
           // Draw unique feature overlays at reduced distance (LOD-based)
-          if (dist < 1200 && typeof drawIslandAt === 'function') {
+        // Use high-quality drawWorldIslandContent when close
+        if (dist < 600 && typeof drawWorldIslandContent === 'function') {
+          drawWorldIslandContent(isle, sx, sy, sc);
+        } else if (dist < 1200 && typeof drawIslandAt === 'function') {
             push();
             translate(sx, sy);
 
@@ -8211,25 +8214,44 @@ function drawSeaMap() {
 
   // Exploration islands removed
 
-  // Draw world islands (neutral)
+  // Draw world islands (neutral) — miniature island shapes on the world map
   if (typeof WORLD_ISLANDS !== 'undefined') {
     for (let isle of WORLD_ISLANDS) {
-      if (isle.faction) continue; // capitals already drawn as nation dots
+      if (isle.faction) continue;
       let pos = getIslandWorldPos(isle);
       let ix = centerX + (pos.x - WORLD.islandCX) * scale;
       let iy = centerY + (pos.y - WORLD.islandCY) * scale;
-      // Color by type
       let tc = isle.type === 'military' ? [200,80,80] : isle.type === 'economic' ? [200,180,60] : isle.type === 'diplomatic' ? [80,160,200] : [120,180,100];
       let controlled = isIslandControlled(isle.key);
-      fill(tc[0], tc[1], tc[2], controlled ? 255 : 150);
       noStroke();
-      ellipse(ix, iy, controlled ? 8 : 6, controlled ? 8 : 6);
-      // Label on hover
-      if (abs(mouseX - ix) < 10 && abs(mouseY - iy) < 10) {
+      let mapRX = Math.max(6, (isle.isleRX || 300) * scale * 0.12);
+      let mapRY = Math.max(4, (isle.isleRY || 200) * scale * 0.12);
+      fill(tc[0]*0.5, tc[1]*0.5, tc[2]*0.5, controlled ? 200 : 120);
+      ellipse(ix, iy+1, mapRX*2.2, mapRY*2.2);
+      fill(tc[0]*0.7, tc[1]*0.7, tc[2]*0.7, controlled ? 240 : 160);
+      ellipse(ix, iy, mapRX*2, mapRY*2);
+      fill(tc[0], tc[1], tc[2], controlled ? 255 : 180);
+      ellipse(ix, iy-1, mapRX*1.5, mapRY*1.2);
+      if (controlled) {
+        noFill(); stroke(100, 255, 100, 120); strokeWeight(1.5);
+        ellipse(ix, iy, mapRX*2.6, mapRY*2.6);
+        noStroke();
+      }
+      if (typeof drawWorldIslandContent === 'function') {
+        push();
+        drawWorldIslandContent(isle, ix, iy, scale * 0.3);
+        pop();
+      }
+      if (abs(mouseX - ix) < mapRX*2 && abs(mouseY - iy) < mapRY*2) {
+        fill(0, 0, 0, 140);
+        rect(ix - 50, iy - 28, 100, 22, 3);
         fill(255, 255, 220);
         textSize(9);
         textAlign(CENTER);
-        text(isle.name, ix, iy - 8);
+        text(isle.name, ix, iy - 12);
+        textSize(7);
+        fill(tc[0], tc[1], tc[2]);
+        text(isle.type.toUpperCase() + (controlled ? ' \u2713' : ''), ix, iy - 4);
       }
     }
   }
