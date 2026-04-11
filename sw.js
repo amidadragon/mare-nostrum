@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mare-nostrum-v10';
+const CACHE_NAME = 'mare-nostrum-v11';
 const ASSETS = [
   './',
   './index.html',
@@ -7,6 +7,14 @@ const ASSETS = [
   './engine.js',
   './sprites.js',
   './sound.js',
+  // V2 core systems
+  './v2-safety.js',
+  './mediterranean.js',
+  './graph.js',
+  './agent.js',
+  './swarm-integration.js',
+  './nations.js',
+  './world-state.js',
   // World & environment
   './world.js',
   './islands.js',
