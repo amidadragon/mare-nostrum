@@ -1732,7 +1732,7 @@ function nationAlly(key) {
   if (!rv) return;
   let threshold = NATION_PERSONALITIES[rv.personality].allyThreshold;
   if (rv.reputation < threshold) { addFloatingText(width / 2, height * 0.3, 'Need reputation ' + threshold + '+ (current: ' + rv.reputation + ')', '#ff6644'); return; }
-  if (typeof notifications !== 'undefined') { for (let _i = notifications.length - 1; _i >= 0; _i--) { if (/War with|WAR DECLARED/i.test(notifications[_i].text)) notifications.splice(_i, 1); } } rv.allied = true; rv.aggression = 0.1; rv.raidParty = [];
+  if (typeof notifications !== 'undefined') { for (let _i = notifications.length - 1; _i >= 0; _i--) { if (/War with|WAR DECLARED/i.test(notifications[_i].text)) notifications.splice(_i, 1); } } rv.stance = 'ally'; rv.allied = true; rv.aggression = 0.1; rv.raidParty = [];
   addFloatingText(width / 2, height * 0.2, 'ALLIANCE WITH ' + getNationName(key).toUpperCase() + '!', '#ffdd44');
   addNotification('Alliance formed with ' + getNationName(key) + '! Shared defense + trade bonuses.', '#ffdd44');
   spawnParticles(state.player.x, state.player.y, 'divine', 12);
@@ -1758,7 +1758,7 @@ function nationDemandTribute(key) {
 function declareWarOnNation(key) {
   let rv = state.nations[key];
   if (!rv) return;
-  if (rv.allied) { if (typeof notifications !== 'undefined') { for (let _i = notifications.length - 1; _i >= 0; _i--) { if (/Alliance formed|ALLIANCE WITH/i.test(notifications[_i].text)) notifications.splice(_i, 1); } } addNotification('Alliance with ' + getNationName(key) + ' broken!', '#ffaa44'); } rv.reputation = -100; rv.aggression = 1.0; rv.allied = false; rv.tradeActive = false;
+  if (rv.allied) { if (typeof notifications !== 'undefined') { for (let _i = notifications.length - 1; _i >= 0; _i--) { if (/Alliance formed|ALLIANCE WITH/i.test(notifications[_i].text)) notifications.splice(_i, 1); } } addNotification('Alliance with ' + getNationName(key) + ' broken!', '#ffaa44'); } rv.stance = 'war'; rv.reputation = -100; rv.aggression = 1.0; rv.allied = false; rv.tradeActive = false;
   addFloatingText(width / 2, height * 0.2, 'WAR DECLARED ON ' + getNationName(key).toUpperCase() + '!', '#ff2222');
   addNotification('War with ' + getNationName(key) + '! Expect heavy raids.', '#ff2222');
   closeNationDiplomacy();
@@ -1770,7 +1770,7 @@ function nationPeaceTreaty(key) {
   let peaceCost = 50 + rv.level * 10;
   if (state.gold < peaceCost) { addFloatingText(width / 2, height * 0.3, 'Need ' + peaceCost + ' gold for peace treaty', '#ff6644'); return; }
   state.gold = max(0, state.gold - peaceCost);
-  rv.reputation = 0; rv.aggression = 0.3; rv.raidParty = [];
+  rv.stance = 'neutral'; rv.reputation = 0; rv.aggression = 0.3; rv.raidParty = [];
   addFloatingText(width / 2, height * 0.2, 'PEACE WITH ' + getNationName(key).toUpperCase() + '!', '#88cc88');
   addNotification('Peace treaty signed with ' + getNationName(key) + '.', '#88cc88');
   closeNationDiplomacy();
