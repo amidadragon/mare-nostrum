@@ -10,7 +10,7 @@ function addFloatingText(x, y, txt, col) {
 function addNotification(txt, col) {
   col = col || '#d4a040';
   if (/cannot|warning|raid|attack/i.test(txt)) col = '#cc3333';
-  notifications.push({ text: txt, col: col, timer: 300, maxTimer: 300, fadeIn: 0 });
+  for (let _d = notifications.length - 1; _d >= 0; _d--) { if (notifications[_d].text === txt && (notifications[_d].maxTimer - notifications[_d].timer) < 90) return; } notifications.push({ text: txt, col: col, timer: 300, maxTimer: 300, fadeIn: 0 });
   if (notifications.length > 8) notifications.shift();
 }
 
