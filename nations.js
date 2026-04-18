@@ -982,7 +982,7 @@ function _getNationMilitaryLabel(military) {
 
 function startNationRaid(key) {
   let rv = state.nations[key];
-  let raidSize = min(rv.military, floor(2 + rv.level * 0.5));
+  let raidSize = min(max(1, floor(rv.military * 0.4)), floor(2 + rv.level * 0.5));
   rv.military -= floor(raidSize * 0.5);
   rv.lastRaid = state.day;
   let name = getNationName(key);
