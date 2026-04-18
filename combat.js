@@ -6216,7 +6216,7 @@ function drawVisualInvasion() {
   // NO dark overlay — island terrain is visible
 
   // Draw all units at world positions with proper sorting for depth
-  let allUnits = [...b.attackers, ...b.defenders];
+  push(); noStroke(); fill(20, 30, 50); rect(0, 0, width, height); pop(); let allUnits = [...b.attackers, ...b.defenders];
   allUnits.sort((a, b2) => a.y - b2.y); // Y-sort for depth
 
   let playerFaction = state.faction || 'rome';
