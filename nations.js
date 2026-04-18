@@ -597,7 +597,7 @@ function updateNationDaily(key) {
     rv.gold = state.gold || 0;
 
     // Phase detection
-    rv._botPhase = level <= 5 ? 'early' : level <= 10 ? 'mid' : 'late';
+    rv._botPhase = (state.day || 1) < 20 ? 'early' : (state.day || 1) < 60 ? 'mid' : (state.day || 1) < 120 ? 'late' : 'endgame';
 
     // Victory focus (based on personality)
     if (!rv._victoryFocus) {
