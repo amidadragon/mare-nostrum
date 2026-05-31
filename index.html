@@ -56,12 +56,13 @@
       });
     }
   </script>
-  <script src="v2-safety.js?v=1787000000"></script>
+  <script src="v2-safety.js?v=1788000000"></script>
   <script src="libs/p5.min.js"></script>
   <script src="libs/p5.sound.min.js"></script>
   <script src="libs/easystar.min.js"></script>
   <script src="libs/lz-string.min.js"></script>
-  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <!-- OVERHAUL: peerjs CDN cut (multiplayer removed). Restore if multiplayer returns.
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script> -->
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
@@ -131,63 +132,67 @@
     <div class="sub">NAVIGATING THE ANCIENT WATERS...</div>
   </div>
 
-  <!-- Swarm Intelligence Engine -->
-  <script src="mediterranean.js?v=1787000000"></script>
-  <script src="graph.js?v=1787000000"></script>
-  <script src="agent.js?v=1787000000"></script>
-  <script src="swarm-integration.js?v=1787000000"></script>
+  <!-- OVERHAUL: Swarm Intelligence Engine cut (agent.js + swarm-integration.js).
+       All callers are guarded with typeof checks, so removal is safe.
+       mediterranean.js + graph.js kept (used by map/pathfinding). -->
+  <script src="mediterranean.js?v=1788000000"></script>
+  <script src="graph.js?v=1788000000"></script>
+  <!-- <script src="agent.js?v=1788000000"></script> -->
+  <!-- <script src="swarm-integration.js?v=1788000000"></script> -->
 
-  <script src="sprites.js?v=1787000000"></script>
-  <script src="engine.js?v=1787000000"></script>
-  <script src="sound.js?v=1787000000"></script>
-  <script src="narrative.js?v=1787000000"></script>
-  <script src="cinematics.js?v=1787000000"></script>
-  <script src="fishing.js?v=1787000000"></script>
-  <script src="farming.js?v=1787000000"></script>
-  <script src="npc.js?v=1787000000"></script>
-  <script src="events.js?v=1787000000"></script>
-  <script src="world.js?v=1787000000"></script>
-  <script src="player.js?v=1787000000"></script>
-  <script src="ui.js?v=1787000000"></script>
-  <script src="faction_emblems.js?v=1787000000"></script>
-  <script src="multiplayer.js?v=1787000000"></script>
-  <script src="lobby.js?v=1787000000"></script>
-  <script src="merchant.js?v=1787000000"></script>
-  <script src="save.js?v=1787000000"></script>
-  <script src="sailing.js?v=1787000000"></script>
-  <script src="building.js?v=1787000000"></script>
-  <script src="nations.js?v=1787000000"></script>
-  <script src="bot.js?v=1787000000"></script>
-  <script src="conquest.js?v=1787000000"></script>
-  <script src="input.js?v=1787000000"></script>
-  <script src="companions.js?v=1787000000"></script>
-  <script src="effects.js?v=1787000000"></script>
-  <script src="military.js?v=1787000000"></script>
-  <script src="systems.js?v=1787000000"></script>
-  <script src="lifecycle.js?v=1787000000"></script>
-  <script src="social.js?v=1787000000"></script>
-  <script src="expansion.js?v=1787000000"></script>
-  <script src="world-state.js?v=1787000000"></script>
-  <script src="environment.js?v=1787000000"></script>
-  <script src="strategy.js?v=1787000000"></script>
-  <script src="progression.js?v=1787000000"></script>
-  <script src="faction_select.js?v=1787000000"></script>
-  <script src="ship_home.js?v=1787000000"></script>
-  <script src="sketch.js?v=1787000000"></script>
-  <script src="wreck.js?v=1787000000"></script>
-  <script src="menu.js?v=1787000000"></script>
-  <script src="islands.js?v=1787000000"></script>
-  <script src="diving.js?v=1787000000"></script>
-  <script src="combat.js?v=1787000000"></script>
-  <script src="naval.js?v=1787000000"></script>
-  <script src="economy.js?v=1787000000"></script>
-  <script src="pets.js?v=1787000000"></script>
-  <script src="lighthouse.js?v=1787000000"></script>
-  <script src="tavern.js?v=1787000000"></script>
-  <script src="sea_events.js?v=1787000000"></script>
-  <script src="diplomacy.js?v=1787000000"></script>
-  <script src="debug.js?v=1787000000"></script>
-  <script src="mobile.js?v=1787000000"></script>
+  <script src="sprites.js?v=1788000000"></script>
+  <script src="engine.js?v=1788000000"></script>
+  <script src="sound.js?v=1788000000"></script>
+  <script src="narrative.js?v=1788000000"></script>
+  <script src="cinematics.js?v=1788000000"></script>
+  <script src="fishing.js?v=1788000000"></script>
+  <script src="farming.js?v=1788000000"></script>
+  <script src="npc.js?v=1788000000"></script>
+  <script src="events.js?v=1788000000"></script>
+  <script src="world.js?v=1788000000"></script>
+  <script src="player.js?v=1788000000"></script>
+  <script src="ui.js?v=1788000000"></script>
+  <script src="faction_emblems.js?v=1788000000"></script>
+  <!-- OVERHAUL: multiplayer + lobby cut (no handler, post-alpha). -->
+  <!-- <script src="multiplayer.js?v=1788000000"></script> -->
+  <!-- <script src="lobby.js?v=1788000000"></script> -->
+  <script src="merchant.js?v=1788000000"></script>
+  <script src="save.js?v=1788000000"></script>
+  <script src="sailing.js?v=1788000000"></script>
+  <script src="building.js?v=1788000000"></script>
+  <script src="nations.js?v=1788000000"></script>
+  <script src="bot.js?v=1788000000"></script>
+  <script src="conquest.js?v=1788000000"></script>
+  <script src="input.js?v=1788000000"></script>
+  <script src="companions.js?v=1788000000"></script>
+  <script src="effects.js?v=1788000000"></script>
+  <script src="military.js?v=1788000000"></script>
+  <script src="systems.js?v=1788000000"></script>
+  <script src="lifecycle.js?v=1788000000"></script>
+  <!-- OVERHAUL: social.js cut (no callers in core). -->
+  <!-- <script src="social.js?v=1788000000"></script> -->
+  <script src="expansion.js?v=1788000000"></script>
+  <script src="world-state.js?v=1788000000"></script>
+  <script src="environment.js?v=1788000000"></script>
+  <script src="strategy.js?v=1788000000"></script>
+  <script src="progression.js?v=1788000000"></script>
+  <script src="faction_select.js?v=1788000000"></script>
+  <script src="ship_home.js?v=1788000000"></script>
+  <script src="sketch.js?v=1788000000"></script>
+  <script src="wreck.js?v=1788000000"></script>
+  <script src="menu.js?v=1788000000"></script>
+  <script src="islands.js?v=1788000000"></script>
+  <script src="diving.js?v=1788000000"></script>
+  <script src="combat.js?v=1788000000"></script>
+  <script src="naval.js?v=1788000000"></script>
+  <script src="economy.js?v=1788000000"></script>
+  <script src="pets.js?v=1788000000"></script>
+  <script src="lighthouse.js?v=1788000000"></script>
+  <script src="tavern.js?v=1788000000"></script>
+  <script src="sea_events.js?v=1788000000"></script>
+  <script src="diplomacy.js?v=1788000000"></script>
+  <script src="debug.js?v=1788000000"></script>
+  <script src="mobile.js?v=1788000000"></script>
   <script>
     // Hide loading screen after p5 starts
     document.addEventListener('click', () => { document.querySelector('canvas')?.focus(); });
@@ -217,9 +222,23 @@
       localStorage.removeItem('sunlitIsles_backup');
     }
     sessionStorage.clear();
-    // PWA: register service worker for offline play
+    // PWA service worker.
+    // DEV (localhost): never cache — auto-unregister any existing SW and clear
+    // caches so reloads ALWAYS show fresh code. This permanently prevents the
+    // "stale build" problem during development.
+    // PROD (deployed site): register normally for offline play.
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js').catch(() => {});
+      var _isLocal = ['localhost', '127.0.0.1', '[::1]', ''].indexOf(location.hostname) !== -1;
+      if (_isLocal) {
+        navigator.serviceWorker.getRegistrations().then(function (rs) {
+          rs.forEach(function (r) { r.unregister(); });
+        }).catch(function () {});
+        if (window.caches && caches.keys) {
+          caches.keys().then(function (ks) { ks.forEach(function (k) { caches.delete(k); }); }).catch(function () {});
+        }
+      } else {
+        navigator.serviceWorker.register('sw.js').catch(function () {});
+      }
     }
     // PWA: capture install prompt for in-game install button
     let _deferredInstallPrompt = null;
@@ -228,5 +247,16 @@
       _deferredInstallPrompt = e;
     });
   </script>
+  <script src="patches/hotfix_missing_fns.js"></script>
+  <script src="patches/cycle4_fixes.js"></script>
+  <script src="patches/safe_init.js"></script>
+  <script src="patches/patch_health.js"></script>
+  <script src="patches/bugtest.js"></script>
+  <script src="patches/faction_army_banners.js"></script>
+  <script src="patches/faction_ship_flags.js"></script>
+  <script src="patches/grover_hunt.js"></script>
+  <script src="patches/quantum_rng.js"></script>
+  <script src="patches/quest_tracker_fix.js"></script>
+  <script src="patches/sandbox_compass.js"></script>
 </body>
 </html>

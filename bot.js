@@ -146,15 +146,10 @@ const BotAI = {
     let task = bot.task;
     if (!task || !task.target) { bot.task = null; return; }
 
-    // Use the bot island's own player, NOT state.player — when the home island
-    // has _usesGlobalState, state.player is the HUMAN player, not the bot's leader.
-    let p = (nation.islandState && nation.islandState.player) ? nation.islandState.player : state.player;
+    let p = state.player;
     if (!p) { bot.task = null; return; }
 
-    // Safety: never drive the human player's character
-    if (state.faction !== nationKey && p === state.player) { bot.task = null; return; }
-
-    // Drive bot leader via click-to-move — same mechanic as human clicking
+    // Drive player via click-to-move — same as human clicking
     let dx = task.target.x - p.x, dy = task.target.y - p.y;
     let d = Math.sqrt(dx * dx + dy * dy);
 

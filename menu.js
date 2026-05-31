@@ -707,11 +707,11 @@ function drawMenuScreen() {
   textSize(subSize);
   // Shadow
   fill(10, 5, 0, floor(150 * subAlpha));
-  text('Cozy Roman Survival', w / 2 + 1, subY + 1);
+  text('A Cozy Roman Odyssey', w / 2 + 1, subY + 1);
   // Text with pulsing brightness
   let subPulse = 0.85 + sin(t0 * 0.7 + 1) * 0.15;
   fill(212 * subPulse, 169 * subPulse, 106, floor(255 * subAlpha));
-  text('Cozy Roman Survival', w / 2, subY);
+  text('A Cozy Roman Odyssey', w / 2, subY);
 
   // Ornamental line below subtitle
   let ornY2 = subY + subSize * 0.8;
@@ -734,7 +734,7 @@ function drawMenuScreen() {
   if (_rs) { try { let _d = JSON.parse(_rs); hasSave = _d && _d.version >= 1; } catch(e) {} }
   let items = [];
   if (hasSave) items.push('CONTINUE');
-  items.push('CONQUEST', 'MULTIPLAYER', 'SETTINGS', 'CREDITS');
+  items.push('CONQUEST', 'SETTINGS', 'CREDITS'); // OVERHAUL: MULTIPLAYER removed (post-alpha)
   let itemCount = items.length;
 
   let menuStartY = floor(h * 0.68);
@@ -752,7 +752,13 @@ function drawMenuScreen() {
     let iw = textWidth(items[i]);
     let btnW = max(iw + 60, 160);
     let btnH = itemSize * 1.6;
-    let btnX = w / 2 - btnW / 2;
+
+    // Slide-in offset (items slide in from right, eased)
+    let slideEase = 1 - pow(1 - slideProgress, 3);
+    let slideX = (1 - slideEase) * 60;
+
+    // Hitbox uses ACTUAL visual position (accounting for slide offset)
+    let btnX = w / 2 - btnW / 2 + slideX;
     let btnY = iy - btnH * 0.45;
     let hitPad = 16;
     let hovered = mouseX > btnX - hitPad && mouseX < btnX + btnW + hitPad &&
@@ -760,9 +766,6 @@ function drawMenuScreen() {
     if (hovered) { menuHover = i; menuKeyIdx = -1; isCursorPointer = true; }
     let selected = hovered || menuKeyIdx === i;
 
-    // Slide-in offset (items slide in from right, eased)
-    let slideEase = 1 - pow(1 - slideProgress, 3);
-    let slideX = (1 - slideEase) * 60;
     let bScale = selected ? 1.04 : 1.0;
     let bw = btnW * bScale, bh = btnH * bScale;
     let bx = w / 2 - bw / 2 + slideX, by = iy - bh * 0.45;
@@ -846,7 +849,7 @@ function drawMenuScreen() {
   text('v1.0', w / 2 - 85, h - 18);
   // Tagline
   fill(130, 115, 85, floor(100 * botAlpha));
-  text('Cozy Roman Survival', w / 2 + 10, h - 18);
+  text('A Cozy Roman Odyssey', w / 2 + 10, h - 18);
   // Copyright line
   fill(90, 80, 60, floor(70 * botAlpha));
   textSize(7);
@@ -1583,7 +1586,7 @@ function handleMenuClick() {
     if (_rs2) { try { let _d2 = JSON.parse(_rs2); hs2 = _d2 && _d2.version >= 8; } catch(e) {} }
     let items2 = ['NEW VOYAGE'];
     if (hs2) items2.splice(1, 0, 'CONTINUE');
-    items2.push('MULTIPLAYER', 'SETTINGS', 'CREDITS');
+    items2.push('SETTINGS', 'CREDITS'); // OVERHAUL: MULTIPLAYER removed
     let itemSize2 = max(13, floor(min(width * 0.02, height * 0.028)));
     let menuStartY2 = floor(height * 0.68);
     let itemGap2 = max(28, floor(height * 0.048));
@@ -1605,7 +1608,7 @@ function handleMenuClick() {
   if (_rs) { try { let _d = JSON.parse(_rs); hasSave = _d && _d.version >= 1; } catch(e) {} }
   let btns = [];
   if (hasSave) btns.push('load');
-  btns.push('conquest', 'multiplayer', 'settings', 'credits');
+  btns.push('conquest', 'settings', 'credits'); // OVERHAUL: must stay parallel to display items[] (line ~737)
   let action = btns[menuHover];
   if (action === '1v1') { menuFadeOut = 1; menuFadeAction = function() { if (typeof start1v1Game === 'function') start1v1Game(); }; return; }
   if (action === 'conquest') { menuFadeOut = 1; menuFadeAction = function() { if (typeof startConquestGame === 'function') startConquestGame(); }; return; }

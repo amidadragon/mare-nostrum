@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mare-nostrum-v10';
+const CACHE_NAME = 'mare-nostrum-v12';
 const ASSETS = [
   './',
   './index.html',
@@ -7,6 +7,12 @@ const ASSETS = [
   './engine.js',
   './sprites.js',
   './sound.js',
+  // V2 core systems
+  './v2-safety.js',
+  './mediterranean.js',
+  './graph.js',
+  './nations.js',
+  './world-state.js',
   // World & environment
   './world.js',
   './islands.js',
@@ -41,7 +47,6 @@ const ASSETS = [
   './faction_select.js',
   // Social & events
   './npc.js',
-  './social.js',
   './events.js',
   './narrative.js',
   './cinematics.js',
@@ -56,9 +61,7 @@ const ASSETS = [
   './wreck.js',
   './lighthouse.js',
   './tavern.js',
-  // Multiplayer
-  './multiplayer.js',
-  './lobby.js',
+  // AI
   './bot.js',
   // Save
   './save.js',
@@ -93,13 +96,31 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
+  if (e.request.method !== 'GET') return;
+  const url = new URL(e.request.url);
+  // App code (navigations, .html/.js/.json) → NETWORK-FIRST so reloads always
+  // get the latest build. Falls back to cache only when offline.
+  const isCode = e.request.mode === 'navigate' || /\.(html|js|json)$/.test(url.pathname);
+  if (isCode) {
+    e.respondWith(
+      fetch(e.request).then((response) => {
+        if (response && response.ok) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
+        }
+        return response;
+      }).catch(() => caches.match(e.request, { ignoreSearch: true }))
+    );
+    return;
+  }
+  // Static/big assets (fonts, images, sounds) → CACHE-FIRST for speed + offline.
   e.respondWith(
     caches.match(e.request, { ignoreSearch: true }).then((cached) => {
       if (cached) return cached;
       return fetch(e.request).then((response) => {
-        // Cache sound files on first fetch so they're available offline next time
-        if (response.ok && e.request.url.match(/\/sounds\//)) {
-          let clone = response.clone();
+        if (response && response.ok &&
+            (url.pathname.match(/\/sounds\//) || url.pathname.match(/\.(woff2|webp|ico|png|jpg|mp3|ogg|wav)$/))) {
+          const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
         }
         return response;

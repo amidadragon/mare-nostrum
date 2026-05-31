@@ -1,5 +1,16 @@
 node_modules/
 .DS_Store
+*.swp
 *.log
+autosync.log
+loop-log.json
 .claude/settings.local.json
 .claude/worktrees/
+*.backup
+*.backup-*
+index.html.backup*
+*~
+dist/
+*.zip
+_test_*.png
+render_test.txt
