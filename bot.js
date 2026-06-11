@@ -143,6 +143,15 @@ const BotAI = {
   },
 
   executeTask(nationKey, bot, nation, dt) {
+    // OVERHAUL (player-hijack fix): FULLY DISABLED. This routine drove the
+    // human's own avatar (state.player) toward bot objectives and spent the
+    // human's resources — that is what walked the player off-map to the
+    // northwest and corrupted the game. Bots stay inert until they are rebuilt
+    // with their own representation. Do NOT re-enable without that.
+    if (bot) bot.task = null;
+    return;
+
+    /* --- old hijacking code, intentionally unreachable --- */
     let task = bot.task;
     if (!task || !task.target) { bot.task = null; return; }
 
@@ -154,9 +163,11 @@ const BotAI = {
     let d = Math.sqrt(dx * dx + dy * dy);
 
     if (d > 20) {
-      // Set click-to-move target — updatePlayer() handles the movement
-      p.targetX = task.target.x;
-      p.targetY = task.target.y;
+      // OVERHAUL (player-hijack fix): do NOT set state.player.targetX/Y here.
+      // This drove the HUMAN's avatar toward bot objectives and walked it
+      // off-map to the northwest. Bots must never move the player. Wait in
+      // place; the avatar is left alone.
+      task.timer = (task.timer || 0) + dt;
       return;
     }
 

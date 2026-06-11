@@ -55,7 +55,32 @@ function mousePressed() {
         }
       }
     }
-    if (factionSelectHover) { _pendingFaction = factionSelectHover; }
+    // OVERHAUL: single-click faction select. Hit-test the cards directly from the
+    // mouse position (same layout as drawFactionSelect) so it never depends on the
+    // hover variable being current. One click enters the game; Sea People still
+    // shows its warning/confirm because it's a very different start.
+    {
+      let fKeys = ['rome', 'carthage', 'egypt', 'greece', 'seapeople', 'persia', 'phoenicia', 'gaul'];
+      let cardW = min(140, width * 0.2), cardH = 220, gap = 10;
+      let totalW = cardW * 4 + gap * 3;
+      let startX = (width - totalW) / 2;
+      let row1Y = height * 0.12, row2Y = row1Y + cardH + gap;
+      for (let fi = 0; fi < 8; fi++) {
+        let col = fi % 4;
+        let cx = startX + col * (cardW + gap);
+        let cy = fi < 4 ? row1Y : row2Y;
+        if (mouseX >= cx && mouseX <= cx + cardW && mouseY >= cy && mouseY <= cy + cardH) {
+          if (fKeys[fi] === 'seapeople') { _pendingFaction = 'seapeople'; }
+          else if (typeof selectFaction === 'function') { selectFaction(fKeys[fi]); }
+          return;
+        }
+      }
+    }
+    // Fallback: if the hover var caught a card the hit-test missed, use it.
+    if (factionSelectHover) {
+      if (factionSelectHover === 'seapeople') { _pendingFaction = 'seapeople'; }
+      else if (typeof selectFaction === 'function') { selectFaction(factionSelectHover); }
+    }
     return;
   }
   if (state.cutscene) { skipCutscene(); return; }
@@ -584,11 +609,20 @@ function mousePressed() {
     }
   }
 
-  if (!clicked && mouseButton === LEFT && !(state._buildExitFrame && frameCount - state._buildExitFrame < 10)) {
+  if (!clicked && mouseButton === LEFT && gameScreen === 'game' && !factionSelectActive
+      && !(state._buildExitFrame && frameCount - state._buildExitFrame < 10)
+      && frameCount > (state._suppressMoveUntil || 0)) {
     let wx = s2wX(mouseX);
     let wy = s2wY(mouseY);
-    state.player.targetX = wx;
-    state.player.targetY = wy;
+    // NW-DRIFT FIX (definitive): a walk target must be NEAR THE PLAYER. A click
+    // that projects far off-map (e.g. onto one of the distant nation islands, as
+    // happened on faction select) must never become a walk target. 700px covers
+    // the whole home island + shallows; anything farther is ignored.
+    let _ddx = wx - state.player.x, _ddy = wy - state.player.y;
+    if ((_ddx * _ddx + _ddy * _ddy) <= 700 * 700) {
+      state.player.targetX = wx;
+      state.player.targetY = wy;
+    }
   }
 }
 

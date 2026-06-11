@@ -203,6 +203,11 @@ function selectFaction(faction) {
   state.faction = faction;
   factionSelectActive = false;
   factionSelectFade = 0;
+  // OVERHAUL (NW-drift fix): the same click that picks a faction also fires
+  // mouseReleased → click-to-move. Suppress move targets for a few frames so
+  // the player doesn't walk off toward where the faction card was clicked.
+  state._suppressMoveUntil = (typeof frameCount !== 'undefined' ? frameCount : 0) + 20;
+  if (state.player) { state.player.targetX = null; state.player.targetY = null; state.player.vx = 0; state.player.vy = 0; state.player.moving = false; }
   if (faction === 'carthage') {
     state.gold += 50;
     addFloatingText(width / 2, height * 0.35, 'Merchant\'s pouch: +50 gold', '#ddaa44');

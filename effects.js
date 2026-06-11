@@ -4,27 +4,29 @@
 function updateParticles(dt) {
   let bright = getSkyBrightness();
 
-  if (frameCount % 12 === 0) {
-    // Spawn near player (visible area)
-    let spawnX = state.player.x + random(-width * 0.5, width * 0.5);
-    let spawnY = state.player.y + random(-height * 0.4, height * 0.3);
-
-    if (bright > 0.3) {
-      particles.push({
-        x: spawnX, y: spawnY,
-        vx: random(-0.3, 0.3), vy: random(-0.8, -0.2),
-        life: random(60, 120), maxLife: 120,
-        type: 'mote', size: random(1, 3),
-        r: 220, g: 160, b: 40, world: true,
-      });
-    } else {
-      particles.push({
-        x: spawnX, y: spawnY,
-        vx: random(-0.4, 0.4), vy: random(-0.3, 0.3),
-        life: random(80, 160), maxLife: 160,
-        type: 'firefly', size: random(2, 4),
-        r: 80, g: 255, b: 160, phase: random(TWO_PI), world: true,
-      });
+  // Subtle ambient — sparse and ONLY over land, so it reads as atmosphere
+  // rather than a swarm following the player.
+  if (frameCount % 40 === 0) {
+    let spawnX = state.player.x + random(-width * 0.35, width * 0.35);
+    let spawnY = state.player.y + random(-height * 0.3, height * 0.25);
+    if (isOnIsland(spawnX, spawnY)) {
+      if (bright > 0.3) {
+        particles.push({
+          x: spawnX, y: spawnY,
+          vx: random(-0.2, 0.2), vy: random(-0.5, -0.15),
+          life: random(60, 120), maxLife: 120,
+          type: 'mote', size: random(1, 2),
+          r: 235, g: 205, b: 120, world: true,
+        });
+      } else {
+        particles.push({
+          x: spawnX, y: spawnY,
+          vx: random(-0.25, 0.25), vy: random(-0.2, 0.2),
+          life: random(80, 160), maxLife: 160,
+          type: 'firefly', size: random(2, 3),
+          r: 150, g: 230, b: 170, phase: random(TWO_PI), world: true,
+        });
+      }
     }
   }
 
@@ -61,7 +63,7 @@ function updateParticles(dt) {
     }
   }
 
-  // Water ripples when player walks near shore  if (state.player.moving && frameCount % 12 === 0) {    let _rpx = state.player.x, _rpy = state.player.y;    let _rdx = (_rpx - WORLD.islandCX) / getSurfaceRX();    let _rdy = (_rpy - WORLD.islandCY) / getSurfaceRY();    let _rd = _rdx * _rdx + _rdy * _rdy;    if (_rd > 0.85 && _rd <= 1.0) {      let _rea = atan2(_rpy - WORLD.islandCY, _rpx - WORLD.islandCX);      particles.push({        x: _rpx + cos(_rea) * 15, y: _rpy + sin(_rea) * 10,        vx: 0, vy: 0, life: 30, maxLife: 30, type: 'ripple', size: 3,        r: 120, g: 190, b: 230, world: true,      });    }  }  // Extra fireflies at dusk/dawn  let _jHour = (state.time || 720) / 60;  if ((_jHour >= 18 && _jHour <= 20) || (_jHour >= 5 && _jHour <= 6.5)) {    if (frameCount % 8 === 0) {      let _jfx = state.player.x + random(-200, 200);      let _jfy = state.player.y + random(-120, 80);      if (isOnIsland(_jfx, _jfy)) {        particles.push({          x: _jfx, y: _jfy, vx: random(-0.3, 0.3), vy: random(-0.2, 0.2),          life: random(100, 200), maxLife: 200, type: 'firefly', size: random(2, 4),          r: 80, g: 255, b: 160, phase: random(TWO_PI), world: true,        });      }    }  }
+  // Water ripples when player walks near shore  if (state.player.moving && frameCount % 12 === 0) {    let _rpx = state.player.x, _rpy = state.player.y;    let _rdx = (_rpx - WORLD.islandCX) / getSurfaceRX();    let _rdy = (_rpy - WORLD.islandCY) / getSurfaceRY();    let _rd = _rdx * _rdx + _rdy * _rdy;    if (_rd > 0.85 && _rd <= 1.0) {      let _rea = atan2(_rpy - WORLD.islandCY, _rpx - WORLD.islandCX);      particles.push({        x: _rpx + cos(_rea) * 15, y: _rpy + sin(_rea) * 10,        vx: 0, vy: 0, life: 30, maxLife: 30, type: 'ripple', size: 3,        r: 120, g: 190, b: 230, world: true,      });    }  }  // Extra fireflies at dusk/dawn  let _jHour = (state.time || 720) / 60;  if ((_jHour >= 18 && _jHour <= 20) || (_jHour >= 5 && _jHour <= 6.5)) {    if (frameCount % 30 === 0) {      let _jfx = state.player.x + random(-160, 160);      let _jfy = state.player.y + random(-120, 80);      if (isOnIsland(_jfx, _jfy)) {        particles.push({          x: _jfx, y: _jfy, vx: random(-0.3, 0.3), vy: random(-0.2, 0.2),          life: random(100, 200), maxLife: 200, type: 'firefly', size: random(2, 4),          r: 80, g: 255, b: 160, phase: random(TWO_PI), world: true,        });      }    }  }
   // Storm rain particles (supplemental — main rain is in _drawStormRain)
   if (stormActive && frameCount % 2 === 0) {
     for (let _ri = 0; _ri < 2; _ri++) {

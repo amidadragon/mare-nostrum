@@ -594,38 +594,20 @@ function drawSky() {
 }
 
 function drawSun(x, y, bright) {
-  let r = 12;
-  let fx = floor(x), fy = floor(y);
+  push();
   noStroke();
-  // Outer pixel glow — cross shape
-  for (let g = 4; g > 0; g--) {
-    let s = g * 10;
-    fill(220, 140, 20, (5 - g) * 4 * bright);
-    rect(fx - 1, fy - s, 2, s * 2);
-    rect(fx - s, fy - 1, s * 2, 2);
+  const r = 20;
+  // Wide, soft warm halo — many faint layers make a smooth glow (no hard rays).
+  for (let i = 16; i >= 1; i--) {
+    const gr = r + i * 12;
+    fill(255, 212, 140, (17 - i) * 1.1 * bright);
+    ellipse(x, y, gr * 2, gr * 2);
   }
-  // Diagonal rays — stepped pixel beams
-  for (let i = 0; i < 8; i++) {
-    let angle = (TWO_PI / 8) * i + frameCount * 0.004;
-    let len = floor(r * 2.2 + sin(frameCount * 0.04 + i * 1.3) * r * 0.6);
-    fill(240, 180, 40, 25 * bright);
-    for (let d = r; d < len; d += 3) {
-      let rx = floor(fx + cos(angle) * d);
-      let ry = floor(fy + sin(angle) * d);
-      rect(rx, ry, 2, 2);
-    }
-  }
-  // Sun disc — pixel square with stepped corners
-  fill(255, 210, 90, 240 * bright);
-  rect(fx - r, fy - r + 3, r * 2, r * 2 - 6);
-  rect(fx - r + 3, fy - r, r * 2 - 6, r * 2);
-  rect(fx - r + 2, fy - r + 2, r * 2 - 4, r * 2 - 4);
-  // Bright core
-  fill(255, 240, 180, 200 * bright);
-  rect(fx - floor(r * 0.55), fy - floor(r * 0.55), floor(r * 1.1), floor(r * 1.1));
-  // Hot center
-  fill(255, 255, 230, 150 * bright);
-  rect(fx - floor(r * 0.25), fy - floor(r * 0.25), floor(r * 0.5), floor(r * 0.5));
+  // Gentle disc with a warm-to-bright core.
+  fill(255, 236, 176, 225 * bright); ellipse(x, y, r * 2, r * 2);
+  fill(255, 245, 205, 195 * bright); ellipse(x, y, r * 1.3, r * 1.3);
+  fill(255, 252, 235, 150 * bright); ellipse(x, y, r * 0.55, r * 0.55);
+  pop();
 }
 
 function drawStarField(alpha) {
@@ -714,6 +696,7 @@ function drawStarField(alpha) {
 function drawStars(alpha) { drawStarField(alpha); }
 
 function drawDriftClouds(bright) {
+  return; // OVERHAUL: clouds disabled — clean sky for now. Redesign deliberately once the look is agreed.
   if (stormActive) return; // storm has its own clouds
   let h = state.time / 60;
   let isNight = (h >= 19.5 || h < 4.5);
@@ -788,6 +771,12 @@ function drawDriftClouds(bright) {
     baseAlpha = 14;
   }
 
+  // Clouds stay light & faint and fade out at night — never dark grey blobs.
+  cloudR = Math.max(cloudR, 222); cloudG = Math.max(cloudG, 226); cloudB = Math.max(cloudB, 232);
+  shR = Math.max(shR, 206); shG = Math.max(shG, 214); shB = Math.max(shB, 224);
+  hiR = 255; hiG = 255; hiB = 255;
+  baseAlpha = Math.min(baseAlpha, 20) * constrain(bright, 0, 1);
+
   cloudPositions.forEach((cl, ci) => {
     // Drift movement
     cl.x += cl.speed * cl.depth;
@@ -805,41 +794,21 @@ function drawDriftClouds(bright) {
 
     // Draw each blob that makes up this cloud — layered for volume
     // Shadow layer first (offset down)
+    // Soft puffy clouds — overlapping ellipses (not blocky rects).
     cl.blobs.forEach(b => {
-      let bx = cx + b.ox * cw;
-      let by = cy + b.oy * ch + ch * 0.15; // shadow offset down
-      let bw = b.sw * cw;
-      let bh = b.sh * ch;
-      fill(shR, shG, shB, a * 0.45);
-      // Pixel-art cloud: overlapping rects for soft shape
-      rect(floor(bx - bw * 0.4), floor(by - bh * 0.15), floor(bw * 0.8), floor(bh * 0.35));
-      rect(floor(bx - bw * 0.3), floor(by - bh * 0.25), floor(bw * 0.6), floor(bh * 0.5));
+      const bx = cx + b.ox * cw, by = cy + b.oy * ch + ch * 0.18;
+      fill(shR, shG, shB, a * 0.4);
+      ellipse(bx, by, b.sw * cw * 1.15, b.sh * ch * 1.25);
     });
-
-    // Main body layer
     cl.blobs.forEach(b => {
-      let bx = cx + b.ox * cw;
-      let by = cy + b.oy * ch;
-      let bw = b.sw * cw;
-      let bh = b.sh * ch;
-      fill(cloudR, cloudG, cloudB, a * 0.8);
-      // Core rectangle
-      rect(floor(bx - bw * 0.4), floor(by - bh * 0.2), floor(bw * 0.8), floor(bh * 0.4));
-      // Extended top and bottom
-      rect(floor(bx - bw * 0.3), floor(by - bh * 0.35), floor(bw * 0.6), floor(bh * 0.7));
-      // Wider middle
-      rect(floor(bx - bw * 0.45), floor(by - bh * 0.1), floor(bw * 0.9), floor(bh * 0.2));
+      const bx = cx + b.ox * cw, by = cy + b.oy * ch;
+      fill(cloudR, cloudG, cloudB, a * 0.85);
+      ellipse(bx, by, b.sw * cw * 1.2, b.sh * ch * 1.35);
     });
-
-    // Highlight layer (top of each blob — sun-lit)
     cl.blobs.forEach(b => {
-      let bx = cx + b.ox * cw;
-      let by = cy + b.oy * ch - ch * 0.08; // highlight offset up
-      let bw = b.sw * cw * 0.7;
-      let bh = b.sh * ch * 0.35;
-      fill(hiR, hiG, hiB, a * 0.55);
-      rect(floor(bx - bw * 0.35), floor(by - bh * 0.3), floor(bw * 0.7), floor(bh * 0.6));
-      rect(floor(bx - bw * 0.25), floor(by - bh * 0.4), floor(bw * 0.5), floor(bh * 0.8));
+      const bx = cx + b.ox * cw, by = cy + b.oy * ch - ch * 0.12;
+      fill(hiR, hiG, hiB, a * 0.5);
+      ellipse(bx, by, b.sw * cw * 0.85, b.sh * ch * 0.85);
     });
   });
 }

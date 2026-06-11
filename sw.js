@@ -47,6 +47,7 @@ const ASSETS = [
   './faction_select.js',
   // Social & events
   './npc.js',
+  './social.js',
   './events.js',
   './narrative.js',
   './cinematics.js',

@@ -1524,8 +1524,8 @@ function updateCamera() {
   // Smooth follow player — bias upward so horizon stays visible
   cam.x = state.player.x;
   cam.y = state.player.y - height * 0.12; // player sits in lower 60% of screen
-  let _camLerp = 0.08;
-  if (_camTransitionFrames > 0) { _camLerp = lerp(0.08, 0.25, _camTransitionFrames / 30); _camTransitionFrames--; }
+  let _camLerp = 0.16; // tighter follow so movement feels snappy, not laggy/floaty
+  if (_camTransitionFrames > 0) { _camLerp = lerp(0.16, 0.3, _camTransitionFrames / 30); _camTransitionFrames--; }
   camSmooth.x = lerp(camSmooth.x, cam.x, _camLerp);
   camSmooth.y = lerp(camSmooth.y, cam.y, _camLerp);
 

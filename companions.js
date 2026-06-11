@@ -356,7 +356,7 @@ function updateWoodcutter(dt) {
       }
       // Look for a tree to chop
       if (w.energy > 25) {
-        let target = state.trees.find(t => t.alive && t.health > 0);
+        let target = state.trees.find(t => t.alive && t.health > 0 && isWalkable(t.x, t.y));
         if (target) {
           w.task = 'chop';
           w.taskTarget = target;
@@ -407,6 +407,17 @@ function updateWoodcutter(dt) {
   }
   w.vx *= 0.8;
   w.vy *= 0.8;
+
+  // Hard safety: the woodcutter must NEVER be off the island (chopping the sea).
+  if (!isWalkable(w.x, w.y)) {
+    let edx = (w.x - WORLD.islandCX) / getSurfaceRX();
+    let edy = (w.y - WORLD.islandCY) / getSurfaceRY();
+    let eDist = sqrt(edx * edx + edy * edy) || 1;
+    let scale = 0.85 / eDist;
+    w.x = WORLD.islandCX + (w.x - WORLD.islandCX) * scale;
+    w.y = WORLD.islandCY + (w.y - WORLD.islandCY) * scale;
+    w.task = 'idle'; w.taskTarget = null;
+  }
 
   // Solar recharge + night rest
   let hour = state.time / 60;

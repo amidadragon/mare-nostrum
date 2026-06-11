@@ -5,7 +5,7 @@
 **One source of truth:** `~/Desktop/_CODE/mare-nostrum`, branch **`lod-world`**. There is no other copy. `main` is stale — ignore it.
 
 - **Edit** only in this folder, on `lod-world`.
-- **Preview:** double-click `start-server.command` → http://localhost:8888. Localhost never caches (the service worker auto-unregisters on localhost), so a reload always shows fresh code.
+- **Preview:** double-click `play.command` → opens the game as an Electron desktop app in `--dev` mode. It clears cache/service-workers on launch and **auto-reloads when any file changes** (no localhost, no browser, no manual reload). (Old localhost path via `start-server.command` still works but isn't needed.)
 - **Save:** `git add -A && git commit -m "..."` then `git push origin lod-world`.
 - **Deploy live:** push a tag — `git tag v1.0.x && git push origin v1.0.x`. GitHub Pages deploys from **tags**, not from `main` (`.github/workflows/deploy.yml` builds `dist/`).
 - **Never run** `autosync.sh` or `mn-boot.applescript` again — they auto-committed and hard-reset the repo, which is what caused work to vanish. They've been disabled.

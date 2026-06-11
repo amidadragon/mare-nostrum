@@ -155,6 +155,17 @@ function updatePlayer(dt) {
     dy = _touchJoystick.dy;
   }
 
+  // TEMP DRIFT DIAGNOSTIC: log the FIRST time the player has any movement driver,
+  // naming whether it's keyboard (dx/dy), a click-target, or the joystick.
+  if (!window._driftDiagDone && (dx !== 0 || dy !== 0 || p.targetX !== null)) {
+    window._driftDiagDone = true;
+    console.warn('[DRIFT-DIAG] frame=' + frameCount +
+      ' dx=' + dx + ' dy=' + dy +
+      ' targetX=' + p.targetX + ' targetY=' + p.targetY +
+      ' joy=' + (typeof _touchJoystick !== 'undefined' && _touchJoystick.active) +
+      ' px=' + Math.round(p.x) + ' py=' + Math.round(p.y));
+  }
+
   if (dx !== 0 || dy !== 0) {
     if (state.fishing.active) { state.fishing.active = false; state.fishing.bite = false; state.fishing.phase = null; }
     let len = sqrt(dx * dx + dy * dy);
