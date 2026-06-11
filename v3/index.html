@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mare Nostrum v3 (dev)</title>
+  <style>
+    html, body { margin: 0; padding: 0; background: #06101f; overflow: hidden; }
+    canvas { display: block; }
+    @font-face {
+      font-family: 'Cinzel';
+      src: url('../libs/cinzel-latin.woff2') format('woff2');
+      font-display: swap;
+    }
+  </style>
+</head>
+<body>
+  <!-- Clean core. NO service worker (dev never caches). Reuses ../libs + ../sprites + ../sounds. -->
+  <script>
+    window.BUILD = 'v3-dev';
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function (rs) { rs.forEach(function (r) { r.unregister(); }); }).catch(function(){});
+      if (window.caches && caches.keys) { caches.keys().then(function (ks) { ks.forEach(function (k) { caches.delete(k); }); }).catch(function(){}); }
+    }
+  </script>
+  <script src="../libs/p5.min.js"></script>
+  <!-- src modules (load order: helpers first, main.js last) -->
+  <script>
+    // DEV cache-buster: heuristic caching kept serving stale modules.
+    // Every load fetches fresh src files (p5 itself may stay cached).
+    (function () {
+      var mods = [
+        'src/data/items.js', 'src/state.js', 'src/camera.js',
+        'src/world/clock.js', 'src/world/tide.js', 'src/world/wind.js',
+        'src/world/island.js', 'src/fx.js',
+        'src/sim/inventory.js', 'src/sim/farming.js', 'src/sim/fishing.js',
+        'src/sim/saltworks.js', 'src/sim/merchant.js',
+        'src/input.js', 'src/player.js', 'src/interact.js',
+        'src/ui/horologium.js', 'src/ui/hud.js',
+        'src/assets.js', 'src/main.js',
+      ];
+      var t = Date.now();
+      for (var i = 0; i < mods.length; i++) {
+        document.write('<script src="' + mods[i] + '?t=' + t + '"><\/script>');
+      }
+    })();
+  </script>
+</body>
+</html>
